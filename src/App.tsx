@@ -3,6 +3,10 @@ import { useAuthenticator } from '@aws-amplify/ui-react';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import CustomersPage from './pages/CustomersPage';
+import WorkOrdersPage from './pages/WorkOrdersPage';
+import EquipmentPage from './pages/EquipmentPage';
+import FinancialPage from './pages/FinancialPage';
+import SchedulingPage from './pages/SchedulingPage';
 
 function App() {
   const { authStatus } = useAuthenticator((context) => [context.authStatus]);
@@ -16,6 +20,10 @@ function App() {
     );
   }
 
+  const ProtectedRoute = ({ element }: { element: React.ReactElement }) => {
+    return authStatus === 'authenticated' ? element : <Navigate to="/login" replace />;
+  };
+
   return (
     <Routes>
       <Route
@@ -28,26 +36,12 @@ function App() {
           )
         }
       />
-      <Route
-        path="/dashboard"
-        element={
-          authStatus === 'authenticated' ? (
-            <DashboardPage />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/customers"
-        element={
-          authStatus === 'authenticated' ? (
-            <CustomersPage />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
+      <Route path="/dashboard" element={<ProtectedRoute element={<DashboardPage />} />} />
+      <Route path="/customers" element={<ProtectedRoute element={<CustomersPage />} />} />
+      <Route path="/work-orders" element={<ProtectedRoute element={<WorkOrdersPage />} />} />
+      <Route path="/equipment" element={<ProtectedRoute element={<EquipmentPage />} />} />
+      <Route path="/financial" element={<ProtectedRoute element={<FinancialPage />} />} />
+      <Route path="/scheduling" element={<ProtectedRoute element={<SchedulingPage />} />} />
       <Route
         path="/"
         element={
