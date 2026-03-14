@@ -1,5 +1,6 @@
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   HomeIcon,
   UserGroupIcon,
@@ -21,15 +22,16 @@ import { useTheme } from '../contexts/ThemeContext';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuthenticator((context) => [context.user]);
   const location = useLocation();
+  const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-    { name: 'Customers', href: '/customers', icon: UserGroupIcon },
-    { name: 'Work Orders', href: '/work-orders', icon: ClipboardDocumentListIcon },
-    { name: 'Equipment', href: '/equipment', icon: WrenchScrewdriverIcon },
-    { name: 'Financial', href: '/financial', icon: CurrencyDollarIcon },
-    { name: 'Scheduling', href: '/scheduling', icon: CalendarIcon },
+    { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
+    { name: t('entities.customers'), href: '/customers', icon: UserGroupIcon },
+    { name: t('entities.workOrders'), href: '/work-orders', icon: ClipboardDocumentListIcon },
+    { name: t('entities.equipment'), href: '/equipment', icon: WrenchScrewdriverIcon },
+    { name: t('entities.financial'), href: '/financial', icon: CurrencyDollarIcon },
+    { name: t('entities.scheduling'), href: '/scheduling', icon: CalendarIcon },
   ];
 
   return (
@@ -42,7 +44,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <span className="text-sm font-bold text-white">D</span>
               </div>
               <div className="text-base font-semibold text-zinc-900 dark:text-white">
-                Dispatch
+                {t('app.name')}
               </div>
             </div>
           </SidebarHeader>
@@ -112,7 +114,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
                 <DropdownItem onClick={() => signOut()}>
-                  <DropdownLabel>Sign out</DropdownLabel>
+                  <DropdownLabel>{t('common.signOut')}</DropdownLabel>
                 </DropdownItem>
               </DropdownMenu>
             </Dropdown>
