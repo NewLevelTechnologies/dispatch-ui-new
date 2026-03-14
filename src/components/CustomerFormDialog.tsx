@@ -92,16 +92,23 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
 
   return (
     <Dialog open={isOpen} onClose={onClose}>
-      <DialogTitle>{t(isEdit ? 'customers.form.titleEdit' : 'customers.form.titleCreate')}</DialogTitle>
+      <DialogTitle>
+        {t('common.form.titleCreate', {
+          action: isEdit ? t('common.edit') : t('common.add'),
+          entity: t('customers.entity')
+        })}
+      </DialogTitle>
       <DialogDescription>
-        {t(isEdit ? 'customers.form.descriptionEdit' : 'customers.form.descriptionCreate')}
+        {t(isEdit ? 'common.form.descriptionEdit' : 'common.form.descriptionCreate', {
+          entity: t('customers.entity')
+        })}
       </DialogDescription>
       <DialogBody>
         <form onSubmit={handleSubmit} id="customer-form">
           <Fieldset>
             <FieldGroup>
               <Field>
-                <Label>{t('customers.form.name')} *</Label>
+                <Label>{t('common.form.name')} *</Label>
                 <Input
                   name="name"
                   value={formData.name}
@@ -111,7 +118,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
               </Field>
 
               <Field>
-                <Label>{t('customers.form.email')} *</Label>
+                <Label>{t('common.form.email')} *</Label>
                 <Input
                   type="email"
                   name="email"
@@ -122,7 +129,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
               </Field>
 
               <Field>
-                <Label>{t('customers.form.phone')}</Label>
+                <Label>{t('common.form.phone')}</Label>
                 <Input
                   type="tel"
                   name="phone"
@@ -132,7 +139,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
               </Field>
 
               <Field>
-                <Label>{t('customers.form.address')}</Label>
+                <Label>{t('common.form.address')}</Label>
                 <Input
                   name="address"
                   value={formData.address || ''}
@@ -142,7 +149,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
 
               <div className="grid grid-cols-2 gap-4">
                 <Field>
-                  <Label>{t('customers.form.city')}</Label>
+                  <Label>{t('common.form.city')}</Label>
                   <Input
                     name="city"
                     value={formData.city || ''}
@@ -151,19 +158,19 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                 </Field>
 
                 <Field>
-                  <Label>{t('customers.form.state')}</Label>
+                  <Label>{t('common.form.state')}</Label>
                   <Input
                     name="state"
                     value={formData.state || ''}
                     onChange={(e) => handleChange('state', e.target.value)}
-                    placeholder={t('customers.form.stateHelper')}
+                    placeholder={t('common.form.stateHelper')}
                     maxLength={2}
                   />
                 </Field>
               </div>
 
               <Field>
-                <Label>{t('customers.form.zipCode')}</Label>
+                <Label>{t('common.form.zipCode')}</Label>
                 <Input
                   name="zipCode"
                   value={formData.zipCode || ''}

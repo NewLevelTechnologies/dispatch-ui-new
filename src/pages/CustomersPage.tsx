@@ -54,7 +54,7 @@ export default function CustomersPage() {
   };
 
   const handleDelete = (customer: Customer) => {
-    if (window.confirm(t('customers.deleteConfirm', { name: customer.name }))) {
+    if (window.confirm(t('common.actions.deleteConfirm', { name: customer.name }))) {
       deleteMutation.mutate(customer.id);
     }
   };
@@ -69,33 +69,33 @@ export default function CustomersPage() {
       <div className="p-8">
         <div className="flex items-center justify-between">
           <div>
-            <Heading>{t('customers.title')}</Heading>
+            <Heading>{t('customers.entities')}</Heading>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
               {t('customers.description')}
             </p>
           </div>
-          <Button onClick={handleAdd}>{t('customers.addButton')}</Button>
+          <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('customers.entity') })}</Button>
         </div>
 
         {isLoading && (
           <div className="mt-8 text-center">
-            <p className="text-zinc-600 dark:text-zinc-400">{t('customers.loading')}</p>
+            <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('customers.entities') })}</p>
           </div>
         )}
 
         {error && (
           <div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
             <p className="text-sm text-red-800 dark:text-red-400">
-              {t('customers.errorLoading')}: {(error as Error).message}
+              {t('common.actions.errorLoading', { entities: t('customers.entities') })}: {(error as Error).message}
             </p>
           </div>
         )}
 
         {customers && customers.length === 0 && (
           <div className="mt-8 text-center">
-            <p className="text-zinc-600 dark:text-zinc-400">{t('customers.noCustomers')}</p>
+            <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('customers.entities') })}</p>
             <Button className="mt-4" onClick={handleAdd}>
-              {t('customers.addFirst')}
+              {t('common.actions.addFirst', { entity: t('customers.entity') })}
             </Button>
           </div>
         )}
@@ -105,11 +105,11 @@ export default function CustomersPage() {
             <Table className="[--gutter:theme(spacing.6)] lg:[--gutter:theme(spacing.10)]">
               <TableHead>
                 <TableRow>
-                  <TableHeader>{t('customers.table.name')}</TableHeader>
-                  <TableHeader>{t('customers.table.email')}</TableHeader>
-                  <TableHeader>{t('customers.table.phone')}</TableHeader>
+                  <TableHeader>{t('common.form.name')}</TableHeader>
+                  <TableHeader>{t('common.form.email')}</TableHeader>
+                  <TableHeader>{t('common.form.phone')}</TableHeader>
                   <TableHeader>{t('customers.table.location')}</TableHeader>
-                  <TableHeader>{t('customers.table.status')}</TableHeader>
+                  <TableHeader>{t('common.form.status')}</TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
