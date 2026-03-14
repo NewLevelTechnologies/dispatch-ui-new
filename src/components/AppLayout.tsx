@@ -76,7 +76,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </DropdownButton>
               <DropdownMenu className="min-w-64" anchor="top start">
                 <div className="px-3 py-2">
-                  <div className="text-sm font-medium text-zinc-900 dark:text-white mb-2">Theme</div>
+                  <div className="text-sm font-medium text-zinc-900 dark:text-white mb-2">{t('common.theme')}</div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setTheme('light')}

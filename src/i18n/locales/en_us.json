@@ -3,6 +3,9 @@
     "loading": "Loading...",
     "name": "Dispatch"
   },
+  "auth": {
+    "signInPrompt": "Sign in to your account"
+  },
   "common": {
     "actions": {
       "add": "Add {{entity}}",
@@ -44,6 +47,7 @@
     "moreOptions": "More options",
     "saving": "Saving...",
     "signOut": "Sign out",
+    "theme": "Theme",
     "update": "Update"
   },
   "customers": {
