@@ -471,6 +471,368 @@ Add route:
 
 ---
 
+## Internationalization (i18n)
+
+### Overview
+
+The application uses **react-i18next** for internationalization with a centralized, DRY translation structure.
+
+**Key Features**:
+- ✅ Centralized entity names (single source of truth)
+- ✅ Compound keys with variable interpolation (eliminate duplication)
+- ✅ Alphabetically organized (easy navigation)
+- ✅ Complete test coverage with mocked translations
+
+### Translation File Structure
+
+**Location**: `src/i18n/locales/en_us.json`
+
+**Organization**:
+```json
+{
+  "app": { /* App-level strings */ },
+  "common": {
+    "actions": { /* Reusable action strings */ },
+    "form": { /* Reusable form strings */ }
+  },
+  "entities": { /* ALL entity names (singular & plural) */ },
+  "customers": { /* Customer-specific strings */ },
+  "workOrders": { /* Work order-specific strings */ },
+  // ... other features
+}
+```
+
+### Centralized Entity Names
+
+**ALL entity names** (singular and plural) are defined once in the `entities` section:
+
+```json
+{
+  "entities": {
+    "customer": "Customer",
+    "customers": "Customers",
+    "workOrder": "Work Order",
+    "workOrders": "Work Orders",
+    "equipment": "Equipment",
+    "dashboard": "Dashboard",
+    "financial": "Financial",
+    "scheduling": "Scheduling"
+  }
+}
+```
+
+**Benefits**:
+- Change "Customer" to "Client" in ONE place
+- All references (nav, headings, buttons, forms) update automatically
+- Complete consistency across the application
+
+### Compound Keys with Interpolation
+
+**Reusable action patterns**:
+```json
+{
+  "common": {
+    "actions": {
+      "add": "Add {{entity}}",
+      "addFirst": "Add your first {{entity, lowercase}}",
+      "loading": "Loading {{entities, lowercase}}...",
+      "errorLoading": "Error loading {{entities, lowercase}}",
+      "deleteConfirm": "Are you sure you want to delete {{name}}?"
+    }
+  }
+}
+```
+
+**Reusable form patterns**:
+```json
+{
+  "common": {
+    "form": {
+      "titleCreate": "{{action}} {{entity}}",
+      "descriptionCreate": "Create a new {{entity, lowercase}} record.",
+      "descriptionEdit": "Update {{entity, lowercase}} information.",
+      "name": "Name",
+      "email": "Email",
+      "errorCreate": "Failed to create {{entity, lowercase}}"
+    }
+  }
+}
+```
+
+### Using Translations in Components
+
+**Import and setup**:
+```typescript
+import { useTranslation } from 'react-i18next';
+
+export default function MyComponent() {
+  const { t } = useTranslation();
+  // ...
+}
+```
+
+**Simple translation**:
+```typescript
+<Heading>{t('entities.customers')}</Heading>
+<Button>{t('common.cancel')}</Button>
+```
+
+**With variable interpolation**:
+```typescript
+// Single variable
+<Button onClick={handleAdd}>
+  {t('common.actions.add', { entity: t('entities.customer') })}
+</Button>
+// Output: "Add Customer"
+
+// Lowercase modifier
+<p>{t('common.actions.loading', { entities: t('entities.customers') })}</p>
+// Output: "Loading customers..."
+
+// Named variable
+if (window.confirm(t('common.actions.deleteConfirm', { name: customer.name }))) {
+  deleteMutation.mutate(customer.id);
+}
+// Output: "Are you sure you want to delete John Doe?"
+```
+
+**Form titles and descriptions**:
+```typescript
+<DialogTitle>
+  {t('common.form.titleCreate', {
+    action: isEdit ? t('common.edit') : t('common.create'),
+    entity: t('entities.customer')
+  })}
+</DialogTitle>
+// Create mode: "Create Customer"
+// Edit mode: "Edit Customer"
+
+<DialogDescription>
+  {t(isEdit ? 'common.form.descriptionEdit' : 'common.form.descriptionCreate', {
+    entity: t('entities.customer')
+  })}
+</DialogDescription>
+// Create: "Create a new customer record."
+// Edit: "Update customer information."
+```
+
+### Adding a New Entity
+
+When adding a new entity (e.g., "Invoice"), follow these steps:
+
+**1. Add entity names to `entities` section** (alphabetically):
+```json
+{
+  "entities": {
+    "customer": "Customer",
+    "customers": "Customers",
+    "invoice": "Invoice",      // ← Add singular
+    "invoices": "Invoices",    // ← Add plural
+    "workOrder": "Work Order",
+    "workOrders": "Work Orders"
+  }
+}
+```
+
+**2. Add entity-specific strings** (if needed):
+```json
+{
+  "invoices": {
+    "description": "Manage invoices and billing",
+    "table": {
+      "invoiceNumber": "Invoice #",
+      "dueDate": "Due Date"
+    },
+    "status": {
+      "draft": "Draft",
+      "sent": "Sent",
+      "paid": "Paid"
+    }
+  }
+}
+```
+
+**3. Use in components**:
+```typescript
+// Page title
+<Heading>{t('entities.invoices')}</Heading>
+
+// Buttons
+<Button onClick={handleAdd}>
+  {t('common.actions.add', { entity: t('entities.invoice') })}
+</Button>
+
+// Loading state
+<p>{t('common.actions.loading', { entities: t('entities.invoices') })}</p>
+
+// Table headers
+<TableHeader>{t('invoices.table.invoiceNumber')}</TableHeader>
+```
+
+**4. Add to test mock** (`src/test/setup.ts`):
+```typescript
+const translations = {
+  'entities.invoice': 'Invoice',
+  'entities.invoices': 'Invoices',
+  'invoices.description': 'Manage invoices and billing',
+  // ... other keys alphabetically
+};
+```
+
+### Alphabetical Organization
+
+**CRITICAL**: ALL keys within each section MUST be alphabetically sorted.
+
+**Why**:
+- Easier to find keys
+- Prevents duplicate keys
+- Better for diffs in version control
+- Professional standard
+
+**Example**:
+```json
+{
+  "common": {
+    "active": "Active",      // ← Alphabetical
+    "add": "Add",
+    "cancel": "Cancel",
+    "create": "Create",
+    "delete": "Delete",
+    "edit": "Edit"
+  }
+}
+```
+
+### Testing with i18n
+
+**Test setup** (`src/test/setup.ts`):
+- Mocks `react-i18next` with actual English translations
+- Supports `{{param}}` and `{{param, lowercase}}` interpolation
+- All translations alphabetically sorted
+
+**In tests**, translations work automatically:
+```typescript
+import { screen } from '@testing-library/react';
+import { renderWithProviders } from '../test/utils';
+
+it('displays customer title', () => {
+  renderWithProviders(<CustomersPage />);
+  expect(screen.getByText('Customers')).toBeInTheDocument();
+});
+```
+
+**Adding new translations to test mock**:
+```typescript
+// In src/test/setup.ts
+const translations = {
+  'entities.invoice': 'Invoice',
+  'entities.invoices': 'Invoices',
+  // ... keep alphabetically sorted
+};
+```
+
+### Complete Pattern Example
+
+**Page component**:
+```typescript
+import { useTranslation } from 'react-i18next';
+
+export default function InvoicesPage() {
+  const { t } = useTranslation();
+
+  return (
+    <AppLayout>
+      <div className="flex items-center justify-between">
+        <div>
+          <Heading>{t('entities.invoices')}</Heading>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            {t('invoices.description')}
+          </p>
+        </div>
+        <Button onClick={handleAdd}>
+          {t('common.actions.add', { entity: t('entities.invoice') })}
+        </Button>
+      </div>
+
+      {isLoading && (
+        <div className="mt-8 text-center">
+          <p>{t('common.actions.loading', { entities: t('entities.invoices') })}</p>
+        </div>
+      )}
+
+      {error && (
+        <p>{t('common.actions.errorLoading', { entities: t('entities.invoices') })}: {error.message}</p>
+      )}
+
+      {invoices?.length === 0 && (
+        <div className="mt-8 text-center">
+          <p>{t('common.actions.notFound', { entities: t('entities.invoices') })}</p>
+          <Button onClick={handleAdd}>
+            {t('common.actions.addFirst', { entity: t('entities.invoice') })}
+          </Button>
+        </div>
+      )}
+    </AppLayout>
+  );
+}
+```
+
+**Form dialog component**:
+```typescript
+import { useTranslation } from 'react-i18next';
+
+export default function InvoiceFormDialog({ isOpen, onClose, invoice }) {
+  const { t } = useTranslation();
+  const isEdit = !!invoice?.id;
+
+  return (
+    <Dialog open={isOpen} onClose={onClose}>
+      <DialogTitle>
+        {t('common.form.titleCreate', {
+          action: isEdit ? t('common.edit') : t('common.create'),
+          entity: t('entities.invoice')
+        })}
+      </DialogTitle>
+      <DialogDescription>
+        {t(isEdit ? 'common.form.descriptionEdit' : 'common.form.descriptionCreate', {
+          entity: t('entities.invoice')
+        })}
+      </DialogDescription>
+      <DialogBody>
+        <form>
+          <Field>
+            <Label>{t('invoices.table.invoiceNumber')}</Label>
+            <Input {...props} />
+          </Field>
+        </form>
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          {t('common.cancel')}
+        </Button>
+        <Button type="submit">
+          {isPending ? t('common.saving') : t(isEdit ? 'common.update' : 'common.create')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+```
+
+### i18n Checklist for New Features
+
+When adding a new feature:
+- [ ] Add entity names to `entities` section (singular & plural)
+- [ ] Add feature-specific strings to dedicated section
+- [ ] Keep ALL sections alphabetically sorted
+- [ ] Use `common.actions.*` for standard actions
+- [ ] Use `common.form.*` for standard form fields
+- [ ] Use entity interpolation: `{t('common.actions.add', { entity: t('entities.xyz') })}`
+- [ ] Add translations to test mock in `src/test/setup.ts`
+- [ ] Test that all strings display correctly
+
+---
+
 ## Key Patterns & Conventions
 
 ### React Query Patterns
