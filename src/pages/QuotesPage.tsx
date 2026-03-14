@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { DocumentChartBarIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
@@ -14,6 +15,7 @@ import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import { QuoteStatus, quotesApi } from '../api/financialApi';
 import type { Quote, CreateQuoteRequest, CreateQuoteLineItemRequest } from '../api/financialApi';
+import apiClient from '../api/client';
 
 interface Customer {
   id: string;
@@ -21,10 +23,8 @@ interface Customer {
 }
 
 export default function QuotesPage() {
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const [quotes, setQuotes] = useState<Quote[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
@@ -50,27 +50,37 @@ export default function QuotesPage() {
   const [newStatus, setNewStatus] = useState<QuoteStatus>(QuoteStatus.DRAFT);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const { data: quotes = [], isLoading: quotesLoading } = useQuery({
+    queryKey: ['quotes'],
+    queryFn: () => quotesApi.getAll(),
+  });
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [quotesData, customersData] = await Promise.all([
-        quotesApi.getAll().catch(() => []),
-        fetch('/api/v1/customers').then(res => res.json()).catch(() => []),
-      ]);
-      setQuotes(quotesData);
-      setCustomers(customersData);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      setQuotes([]);
-      setCustomers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const response = await apiClient.get<Customer[]>('/customers');
+      return response.data;
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (request: CreateQuoteRequest) => quotesApi.create(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      setIsCreateOpen(false);
+      resetForm();
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: QuoteStatus }) =>
+      quotesApi.updateStatus(id, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      setIsStatusOpen(false);
+      setSelectedQuote(null);
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,10 +105,7 @@ export default function QuotesPage() {
         notes: formData.notes || undefined,
         lineItems: formData.lineItems,
       };
-      await quotesApi.create(request);
-      setIsCreateOpen(false);
-      resetForm();
-      loadData();
+      await createMutation.mutateAsync(request);
     } catch (error: any) {
       console.error('Error creating quote:', error);
       alert(error.response?.data?.message || t('common.form.errorCreate', { entity: t('entities.quote') }));
@@ -112,10 +119,7 @@ export default function QuotesPage() {
 
     try {
       setSubmitting(true);
-      await quotesApi.updateStatus(selectedQuote.id, { status: newStatus });
-      setIsStatusOpen(false);
-      setSelectedQuote(null);
-      loadData();
+      await updateStatusMutation.mutateAsync({ id: selectedQuote.id, status: newStatus });
     } catch (error: any) {
       console.error('Error updating status:', error);
       alert(error.response?.data?.message || 'Failed to update quote status');
@@ -167,14 +171,15 @@ export default function QuotesPage() {
   };
 
   const getCustomerName = (customerId: string) => {
+    if (!Array.isArray(customers)) return customerId;
     const customer = customers.find(c => c.id === customerId);
     return customer?.name || customerId;
   };
 
-  const filteredQuotes = quotes.filter(quote =>
+  const filteredQuotes = Array.isArray(quotes) ? quotes.filter(quote =>
     quote.quoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     getCustomerName(quote.customerId).toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : [];
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -183,15 +188,6 @@ export default function QuotesPage() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
-
-  if (loading) {
-    return (
-      <AppLayout>
-        <Heading>{t('entities.quotes')}</Heading>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.quotes') })}</p>
-      </AppLayout>
-    );
-  }
 
   return (
     <AppLayout>
@@ -216,7 +212,11 @@ export default function QuotesPage() {
 
       <Divider className="my-10" />
 
-      {filteredQuotes.length === 0 ? (
+      {quotesLoading ? (
+        <div className="flex flex-col items-center justify-center py-12">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.quotes') })}</p>
+        </div>
+      ) : filteredQuotes.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12">
           <DocumentChartBarIcon className="h-12 w-12 text-zinc-400" />
           <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">

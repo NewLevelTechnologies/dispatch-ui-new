@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
@@ -14,6 +15,7 @@ import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import { InvoiceStatus, invoicesApi } from '../api/financialApi';
 import type { Invoice, CreateInvoiceRequest, CreateInvoiceLineItemRequest } from '../api/financialApi';
+import apiClient from '../api/client';
 
 interface Customer {
   id: string;
@@ -26,11 +28,8 @@ interface WorkOrder {
 }
 
 export default function InvoicesPage() {
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -58,30 +57,45 @@ export default function InvoicesPage() {
   const [newStatus, setNewStatus] = useState<InvoiceStatus>(InvoiceStatus.DRAFT);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
+    queryKey: ['invoices'],
+    queryFn: () => invoicesApi.getAll(),
+  });
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [invoicesData, customersData, workOrdersData] = await Promise.all([
-        invoicesApi.getAll().catch(() => []),
-        fetch('/api/v1/customers').then(res => res.json()).catch(() => []),
-        fetch('/api/v1/work-orders').then(res => res.json()).catch(() => []),
-      ]);
-      setInvoices(invoicesData);
-      setCustomers(customersData);
-      setWorkOrders(workOrdersData);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      setInvoices([]);
-      setCustomers([]);
-      setWorkOrders([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const response = await apiClient.get<Customer[]>('/customers');
+      return response.data;
+    },
+  });
+
+  const { data: workOrders = [] } = useQuery({
+    queryKey: ['work-orders'],
+    queryFn: async () => {
+      const response = await apiClient.get<WorkOrder[]>('/work-orders');
+      return response.data;
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (request: CreateInvoiceRequest) => invoicesApi.create(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      setIsCreateOpen(false);
+      resetForm();
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: InvoiceStatus }) =>
+      invoicesApi.updateStatus(id, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      setIsStatusOpen(false);
+      setSelectedInvoice(null);
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,10 +121,7 @@ export default function InvoicesPage() {
         notes: formData.notes || undefined,
         lineItems: formData.lineItems,
       };
-      await invoicesApi.create(request);
-      setIsCreateOpen(false);
-      resetForm();
-      loadData();
+      await createMutation.mutateAsync(request);
     } catch (error: any) {
       console.error('Error creating invoice:', error);
       alert(error.response?.data?.message || t('common.form.errorCreate', { entity: t('entities.invoice') }));
@@ -124,10 +135,7 @@ export default function InvoicesPage() {
 
     try {
       setSubmitting(true);
-      await invoicesApi.updateStatus(selectedInvoice.id, { status: newStatus });
-      setIsStatusOpen(false);
-      setSelectedInvoice(null);
-      loadData();
+      await updateStatusMutation.mutateAsync({ id: selectedInvoice.id, status: newStatus });
     } catch (error: any) {
       console.error('Error updating status:', error);
       alert(error.response?.data?.message || 'Failed to update invoice status');
@@ -181,14 +189,15 @@ export default function InvoicesPage() {
   };
 
   const getCustomerName = (customerId: string) => {
+    if (!Array.isArray(customers)) return customerId;
     const customer = customers.find(c => c.id === customerId);
     return customer?.name || customerId;
   };
 
-  const filteredInvoices = invoices.filter(invoice =>
+  const filteredInvoices = Array.isArray(invoices) ? invoices.filter(invoice =>
     invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     getCustomerName(invoice.customerId).toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : [];
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -197,15 +206,6 @@ export default function InvoicesPage() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
-
-  if (loading) {
-    return (
-      <AppLayout>
-        <Heading>{t('entities.invoices')}</Heading>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.invoices') })}</p>
-      </AppLayout>
-    );
-  }
 
   return (
     <AppLayout>
@@ -230,7 +230,11 @@ export default function InvoicesPage() {
 
       <Divider className="my-10" />
 
-      {filteredInvoices.length === 0 ? (
+      {invoicesLoading ? (
+        <div className="flex flex-col items-center justify-center py-12">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.invoices') })}</p>
+        </div>
+      ) : filteredInvoices.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12">
           <DocumentTextIcon className="h-12 w-12 text-zinc-400" />
           <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">

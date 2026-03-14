@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { CreditCardIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
@@ -13,7 +14,8 @@ import { Field, Label } from '../components/catalyst/fieldset';
 import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import { PaymentMethod, paymentsApi, invoicesApi } from '../api/financialApi';
-import type { Payment, CreatePaymentRequest, Invoice } from '../api/financialApi';
+import type { CreatePaymentRequest } from '../api/financialApi';
+import apiClient from '../api/client';
 
 interface Customer {
   id: string;
@@ -21,11 +23,8 @@ interface Customer {
 }
 
 export default function PaymentsPage() {
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -48,30 +47,33 @@ export default function PaymentsPage() {
 
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+    queryKey: ['payments'],
+    queryFn: () => paymentsApi.getAll(),
+  });
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [paymentsData, invoicesData, customersData] = await Promise.all([
-        paymentsApi.getAll().catch(() => []),
-        invoicesApi.getAll().catch(() => []),
-        fetch('/api/v1/customers').then(res => res.json()).catch(() => []),
-      ]);
-      setPayments(paymentsData);
-      setInvoices(invoicesData);
-      setCustomers(customersData);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      setPayments([]);
-      setInvoices([]);
-      setCustomers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: invoices = [] } = useQuery({
+    queryKey: ['invoices'],
+    queryFn: () => invoicesApi.getAll(),
+  });
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const response = await apiClient.get<Customer[]>('/customers');
+      return response.data;
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (request: CreatePaymentRequest) => paymentsApi.create(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      setIsCreateOpen(false);
+      resetForm();
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,10 +99,7 @@ export default function PaymentsPage() {
         referenceNumber: formData.referenceNumber || undefined,
         notes: formData.notes || undefined,
       };
-      await paymentsApi.create(request);
-      setIsCreateOpen(false);
-      resetForm();
-      loadData();
+      await createMutation.mutateAsync(request);
     } catch (error: any) {
       console.error('Error creating payment:', error);
       alert(error.response?.data?.message || t('common.form.errorCreate', { entity: t('entities.payment') }));
@@ -121,16 +120,19 @@ export default function PaymentsPage() {
   };
 
   const getCustomerName = (customerId: string) => {
+    if (!Array.isArray(customers)) return customerId;
     const customer = customers.find(c => c.id === customerId);
     return customer?.name || customerId;
   };
 
   const getInvoiceNumber = (invoiceId: string) => {
+    if (!Array.isArray(invoices)) return invoiceId;
     const invoice = invoices.find(inv => inv.id === invoiceId);
     return invoice?.invoiceNumber || invoiceId;
   };
 
   const getInvoiceBalance = (invoiceId: string) => {
+    if (!Array.isArray(invoices)) return 0;
     const invoice = invoices.find(inv => inv.id === invoiceId);
     return invoice?.balanceDue || 0;
   };
@@ -139,11 +141,11 @@ export default function PaymentsPage() {
     return <Badge color="zinc">{t(`payments.methods.${method.toLowerCase()}`)}</Badge>;
   };
 
-  const filteredPayments = payments.filter(payment =>
+  const filteredPayments = Array.isArray(payments) ? payments.filter(payment =>
     payment.paymentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     getInvoiceNumber(payment.invoiceId).toLowerCase().includes(searchTerm.toLowerCase()) ||
     getCustomerName(payment.customerId).toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : [];
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -152,15 +154,6 @@ export default function PaymentsPage() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
-
-  if (loading) {
-    return (
-      <AppLayout>
-        <Heading>{t('entities.payments')}</Heading>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.payments') })}</p>
-      </AppLayout>
-    );
-  }
 
   return (
     <AppLayout>
@@ -185,7 +178,11 @@ export default function PaymentsPage() {
 
       <Divider className="my-10" />
 
-      {filteredPayments.length === 0 ? (
+      {paymentsLoading ? (
+        <div className="flex flex-col items-center justify-center py-12">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.payments') })}</p>
+        </div>
+      ) : filteredPayments.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12">
           <CreditCardIcon className="h-12 w-12 text-zinc-400" />
           <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
@@ -244,7 +241,7 @@ export default function PaymentsPage() {
                   required
                 >
                   <option value="">Select invoice...</option>
-                  {invoices.filter(inv => inv.balanceDue > 0).map((invoice) => (
+                  {(Array.isArray(invoices) ? invoices.filter(inv => inv.balanceDue > 0) : []).map((invoice) => (
                     <option key={invoice.id} value={invoice.id}>
                       {invoice.invoiceNumber} - {getCustomerName(invoice.customerId)} - Balance: {formatCurrency(invoice.balanceDue)}
                     </option>
