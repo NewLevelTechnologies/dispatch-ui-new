@@ -68,33 +68,33 @@ export default function CustomersPage() {
     <AppLayout>
       <div className="flex items-center justify-between">
         <div>
-          <Heading>{t('customers.entities')}</Heading>
+          <Heading>{t('entities.customers')}</Heading>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
             {t('customers.description')}
           </p>
         </div>
-        <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('customers.entity') })}</Button>
+        <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.customer') })}</Button>
       </div>
 
       {isLoading && (
         <div className="mt-8 text-center">
-          <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('customers.entities') })}</p>
+          <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.customers') })}</p>
         </div>
       )}
 
       {error && (
         <div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
           <p className="text-sm text-red-800 dark:text-red-400">
-            {t('common.actions.errorLoading', { entities: t('customers.entities') })}: {(error as Error).message}
+            {t('common.actions.errorLoading', { entities: t('entities.customers') })}: {(error as Error).message}
           </p>
         </div>
       )}
 
       {customers && customers.length === 0 && (
         <div className="mt-8 text-center">
-          <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('customers.entities') })}</p>
+          <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('entities.customers') })}</p>
           <Button className="mt-4" onClick={handleAdd}>
-            {t('common.actions.addFirst', { entity: t('customers.entity') })}
+            {t('common.actions.addFirst', { entity: t('entities.customer') })}
           </Button>
         </div>
       )}

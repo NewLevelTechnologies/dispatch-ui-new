@@ -56,6 +56,14 @@ global.ResizeObserver = class ResizeObserver {
 // Mock react-i18next with actual translations
 vi.mock('react-i18next', () => {
   const translations = {
+    'entities.customer': 'Customer',
+    'entities.customers': 'Customers',
+    'entities.workOrder': 'Work Order',
+    'entities.workOrders': 'Work Orders',
+    'entities.equipment': 'Equipment',
+    'entities.dashboard': 'Dashboard',
+    'entities.financial': 'Financial',
+    'entities.scheduling': 'Scheduling',
     'app.name': 'Dispatch',
     'app.loading': 'Loading...',
     'nav.dashboard': 'Dashboard',
@@ -101,14 +109,9 @@ vi.mock('react-i18next', () => {
     'common.form.status': 'Status',
     'common.form.errorCreate': 'Failed to create {{entity, lowercase}}',
     'common.form.errorUpdate': 'Failed to update {{entity, lowercase}}',
-    'customers.entity': 'Customer',
-    'customers.entities': 'Customers',
     'customers.description': 'Manage your customer database',
     'customers.table.location': 'Location',
-    'workOrders.entity': 'Work Order',
-    'workOrders.entities': 'Work Orders',
     'workOrders.description': 'Manage work orders and service requests',
-    'workOrders.form.customer': 'Customer',
     'workOrders.form.customerPlaceholder': 'Select a customer...',
     'workOrders.form.customerRequired': 'Please select a customer',
     'workOrders.form.scheduledDate': 'Scheduled Date',
@@ -118,8 +121,6 @@ vi.mock('react-i18next', () => {
     'workOrders.status.completed': 'Completed',
     'workOrders.status.cancelled': 'Cancelled',
     'workOrders.table.id': 'ID',
-    'workOrders.table.customer': 'Customer',
-    'workOrders.table.status': 'Status',
     'workOrders.table.scheduled': 'Scheduled',
     'workOrders.table.amount': 'Amount',
   };

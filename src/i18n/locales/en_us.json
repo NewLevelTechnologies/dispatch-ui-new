@@ -1,4 +1,14 @@
 {
+  "entities": {
+    "customer": "Customer",
+    "customers": "Customers",
+    "workOrder": "Work Order",
+    "workOrders": "Work Orders",
+    "equipment": "Equipment",
+    "dashboard": "Dashboard",
+    "financial": "Financial",
+    "scheduling": "Scheduling"
+  },
   "app": {
     "name": "Dispatch",
     "loading": "Loading..."
@@ -55,19 +65,14 @@
     }
   },
   "customers": {
-    "entity": "Customer",
-    "entities": "Customers",
     "description": "Manage your customer database",
     "table": {
       "location": "Location"
     }
   },
   "workOrders": {
-    "entity": "Work Order",
-    "entities": "Work Orders",
     "description": "Manage work orders and service requests",
     "form": {
-      "customer": "Customer",
       "customerPlaceholder": "Select a customer...",
       "customerRequired": "Please select a customer",
       "scheduledDate": "Scheduled Date"
@@ -81,8 +86,6 @@
     },
     "table": {
       "id": "ID",
-      "customer": "Customer",
-      "status": "Status",
       "scheduled": "Scheduled",
       "amount": "Amount"
     }

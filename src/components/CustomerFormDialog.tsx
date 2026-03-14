@@ -95,12 +95,12 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       <DialogTitle>
         {t('common.form.titleCreate', {
           action: isEdit ? t('common.edit') : t('common.add'),
-          entity: t('customers.entity')
+          entity: t('entities.customer')
         })}
       </DialogTitle>
       <DialogDescription>
         {t(isEdit ? 'common.form.descriptionEdit' : 'common.form.descriptionCreate', {
-          entity: t('customers.entity')
+          entity: t('entities.customer')
         })}
       </DialogDescription>
       <DialogBody>
