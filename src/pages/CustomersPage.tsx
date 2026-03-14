@@ -64,16 +64,15 @@ export default function CustomersPage() {
 
   return (
     <AppLayout>
-      <div className="p-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <Heading>Customers</Heading>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              Manage your customer database
-            </p>
-          </div>
-          <Button onClick={handleAdd}>Add Customer</Button>
+      <div className="flex items-center justify-between">
+        <div>
+          <Heading>Customers</Heading>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            Manage your customer database
+          </p>
         </div>
+        <Button onClick={handleAdd}>Add Customer</Button>
+      </div>
 
         {isLoading && (
           <div className="mt-8 text-center">
@@ -100,7 +99,7 @@ export default function CustomersPage() {
 
         {customers && customers.length > 0 && (
           <div className="mt-8">
-            <Table className="[--gutter:theme(spacing.6)] lg:[--gutter:theme(spacing.10)]">
+            <Table className="[--gutter:theme(spacing.2)] lg:[--gutter:theme(spacing.3)]">
               <TableHead>
                 <TableRow>
                   <TableHeader>Name</TableHeader>
@@ -148,7 +147,6 @@ export default function CustomersPage() {
             </Table>
           </div>
         )}
-      </div>
 
       <CustomerFormDialog
         isOpen={isDialogOpen}
