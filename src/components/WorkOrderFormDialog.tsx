@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import apiClient from '../api/client';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
@@ -31,6 +32,7 @@ interface WorkOrderFormDialogProps {
 
 export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: WorkOrderFormDialogProps) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const isEdit = !!workOrder?.id;
 
   const [formData, setFormData] = useState<WorkOrder>({
@@ -87,7 +89,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
-      alert(errorMessage || 'Failed to create work order');
+      alert(errorMessage || t('common.form.errorCreate', { entity: t('entities.workOrder') }));
     },
   });
 
@@ -107,7 +109,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
-      alert(errorMessage || 'Failed to update work order');
+      alert(errorMessage || t('common.form.errorUpdate', { entity: t('entities.workOrder') }));
     },
   });
 
@@ -115,7 +117,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     e.preventDefault();
 
     if (!formData.customerId) {
-      alert('Please select a customer');
+      alert(t('workOrders.form.customerRequired'));
       return;
     }
 
@@ -132,16 +134,23 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
 
   return (
     <Dialog open={isOpen} onClose={onClose}>
-      <DialogTitle>{isEdit ? 'Edit Work Order' : 'Create Work Order'}</DialogTitle>
+      <DialogTitle>
+        {t('common.form.titleCreate', {
+          action: isEdit ? t('common.edit') : t('common.create'),
+          entity: t('entities.workOrder')
+        })}
+      </DialogTitle>
       <DialogDescription>
-        {isEdit ? 'Update work order information.' : 'Create a new work order for a customer.'}
+        {t(isEdit ? 'common.form.descriptionEdit' : 'common.form.descriptionCreate', {
+          entity: t('entities.workOrder')
+        })}
       </DialogDescription>
       <DialogBody>
         <form onSubmit={handleSubmit} id="work-order-form">
           <Fieldset>
             <FieldGroup>
               <Field>
-                <Label>Customer *</Label>
+                <Label>{t('entities.customer')} *</Label>
                 <Select
                   name="customerId"
                   value={formData.customerId}
@@ -149,7 +158,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                   required
                   disabled={isEdit}
                 >
-                  <option value="">Select a customer...</option>
+                  <option value="">{t('workOrders.form.customerPlaceholder')}</option>
                   {customers?.map((customer) => (
                     <option key={customer.id} value={customer.id}>
                       {customer.name} ({customer.email})
@@ -160,23 +169,23 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
 
               {isEdit && (
                 <Field>
-                  <Label>Status</Label>
+                  <Label>{t('common.form.status')}</Label>
                   <Select
                     name="status"
                     value={formData.status}
                     onChange={(e) => handleChange('status', e.target.value)}
                   >
-                    <option value="PENDING">Pending</option>
-                    <option value="SCHEDULED">Scheduled</option>
-                    <option value="IN_PROGRESS">In Progress</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="CANCELLED">Cancelled</option>
+                    <option value="PENDING">{t('workOrders.status.pending')}</option>
+                    <option value="SCHEDULED">{t('workOrders.status.scheduled')}</option>
+                    <option value="IN_PROGRESS">{t('workOrders.status.inProgress')}</option>
+                    <option value="COMPLETED">{t('workOrders.status.completed')}</option>
+                    <option value="CANCELLED">{t('workOrders.status.cancelled')}</option>
                   </Select>
                 </Field>
               )}
 
               <Field>
-                <Label>Scheduled Date</Label>
+                <Label>{t('workOrders.form.scheduledDate')}</Label>
                 <Input
                   type="date"
                   name="scheduledDate"
@@ -186,7 +195,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
               </Field>
 
               <Field>
-                <Label>Description</Label>
+                <Label>{t('common.form.description')}</Label>
                 <Textarea
                   name="description"
                   value={formData.description || ''}
@@ -196,7 +205,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
               </Field>
 
               <Field>
-                <Label>Notes</Label>
+                <Label>{t('common.form.notes')}</Label>
                 <Textarea
                   name="notes"
                   value={formData.notes || ''}
@@ -210,7 +219,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       </DialogBody>
       <DialogActions>
         <Button plain onClick={onClose}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button
           type="submit"
@@ -218,10 +227,8 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
           disabled={createMutation.isPending || updateMutation.isPending}
         >
           {createMutation.isPending || updateMutation.isPending
-            ? 'Saving...'
-            : isEdit
-              ? 'Update'
-              : 'Create'}
+            ? t('common.saving')
+            : t(isEdit ? 'common.update' : 'common.create')}
         </Button>
       </DialogActions>
     </Dialog>

@@ -7,19 +7,12 @@
     "equipment": "Equipment",
     "dashboard": "Dashboard",
     "financial": "Financial",
-    "scheduling": "Scheduling"
+    "scheduling": "Scheduling",
+    "revenue": "Revenue"
   },
   "app": {
     "name": "Dispatch",
     "loading": "Loading..."
-  },
-  "nav": {
-    "dashboard": "Dashboard",
-    "customers": "Customers",
-    "workOrders": "Work Orders",
-    "equipment": "Equipment",
-    "financial": "Financial",
-    "scheduling": "Scheduling"
   },
   "common": {
     "signOut": "Sign out",
@@ -91,23 +84,23 @@
     }
   },
   "dashboard": {
-    "title": "Dashboard",
-    "description": "Overview of your dispatch operations",
-    "comingSoon": "Coming soon..."
+    "welcome": "Welcome to Dispatch",
+    "stats": {
+      "totalCustomers": "Total customers",
+      "activeWorkOrders": "Active work orders",
+      "thisMonth": "This month"
+    }
   },
   "equipment": {
-    "title": "Equipment",
-    "description": "Manage equipment and inventory",
+    "description": "Track equipment and inventory",
     "comingSoon": "Coming soon..."
   },
   "financial": {
-    "title": "Financial",
     "description": "Manage invoices, quotes, and payments",
     "comingSoon": "Coming soon..."
   },
   "scheduling": {
-    "title": "Scheduling",
-    "description": "Schedule and dispatch work orders",
+    "description": "Manage dispatches and technician schedules",
     "comingSoon": "Coming soon..."
   }
 }

@@ -26,12 +26,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
 
   const navigation = [
-    { name: t('nav.dashboard'), href: '/dashboard', icon: HomeIcon },
-    { name: t('nav.customers'), href: '/customers', icon: UserGroupIcon },
-    { name: t('nav.workOrders'), href: '/work-orders', icon: ClipboardDocumentListIcon },
-    { name: t('nav.equipment'), href: '/equipment', icon: WrenchScrewdriverIcon },
-    { name: t('nav.financial'), href: '/financial', icon: CurrencyDollarIcon },
-    { name: t('nav.scheduling'), href: '/scheduling', icon: CalendarIcon },
+    { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
+    { name: t('entities.customers'), href: '/customers', icon: UserGroupIcon },
+    { name: t('entities.workOrders'), href: '/work-orders', icon: ClipboardDocumentListIcon },
+    { name: t('entities.equipment'), href: '/equipment', icon: WrenchScrewdriverIcon },
+    { name: t('entities.financial'), href: '/financial', icon: CurrencyDollarIcon },
+    { name: t('entities.scheduling'), href: '/scheduling', icon: CalendarIcon },
   ];
 
   return (

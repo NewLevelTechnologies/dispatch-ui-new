@@ -26,7 +26,7 @@ describe('WorkOrderFormDialog', () => {
       renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
 
       expect(screen.getByText('Create Work Order')).toBeInTheDocument();
-      expect(screen.getByText('Create a new work order for a customer.')).toBeInTheDocument();
+      expect(screen.getByText('Create a new work order record.')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /create/i })).toBeInTheDocument();
 
       // Wait for customers to load
