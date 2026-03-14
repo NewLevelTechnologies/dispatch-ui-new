@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import apiClient from '../api/client';
 import AppLayout from '../components/AppLayout';
@@ -23,6 +24,7 @@ interface Customer {
 
 export default function CustomersPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
@@ -52,7 +54,7 @@ export default function CustomersPage() {
   };
 
   const handleDelete = (customer: Customer) => {
-    if (window.confirm(`Are you sure you want to delete ${customer.name}?`)) {
+    if (window.confirm(t('customers.deleteConfirm', { name: customer.name }))) {
       deleteMutation.mutate(customer.id);
     }
   };
@@ -67,33 +69,33 @@ export default function CustomersPage() {
       <div className="p-8">
         <div className="flex items-center justify-between">
           <div>
-            <Heading>Customers</Heading>
+            <Heading>{t('customers.title')}</Heading>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              Manage your customer database
+              {t('customers.description')}
             </p>
           </div>
-          <Button onClick={handleAdd}>Add Customer</Button>
+          <Button onClick={handleAdd}>{t('customers.addButton')}</Button>
         </div>
 
         {isLoading && (
           <div className="mt-8 text-center">
-            <p className="text-zinc-600 dark:text-zinc-400">Loading customers...</p>
+            <p className="text-zinc-600 dark:text-zinc-400">{t('customers.loading')}</p>
           </div>
         )}
 
         {error && (
           <div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
             <p className="text-sm text-red-800 dark:text-red-400">
-              Error loading customers: {(error as Error).message}
+              {t('customers.errorLoading')}: {(error as Error).message}
             </p>
           </div>
         )}
 
         {customers && customers.length === 0 && (
           <div className="mt-8 text-center">
-            <p className="text-zinc-600 dark:text-zinc-400">No customers found</p>
+            <p className="text-zinc-600 dark:text-zinc-400">{t('customers.noCustomers')}</p>
             <Button className="mt-4" onClick={handleAdd}>
-              Add your first customer
+              {t('customers.addFirst')}
             </Button>
           </div>
         )}
@@ -103,11 +105,11 @@ export default function CustomersPage() {
             <Table className="[--gutter:theme(spacing.6)] lg:[--gutter:theme(spacing.10)]">
               <TableHead>
                 <TableRow>
-                  <TableHeader>Name</TableHeader>
-                  <TableHeader>Email</TableHeader>
-                  <TableHeader>Phone</TableHeader>
-                  <TableHeader>Location</TableHeader>
-                  <TableHeader>Status</TableHeader>
+                  <TableHeader>{t('customers.table.name')}</TableHeader>
+                  <TableHeader>{t('customers.table.email')}</TableHeader>
+                  <TableHeader>{t('customers.table.phone')}</TableHeader>
+                  <TableHeader>{t('customers.table.location')}</TableHeader>
+                  <TableHeader>{t('customers.table.status')}</TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
@@ -123,20 +125,20 @@ export default function CustomersPage() {
                         : '-'}
                     </TableCell>
                     <TableCell>
-                      <Badge color="lime">Active</Badge>
+                      <Badge color="lime">{t('common.active')}</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="-mx-3 -my-1.5 sm:-mx-2.5">
                         <Dropdown>
-                          <DropdownButton plain aria-label="More options">
+                          <DropdownButton plain aria-label={t('common.moreOptions')}>
                             <EllipsisVerticalIcon className="size-5" />
                           </DropdownButton>
                           <DropdownMenu anchor="bottom end">
                             <DropdownItem onClick={() => handleEdit(customer)}>
-                              <DropdownLabel>Edit</DropdownLabel>
+                              <DropdownLabel>{t('common.edit')}</DropdownLabel>
                             </DropdownItem>
                             <DropdownItem onClick={() => handleDelete(customer)}>
-                              <DropdownLabel>Delete</DropdownLabel>
+                              <DropdownLabel>{t('common.delete')}</DropdownLabel>
                             </DropdownItem>
                           </DropdownMenu>
                         </Dropdown>

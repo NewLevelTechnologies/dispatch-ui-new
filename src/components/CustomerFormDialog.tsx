@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import apiClient from '../api/client';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
@@ -25,6 +26,7 @@ interface CustomerFormDialogProps {
 
 export default function CustomerFormDialog({ isOpen, onClose, customer }: CustomerFormDialogProps) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const isEdit = !!customer?.id;
 
   const [formData, setFormData] = useState<Customer>({
@@ -90,16 +92,16 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
 
   return (
     <Dialog open={isOpen} onClose={onClose}>
-      <DialogTitle>{isEdit ? 'Edit Customer' : 'Add Customer'}</DialogTitle>
+      <DialogTitle>{t(isEdit ? 'customers.form.titleEdit' : 'customers.form.titleCreate')}</DialogTitle>
       <DialogDescription>
-        {isEdit ? 'Update customer information.' : 'Create a new customer record.'}
+        {t(isEdit ? 'customers.form.descriptionEdit' : 'customers.form.descriptionCreate')}
       </DialogDescription>
       <DialogBody>
         <form onSubmit={handleSubmit} id="customer-form">
           <Fieldset>
             <FieldGroup>
               <Field>
-                <Label>Name *</Label>
+                <Label>{t('customers.form.name')} *</Label>
                 <Input
                   name="name"
                   value={formData.name}
@@ -109,7 +111,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
               </Field>
 
               <Field>
-                <Label>Email *</Label>
+                <Label>{t('customers.form.email')} *</Label>
                 <Input
                   type="email"
                   name="email"
@@ -120,7 +122,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
               </Field>
 
               <Field>
-                <Label>Phone</Label>
+                <Label>{t('customers.form.phone')}</Label>
                 <Input
                   type="tel"
                   name="phone"
@@ -130,7 +132,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
               </Field>
 
               <Field>
-                <Label>Address</Label>
+                <Label>{t('customers.form.address')}</Label>
                 <Input
                   name="address"
                   value={formData.address || ''}
@@ -140,7 +142,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
 
               <div className="grid grid-cols-2 gap-4">
                 <Field>
-                  <Label>City</Label>
+                  <Label>{t('customers.form.city')}</Label>
                   <Input
                     name="city"
                     value={formData.city || ''}
@@ -149,19 +151,19 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                 </Field>
 
                 <Field>
-                  <Label>State</Label>
+                  <Label>{t('customers.form.state')}</Label>
                   <Input
                     name="state"
                     value={formData.state || ''}
                     onChange={(e) => handleChange('state', e.target.value)}
-                    placeholder="CA"
+                    placeholder={t('customers.form.stateHelper')}
                     maxLength={2}
                   />
                 </Field>
               </div>
 
               <Field>
-                <Label>Zip Code</Label>
+                <Label>{t('customers.form.zipCode')}</Label>
                 <Input
                   name="zipCode"
                   value={formData.zipCode || ''}
@@ -174,7 +176,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       </DialogBody>
       <DialogActions>
         <Button plain onClick={onClose}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button
           type="submit"
@@ -182,10 +184,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
           disabled={createMutation.isPending || updateMutation.isPending}
         >
           {createMutation.isPending || updateMutation.isPending
-            ? 'Saving...'
-            : isEdit
-              ? 'Update'
-              : 'Create'}
+            ? t('common.saving')
+            : t(isEdit ? 'common.update' : 'common.create')}
         </Button>
       </DialogActions>
     </Dialog>

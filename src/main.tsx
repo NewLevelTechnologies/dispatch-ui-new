@@ -6,6 +6,7 @@ import { Authenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 import './index.css';
 import './config/amplify';
+import './i18n/config';
 import App from './App';
 
 // Create a React Query client
