@@ -58,6 +58,7 @@ vi.mock('react-i18next', () => {
   const translations = {
     'app.loading': 'Loading...',
     'app.name': 'Dispatch',
+    'auth.signInPrompt': 'Sign in to your account',
     'common.actions.add': 'Add {{entity}}',
     'common.actions.addFirst': 'Add your first {{entity, lowercase}}',
     'common.actions.create': 'Create {{entity}}',
@@ -94,6 +95,7 @@ vi.mock('react-i18next', () => {
     'common.moreOptions': 'More options',
     'common.saving': 'Saving...',
     'common.signOut': 'Sign out',
+    'common.theme': 'Theme',
     'common.update': 'Update',
     'customers.description': 'Manage your customer database',
     'customers.table.location': 'Location',
