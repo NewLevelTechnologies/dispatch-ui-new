@@ -7,6 +7,7 @@ import WorkOrdersPage from './pages/WorkOrdersPage';
 import EquipmentPage from './pages/EquipmentPage';
 import FinancialPage from './pages/FinancialPage';
 import SchedulingPage from './pages/SchedulingPage';
+import UsersPage from './pages/UsersPage';
 
 // ProtectedRoute component - defined outside of App to avoid recreation on every render
 const ProtectedRoute = ({ element, isAuthenticated }: { element: React.ReactElement; isAuthenticated: boolean }) => {
@@ -45,6 +46,7 @@ function App() {
       <Route path="/equipment" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentPage />} />} />
       <Route path="/financial" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<FinancialPage />} />} />
       <Route path="/scheduling" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<SchedulingPage />} />} />
+      <Route path="/users" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<UsersPage />} />} />
       <Route
         path="/"
         element={

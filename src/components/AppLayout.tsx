@@ -8,6 +8,7 @@ import {
   WrenchScrewdriverIcon,
   CurrencyDollarIcon,
   CalendarIcon,
+  ShieldCheckIcon,
   SunIcon,
   MoonIcon,
   ComputerDesktopIcon,
@@ -32,6 +33,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { name: t('entities.equipment'), href: '/equipment', icon: WrenchScrewdriverIcon },
     { name: t('entities.financial'), href: '/financial', icon: CurrencyDollarIcon },
     { name: t('entities.scheduling'), href: '/scheduling', icon: CalendarIcon },
+    // TODO: Add capability check - only show if user has VIEW_USERS capability
+    { name: t('entities.users'), href: '/users', icon: ShieldCheckIcon },
   ];
 
   return (
