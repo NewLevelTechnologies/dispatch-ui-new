@@ -77,7 +77,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarSection className="max-lg:hidden">
               <div className="flex items-center gap-2 px-2 py-1">
                 <CurrencyDollarIcon className="h-4 w-4 text-zinc-500" />
-                <span className="text-xs font-medium text-zinc-500">{t('entities.financial')}</span>
+                <span className="text-sm font-medium text-zinc-500">{t('entities.financial')}</span>
               </div>
               {financialNavigation.map((item) => (
                 <SidebarItem
