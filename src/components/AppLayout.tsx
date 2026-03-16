@@ -8,6 +8,7 @@ import {
   WrenchScrewdriverIcon,
   CurrencyDollarIcon,
   CalendarIcon,
+  ShieldCheckIcon,
   SunIcon,
   MoonIcon,
   ComputerDesktopIcon,
@@ -54,6 +55,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { name: t('scheduling.entities.dispatches'), href: '/dispatches', icon: CalendarIcon },
     { name: t('scheduling.entities.availability'), href: '/availability', icon: ClockIcon },
     { name: t('scheduling.entities.recurringOrders'), href: '/recurring-orders', icon: ArrowPathIcon },
+  ];
+
+  const adminNavigation = [
+    // TODO: Add capability check - only show if user has VIEW_USERS capability
+    { name: t('entities.users'), href: '/users', icon: ShieldCheckIcon },
   ];
 
   return (
@@ -125,6 +131,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.scheduling')}</span>
               </div>
               {schedulingNavigation.map((item) => (
+                <SidebarItem
+                  key={item.name}
+                  href={item.href}
+                  current={location.pathname === item.href}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span>{item.name}</span>
+                </SidebarItem>
+              ))}
+            </SidebarSection>
+
+            <SidebarSection className="max-lg:hidden">
+              {adminNavigation.map((item) => (
                 <SidebarItem
                   key={item.name}
                   href={item.href}
