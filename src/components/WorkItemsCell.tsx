@@ -36,20 +36,25 @@ interface Props {
 }
 
 /**
- * Compact stack of work item descriptions with a status badge per line.
- * Used on the WO list page (main + scoped variants) to answer "what is
- * this WO about" — the highest-signal scan target on the list.
+ * Stack of work item descriptions with a status badge per line. Used on
+ * the WO list page (main + scoped variants) to answer "what is this WO
+ * about" — the highest-signal scan target on the list.
  *
  * Layout choices:
  * - **Status badge LEFT of description**, matching the order CSRs see on
  *   the WO detail page (design §3.3). Same content in both surfaces
  *   should read in the same order — switching it forces re-parsing.
- * - **`line-clamp-2`** on each description: most real descriptions fit
- *   in 1–2 lines so the common case shows full text; outliers truncate
- *   at 2 lines instead of 1.
- * - **`title` attribute** carries the full description so hover and
- *   keyboard focus reveal anything that got clamped — no info is hidden
- *   behind a navigation step.
+ * - **No truncation in the normal case.** Variable row height is
+ *   functional, not a flaw — uniform-height rows are a dashboard
+ *   aesthetic, not a worklist one. Real CSR ops tools (ServiceTitan,
+ *   Housecall Pro, etc.) all let descriptions wrap. Other columns on
+ *   the row are single-line, so the eye still tracks down the table.
+ * - **`line-clamp-5` as a safety net** for pathological cases (e.g. a
+ *   400-word call note pasted into a description). Bounds one bad row
+ *   from blowing out the table; the row remains clickable to detail
+ *   for the full text. 5 lines is generous enough that 99% of real
+ *   descriptions render in full — no hover/click pattern needed for
+ *   the normal case.
  *
  * Renders an em-dash placeholder when the WO has no items so the column
  * stays visually present (avoids ragged-right rows).
@@ -73,10 +78,7 @@ export default function WorkItemsCell({ items, totalCount }: Props) {
               `workOrders.progress.${PROGRESS_TRANSLATION_KEYS[wi.statusCategory]}`
             )}
           </Badge>
-          <span
-            title={wi.description}
-            className="line-clamp-2 min-w-0 flex-1 text-zinc-700 dark:text-zinc-300"
-          >
+          <span className="line-clamp-5 min-w-0 flex-1 whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
             {wi.description}
           </span>
         </div>
