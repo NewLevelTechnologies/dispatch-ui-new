@@ -15,6 +15,7 @@ import {
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
+import WorkItemsCell from '../components/WorkItemsCell';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';
 import { Heading } from '../components/catalyst/heading';
@@ -641,6 +642,7 @@ export default function WorkOrdersPage() {
               <TableRow>
                 <TableHeader>{t('workOrders.table.id')}</TableHeader>
                 <TableHeader>{getName('service_location')}</TableHeader>
+                <TableHeader>{t('workOrders.table.work')}</TableHeader>
                 <TableHeader>{t('workOrders.table.statusHeader')}</TableHeader>
                 <TableHeader>{t('workOrders.table.priority')}</TableHeader>
                 <TableHeader>{t('workOrders.table.scheduled')}</TableHeader>
@@ -683,6 +685,12 @@ export default function WorkOrdersPage() {
                           {workOrder.serviceLocation?.address.city || ''}, {workOrder.serviceLocation?.address.state || ''}
                         </span>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <WorkItemsCell
+                        items={workOrder.workItems}
+                        totalCount={workOrder.workItemCount}
+                      />
                     </TableCell>
                     <TableCell>
                       {cancelled ? (

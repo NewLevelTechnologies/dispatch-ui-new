@@ -38,6 +38,8 @@ const mockWorkOrders = [
     progressCategory: 'NOT_STARTED' as const,
     priority: 'NORMAL' as const,
     scheduledDate: '2024-03-15T10:00:00Z',
+    workItemCount: 0,
+    workItems: [],
     createdAt: '2024-03-01T10:00:00Z',
     updatedAt: '2024-03-01T10:00:00Z',
     customer: {
@@ -68,6 +70,8 @@ const mockWorkOrders = [
     progressCategory: 'IN_PROGRESS' as const,
     priority: 'NORMAL' as const,
     scheduledDate: '2024-03-14T10:00:00Z',
+    workItemCount: 0,
+    workItems: [],
     createdAt: '2024-03-02T11:00:00Z',
     updatedAt: '2024-03-02T11:00:00Z',
     customer: {
