@@ -51,6 +51,7 @@
     "search": "Search...",
     "show": "Show",
     "view": "View",
+    "viewAll": "View all",
     "form": {
       "accessInstructions": "Access Instructions",
       "address": "Address",
@@ -512,6 +513,7 @@
     "tabs": {
       "equipment": "Equipment",
       "filters": "Filters",
+      "notes": "Notes",
       "overview": "Overview",
       "partsInventory": "Parts Inventory",
       "photos": "Photos",

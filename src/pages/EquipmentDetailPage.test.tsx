@@ -19,6 +19,10 @@ const mockImagesList = vi.fn();
 const mockImageUpload = vi.fn();
 const mockImagePatch = vi.fn();
 const mockImageDelete = vi.fn();
+const mockNotesList = vi.fn();
+const mockNotesCreate = vi.fn();
+const mockNotesUpdate = vi.fn();
+const mockNotesDelete = vi.fn();
 const mockWorkOrdersGetAll = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
@@ -50,6 +54,12 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
       upload: (...args: unknown[]) => mockImageUpload(...args),
       patch: (...args: unknown[]) => mockImagePatch(...args),
       delete: (...args: unknown[]) => mockImageDelete(...args),
+    },
+    equipmentNotesApi: {
+      list: (...args: unknown[]) => mockNotesList(...args),
+      create: (...args: unknown[]) => mockNotesCreate(...args),
+      update: (...args: unknown[]) => mockNotesUpdate(...args),
+      delete: (...args: unknown[]) => mockNotesDelete(...args),
     },
   };
 });
@@ -117,6 +127,7 @@ describe('EquipmentDetailPage', () => {
     mockFiltersGetAll.mockResolvedValue([]);
     mockFilterSizesGetAll.mockResolvedValue([]);
     mockImagesList.mockResolvedValue([]);
+    mockNotesList.mockResolvedValue([]);
     mockWorkOrdersGetAll.mockResolvedValue({
       content: [],
       totalElements: 0,
@@ -405,7 +416,7 @@ describe('EquipmentDetailPage', () => {
     await user.click(filtersTab);
 
     await waitFor(() => {
-      expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument();
+      expect(screen.getByText('20×25×1')).toBeInTheDocument();
     });
     expect(screen.getByText('Return air')).toBeInTheDocument();
   });
@@ -433,18 +444,18 @@ describe('EquipmentDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /^filters/i }));
 
     // Default view: 10 chips visible, 11th and 12th hidden until toggled.
-    await waitFor(() => expect(screen.getByText('10 × 20 × 1')).toBeInTheDocument());
-    expect(screen.queryByText('20 × 20 × 1')).not.toBeInTheDocument();
-    expect(screen.queryByText('21 × 20 × 1')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('10×20×1')).toBeInTheDocument());
+    expect(screen.queryByText('20×20×1')).not.toBeInTheDocument();
+    expect(screen.queryByText('21×20×1')).not.toBeInTheDocument();
 
     // Click Show all → all 12 chips visible.
     await user.click(screen.getByRole('button', { name: /show all \(12\)/i }));
-    expect(screen.getByText('20 × 20 × 1')).toBeInTheDocument();
-    expect(screen.getByText('21 × 20 × 1')).toBeInTheDocument();
+    expect(screen.getByText('20×20×1')).toBeInTheDocument();
+    expect(screen.getByText('21×20×1')).toBeInTheDocument();
 
     // Show fewer collapses back to 10.
     await user.click(screen.getByRole('button', { name: /show fewer/i }));
-    expect(screen.queryByText('20 × 20 × 1')).not.toBeInTheDocument();
+    expect(screen.queryByText('20×20×1')).not.toBeInTheDocument();
   });
 
   it('renders quick-add chips and pre-fills dimensions when one is clicked', async () => {
@@ -469,7 +480,7 @@ describe('EquipmentDetailPage', () => {
     });
     await user.click(screen.getByRole('button', { name: /^filters/i }));
 
-    const chip = await screen.findByRole('button', { name: '16 × 20 × 1' });
+    const chip = await screen.findByRole('button', { name: '16×20×1' });
     await user.click(chip);
 
     // Dialog opens with dimensions pre-filled.
@@ -508,7 +519,7 @@ describe('EquipmentDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /^filters/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument();
+      expect(screen.getByText('20×25×1')).toBeInTheDocument();
     });
 
     // Header carries its own overflow (Delete equipment); row-level menu is the second match.
@@ -675,7 +686,7 @@ describe('EquipmentDetailPage', () => {
     });
     await user.click(screen.getByRole('button', { name: /^filters/i }));
 
-    await waitFor(() => expect(screen.getByText('16 × 20 × 1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
     // Header carries its own overflow (Delete equipment); row-level menu is the second match.
     await user.click(screen.getAllByRole('button', { name: /more options/i })[1]);
     const editItem = await screen.findByRole('menuitem', { name: /edit/i });
@@ -715,7 +726,7 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
     await user.click(screen.getByRole('button', { name: /^filters/i }));
-    await waitFor(() => expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('20×25×1')).toBeInTheDocument());
 
     // Header carries its own overflow (Delete equipment); row-level menu is the second match.
     await user.click(screen.getAllByRole('button', { name: /more options/i })[1]);
@@ -898,6 +909,177 @@ describe('EquipmentDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /add photo/i }));
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('renders a Filters summary inside Identification when the unit has filters', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockFiltersGetAll.mockResolvedValue([
+      {
+        id: 'f-1',
+        equipmentId: 'eq-1',
+        lengthIn: 20,
+        widthIn: 25,
+        thicknessIn: 1,
+        quantity: 2,
+        label: 'Return air',
+        createdAt: '',
+        updatedAt: '',
+      },
+      {
+        id: 'f-2',
+        equipmentId: 'eq-1',
+        lengthIn: 16,
+        widthIn: 20,
+        thicknessIn: 1,
+        quantity: 1,
+        label: null,
+        createdAt: '',
+        updatedAt: '',
+      },
+    ]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Carrier')).toBeInTheDocument();
+    });
+    // ×N appears only when quantity > 1; single-quantity filter omits it.
+    expect(await screen.findByText('20×25×1 ×2, 16×20×1')).toBeInTheDocument();
+  });
+
+  it('hides the Recent Service History and Recent Notes cards on Overview when both lists are empty', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    // Identification header still shows; Recent cards do not.
+    expect(screen.getByText('Identification')).toBeInTheDocument();
+    expect(screen.queryByText(/recent work orders/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/recent notes/i)).not.toBeInTheDocument();
+  });
+
+  it('renders Recent Service History on Overview and View all jumps to the Service History tab', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockWorkOrdersGetAll.mockResolvedValue({
+      content: [
+        {
+          id: 'wo-1',
+          workOrderNumber: 'WO-00010',
+          customerId: 'c-1',
+          serviceLocationId: 'loc-1',
+          lifecycleState: 'ACTIVE',
+          progressCategory: 'IN_PROGRESS',
+          priority: 'NORMAL',
+          scheduledDate: '2026-04-24',
+          createdAt: '2026-04-20T12:00:00Z',
+          updatedAt: '2026-04-24T12:00:00Z',
+        },
+      ],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 25,
+      first: true,
+      last: true,
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    expect(await screen.findByText(/recent work orders/i)).toBeInTheDocument();
+    // The WO row links to its detail page
+    const woLink = screen.getByRole('link', { name: /WO-00010/i });
+    expect(woLink).toHaveAttribute('href', '/work-orders/wo-1');
+
+    // "View all" jumps to the Service History tab
+    await user.click(screen.getByRole('button', { name: /view all/i }));
+    await waitFor(() => {
+      // Service history tab content is the WorkOrdersList component;
+      // the recent card disappears because we're no longer on Overview.
+      expect(screen.queryByText(/recent work orders/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('renders Recent Notes on Overview with the latest 3 entries', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockNotesList.mockResolvedValue([
+      { id: 'n-1', body: 'Replaced compressor', authorUserId: 'u-1', authorName: 'Jane', createdAt: '2026-05-01T12:00:00Z', updatedAt: '2026-05-01T12:00:00Z' },
+      { id: 'n-2', body: 'Filter due', authorUserId: 'u-2', authorName: 'Bob', createdAt: '2026-04-20T09:00:00Z', updatedAt: '2026-04-20T09:00:00Z' },
+      { id: 'n-3', body: 'Loud rattle on startup', authorUserId: 'u-3', authorName: 'Sue', createdAt: '2026-04-10T09:00:00Z', updatedAt: '2026-04-10T09:00:00Z' },
+      { id: 'n-4', body: 'Should not appear in the recent card', authorUserId: 'u-4', authorName: 'Joe', createdAt: '2026-04-01T09:00:00Z', updatedAt: '2026-04-01T09:00:00Z' },
+    ]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    expect(await screen.findByText(/recent notes/i)).toBeInTheDocument();
+    expect(screen.getByText('Replaced compressor')).toBeInTheDocument();
+    expect(screen.getByText('Filter due')).toBeInTheDocument();
+    expect(screen.getByText('Loud rattle on startup')).toBeInTheDocument();
+    // The 4th note isn't on the Overview card (capped at 3) — but it WILL
+    // render on the Notes tab via EquipmentNotesSection. We assert the
+    // cap by counting that the 4th body string isn't surfaced.
+    expect(screen.queryByText(/should not appear/i)).not.toBeInTheDocument();
+  });
+
+  it('renders an empty Notes tab with the Add note affordance', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /^notes/i }));
+
+    // EquipmentNotesSection always renders heading + Add note CTA, even at count 0.
+    expect(await screen.findByText('Notes (0)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add note/i })).toBeInTheDocument();
+  });
+
+  it('renders the Notes tab with the full list and a count badge', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockNotesList.mockResolvedValue([
+      {
+        id: 'n-1',
+        body: 'Replaced compressor 2025-08-12',
+        authorUserId: 'u-1',
+        authorName: 'Jane Smith',
+        createdAt: '2026-05-01T12:00:00Z',
+        updatedAt: '2026-05-01T12:00:00Z',
+      },
+      {
+        id: 'n-2',
+        body: 'Filter due in May',
+        authorUserId: 'u-2',
+        authorName: 'Bob',
+        createdAt: '2026-04-20T09:00:00Z',
+        updatedAt: '2026-04-20T09:00:00Z',
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    // Tab badge surfaces the count
+    const notesTab = await screen.findByRole('button', { name: /^notes\s*2$/i });
+    await user.click(notesTab);
+
+    // Section heading reflects the full list size, and both bodies render
+    await waitFor(() => {
+      expect(screen.getByText('Notes (2)')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Replaced compressor 2025-08-12')).toBeInTheDocument();
+    expect(screen.getByText('Filter due in May')).toBeInTheDocument();
   });
 
   it('alerts and stays in edit mode when PATCH fails', async () => {

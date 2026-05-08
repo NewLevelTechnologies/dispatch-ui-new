@@ -9,14 +9,18 @@ import {
   equipmentCategoriesApi,
   equipmentFiltersApi,
   equipmentImagesApi,
+  equipmentNotesApi,
   tenantFilterSizesApi,
   EquipmentStatus,
   EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
   type EquipmentFilter,
   type EquipmentImage,
+  type EquipmentNote,
   type EquipmentSummary,
+  type ProgressCategory,
   type TenantFilterSize,
   type UpdateEquipmentRequest,
+  type WorkOrderSummary,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
@@ -25,6 +29,7 @@ import EditableField from '../components/EditableField';
 import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentImageUploadDialog from '../components/EquipmentImageUploadDialog';
+import EquipmentNotesSection from '../components/EquipmentNotesSection';
 import EquipmentPhotoLightbox from '../components/EquipmentPhotoLightbox';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import WorkOrdersList from '../components/WorkOrdersList';
@@ -50,6 +55,7 @@ import {
 } from '../components/catalyst/dropdown';
 import {
   ArrowLeftIcon,
+  ArrowRightIcon,
   ChevronRightIcon,
   EllipsisVerticalIcon,
   PencilIcon,
@@ -57,13 +63,35 @@ import {
   StarIcon as StarIconOutline,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
+import { formatFilterSize } from '../utils/formatFilterSize';
+import { formatRelativeTime } from '../utils/formatRelativeTime';
 
-type TabId = 'overview' | 'photos' | 'filters' | 'service-history' | 'components';
+type TabId = 'overview' | 'notes' | 'photos' | 'filters' | 'service-history' | 'components';
 
 // Above this number of tenant filter sizes, the chip palette collapses to
 // the top N by sortOrder with a "Show all" toggle. Keeps the filters tab
 // header tight when a tenant has curated a long list.
 const FILTER_SIZE_CHIP_COLLAPSED = 10;
+
+// Mirrors the maps used by WorkOrdersList / WorkOrderDetailPage for the
+// status badge — duplicated here rather than extracted to keep the
+// dependency footprint flat (only consumed by the Overview's Recent
+// Service History card).
+const PROGRESS_COLORS: Record<ProgressCategory, 'zinc' | 'sky' | 'blue' | 'amber' | 'lime'> = {
+  NOT_STARTED: 'zinc',
+  IN_PROGRESS: 'blue',
+  BLOCKED: 'amber',
+  COMPLETED: 'lime',
+  CANCELLED: 'zinc',
+};
+
+const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
+  NOT_STARTED: 'notStarted',
+  IN_PROGRESS: 'inProgress',
+  BLOCKED: 'blocked',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+};
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -74,10 +102,6 @@ function formatDate(iso: string | null | undefined): string {
   });
 }
 
-// JS Number.toString() naturally drops trailing zeros, so 20.00 → "20" and 1.5 stays "1.5".
-function formatInches(n: number): string {
-  return String(n);
-}
 
 export default function EquipmentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -182,6 +206,16 @@ export default function EquipmentDetailPage() {
   const { data: images = [], isLoading: imagesLoading, error: imagesError } = useQuery({
     queryKey: ['equipment-images', id],
     queryFn: () => equipmentImagesApi.list(id!),
+    enabled: !!id,
+  });
+
+  // Full notes list for the Notes tab. Cache key is shared with
+  // EquipmentNotesSection's mutations so create/update/delete invalidations
+  // reach this query too — the embedded section in the WO row + this tab
+  // refresh in lockstep when either surface mutates.
+  const { data: allNotes = [], isLoading: notesLoading, error: notesError } = useQuery({
+    queryKey: ['equipment-notes', id],
+    queryFn: () => equipmentNotesApi.list(id!),
     enabled: !!id,
   });
 
@@ -371,6 +405,11 @@ export default function EquipmentDetailPage() {
   const isSubUnit = Boolean(equipment.parentId);
   const tabs = [
     { id: 'overview', label: t('equipment.tabs.overview') },
+    // Notes sit between Overview and Photos — both are supporting reference
+    // content (identity facts ↔ service knowledge ↔ visual id), so they
+    // cluster ahead of Filters / Service History / Components which are
+    // operational surfaces.
+    { id: 'notes', label: t('equipment.tabs.notes'), count: allNotes.length },
     { id: 'photos', label: t('equipment.tabs.photos'), count: images.length },
     { id: 'filters', label: t('equipment.tabs.filters'), count: filters.length },
     {
@@ -430,9 +469,6 @@ export default function EquipmentDetailPage() {
       deleteFilterMutation.mutate(f.id);
     }
   };
-
-  const formatFilterSize = (f: { lengthIn: number; widthIn: number; thicknessIn: number }) =>
-    `${formatInches(f.lengthIn)} × ${formatInches(f.widthIn)} × ${formatInches(f.thicknessIn)}`;
 
   const handleSetProfileImage = (img: EquipmentImage) => {
     if (img.isProfile) return;
@@ -649,6 +685,24 @@ export default function EquipmentDetailPage() {
                       ariaLabel={t('equipment.form.locationOnSite')}
                     />
                   </FieldRow>
+                  {/* Filters summary — read-only at-a-glance row appended to
+                      Identification when this unit has filters configured.
+                      Common case is 1-3 filters per unit, so a comma-joined
+                      string fits comfortably without overflow handling.
+                      Full management lives on the Filters tab. */}
+                  {filters.length > 0 && (
+                    <FieldRow label={t('equipment.tabs.filters')}>
+                      <span>
+                        {filters
+                          .map((f) =>
+                            f.quantity > 1
+                              ? `${formatFilterSize(f)} ×${f.quantity}`
+                              : formatFilterSize(f)
+                          )
+                          .join(', ')}
+                      </span>
+                    </FieldRow>
+                  )}
                 </FieldGrid>
               </section>
 
@@ -696,6 +750,29 @@ export default function EquipmentDetailPage() {
                 </section>
               )}
 
+              {/* Recent Service History. Hidden when no WOs touch this
+                  unit; surfaces the top 3 most recent so CSRs can answer
+                  "what's been happening with this unit" from Overview
+                  without clicking out. "View all" jumps to the Service
+                  History tab where the full WorkOrdersList lives. */}
+              {(serviceHistoryData?.content ?? []).length > 0 && (
+                <RecentServiceHistoryCard
+                  workOrders={(serviceHistoryData?.content ?? []).slice(0, 3)}
+                  onViewAll={() => setActiveTab('service-history')}
+                />
+              )}
+
+              {/* Recent Notes. Hidden when no notes exist; surfaces the
+                  top 3 most recent so the persistent service knowledge is
+                  visible from Overview. "View all" jumps to the Notes
+                  tab for the full list + composer. */}
+              {allNotes.length > 0 && (
+                <RecentNotesCard
+                  notes={allNotes.slice(0, 3)}
+                  onViewAll={() => setActiveTab('notes')}
+                />
+              )}
+
               {/* Description. Hidden when empty — same reasoning as
                   Lifecycle; an empty card with a placeholder textarea
                   doesn't earn its vertical weight. Adding a description is
@@ -713,6 +790,38 @@ export default function EquipmentDetailPage() {
                     />
                   </div>
                 </section>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'notes' && (
+            <div>
+              {notesError ? (
+                <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+                  <Text className="text-sm text-red-800 dark:text-red-400">
+                    {t('common.actions.errorLoading', { entities: t('equipment.notes.heading').toLowerCase() })}: {(notesError as Error).message}
+                  </Text>
+                </div>
+              ) : notesLoading ? (
+                <div className="rounded-lg border border-zinc-200 p-6 text-center dark:border-zinc-800">
+                  <Text className="text-zinc-500 dark:text-zinc-400">
+                    {t('common.actions.loading', { entities: t('equipment.notes.heading').toLowerCase() })}
+                  </Text>
+                </div>
+              ) : (
+                // Reuse EquipmentNotesSection for the tab — it already owns
+                // composer + edit + delete + helper text. `bare` drops the
+                // section's nested-context wrapper styling (mt-3 + border-t)
+                // since there's no parent surface to separate from here.
+                // Pass the full list as both recentNotes and noteCount so
+                // the "+N more" overflow hint stays hidden (we ARE on the
+                // page that overflow would route to).
+                <EquipmentNotesSection
+                  equipmentId={id!}
+                  recentNotes={allNotes}
+                  noteCount={allNotes.length}
+                  bare
+                />
               )}
             </div>
           )}
@@ -913,7 +1022,7 @@ export default function EquipmentDetailPage() {
                     <TableBody>
                       {filters.map((f) => (
                         <TableRow key={f.id}>
-                          <TableCell className="font-mono">{formatFilterSize(f)}</TableCell>
+                          <TableCell>{formatFilterSize(f)}</TableCell>
                           <TableCell>{f.quantity}</TableCell>
                           <TableCell>{f.label || '—'}</TableCell>
                           <TableCell>
@@ -1121,6 +1230,114 @@ function ComponentsTreeNode({ node, depth, descendantsByParent }: ComponentsTree
         </ul>
       )}
     </li>
+  );
+}
+
+interface RecentServiceHistoryCardProps {
+  workOrders: WorkOrderSummary[];
+  onViewAll: () => void;
+}
+
+/**
+ * Compact at-a-glance card on the Overview tab — top 3 most recent WOs
+ * touching this equipment. Each row links to the WO detail page; the
+ * card footer "View all →" jumps to the Service History tab where the
+ * full WorkOrdersList renders. Uses the same data fetched for the tab
+ * count, so no additional network cost.
+ */
+function RecentServiceHistoryCard({ workOrders, onViewAll }: RecentServiceHistoryCardProps) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+
+  return (
+    <section className="rounded-lg border border-zinc-200 p-2.5 dark:border-zinc-800">
+      <div className="flex items-baseline justify-between gap-2">
+        <SectionLabel>
+          {t('common.recentEntities', { entities: getName('work_order', true) })}
+        </SectionLabel>
+        <button
+          type="button"
+          onClick={onViewAll}
+          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400"
+        >
+          {t('common.viewAll')}
+          <ArrowRightIcon className="size-3" />
+        </button>
+      </div>
+      <ul className="mt-1.5 divide-y divide-zinc-200 dark:divide-zinc-800">
+        {workOrders.map((wo) => {
+          // Prefer scheduledDate (operational anchor); fall back to
+          // completedDate or createdAt so every row has a date to scan.
+          const dateIso = wo.scheduledDate ?? wo.completedDate ?? wo.createdAt;
+          const woNumber = wo.workOrderNumber ?? `#${wo.id.slice(0, 8)}`;
+          return (
+            <li key={wo.id} className="py-1.5 first:pt-0 last:pb-0">
+              <RouterLink
+                to={`/work-orders/${wo.id}`}
+                className="flex items-center gap-2 rounded text-sm hover:bg-zinc-50 dark:hover:bg-white/5"
+              >
+                <span className="whitespace-nowrap text-xs text-zinc-500 dark:text-zinc-400">
+                  {formatDate(dateIso)}
+                </span>
+                <span className="font-medium text-zinc-950 hover:text-blue-600 hover:underline dark:text-white dark:hover:text-blue-400">
+                  {woNumber}
+                </span>
+                <Badge color={PROGRESS_COLORS[wo.progressCategory]}>
+                  {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[wo.progressCategory]}`)}
+                </Badge>
+              </RouterLink>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+interface RecentNotesCardProps {
+  notes: EquipmentNote[];
+  onViewAll: () => void;
+}
+
+/**
+ * Compact at-a-glance card on the Overview tab — top 3 most recent
+ * equipment notes. Read-only preview (full edit/delete + composer live
+ * on the Notes tab via "View all"). Uses the same data the Notes tab
+ * fetches.
+ */
+function RecentNotesCard({ notes, onViewAll }: RecentNotesCardProps) {
+  const { t } = useTranslation();
+
+  return (
+    <section className="rounded-lg border border-zinc-200 p-2.5 dark:border-zinc-800">
+      <div className="flex items-baseline justify-between gap-2">
+        <SectionLabel>
+          {t('common.recentEntities', { entities: t('equipment.notes.heading') })}
+        </SectionLabel>
+        <button
+          type="button"
+          onClick={onViewAll}
+          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400"
+        >
+          {t('common.viewAll')}
+          <ArrowRightIcon className="size-3" />
+        </button>
+      </div>
+      <ul className="mt-1.5 divide-y divide-zinc-200 dark:divide-zinc-800">
+        {notes.map((note) => (
+          <li key={note.id} className="py-1.5 first:pt-0 last:pb-0">
+            <p className="line-clamp-2 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">
+              {note.body}
+            </p>
+            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+              {note.authorName ?? t('equipment.notes.systemAuthor')}
+              {' · '}
+              {formatRelativeTime(note.createdAt)}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

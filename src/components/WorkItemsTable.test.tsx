@@ -6,6 +6,8 @@ import type { WorkItemEquipmentSummary, WorkItemResponse } from '../api';
 
 const mockEquipmentUpdate = vi.fn();
 
+const mockFiltersGetAll = vi.fn();
+
 vi.mock('../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/equipmentApi')>();
   return {
@@ -13,6 +15,10 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
     equipmentApi: {
       ...actual.equipmentApi,
       update: (...args: unknown[]) => mockEquipmentUpdate(...args),
+    },
+    equipmentFiltersApi: {
+      ...actual.equipmentFiltersApi,
+      getAll: (...args: unknown[]) => mockFiltersGetAll(...args),
     },
   };
 });
@@ -52,6 +58,7 @@ describe('WorkItemsTable', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockEquipmentUpdate.mockResolvedValue({ id: 'eq-1' });
+    mockFiltersGetAll.mockResolvedValue([]);
   });
 
   it('renders the empty state when there are no work items', () => {
@@ -394,6 +401,72 @@ describe('WorkItemsTable', () => {
       // Un-retiring is one click — no confirm dialog.
       expect(confirmSpy).not.toHaveBeenCalled();
       confirmSpy.mockRestore();
+    });
+
+    it('renders the filters summary inline next to the equipment grid when filters exist', async () => {
+      mockFiltersGetAll.mockResolvedValue([
+        {
+          id: 'f-1',
+          equipmentId: 'eq-1',
+          lengthIn: 14,
+          widthIn: 20,
+          thicknessIn: 1,
+          quantity: 1,
+          label: null,
+          createdAt: '',
+          updatedAt: '',
+        },
+        {
+          id: 'f-2',
+          equipmentId: 'eq-1',
+          lengthIn: 20,
+          widthIn: 25,
+          thicknessIn: 4,
+          quantity: 2,
+          label: null,
+          createdAt: '',
+          updatedAt: '',
+        },
+      ]);
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[
+            wi('wi-1', 'Replace filter', {
+              equipment: equip({ id: 'eq-1' }),
+            }),
+          ]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+        />
+      );
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+      // Filters stack one-per-line on the right of the grid; ×N appears
+      // only when quantity > 1.
+      expect(await screen.findByText('14×20×1')).toBeInTheDocument();
+      expect(screen.getByText('20×25×4 ×2')).toBeInTheDocument();
+    });
+
+    it('hides the filters summary when the equipment has no filters', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[
+            wi('wi-1', 'Replace filter', {
+              equipment: equip({ id: 'eq-1' }),
+            }),
+          ]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+        />
+      );
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+      // The "FILTERS:" label only appears when summary content exists.
+      expect(screen.queryByText(/^filters:/i)).not.toBeInTheDocument();
     });
 
     it('renders sub-unit chips when descendants are present, with truncation indicator', async () => {

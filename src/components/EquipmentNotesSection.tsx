@@ -32,6 +32,10 @@ interface Props {
    *  reference, not first-scan content. Defaults to false (always-expanded
    *  legacy behavior, used by the equipment detail page + quickview drawer). */
   collapsible?: boolean;
+  /** When true, drops the wrapper's nested-context styling (mt-3 +
+   *  border-t + pt-3). Used by the equipment detail Notes tab where
+   *  there's no parent surface to separate from. */
+  bare?: boolean;
 }
 
 /**
@@ -57,6 +61,7 @@ export default function EquipmentNotesSection({
   noteCount,
   readOnly = false,
   collapsible = false,
+  bare = false,
 }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -136,7 +141,11 @@ export default function EquipmentNotesSection({
   return (
     <section
       aria-label={t('equipment.notes.heading')}
-      className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800"
+      className={
+        bare
+          ? undefined
+          : 'mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800'
+      }
     >
       <div className="flex items-center justify-between gap-2">
         {collapsible ? (
