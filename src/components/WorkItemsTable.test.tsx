@@ -443,8 +443,10 @@ describe('WorkItemsTable', () => {
         />
       );
       await user.click(screen.getByRole('button', { name: /show details/i }));
-      // Comma-joined dimensions with ×N for quantity > 1
-      expect(await screen.findByText('14×20×1, 20×25×4 ×2')).toBeInTheDocument();
+      // Filters stack one-per-line on the right of the grid; ×N appears
+      // only when quantity > 1.
+      expect(await screen.findByText('14×20×1')).toBeInTheDocument();
+      expect(screen.getByText('20×25×4 ×2')).toBeInTheDocument();
     });
 
     it('hides the filters summary when the equipment has no filters', async () => {

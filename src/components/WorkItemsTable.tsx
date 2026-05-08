@@ -888,23 +888,31 @@ interface FiltersInlineProps {
  * Surfaced here because techs / CSRs often coordinate filter changes
  * during repairs ("what size do I need to pick up?"). Hidden when no
  * filters; full management still lives on the equipment detail page's
- * Filters tab. Comma-joined sizes with "×N" for quantity > 1. Wraps
- * below the grid on narrow screens via the parent's flex-wrap.
+ * Filters tab.
+ *
+ * Sizes stack vertically (one per line) — filters are a list, and the
+ * left side of the equipment block already runs 2 grid rows tall so the
+ * stack fills available vertical real estate without growing the block.
+ * "×N" suffix appears only when quantity > 1. Wraps below the grid on
+ * narrow screens via the parent's flex-wrap.
  */
 function FiltersInline({ filters }: FiltersInlineProps) {
   const { t } = useTranslation();
   if (filters.length === 0) return null;
-  const summary = filters
-    .map((f) =>
-      f.quantity > 1 ? `${formatFilterSize(f)} ×${f.quantity}` : formatFilterSize(f)
-    )
-    .join(', ');
   return (
     <div className="flex items-baseline gap-2 text-sm">
       <span className="whitespace-nowrap text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         {t('equipment.tabs.filters')}:
       </span>
-      <span className="text-zinc-700 dark:text-zinc-300">{summary}</span>
+      <ul className="flex flex-col gap-0.5 text-zinc-700 dark:text-zinc-300">
+        {filters.map((f) => (
+          <li key={f.id}>
+            {f.quantity > 1
+              ? `${formatFilterSize(f)} ×${f.quantity}`
+              : formatFilterSize(f)}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
