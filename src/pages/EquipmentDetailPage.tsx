@@ -698,7 +698,7 @@ export default function EquipmentDetailPage() {
                       Full management lives on the Filters tab. */}
                   {filters.length > 0 && (
                     <FieldRow label={t('equipment.tabs.filters')}>
-                      <span className="font-mono">
+                      <span>
                         {filters
                           .map((f) =>
                             f.quantity > 1
