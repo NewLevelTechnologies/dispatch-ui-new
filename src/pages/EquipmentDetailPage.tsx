@@ -1244,6 +1244,11 @@ interface RecentServiceHistoryCardProps {
  * card footer "View all →" jumps to the Service History tab where the
  * full WorkOrdersList renders. Uses the same data fetched for the tab
  * count, so no additional network cost.
+ *
+ * Each row surfaces the first work item description (with "+N more" when
+ * the WO has additional items) so the card answers "what was this WO
+ * about" — the most-asked question on a service history scan. The full
+ * up-to-five-item list lives on the WO detail page.
  */
 function RecentServiceHistoryCard({ workOrders, onViewAll }: RecentServiceHistoryCardProps) {
   const { t } = useTranslation();
@@ -1270,21 +1275,35 @@ function RecentServiceHistoryCard({ workOrders, onViewAll }: RecentServiceHistor
           // completedDate or createdAt so every row has a date to scan.
           const dateIso = wo.scheduledDate ?? wo.completedDate ?? wo.createdAt;
           const woNumber = wo.workOrderNumber ?? `#${wo.id.slice(0, 8)}`;
+          const firstItem = wo.workItems[0];
+          const extraItems = wo.workItemCount - 1;
           return (
             <li key={wo.id} className="py-1.5 first:pt-0 last:pb-0">
               <RouterLink
                 to={`/work-orders/${wo.id}`}
-                className="flex items-center gap-2 rounded text-sm hover:bg-zinc-50 dark:hover:bg-white/5"
+                className="block rounded hover:bg-zinc-50 dark:hover:bg-white/5"
               >
-                <span className="whitespace-nowrap text-xs text-zinc-500 dark:text-zinc-400">
-                  {formatDate(dateIso)}
-                </span>
-                <span className="font-medium text-zinc-950 hover:text-blue-600 hover:underline dark:text-white dark:hover:text-blue-400">
-                  {woNumber}
-                </span>
-                <Badge color={PROGRESS_COLORS[wo.progressCategory]}>
-                  {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[wo.progressCategory]}`)}
-                </Badge>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="whitespace-nowrap text-xs text-zinc-500 dark:text-zinc-400">
+                    {formatDate(dateIso)}
+                  </span>
+                  <span className="font-medium text-zinc-950 hover:text-blue-600 hover:underline dark:text-white dark:hover:text-blue-400">
+                    {woNumber}
+                  </span>
+                  <Badge color={PROGRESS_COLORS[wo.progressCategory]}>
+                    {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[wo.progressCategory]}`)}
+                  </Badge>
+                </div>
+                {firstItem && (
+                  <div className="mt-0.5 truncate text-xs text-zinc-600 dark:text-zinc-400">
+                    {firstItem.description}
+                    {extraItems > 0 && (
+                      <span className="ml-1 text-zinc-500 dark:text-zinc-500">
+                        {t('workOrders.table.workItemsMore', { count: extraItems })}
+                      </span>
+                    )}
+                  </div>
+                )}
               </RouterLink>
             </li>
           );

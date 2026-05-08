@@ -82,8 +82,19 @@ export interface WorkItemResponse {
   updatedAt: string;
 }
 
-// Slim shape returned by the list endpoint — excludes workItems and other detail-only fields
-// to keep the list payload small. Use getById() for the full WorkOrder.
+// Compact projection of the work items belonging to a WorkOrderSummary —
+// just description + status category, since the list views don't link
+// individual work items. Backend caps at 5 entries; UI uses
+// `workItemCount > workItems.length` to render a "+N more" indicator.
+export interface WorkItemSummaryProjection {
+  description: string;
+  statusCategory: ProgressCategory;
+}
+
+// Slim shape returned by the list endpoint. Includes a capped projection
+// of work items (description + statusCategory) so list surfaces can
+// answer "what is this WO about" at a glance; full WorkItemResponse[] —
+// with status IDs, equipment, etc. — only ships from getById().
 export interface WorkOrderSummary {
   id: string;
   workOrderNumber?: string;
@@ -134,6 +145,11 @@ export interface WorkOrderSummary {
     status?: string;
   };
 
+  // Work items projection — capped at 5 entries server-side, ordered by
+  // createdAt (insertion order). `workItemCount` is the unbounded total.
+  workItemCount: number;
+  workItems: WorkItemSummaryProjection[];
+
   createdAt: string;
   updatedAt: string;
 }
@@ -145,7 +161,11 @@ export interface WorkOrder extends WorkOrderSummary {
   cancellationReason?: string | null;
   cancelledByUserId?: string | null;
   createdByUserId?: string;
-  workItems?: WorkItemResponse[];
+  // Detail endpoint widens the inherited projection to the full
+  // WorkItemResponse shape (status IDs, equipment summaries, etc.).
+  // WorkItemResponse is a structural superset of WorkItemSummaryProjection,
+  // so this narrows the inherited property type at the detail level.
+  workItems: WorkItemResponse[];
 }
 
 // Spring Data Page<T> response wrapper

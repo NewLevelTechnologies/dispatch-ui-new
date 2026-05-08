@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   type ProgressCategory,
+  type WorkItemSummaryProjection,
   type WorkOrderPriority,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
@@ -26,6 +27,23 @@ const PROGRESS_COLORS: Record<ProgressCategory, 'zinc' | 'sky' | 'blue' | 'amber
   COMPLETED: 'lime',
   CANCELLED: 'zinc',
 };
+
+// Tailwind utility classes for the per-work-item status dot rendered in
+// the "Work" column. Mirrors PROGRESS_COLORS but maps to bg-* utilities
+// since Catalyst's Badge is too tall for inline list rendering.
+const PROGRESS_DOT_CLASS: Record<ProgressCategory, string> = {
+  NOT_STARTED: 'bg-zinc-300 dark:bg-zinc-600',
+  IN_PROGRESS: 'bg-blue-500',
+  BLOCKED: 'bg-amber-500',
+  COMPLETED: 'bg-lime-500',
+  CANCELLED: 'bg-zinc-300 dark:bg-zinc-600',
+};
+
+// Cap on how many work items we render inline in the Work column before
+// collapsing the rest into a "+N more" indicator. Backend caps at 5, but
+// 3 keeps row height in check on dense lists; the count badge surfaces
+// the unbounded total and disambiguates the "+N more" line.
+const WORK_ITEMS_INLINE_CAP = 3;
 
 const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
   NOT_STARTED: 'notStarted',
@@ -134,6 +152,7 @@ export default function WorkOrdersList({
         <TableRow>
           <TableHeader>{t('workOrders.table.id')}</TableHeader>
           {showLocation && <TableHeader>{getName('service_location')}</TableHeader>}
+          <TableHeader>{t('workOrders.table.work')}</TableHeader>
           <TableHeader>{t('workOrders.table.statusHeader')}</TableHeader>
           <TableHeader>{t('workOrders.table.priority')}</TableHeader>
           <TableHeader>{t('workOrders.table.scheduled')}</TableHeader>
@@ -183,6 +202,12 @@ export default function WorkOrdersList({
                 </TableCell>
               )}
               <TableCell>
+                <WorkItemsCell
+                  items={wo.workItems}
+                  totalCount={wo.workItemCount}
+                />
+              </TableCell>
+              <TableCell>
                 {cancelled ? (
                   <Badge color="zinc">{t('workOrders.actions.cancelledBadge')}</Badge>
                 ) : (
@@ -206,5 +231,50 @@ export default function WorkOrdersList({
         })}
       </TableBody>
     </Table>
+  );
+}
+
+interface WorkItemsCellProps {
+  items: WorkItemSummaryProjection[];
+  /** Unbounded total — drives the "+N more" indicator regardless of
+   *  whether the server truncated the projection (server caps at 5). */
+  totalCount: number;
+}
+
+/**
+ * Compact stack of work item descriptions with a colored status dot per
+ * line. Truncates each line to keep the row tight; collapses anything
+ * beyond WORK_ITEMS_INLINE_CAP into a "+N more" footer using the unbounded
+ * `totalCount` so the count is correct even when the server projection
+ * was truncated.
+ */
+function WorkItemsCell({ items, totalCount }: WorkItemsCellProps) {
+  const { t } = useTranslation();
+  if (totalCount === 0 || items.length === 0) {
+    return <span className="text-zinc-400 dark:text-zinc-600">—</span>;
+  }
+  const visible = items.slice(0, WORK_ITEMS_INLINE_CAP);
+  const overflow = totalCount - visible.length;
+  return (
+    <div className="flex max-w-[28rem] flex-col gap-0.5">
+      {visible.map((wi, i) => (
+        <div key={i} className="flex items-center gap-1.5">
+          <span
+            aria-label={t(
+              `workOrders.progress.${PROGRESS_TRANSLATION_KEYS[wi.statusCategory]}`
+            )}
+            className={`size-1.5 shrink-0 rounded-full ${PROGRESS_DOT_CLASS[wi.statusCategory]}`}
+          />
+          <span className="truncate text-zinc-700 dark:text-zinc-300">
+            {wi.description}
+          </span>
+        </div>
+      ))}
+      {overflow > 0 && (
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+          {t('workOrders.table.workItemsMore', { count: overflow })}
+        </span>
+      )}
+    </div>
   );
 }
