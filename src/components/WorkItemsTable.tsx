@@ -6,6 +6,7 @@ import {
   equipmentApi,
   equipmentImagesApi,
   EquipmentStatus,
+  type EquipmentImage,
   type EquipmentNote,
   type StatusWorkflowRule,
   type UpdateEquipmentRequest,
@@ -15,7 +16,6 @@ import {
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import EquipmentNotesSection from './EquipmentNotesSection';
-import EquipmentPhotosSection from './EquipmentPhotosSection';
 import EquipmentThumbnail from './EquipmentThumbnail';
 import {
   Table,
@@ -563,7 +563,11 @@ function EquipmentBlockBody({
 
       {/* Identity row: thumbnail (48px) + name + status pill + type/category subline.
           Hero thumbnail becomes a click target when images exist — opens the
-          shared lightbox at index 0 (the profile image, by sort contract). */}
+          shared lightbox at index 0 (the profile image, by sort contract).
+          Photo strip lives at the right end of this row (when 2+ photos
+          exist) so visual identity content clusters together rather than
+          stacking a labeled PHOTOS section below — saves vertical and
+          reads as "here's the unit, and here are more views of it." */}
       <div className="mt-1 flex items-start gap-3">
         {heroClickable ? (
           <button
@@ -608,6 +612,10 @@ function EquipmentBlockBody({
             </div>
           )}
         </div>
+        <PhotoStrip
+          images={orderedImages}
+          onSelect={(i) => setLightboxIndex(i)}
+        />
       </div>
 
       {/* Inline-edit grid: Make / Model on row 1, Serial / Location on
@@ -657,19 +665,18 @@ function EquipmentBlockBody({
         onAddSubUnit={onAddSubUnit}
       />
 
-      <EquipmentPhotosSection
-        images={orderedImages}
-        onSelectImage={(i) => setLightboxIndex(i)}
-      />
-
       {/* recentNotes shape on WorkItemEquipmentSummary is inlined (not the
           EquipmentNote type) to avoid a circular import in workOrderApi.
-          The fields match exactly, so the cast is structural equality. */}
+          The fields match exactly, so the cast is structural equality.
+          collapsible=true: notes are second-pass reference content here,
+          not first-scan — collapsed-by-default with a one-line preview
+          keeps the row dense without losing access. */}
       <EquipmentNotesSection
         equipmentId={equipment.id}
         recentNotes={(equipment.recentNotes ?? []) as EquipmentNote[]}
         noteCount={equipment.noteCount ?? 0}
         readOnly={readOnly}
+        collapsible
       />
 
       <EquipmentPhotoLightbox
@@ -847,6 +854,65 @@ function SectionHeader({ label, actions }: SectionHeaderProps) {
         {label}
       </div>
       {actions && <div className="flex items-center gap-1">{actions}</div>}
+    </div>
+  );
+}
+
+interface PhotoStripProps {
+  images: EquipmentImage[];
+  /** Click handler — receives the index in `images`. The +N overflow chip
+   *  jumps to the first hidden index so the lightbox can flip through the
+   *  rest of the set. */
+  onSelect: (index: number) => void;
+}
+
+/**
+ * Compact photo row pinned to the right of the equipment identity row.
+ * Replaces the labeled PHOTOS sub-section below the equipment block on
+ * dense WO row expansions — hero thumb + this strip cover the same visual
+ * ground without burning a labeled section's worth of vertical space.
+ *
+ * Hidden when there's 0 or 1 image because the hero thumbnail already
+ * surfaces the only photo via click-to-lightbox. Cap is 3 (vs the section
+ * variant's 6) — the right column has narrow space and the +N chip routes
+ * to the lightbox for full browsing.
+ */
+function PhotoStrip({ images, onSelect }: PhotoStripProps) {
+  const { t } = useTranslation();
+  if (images.length <= 1) return null;
+  const cap = 3;
+  const visible = images.slice(0, cap);
+  const overflow = images.length - visible.length;
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-1">
+      {visible.map((img, i) => (
+        <button
+          key={img.id}
+          type="button"
+          onClick={() => onSelect(i)}
+          // 32px (size-8) — distinctly smaller than the 48px hero so the
+          // identity hierarchy reads as "this is the unit, these are more
+          // views." object-contain + bg keeps non-square photos uncropped.
+          className="block size-8 overflow-hidden rounded bg-zinc-100 ring-1 ring-zinc-950/10 hover:ring-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-zinc-800 dark:ring-white/10"
+          title={img.caption ?? t('equipment.images.openFullSize')}
+        >
+          <img
+            src={img.thumbnailUrl ?? img.url}
+            alt={img.caption ?? ''}
+            className="size-full object-contain"
+            loading="lazy"
+          />
+        </button>
+      ))}
+      {overflow > 0 && (
+        <button
+          type="button"
+          onClick={() => onSelect(visible.length)}
+          className="flex size-8 items-center justify-center rounded text-xs font-medium text-zinc-700 ring-1 ring-zinc-950/10 hover:bg-zinc-50 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-zinc-300 dark:ring-white/10 dark:hover:bg-white/5 dark:hover:text-blue-400"
+        >
+          +{overflow}
+        </button>
+      )}
     </div>
   );
 }
