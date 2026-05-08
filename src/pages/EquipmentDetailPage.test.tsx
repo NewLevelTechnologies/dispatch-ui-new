@@ -911,6 +911,41 @@ describe('EquipmentDetailPage', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
+  it('renders a Filters summary inside Identification when the unit has filters', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockFiltersGetAll.mockResolvedValue([
+      {
+        id: 'f-1',
+        equipmentId: 'eq-1',
+        lengthIn: 20,
+        widthIn: 25,
+        thicknessIn: 1,
+        quantity: 2,
+        label: 'Return air',
+        createdAt: '',
+        updatedAt: '',
+      },
+      {
+        id: 'f-2',
+        equipmentId: 'eq-1',
+        lengthIn: 16,
+        widthIn: 20,
+        thicknessIn: 1,
+        quantity: 1,
+        label: null,
+        createdAt: '',
+        updatedAt: '',
+      },
+    ]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Carrier')).toBeInTheDocument();
+    });
+    // ×N appears only when quantity > 1; single-quantity filter omits it.
+    expect(await screen.findByText('20 × 25 × 1 ×2, 16 × 20 × 1')).toBeInTheDocument();
+  });
+
   it('hides the Recent Service History and Recent Notes cards on Overview when both lists are empty', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     renderPage();

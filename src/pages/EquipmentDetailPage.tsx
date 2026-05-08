@@ -691,6 +691,24 @@ export default function EquipmentDetailPage() {
                       ariaLabel={t('equipment.form.locationOnSite')}
                     />
                   </FieldRow>
+                  {/* Filters summary — read-only at-a-glance row appended to
+                      Identification when this unit has filters configured.
+                      Common case is 1-3 filters per unit, so a comma-joined
+                      string fits comfortably without overflow handling.
+                      Full management lives on the Filters tab. */}
+                  {filters.length > 0 && (
+                    <FieldRow label={t('equipment.tabs.filters')}>
+                      <span className="font-mono">
+                        {filters
+                          .map((f) =>
+                            f.quantity > 1
+                              ? `${formatFilterSize(f)} ×${f.quantity}`
+                              : formatFilterSize(f)
+                          )
+                          .join(', ')}
+                      </span>
+                    </FieldRow>
+                  )}
                 </FieldGrid>
               </section>
 
