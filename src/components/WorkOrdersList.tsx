@@ -2,6 +2,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
+  workOrderTypesApi,
   type ProgressCategory,
   type WorkOrderPriority,
 } from '../api';
@@ -92,6 +93,18 @@ export default function WorkOrdersList({
     workOrdersListQueryOptions({ customerId, serviceLocationId, equipmentId, pageSize })
   );
 
+  // Resolve workOrderTypeId → type name for the Type column. Same query
+  // key as WorkOrdersPage so the cache is shared and the request fires
+  // at most once across both surfaces in the same session.
+  const { data: workOrderTypes } = useQuery({
+    queryKey: ['work-order-types'],
+    queryFn: () => workOrderTypesApi.getAll(),
+  });
+  // Array.isArray guard mirrors WorkOrdersPage — the types endpoint can
+  // return a non-array shape (e.g., from bulk-mocked tests or stale
+  // cache); narrowing here keeps the .find() lookup safe.
+  const safeTypes = Array.isArray(workOrderTypes) ? workOrderTypes : [];
+
   const items = data?.content ?? [];
 
   if (isLoading) {
@@ -136,6 +149,7 @@ export default function WorkOrdersList({
           <TableHeader>{t('workOrders.table.id')}</TableHeader>
           {showLocation && <TableHeader>{getName('service_location')}</TableHeader>}
           <TableHeader>{t('workOrders.table.work')}</TableHeader>
+          <TableHeader>{t('workOrders.table.type')}</TableHeader>
           <TableHeader>{t('workOrders.table.statusHeader')}</TableHeader>
           <TableHeader>{t('workOrders.table.priority')}</TableHeader>
           <TableHeader>{t('workOrders.table.scheduled')}</TableHeader>
@@ -189,6 +203,9 @@ export default function WorkOrdersList({
                   items={wo.workItems}
                   totalCount={wo.workItemCount}
                 />
+              </TableCell>
+              <TableCell className="text-zinc-600 dark:text-zinc-400">
+                {safeTypes.find((tp) => tp.id === wo.workOrderTypeId)?.name ?? '—'}
               </TableCell>
               <TableCell>
                 {cancelled ? (

@@ -3,16 +3,14 @@ import {
   type ProgressCategory,
   type WorkItemSummaryProjection,
 } from '../api';
+import { Badge } from './catalyst/badge';
 
-// Tailwind utility classes for the per-work-item status dot. Mirrors the
-// PROGRESS_COLORS Badge map but maps to bg-* utilities since Catalyst's
-// Badge is too tall for inline list rendering inside a dense table cell.
-const PROGRESS_DOT_CLASS: Record<ProgressCategory, string> = {
-  NOT_STARTED: 'bg-zinc-300 dark:bg-zinc-600',
-  IN_PROGRESS: 'bg-blue-500',
-  BLOCKED: 'bg-amber-500',
-  COMPLETED: 'bg-lime-500',
-  CANCELLED: 'bg-zinc-300 dark:bg-zinc-600',
+const PROGRESS_COLORS: Record<ProgressCategory, 'zinc' | 'blue' | 'amber' | 'lime'> = {
+  NOT_STARTED: 'zinc',
+  IN_PROGRESS: 'blue',
+  BLOCKED: 'amber',
+  COMPLETED: 'lime',
+  CANCELLED: 'zinc',
 };
 
 const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
@@ -38,12 +36,15 @@ interface Props {
 }
 
 /**
- * Compact stack of work item descriptions with a colored status dot per
- * line. Used on the WO list page (main + scoped variants) to answer
- * "what is this WO about" — the highest-signal scan target on the list.
+ * Compact stack of work item descriptions with a status badge per line.
+ * Used on the WO list page (main + scoped variants) to answer "what is
+ * this WO about" — the highest-signal scan target on the list.
  *
  * Renders an em-dash placeholder when the WO has no items so the column
- * stays visually present (avoids ragged-right rows).
+ * stays visually present (avoids ragged-right rows). Badge sits to the
+ * right of the description (right-aligned) so the column reads as a
+ * column of statuses on the right edge — easier to scan status mix at a
+ * glance than badges interleaved with descriptions on the left.
  */
 export default function WorkItemsCell({ items, totalCount }: Props) {
   const { t } = useTranslation();
@@ -53,18 +54,17 @@ export default function WorkItemsCell({ items, totalCount }: Props) {
   const visible = items.slice(0, WORK_ITEMS_INLINE_CAP);
   const overflow = totalCount - visible.length;
   return (
-    <div className="flex max-w-[28rem] flex-col gap-0.5">
+    <div className="flex max-w-[32rem] flex-col gap-0.5">
       {visible.map((wi, i) => (
-        <div key={i} className="flex items-center gap-1.5">
-          <span
-            aria-label={t(
-              `workOrders.progress.${PROGRESS_TRANSLATION_KEYS[wi.statusCategory]}`
-            )}
-            className={`size-1.5 shrink-0 rounded-full ${PROGRESS_DOT_CLASS[wi.statusCategory]}`}
-          />
-          <span className="truncate text-zinc-700 dark:text-zinc-300">
+        <div key={i} className="flex items-center justify-between gap-2">
+          <span className="min-w-0 flex-1 truncate text-zinc-700 dark:text-zinc-300">
             {wi.description}
           </span>
+          <Badge color={PROGRESS_COLORS[wi.statusCategory]}>
+            {t(
+              `workOrders.progress.${PROGRESS_TRANSLATION_KEYS[wi.statusCategory]}`
+            )}
+          </Badge>
         </div>
       ))}
       {overflow > 0 && (

@@ -1253,6 +1253,7 @@
       "priority": "Priority",
       "scheduled": "Scheduled",
       "statusHeader": "Status",
+      "type": "Type",
       "work": "Work",
       "workItemsMore": "+{{count}} more"
     },

@@ -760,6 +760,7 @@ vi.mock('react-i18next', () => {
     'workOrders.table.priority': 'Priority',
     'workOrders.table.scheduled': 'Scheduled',
     'workOrders.table.statusHeader': 'Status',
+    'workOrders.table.type': 'Type',
     'workOrders.table.work': 'Work',
     'workOrders.table.workItemsMore': '+{{count}} more',
     'workOrders.workItems.empty': 'No {{children, lowercase}} on this {{entity, lowercase}} yet.',
