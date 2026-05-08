@@ -9,6 +9,7 @@ import {
   equipmentCategoriesApi,
   equipmentFiltersApi,
   equipmentImagesApi,
+  equipmentNotesApi,
   tenantFilterSizesApi,
   EquipmentStatus,
   EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
@@ -25,6 +26,7 @@ import EditableField from '../components/EditableField';
 import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentImageUploadDialog from '../components/EquipmentImageUploadDialog';
+import EquipmentNotesSection from '../components/EquipmentNotesSection';
 import EquipmentPhotoLightbox from '../components/EquipmentPhotoLightbox';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import WorkOrdersList from '../components/WorkOrdersList';
@@ -58,7 +60,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 
-type TabId = 'overview' | 'photos' | 'filters' | 'service-history' | 'components';
+type TabId = 'overview' | 'notes' | 'photos' | 'filters' | 'service-history' | 'components';
 
 // Above this number of tenant filter sizes, the chip palette collapses to
 // the top N by sortOrder with a "Show all" toggle. Keeps the filters tab
@@ -182,6 +184,16 @@ export default function EquipmentDetailPage() {
   const { data: images = [], isLoading: imagesLoading, error: imagesError } = useQuery({
     queryKey: ['equipment-images', id],
     queryFn: () => equipmentImagesApi.list(id!),
+    enabled: !!id,
+  });
+
+  // Full notes list for the Notes tab. Cache key is shared with
+  // EquipmentNotesSection's mutations so create/update/delete invalidations
+  // reach this query too — the embedded section in the WO row + this tab
+  // refresh in lockstep when either surface mutates.
+  const { data: allNotes = [], isLoading: notesLoading, error: notesError } = useQuery({
+    queryKey: ['equipment-notes', id],
+    queryFn: () => equipmentNotesApi.list(id!),
     enabled: !!id,
   });
 
@@ -371,6 +383,11 @@ export default function EquipmentDetailPage() {
   const isSubUnit = Boolean(equipment.parentId);
   const tabs = [
     { id: 'overview', label: t('equipment.tabs.overview') },
+    // Notes sit between Overview and Photos — both are supporting reference
+    // content (identity facts ↔ service knowledge ↔ visual id), so they
+    // cluster ahead of Filters / Service History / Components which are
+    // operational surfaces.
+    { id: 'notes', label: t('equipment.tabs.notes'), count: allNotes.length },
     { id: 'photos', label: t('equipment.tabs.photos'), count: images.length },
     { id: 'filters', label: t('equipment.tabs.filters'), count: filters.length },
     {
@@ -713,6 +730,38 @@ export default function EquipmentDetailPage() {
                     />
                   </div>
                 </section>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'notes' && (
+            <div>
+              {notesError ? (
+                <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+                  <Text className="text-sm text-red-800 dark:text-red-400">
+                    {t('common.actions.errorLoading', { entities: t('equipment.notes.heading').toLowerCase() })}: {(notesError as Error).message}
+                  </Text>
+                </div>
+              ) : notesLoading ? (
+                <div className="rounded-lg border border-zinc-200 p-6 text-center dark:border-zinc-800">
+                  <Text className="text-zinc-500 dark:text-zinc-400">
+                    {t('common.actions.loading', { entities: t('equipment.notes.heading').toLowerCase() })}
+                  </Text>
+                </div>
+              ) : (
+                // Reuse EquipmentNotesSection for the tab — it already owns
+                // composer + edit + delete + helper text. `bare` drops the
+                // section's nested-context wrapper styling (mt-3 + border-t)
+                // since there's no parent surface to separate from here.
+                // Pass the full list as both recentNotes and noteCount so
+                // the "+N more" overflow hint stays hidden (we ARE on the
+                // page that overflow would route to).
+                <EquipmentNotesSection
+                  equipmentId={id!}
+                  recentNotes={allNotes}
+                  noteCount={allNotes.length}
+                  bare
+                />
               )}
             </div>
           )}

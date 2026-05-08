@@ -398,6 +398,7 @@ vi.mock('react-i18next', () => {
     'equipment.status.all': 'All',
     'equipment.status.retired': 'Retired',
     'equipment.tabs.filters': 'Filters',
+    'equipment.tabs.notes': 'Notes',
     'equipment.tabs.overview': 'Overview',
     'equipment.tabs.serviceHistory': 'Service History',
     'equipment.table.category': 'Category',

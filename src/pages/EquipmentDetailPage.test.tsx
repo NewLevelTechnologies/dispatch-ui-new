@@ -19,6 +19,10 @@ const mockImagesList = vi.fn();
 const mockImageUpload = vi.fn();
 const mockImagePatch = vi.fn();
 const mockImageDelete = vi.fn();
+const mockNotesList = vi.fn();
+const mockNotesCreate = vi.fn();
+const mockNotesUpdate = vi.fn();
+const mockNotesDelete = vi.fn();
 const mockWorkOrdersGetAll = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
@@ -50,6 +54,12 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
       upload: (...args: unknown[]) => mockImageUpload(...args),
       patch: (...args: unknown[]) => mockImagePatch(...args),
       delete: (...args: unknown[]) => mockImageDelete(...args),
+    },
+    equipmentNotesApi: {
+      list: (...args: unknown[]) => mockNotesList(...args),
+      create: (...args: unknown[]) => mockNotesCreate(...args),
+      update: (...args: unknown[]) => mockNotesUpdate(...args),
+      delete: (...args: unknown[]) => mockNotesDelete(...args),
     },
   };
 });
@@ -117,6 +127,7 @@ describe('EquipmentDetailPage', () => {
     mockFiltersGetAll.mockResolvedValue([]);
     mockFilterSizesGetAll.mockResolvedValue([]);
     mockImagesList.mockResolvedValue([]);
+    mockNotesList.mockResolvedValue([]);
     mockWorkOrdersGetAll.mockResolvedValue({
       content: [],
       totalElements: 0,
@@ -898,6 +909,60 @@ describe('EquipmentDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /add photo/i }));
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('renders an empty Notes tab with the Add note affordance', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /^notes/i }));
+
+    // EquipmentNotesSection always renders heading + Add note CTA, even at count 0.
+    expect(await screen.findByText('Notes (0)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add note/i })).toBeInTheDocument();
+  });
+
+  it('renders the Notes tab with the full list and a count badge', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockNotesList.mockResolvedValue([
+      {
+        id: 'n-1',
+        body: 'Replaced compressor 2025-08-12',
+        authorUserId: 'u-1',
+        authorName: 'Jane Smith',
+        createdAt: '2026-05-01T12:00:00Z',
+        updatedAt: '2026-05-01T12:00:00Z',
+      },
+      {
+        id: 'n-2',
+        body: 'Filter due in May',
+        authorUserId: 'u-2',
+        authorName: 'Bob',
+        createdAt: '2026-04-20T09:00:00Z',
+        updatedAt: '2026-04-20T09:00:00Z',
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    // Tab badge surfaces the count
+    const notesTab = await screen.findByRole('button', { name: /^notes\s*2$/i });
+    await user.click(notesTab);
+
+    // Section heading reflects the full list size, and both bodies render
+    await waitFor(() => {
+      expect(screen.getByText('Notes (2)')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Replaced compressor 2025-08-12')).toBeInTheDocument();
+    expect(screen.getByText('Filter due in May')).toBeInTheDocument();
   });
 
   it('alerts and stays in edit mode when PATCH fails', async () => {
