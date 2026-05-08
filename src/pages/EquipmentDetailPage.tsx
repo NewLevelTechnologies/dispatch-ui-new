@@ -1028,7 +1028,7 @@ export default function EquipmentDetailPage() {
                     <TableBody>
                       {filters.map((f) => (
                         <TableRow key={f.id}>
-                          <TableCell className="font-mono">{formatFilterSize(f)}</TableCell>
+                          <TableCell>{formatFilterSize(f)}</TableCell>
                           <TableCell>{f.quantity}</TableCell>
                           <TableCell>{f.label || '—'}</TableCell>
                           <TableCell>
