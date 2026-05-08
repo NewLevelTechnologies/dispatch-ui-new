@@ -40,11 +40,19 @@ interface Props {
  * Used on the WO list page (main + scoped variants) to answer "what is
  * this WO about" — the highest-signal scan target on the list.
  *
+ * Layout choices:
+ * - **Status badge LEFT of description**, matching the order CSRs see on
+ *   the WO detail page (design §3.3). Same content in both surfaces
+ *   should read in the same order — switching it forces re-parsing.
+ * - **`line-clamp-2`** on each description: most real descriptions fit
+ *   in 1–2 lines so the common case shows full text; outliers truncate
+ *   at 2 lines instead of 1.
+ * - **`title` attribute** carries the full description so hover and
+ *   keyboard focus reveal anything that got clamped — no info is hidden
+ *   behind a navigation step.
+ *
  * Renders an em-dash placeholder when the WO has no items so the column
- * stays visually present (avoids ragged-right rows). Badge sits to the
- * right of the description (right-aligned) so the column reads as a
- * column of statuses on the right edge — easier to scan status mix at a
- * glance than badges interleaved with descriptions on the left.
+ * stays visually present (avoids ragged-right rows).
  */
 export default function WorkItemsCell({ items, totalCount }: Props) {
   const { t } = useTranslation();
@@ -54,17 +62,23 @@ export default function WorkItemsCell({ items, totalCount }: Props) {
   const visible = items.slice(0, WORK_ITEMS_INLINE_CAP);
   const overflow = totalCount - visible.length;
   return (
-    <div className="flex max-w-[32rem] flex-col gap-0.5">
+    <div className="flex max-w-[32rem] flex-col gap-1">
       {visible.map((wi, i) => (
-        <div key={i} className="flex items-center justify-between gap-2">
-          <span className="min-w-0 flex-1 truncate text-zinc-700 dark:text-zinc-300">
-            {wi.description}
-          </span>
-          <Badge color={PROGRESS_COLORS[wi.statusCategory]}>
+        <div key={i} className="flex items-start gap-2">
+          <Badge
+            color={PROGRESS_COLORS[wi.statusCategory]}
+            className="shrink-0"
+          >
             {t(
               `workOrders.progress.${PROGRESS_TRANSLATION_KEYS[wi.statusCategory]}`
             )}
           </Badge>
+          <span
+            title={wi.description}
+            className="line-clamp-2 min-w-0 flex-1 text-zinc-700 dark:text-zinc-300"
+          >
+            {wi.description}
+          </span>
         </div>
       ))}
       {overflow > 0 && (
