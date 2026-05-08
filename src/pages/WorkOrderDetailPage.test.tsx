@@ -41,6 +41,7 @@ const mockWorkOrder: WorkOrder = {
     siteContactPhone: '5559876543',
     status: 'ACTIVE',
   },
+  workItemCount: 0,
   workItems: [],
   createdAt: '2026-04-21T13:40:00Z',
   updatedAt: '2026-04-23T14:46:00Z',

@@ -84,6 +84,7 @@ export {
   type WorkOrder,
   type WorkOrderSummary,
   type WorkItemResponse,
+  type WorkItemSummaryProjection,
   type WorkItemEquipmentSummary,
   type Page,
   type CreateWorkOrderRequest,

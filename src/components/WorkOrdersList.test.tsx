@@ -22,6 +22,8 @@ const woAtLocation1: WorkOrderSummary = {
     address: { streetAddress: '1 Main St', city: 'Springfield', state: 'IL', zipCode: '62701' },
   },
   customer: { id: 'cust-1', name: 'Acme Co.' },
+  workItemCount: 0,
+  workItems: [],
   createdAt: '2026-04-21T13:40:00Z',
   updatedAt: '2026-04-22T10:30:00Z',
 };
@@ -42,6 +44,8 @@ const cancelledWO: WorkOrderSummary = {
     address: { streetAddress: '2 Annex Rd', city: 'Springfield', state: 'IL', zipCode: '62702' },
   },
   customer: { id: 'cust-1', name: 'Acme Co.' },
+  workItemCount: 0,
+  workItems: [],
   createdAt: '2026-03-01T13:40:00Z',
   updatedAt: '2026-03-10T10:00:00Z',
 };
@@ -155,6 +159,59 @@ describe('WorkOrdersList', () => {
       expect(screen.getByText('WO-00002')).toBeInTheDocument();
     });
     expect(screen.getByText(/cancelled/i)).toBeInTheDocument();
+  });
+
+  it('renders work item descriptions in the Work column with a status dot per item', async () => {
+    const woWithItems: WorkOrderSummary = {
+      ...woAtLocation1,
+      workItemCount: 2,
+      workItems: [
+        { description: 'Replace condenser coil', statusCategory: 'IN_PROGRESS' },
+        { description: 'Inspect ductwork', statusCategory: 'COMPLETED' },
+      ],
+    };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([woWithItems]) });
+    renderWithProviders(<WorkOrdersList customerId="cust-1" />);
+    await waitFor(() => {
+      expect(screen.getByText('Replace condenser coil')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Inspect ductwork')).toBeInTheDocument();
+  });
+
+  it('collapses overflow into a "+N more" indicator when work item count exceeds the inline cap', async () => {
+    const woWithMany: WorkOrderSummary = {
+      ...woAtLocation1,
+      workItemCount: 7,
+      workItems: [
+        { description: 'Item one', statusCategory: 'IN_PROGRESS' },
+        { description: 'Item two', statusCategory: 'NOT_STARTED' },
+        { description: 'Item three', statusCategory: 'COMPLETED' },
+        { description: 'Item four', statusCategory: 'NOT_STARTED' },
+        { description: 'Item five', statusCategory: 'NOT_STARTED' },
+      ],
+    };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([woWithMany]) });
+    renderWithProviders(<WorkOrdersList customerId="cust-1" />);
+    await waitFor(() => {
+      expect(screen.getByText('Item one')).toBeInTheDocument();
+    });
+    // Inline cap is 3
+    expect(screen.getByText('Item one')).toBeInTheDocument();
+    expect(screen.getByText('Item two')).toBeInTheDocument();
+    expect(screen.getByText('Item three')).toBeInTheDocument();
+    expect(screen.queryByText('Item four')).not.toBeInTheDocument();
+    // Overflow is `workItemCount - visible.length` = 7 - 3 = 4
+    expect(screen.getByText('+4 more')).toBeInTheDocument();
+  });
+
+  it('renders an em-dash placeholder in the Work column when the WO has no items', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([woAtLocation1]) });
+    renderWithProviders(<WorkOrdersList customerId="cust-1" />);
+    await waitFor(() => {
+      expect(screen.getByText('WO-00001')).toBeInTheDocument();
+    });
+    // woAtLocation1 has workItemCount: 0, workItems: []
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
   it('passes serviceLocationId as a server-side filter to the list endpoint', async () => {

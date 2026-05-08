@@ -253,6 +253,8 @@ describe('EquipmentDetailPage', () => {
           scheduledDate: '2026-04-15',
           serviceLocation: null,
           lifecycleState: 'ACTIVE',
+          workItemCount: 0,
+          workItems: [],
         },
       ],
       totalElements: 1,
@@ -972,6 +974,11 @@ describe('EquipmentDetailPage', () => {
           progressCategory: 'IN_PROGRESS',
           priority: 'NORMAL',
           scheduledDate: '2026-04-24',
+          workItemCount: 2,
+          workItems: [
+            { description: 'Replace condenser coil', statusCategory: 'IN_PROGRESS' },
+            { description: 'Inspect ductwork', statusCategory: 'NOT_STARTED' },
+          ],
           createdAt: '2026-04-20T12:00:00Z',
           updatedAt: '2026-04-24T12:00:00Z',
         },
@@ -991,9 +998,12 @@ describe('EquipmentDetailPage', () => {
     });
 
     expect(await screen.findByText(/recent work orders/i)).toBeInTheDocument();
-    // The WO row links to its detail page
+    // The WO row links to its detail page and surfaces the first work item
+    // description with a "+N more" indicator when the WO has additional items.
     const woLink = screen.getByRole('link', { name: /WO-00010/i });
     expect(woLink).toHaveAttribute('href', '/work-orders/wo-1');
+    expect(screen.getByText(/replace condenser coil/i)).toBeInTheDocument();
+    expect(screen.getByText(/\+1 more/i)).toBeInTheDocument();
 
     // "View all" jumps to the Service History tab
     await user.click(screen.getByRole('button', { name: /view all/i }));

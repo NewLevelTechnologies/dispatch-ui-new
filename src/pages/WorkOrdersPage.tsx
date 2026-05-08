@@ -15,6 +15,7 @@ import {
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
+import WorkItemsCell from '../components/WorkItemsCell';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';
 import { Heading } from '../components/catalyst/heading';
@@ -641,10 +642,11 @@ export default function WorkOrdersPage() {
               <TableRow>
                 <TableHeader>{t('workOrders.table.id')}</TableHeader>
                 <TableHeader>{getName('service_location')}</TableHeader>
+                <TableHeader>{t('workOrders.table.work')}</TableHeader>
+                <TableHeader>{t('workOrders.table.type')}</TableHeader>
                 <TableHeader>{t('workOrders.table.statusHeader')}</TableHeader>
                 <TableHeader>{t('workOrders.table.priority')}</TableHeader>
                 <TableHeader>{t('workOrders.table.scheduled')}</TableHeader>
-                <TableHeader>{t('workOrders.table.customerPO')}</TableHeader>
                 <TableHeader></TableHeader>
               </TableRow>
             </TableHead>
@@ -685,6 +687,15 @@ export default function WorkOrdersPage() {
                       </div>
                     </TableCell>
                     <TableCell>
+                      <WorkItemsCell
+                        items={workOrder.workItems}
+                        totalCount={workOrder.workItemCount}
+                      />
+                    </TableCell>
+                    <TableCell className="text-zinc-600 dark:text-zinc-400">
+                      {activeTypes.find((tp) => tp.id === workOrder.workOrderTypeId)?.name ?? '—'}
+                    </TableCell>
+                    <TableCell>
                       {cancelled ? (
                         <div className="flex flex-col gap-0.5">
                           <Badge color="zinc">{t('workOrders.actions.cancelledBadge')}</Badge>
@@ -707,9 +718,6 @@ export default function WorkOrdersPage() {
                     </TableCell>
                     <TableCell className="text-zinc-500">
                       {formatDate(workOrder.scheduledDate)}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-zinc-500">
-                      {workOrder.customerOrderNumber || '-'}
                     </TableCell>
                     <TableCell>
                       <div className="-mx-3 -my-1.5 sm:-mx-2.5">

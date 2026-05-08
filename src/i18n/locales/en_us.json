@@ -1252,7 +1252,10 @@
       "id": "ID",
       "priority": "Priority",
       "scheduled": "Scheduled",
-      "statusHeader": "Status"
+      "statusHeader": "Status",
+      "type": "Type",
+      "work": "Work",
+      "workItemsMore": "+{{count}} more"
     },
     "workItems": {
       "backToEntity": "Back to {{entity}}",

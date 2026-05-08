@@ -86,6 +86,8 @@ describe('WorkOrderFormDialog', () => {
       scheduledDate: '2024-03-15',
       description: 'Fix leaking pipe',
       internalNotes: 'Customer prefers morning',
+      workItemCount: 0,
+      workItems: [],
       createdAt: '2024-03-10T10:00:00Z',
       updatedAt: '2024-03-10T10:00:00Z',
     };
@@ -292,6 +294,8 @@ describe('WorkOrderFormDialog', () => {
         scheduledDate: '2024-03-15',
         description: 'Fix leaking pipe',
         internalNotes: 'Customer prefers morning',
+        workItemCount: 0,
+        workItems: [],
         createdAt: '2024-03-10T10:00:00Z',
         updatedAt: '2024-03-10T10:00:00Z',
       };
@@ -426,6 +430,8 @@ describe('WorkOrderFormDialog', () => {
         internalNotes: 'Customer prefers morning',
         cancellationReason: 'Customer requested cancellation',
         cancelledAt: '2024-03-12T10:00:00Z',
+        workItemCount: 0,
+        workItems: [],
         createdAt: '2024-03-10T10:00:00Z',
         updatedAt: '2024-03-12T10:00:00Z',
       };
@@ -554,6 +560,8 @@ describe('WorkOrderFormDialog', () => {
         scheduledDate: '2024-03-15',
         description: 'Fix leaking pipe',
         internalNotes: 'Customer prefers morning',
+        workItemCount: 0,
+        workItems: [],
         createdAt: '2024-03-10T10:00:00Z',
         updatedAt: '2024-03-10T10:00:00Z',
       };
