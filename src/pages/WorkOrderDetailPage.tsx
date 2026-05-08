@@ -46,6 +46,7 @@ import {
 } from '../components/catalyst/description-list';
 import { Link as CatLink } from '../components/catalyst/link';
 import {
+  ArrowDownIcon,
   ArrowLeftIcon,
   ArrowUpIcon,
   CalendarIcon,
@@ -70,28 +71,34 @@ const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
   CANCELLED: 'cancelled',
 };
 
-// Priority is rendered as a header chip ONLY when elevated (HIGH/URGENT).
-// LOW + NORMAL are silent — default values rendered as wallpaper become noise
-// and dilute the few WOs that genuinely need attention. To set/elevate from
-// the default state, CSRs go through the Edit WO dialog (canonical surface);
-// the inline chip is a power-user demote/change shortcut for already-elevated
-// WOs.
+// Priority is rendered as a header chip ONLY when the user has explicitly
+// set a non-default value. NORMAL is the implicit default — showing it adds
+// zero information and dilutes status visually. LOW, HIGH, and URGENT each
+// carry real signal (someone made a deliberate choice) so they earn a chip.
+// To set priority from the default state, CSRs go through the Edit WO dialog
+// (canonical surface); the inline chip is a click-to-change shortcut for
+// already-non-default WOs.
 //
 // Visual grammar (deliberately distinct from status pills):
 //   status pill    = sentence case, no icon, categorical color (sky/lime/zinc/...)
-//   priority chip  = ALL CAPS + tracking-wider, leading icon, heat color
+//   priority chip  = ALL CAPS + tracking-wider, leading icon, heat scale
 //
-// Future EMERGENCY tier (reservation, not deliverable) extends along this
-// axis: heat color goes amber→rose→red; icon escalates ArrowUp→ExclamationTriangle→stronger
+// Heat scale runs cold→hot: zinc (LOW, "this can wait") → amber (HIGH) → rose
+// (URGENT). LOW shares Badge shape with HIGH/URGENT but uses zinc to stay
+// calm — present without demanding attention.
+//
+// Future EMERGENCY tier (reservation, not deliverable) extends along the same
+// axis: color goes ...→rose→red; icon escalates ExclamationTriangle→stronger
 // (FireIcon or BoltIcon). Don't add the tier until a real customer ask earns
 // it — the URGENT slot already serves "gas leak / flooding / no-heat-winter"
 // in current shop usage.
-const ELEVATED_PRIORITY_CONFIG: Partial<
+const PRIORITY_CHIP_CONFIG: Partial<
   Record<
     WorkOrderPriority,
-    { color: 'amber' | 'rose'; Icon: typeof ArrowUpIcon; labelKey: string }
+    { color: 'zinc' | 'amber' | 'rose'; Icon: typeof ArrowUpIcon; labelKey: string }
   >
 > = {
+  LOW: { color: 'zinc', Icon: ArrowDownIcon, labelKey: 'low' },
   HIGH: { color: 'amber', Icon: ArrowUpIcon, labelKey: 'high' },
   URGENT: { color: 'rose', Icon: ExclamationTriangleIcon, labelKey: 'urgent' },
 };
@@ -466,12 +473,13 @@ export default function WorkOrderDetailPage() {
               <Badge color="zinc">{t('workOrders.actions.archived')}</Badge>
             )}
             {(() => {
-              // Elevated-only chip: silent for LOW/NORMAL, distinct grammar
-              // when HIGH/URGENT. See the ELEVATED_PRIORITY_CONFIG comment
-              // above for the reasoning. Cancelled/archived WOs render the
-              // chip read-only (no dropdown); active WOs wrap it in a
-              // dropdown so a CSR can demote/change without leaving the page.
-              const cfg = ELEVATED_PRIORITY_CONFIG[priority];
+              // Non-default priority chip: silent for NORMAL, present in
+              // distinct grammar when LOW/HIGH/URGENT. See the
+              // PRIORITY_CHIP_CONFIG comment above for the reasoning.
+              // Cancelled/archived WOs render the chip read-only (no
+              // dropdown); active WOs wrap it in a dropdown so a CSR can
+              // change it without leaving the page.
+              const cfg = PRIORITY_CHIP_CONFIG[priority];
               if (!cfg) return null;
               const { color, Icon, labelKey } = cfg;
               const label = t(`workOrders.priority.${labelKey}`).toUpperCase();

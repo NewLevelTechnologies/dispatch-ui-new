@@ -134,23 +134,31 @@ describe('WorkOrderDetailPage', () => {
     expect(screen.getByText(/not started/i)).toBeInTheDocument();
   });
 
-  it('hides the priority chip on the default NORMAL priority', async () => {
+  it('hides the priority chip on the implicit default NORMAL', async () => {
     mockApiResponses();
     renderPage();
     await waitFor(() => {
       expect(screen.getByText('WO-00010')).toBeInTheDocument();
     });
-    // Priority renders only when elevated (HIGH/URGENT). Default values
-    // (LOW, NORMAL) are silent — they'd otherwise dilute status visually.
+    // NORMAL is the implicit default — showing it adds no information and
+    // dilutes status visually. The chip renders only when the user has
+    // explicitly set a non-default value (LOW / HIGH / URGENT).
     expect(screen.queryByText(/^normal$/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^low$/i)).not.toBeInTheDocument();
+  });
+
+  it('renders the LOW priority chip when explicitly deprioritized', async () => {
+    mockApiResponses({ ...mockWorkOrder, priority: 'LOW' });
+    renderPage();
+    await waitFor(() => {
+      // ALL CAPS label, distinct from the sentence-case status pill.
+      expect(screen.getByText('LOW')).toBeInTheDocument();
+    });
   });
 
   it('renders an elevated priority chip in ALL CAPS with heat color when HIGH', async () => {
     mockApiResponses({ ...mockWorkOrder, priority: 'HIGH' });
     renderPage();
     await waitFor(() => {
-      // ALL CAPS label, distinct from the sentence-case status pill.
       expect(screen.getByText('HIGH')).toBeInTheDocument();
     });
   });
