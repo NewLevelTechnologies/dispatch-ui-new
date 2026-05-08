@@ -474,7 +474,7 @@ export default function EquipmentDetailPage() {
   };
 
   const formatFilterSize = (f: { lengthIn: number; widthIn: number; thicknessIn: number }) =>
-    `${formatInches(f.lengthIn)} × ${formatInches(f.widthIn)} × ${formatInches(f.thicknessIn)}`;
+    `${formatInches(f.lengthIn)}×${formatInches(f.widthIn)}×${formatInches(f.thicknessIn)}`;
 
   const handleSetProfileImage = (img: EquipmentImage) => {
     if (img.isProfile) return;

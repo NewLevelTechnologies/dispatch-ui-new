@@ -40,7 +40,7 @@ function formatInches(n: number): string {
   return String(n);
 }
 function formatSize(s: TenantFilterSize): string {
-  return `${formatInches(s.lengthIn)} × ${formatInches(s.widthIn)} × ${formatInches(s.thicknessIn)}`;
+  return `${formatInches(s.lengthIn)}×${formatInches(s.widthIn)}×${formatInches(s.thicknessIn)}`;
 }
 
 export default function FilterSizesPanel() {
@@ -189,7 +189,7 @@ export default function FilterSizesPanel() {
           <TableBody>
             {sorted.map((item, index) => (
               <TableRow key={item.id}>
-                <TableCell className="font-mono">{formatSize(item)}</TableCell>
+                <TableCell>{formatSize(item)}</TableCell>
                 <TableCell>
                   {canEdit && (
                     <div className="flex items-center gap-0.5">

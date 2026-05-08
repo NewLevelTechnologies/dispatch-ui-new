@@ -416,7 +416,7 @@ describe('EquipmentDetailPage', () => {
     await user.click(filtersTab);
 
     await waitFor(() => {
-      expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument();
+      expect(screen.getByText('20×25×1')).toBeInTheDocument();
     });
     expect(screen.getByText('Return air')).toBeInTheDocument();
   });
@@ -444,18 +444,18 @@ describe('EquipmentDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /^filters/i }));
 
     // Default view: 10 chips visible, 11th and 12th hidden until toggled.
-    await waitFor(() => expect(screen.getByText('10 × 20 × 1')).toBeInTheDocument());
-    expect(screen.queryByText('20 × 20 × 1')).not.toBeInTheDocument();
-    expect(screen.queryByText('21 × 20 × 1')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('10×20×1')).toBeInTheDocument());
+    expect(screen.queryByText('20×20×1')).not.toBeInTheDocument();
+    expect(screen.queryByText('21×20×1')).not.toBeInTheDocument();
 
     // Click Show all → all 12 chips visible.
     await user.click(screen.getByRole('button', { name: /show all \(12\)/i }));
-    expect(screen.getByText('20 × 20 × 1')).toBeInTheDocument();
-    expect(screen.getByText('21 × 20 × 1')).toBeInTheDocument();
+    expect(screen.getByText('20×20×1')).toBeInTheDocument();
+    expect(screen.getByText('21×20×1')).toBeInTheDocument();
 
     // Show fewer collapses back to 10.
     await user.click(screen.getByRole('button', { name: /show fewer/i }));
-    expect(screen.queryByText('20 × 20 × 1')).not.toBeInTheDocument();
+    expect(screen.queryByText('20×20×1')).not.toBeInTheDocument();
   });
 
   it('renders quick-add chips and pre-fills dimensions when one is clicked', async () => {
@@ -480,7 +480,7 @@ describe('EquipmentDetailPage', () => {
     });
     await user.click(screen.getByRole('button', { name: /^filters/i }));
 
-    const chip = await screen.findByRole('button', { name: '16 × 20 × 1' });
+    const chip = await screen.findByRole('button', { name: '16×20×1' });
     await user.click(chip);
 
     // Dialog opens with dimensions pre-filled.
@@ -519,7 +519,7 @@ describe('EquipmentDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /^filters/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument();
+      expect(screen.getByText('20×25×1')).toBeInTheDocument();
     });
 
     // Header carries its own overflow (Delete equipment); row-level menu is the second match.
@@ -686,7 +686,7 @@ describe('EquipmentDetailPage', () => {
     });
     await user.click(screen.getByRole('button', { name: /^filters/i }));
 
-    await waitFor(() => expect(screen.getByText('16 × 20 × 1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
     // Header carries its own overflow (Delete equipment); row-level menu is the second match.
     await user.click(screen.getAllByRole('button', { name: /more options/i })[1]);
     const editItem = await screen.findByRole('menuitem', { name: /edit/i });
@@ -726,7 +726,7 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
     await user.click(screen.getByRole('button', { name: /^filters/i }));
-    await waitFor(() => expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('20×25×1')).toBeInTheDocument());
 
     // Header carries its own overflow (Delete equipment); row-level menu is the second match.
     await user.click(screen.getAllByRole('button', { name: /more options/i })[1]);
@@ -943,7 +943,7 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByText('Carrier')).toBeInTheDocument();
     });
     // ×N appears only when quantity > 1; single-quantity filter omits it.
-    expect(await screen.findByText('20 × 25 × 1 ×2, 16 × 20 × 1')).toBeInTheDocument();
+    expect(await screen.findByText('20×25×1 ×2, 16×20×1')).toBeInTheDocument();
   });
 
   it('hides the Recent Service History and Recent Notes cards on Overview when both lists are empty', async () => {

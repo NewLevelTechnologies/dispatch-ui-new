@@ -44,8 +44,8 @@ describe('FilterSizesPanel', () => {
     renderWithProviders(<FilterSizesPanel />);
 
     await waitFor(() => {
-      expect(screen.getByText('16 × 20 × 1')).toBeInTheDocument();
-      expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument();
+      expect(screen.getByText('16×20×1')).toBeInTheDocument();
+      expect(screen.getByText('20×25×1')).toBeInTheDocument();
     });
   });
 
@@ -100,7 +100,7 @@ describe('FilterSizesPanel', () => {
     const user = userEvent.setup();
     renderWithProviders(<FilterSizesPanel />);
 
-    await waitFor(() => expect(screen.getByText('16 × 20 × 1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
     const moreButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(moreButtons[0]);
     const editItem = await screen.findByRole('menuitem', { name: /edit/i });
@@ -129,7 +129,7 @@ describe('FilterSizesPanel', () => {
     const user = userEvent.setup();
     renderWithProviders(<FilterSizesPanel />);
 
-    await waitFor(() => expect(screen.getByText('16 × 20 × 1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
     const moreButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(moreButtons[0]);
     const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
@@ -150,7 +150,7 @@ describe('FilterSizesPanel', () => {
     const user = userEvent.setup();
     renderWithProviders(<FilterSizesPanel />);
 
-    await waitFor(() => expect(screen.getByText('16 × 20 × 1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
     const upButtons = screen.getAllByRole('button', { name: /move up/i });
     await user.click(upButtons[1]);
 
