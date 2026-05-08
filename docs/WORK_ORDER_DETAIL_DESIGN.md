@@ -160,6 +160,8 @@ Desktop-first (≥1280px effective width). Two columns + sticky header. Peripher
 
 ### 3.1 Sticky header (~110px, three rows + action bar)
 
+**Revised 2026-05-08:** the action bar is removed; `+` affordances move to where their data lives (see §5d). Header keeps only `[Edit WO ▾]` + overflow `[⋯]` clustered at the right edge of row 1. Effective row count drops from "3 rows + action bar" to ~2 rows of metadata.
+
 Always visible while scrolling.
 
 - **Row 1 — Identity & state:** `WO #1234` · clickable status pill (current overall progress category; click → dropdown of allowed transitions per workflow rules) · `last touched 14m ago by Jamie`
@@ -168,8 +170,7 @@ Always visible while scrolling.
 - **Row 3 — Money summary chips:** `$ quoted · $ invoiced · $ paid · NTE · Balance`
   - Each segment is a clickable chip that opens the Financial detail drawer (§3.5) directly to the matching tab.
   - **Zero-value chips remain clickable.** `$0 paid` opens the Payments tab to an empty state. Consistency over special-casing.
-- **Action bar:** `+ Work Item` · `+ Dispatch` · `+ Note` · `Edit WO ▾` · overflow `⋯` (Delete, Print, Duplicate, Convert to Recurring).
-  - `+ Note` is intentionally available in *both* the action bar and the inline composer at the top of the activity stream (§3.4). The action bar is always-visible regardless of scroll and keyboard-shortcut-friendly; the inline composer is the dominant fast path while reading the stream. Same logic as a "Compose" button in both the email toolbar and the inbox header.
+- ~~**Action bar:** `+ Work Item` · `+ Dispatch` · `+ Note` · `Edit WO ▾` · overflow `⋯` (Delete, Print, Duplicate, Convert to Recurring).~~ <br/> **Revised 2026-05-08:** action bar removed. Only `[Edit WO ▾]` + overflow `[⋯]` (Delete, Print, Duplicate, Convert to Recurring) remain, clustered at the right edge of header row 1. `+ Work Item` / `+ Dispatch` / `+ Note` redistribute to their natural homes per §5d. The earlier "compose button in both places" rationale is moot once the always-on composer is gone.
 
 ### 3.2 Left strip (~240px, collapsible)
 
@@ -201,7 +202,11 @@ Dense Catalyst `Table` of work items with click-to-expand rows. **No tabs in thi
 - **Default expansion state:** all rows collapsed. Multiple rows may be expanded simultaneously (CSRs comparing two items). State is in-memory; resets on navigation.
 - **Inline editing:** status pill (dropdown of allowed transitions per workflow), description (click-to-edit textarea), every visible equipment field in the expansion (click-to-edit text via `EditableField`). Per-row delete via `⋯`. `readOnly` (cancelled/archived WO) suppresses Edit / Add / Delete.
 
+**Equipment is multi-audience on this page; do not collapse it to a chip.** Even after the future tech mobile app ships, equipment info on the WO page serves four audiences routinely: CSRs (call disambiguation — "is this the AC or the heater you're calling about?"), dispatchers (skill-match for assignment — Daniel HVAC vs Jason general; commercial 5-ton vs residential split), sales (quoting / scoping replacements), and techs as a desktop fallback. "Collapse equipment to a chevron chip with full block on demand" was floated 2026-05-08 and rejected — it would force four audiences to click for data they all use routinely. Visual-weight concerns about the equipment block dominating the page are usually downstream of *other* sections being missing or placeholder (dispatch unbuilt, money chips hidden, oversized action bar). Fix those first per §5d, then re-evaluate equipment hierarchy at the §5e stand-back review — not before.
+
 ### 3.4 Right rail (~360px)
+
+**Revised 2026-05-08:** this section is obsolete. The right rail is removed entirely. Activity stream + inline note composer move into a slide-in drawer (~440–520px) triggered by an `Activity ●` button on the page; see §5d for the new spec. Active Dispatches surface placement is deferred to the phase 6 design pass — no longer pinned to the (deleted) rail. The original spec below is preserved as historical context only.
 
 Two stacked sections, both serving the "what's happening on this WO" question:
 
@@ -237,7 +242,7 @@ CSRs are half-keyboard. Inline edits and shortcuts are not optional polish — t
 
 **Keyboard shortcuts** (active when the page has focus and no input is focused):
 
-- `N` — focus inline note composer in activity rail.
+- `N` — open activity drawer with composer autofocused (§5d). *Previously: focus inline composer in right rail — obsolete since the rail was removed.*
 - `W` — open `+ Work Item` dialog.
 - `D` — open `+ Dispatch` dialog.
 - `E` — open `Edit WO` dialog.
@@ -303,7 +308,7 @@ Each phase produces a working page that's better than the previous. We don't shi
 
 4. **Work item create/edit dialog + `WorkOrder.description` → `WorkItem.description` migration.** Focused dialog with description, type, status, equipment typeahead (mirror `ServiceLocationPicker` pattern). WO create flow gains a "First work item description" field that creates WO + first work item atomically (or two sequential calls if the atomic-create endpoint in §7 is not yet resolved). The `WorkOrderFormDialog`'s `internalNotes` field is also removed here (notes are now a sub-resource — initial note creation, if any, is a separate `POST /work-orders/{id}/notes` call after the WO is created). `W` keyboard shortcut wires up here. ✅ shipped
 5. **Inline edits on existing fields.** Click-to-edit for description / NTE / type / division / priority / work item description — `EditableField` custom component (§3.8) built here, then reused. `/` keyboard shortcut wires up here. *Note creation moved to phase 3 — phase 5 owns the click-to-edit-existing-value pattern only.* ✅ shipped (NTE inline edit waits on backend `WorkOrder.notToExceed` field — not blocking)
-6. **Dispatch create flow + Active Dispatches widget interactivity.** `+ Dispatch` opens create dialog; widget primary actions (Check Out, etc.) wired up. `D` keyboard shortcut wires up here. ⏳ not started — `dispatchApi.create` already exists, no backend dependency.
+6. **Dispatch create flow + Active Dispatches surface.** `+ Dispatch` opens create dialog; surface primary actions (Check Out, etc.) wired up. `D` keyboard shortcut wires up here. **Design pass before code:** stress-test against within-WO ugly cases — reassignment chains (cancel → reassign → revisit), no-shows, multi-day repairs, disputed arrival timestamps. Cross-WO scheduling is *not* this page's job (§8). Surface placement (header strip vs sidebar vs other) is part of the design pass; the §3.4 "pinned to right rail" call is obsolete per §5d. ⏳ not started — `dispatchApi.create` already exists, no backend dependency.
 7. **Financial detail drawer.** Header money chips become live; linked-entity chips on work-item rows become live. Drawer with `POs · Quotes · Invoices · Payments` internal tabs. Create dialogs open over the drawer per §3.5. `Esc` close-topmost shortcut formalized here (it can land earlier with whatever first introduces a drawer or dialog; phase 7 just makes it the canonical close behavior across all surfaces). ⏳ not started — biggest remaining surface; warrants a dedicated scoping pass before code (invoice/quote/PO/payment create-form designs in particular). Money chip row currently hidden on the page until phase 7 starts populating real values.
 
 Each phase ships behind the same route — `/work-orders/:id` is wired up at phase 1 and progressively gains capability.
@@ -366,6 +371,45 @@ Independent of the phase ordering — each is a small, separate branch.
 - **NTE field** in left strip + header chip. Backend doesn't have `WorkOrder.notToExceed` yet; add it as a small backend ask alongside the financial drawer scoping (phase 7 reads from it).
 - **Money chip row reveal logic**: when phase 7 ships and chips have real values, reveal the row when at least one chip has a non-zero value; keep hidden on fresh WOs.
 
+### 5d. Page reshape (planned 2026-05-08)
+
+Set of cheap, independent wins to ship before phase 6/7. Bundled here so they land together but they're individually deployable on separate branches — none depend on each other or on phase 6/7 backend work.
+
+**Why now:** the page's information hierarchy is currently distorted by missing pieces — phase 6 (dispatches) is unbuilt, phase 7 (money chips) is hidden, and the action bar is oversized placeholder. Three things look wrong as a result: the action bar dominates with three CTAs that should live next to their data; the right rail's always-on activity feed and note composer eat premium real estate for what are reference and low-frequency-write surfaces respectively; and the equipment block looks visually heavy mostly because everything around it is empty. Fix the cheap things now. Defer the equipment hierarchy question (and any other "is this section the right size" question) until after phase 6 + 7 land — at that point the page weighs its real weight and §5e covers the holistic re-look.
+
+**What ships:**
+
+- **Action bar removed** (§3.1). Three big buttons go away. Only `[Edit WO ▾]` + overflow `[⋯]` remain, clustered at the right edge of header row 1.
+- **`+` affordances redistribute contextually.** `+ Work Item` at the top of the work items table. `+ Dispatch` in the active dispatches surface (lands with phase 6). `+ Note` inside the activity drawer (see below). Discoverability is preserved because contextual placement *is* the discoverability — `+ Work Item` next to the work item table is more findable than `+ Work Item` in a generic top bar.
+- **Right rail removed** (§3.4). Activity stream + inline note composer both move into a slide-in drawer (~440–520px wide; text-heavy, doesn't need financial-drawer width). Triggered by an `Activity ●` button on the page — dot signals unread since last open. **No count.** Total counts grow forever and stop meaning anything; notes-only counts are arbitrary. The dot also avoids the "47 events, deal with later" psychology.
+- **Composer lives inside the drawer**, top-of-stack above the stream. One drawer, one entry point, opens for both reading and writing. Replaces the design's earlier "composer in two places" rationale.
+- **Label is `Activity`, not `History`.** Present-tense framing for a live work order; `History` reads as audit/forensic.
+- **Empty-state for the drawer:** composer carries it. Autofocus on open, useful placeholder ("Note for the team about WO-XXXX..."), generous height, single "WO created" event quietly underneath. No "0 events" header above the stream.
+- **`N` keyboard shortcut** opens the drawer with composer autofocused (§3.6). Same muscle memory, different surface.
+- **Active Dispatches surface placement is *not* settled here.** It's no longer pinned to the (deleted) right rail; the actual call (header strip vs sidebar vs other) is part of the phase 6 design pass — see phase 6 entry above.
+
+**Three-pattern rule (§1.1) is preserved.** The activity drawer is canonical drawer use; nothing else changes.
+
+**Doc bookkeeping:** §3.1, §3.3, §3.4, §3.6, §8 carry inline revision notes pointing here. Phase 6 (§5) is updated to reflect that dispatches no longer ship into a deleted right rail.
+
+### 5e. Stand-back review (planned, post-phase-7)
+
+Deliberate full-page review once phase 6 (dispatches), phase 7 (financial drawer / money chips), and §5d (page reshape) have all shipped. The visual hierarchy can only be honestly assessed when the page is actually populated; small adjustments along the way risk ending up with a page that's the sum of local decisions rather than a coherent whole.
+
+**Format:**
+
+- Real CSR or dispatcher in the room. Not a designer self-review. Designers find layout problems; users find workflow problems — different bug classes.
+- Real-shaped data: spin up a tenant with ~50 WOs across the lifecycle (fresh, mid-flight, escalated, completed, cancelled, multi-dispatch, no-equipment, equipment-heavy). Watch the user navigate them.
+
+**What's deferred to this review:**
+
+- Whether the equipment block (currently dominant in the work-item expansion) needs to shrink. Equipment is multi-audience (§3.3) — collapse-to-chip is rejected up front. The open question is sizing within the expansion, not whether it lives there.
+- Whether the left strip's content composition is right.
+- Whether the header weight is balanced once money chips populate.
+- Whether the Active Dispatches surface placement chosen in phase 6 still feels right with everything else populated.
+
+Don't make these calls before the review. The right answer depends on the populated page, not a half-built one.
+
 ---
 
 ## 6. UI / component conventions
@@ -410,7 +454,7 @@ These do not block phase 1. Calling them out so we know they exist.
 
 - Customer-facing views. This page is internal.
 - Mobile field tech UI. Techs need a different, simpler view; out of scope here.
-- Replacement for the dispatch board. The dispatch board is its own page; this page references dispatches but doesn't manage scheduling at scale.
+- Replacement for the dispatch board. The dispatch board is its own page; this page references dispatches but doesn't manage scheduling at scale. **Specifically out of scope:** cross-WO scheduling decisions (e.g., "is Tech A free at 4pm given his other jobs"). Those belong on the dispatch board. The WO page surfaces dispatches *for this WO only* and resists scope creep that would absorb cross-WO concerns. When the phase 6 dispatch surface is designed (§5), stress-test against within-WO ugly cases — reassignment chains, no-shows, multi-day repairs, disputed timestamps — not cross-WO scenarios.
 
 ---
 

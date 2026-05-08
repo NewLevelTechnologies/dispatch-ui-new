@@ -93,6 +93,13 @@ interface Props {
    * create; serviceLocationId is inherited (same location as the parent).
    */
   onAddSubUnit?: (parent: { id: string; name: string }) => void;
+  /**
+   * Renders a "+ Work Item" button at the top of the table (and inside the
+   * empty state). Replaces the page-level action bar's "+ Work Item" entry
+   * point per §5d — actions live next to the data they affect. Suppressed
+   * when omitted or when readOnly.
+   */
+  onAdd?: () => void;
 }
 
 export default function WorkItemsTable({
@@ -109,6 +116,7 @@ export default function WorkItemsTable({
   onAddEquipment,
   onSelectSubUnit,
   onAddSubUnit,
+  onAdd,
 }: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -175,15 +183,34 @@ export default function WorkItemsTable({
     }
   };
 
+  // "+ Work Item" lives next to the table head per §5d. Only renders when the
+  // parent supplied an onAdd handler and the WO isn't frozen — readOnly hides
+  // every Edit / Add / Delete affordance on the page.
+  const showAddButton = !readOnly && !!onAdd;
+  const headerBar = showAddButton ? (
+    <div className="mb-2 flex items-center justify-between">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        {getName('work_item', true)}
+      </h2>
+      <Button onClick={onAdd}>
+        <PlusIcon className="size-4" />
+        {t('common.actions.add', { entity: getName('work_item') })}
+      </Button>
+    </div>
+  ) : null;
+
   if (workItems.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-zinc-200 p-6 text-center dark:border-zinc-800">
-        <Text className="text-zinc-500 dark:text-zinc-400">
-          {t('workOrders.workItems.empty', {
-            children: getName('work_item', true),
-            entity: getName('work_order'),
-          })}
-        </Text>
+      <div>
+        {headerBar}
+        <div className="rounded-lg border border-dashed border-zinc-200 p-6 text-center dark:border-zinc-800">
+          <Text className="text-zinc-500 dark:text-zinc-400">
+            {t('workOrders.workItems.empty', {
+              children: getName('work_item', true),
+              entity: getName('work_order'),
+            })}
+          </Text>
+        </div>
       </div>
     );
   }
@@ -197,7 +224,9 @@ export default function WorkItemsTable({
   const totalCols = 3 + (showActions ? 1 : 0);
 
   return (
-    <Table dense className="[--gutter:theme(spacing.1)] text-sm">
+    <div>
+      {headerBar}
+      <Table dense className="[--gutter:theme(spacing.1)] text-sm">
       <TableHead>
         <TableRow>
           <TableHeader className="w-px" aria-hidden />
@@ -339,7 +368,8 @@ export default function WorkItemsTable({
           return rows;
         })}
       </TableBody>
-    </Table>
+      </Table>
+    </div>
   );
 }
 
