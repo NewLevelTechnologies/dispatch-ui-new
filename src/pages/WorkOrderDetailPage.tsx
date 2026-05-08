@@ -47,8 +47,10 @@ import {
 import { Link as CatLink } from '../components/catalyst/link';
 import {
   ArrowLeftIcon,
+  ArrowUpIcon,
   CalendarIcon,
   EllipsisHorizontalIcon,
+  ExclamationTriangleIcon,
   PencilIcon,
 } from '@heroicons/react/24/outline';
 
@@ -68,11 +70,30 @@ const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
   CANCELLED: 'cancelled',
 };
 
-const PRIORITY_COLORS: Record<WorkOrderPriority, 'zinc' | 'sky' | 'amber' | 'rose'> = {
-  LOW: 'zinc',
-  NORMAL: 'sky',
-  HIGH: 'amber',
-  URGENT: 'rose',
+// Priority is rendered as a header chip ONLY when elevated (HIGH/URGENT).
+// LOW + NORMAL are silent — default values rendered as wallpaper become noise
+// and dilute the few WOs that genuinely need attention. To set/elevate from
+// the default state, CSRs go through the Edit WO dialog (canonical surface);
+// the inline chip is a power-user demote/change shortcut for already-elevated
+// WOs.
+//
+// Visual grammar (deliberately distinct from status pills):
+//   status pill    = sentence case, no icon, categorical color (sky/lime/zinc/...)
+//   priority chip  = ALL CAPS + tracking-wider, leading icon, heat color
+//
+// Future EMERGENCY tier (reservation, not deliverable) extends along this
+// axis: heat color goes amber→rose→red; icon escalates ArrowUp→ExclamationTriangle→stronger
+// (FireIcon or BoltIcon). Don't add the tier until a real customer ask earns
+// it — the URGENT slot already serves "gas leak / flooding / no-heat-winter"
+// in current shop usage.
+const ELEVATED_PRIORITY_CONFIG: Partial<
+  Record<
+    WorkOrderPriority,
+    { color: 'amber' | 'rose'; Icon: typeof ArrowUpIcon; labelKey: string }
+  >
+> = {
+  HIGH: { color: 'amber', Icon: ArrowUpIcon, labelKey: 'high' },
+  URGENT: { color: 'rose', Icon: ExclamationTriangleIcon, labelKey: 'urgent' },
 };
 
 const PRIORITY_TRANSLATION_KEYS: Record<WorkOrderPriority, string> = {
@@ -444,44 +465,50 @@ export default function WorkOrderDetailPage() {
             {isArchived && (
               <Badge color="zinc">{t('workOrders.actions.archived')}</Badge>
             )}
-            {isCancelled || isArchived ? (
-              <Badge color={PRIORITY_COLORS[priority]}>
-                {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[priority]}`)}
-              </Badge>
-            ) : (
-              // Priority click-to-edit follows the WorkItemStatusPill pattern:
-              // Badge is the trigger of a Headless Dropdown so the badge stays
-              // sized to its label and the menu pops below. EditableField's
-              // Select swap was visually awkward here because the underlying
-              // Catalyst Select is `block w-full`, blowing the trigger out to
-              // fill the flex row.
-              <Dropdown>
-                <DropdownButton
-                  as="button"
-                  type="button"
-                  className="cursor-pointer rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                  aria-label={t('workOrders.form.priority')}
-                >
-                  <Badge color={PRIORITY_COLORS[priority]}>
-                    {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[priority]}`)}
-                  </Badge>
-                </DropdownButton>
-                <DropdownMenu anchor="bottom start">
-                  {(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as WorkOrderPriority[])
-                    .filter((p) => p !== priority)
-                    .map((p) => (
-                      <DropdownItem
-                        key={p}
-                        onClick={() => handleSaveWorkOrderField('priority', p)}
-                      >
-                        <DropdownLabel>
-                          {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[p]}`)}
-                        </DropdownLabel>
-                      </DropdownItem>
-                    ))}
-                </DropdownMenu>
-              </Dropdown>
-            )}
+            {(() => {
+              // Elevated-only chip: silent for LOW/NORMAL, distinct grammar
+              // when HIGH/URGENT. See the ELEVATED_PRIORITY_CONFIG comment
+              // above for the reasoning. Cancelled/archived WOs render the
+              // chip read-only (no dropdown); active WOs wrap it in a
+              // dropdown so a CSR can demote/change without leaving the page.
+              const cfg = ELEVATED_PRIORITY_CONFIG[priority];
+              if (!cfg) return null;
+              const { color, Icon, labelKey } = cfg;
+              const label = t(`workOrders.priority.${labelKey}`).toUpperCase();
+              const badge = (
+                <Badge color={color} className="tracking-wider">
+                  <Icon className="size-3" />
+                  {label}
+                </Badge>
+              );
+              if (isCancelled || isArchived) return badge;
+              return (
+                <Dropdown>
+                  <DropdownButton
+                    as="button"
+                    type="button"
+                    className="cursor-pointer rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    aria-label={t('workOrders.form.priority')}
+                  >
+                    {badge}
+                  </DropdownButton>
+                  <DropdownMenu anchor="bottom start">
+                    {(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as WorkOrderPriority[])
+                      .filter((p) => p !== priority)
+                      .map((p) => (
+                        <DropdownItem
+                          key={p}
+                          onClick={() => handleSaveWorkOrderField('priority', p)}
+                        >
+                          <DropdownLabel>
+                            {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[p]}`)}
+                          </DropdownLabel>
+                        </DropdownItem>
+                      ))}
+                  </DropdownMenu>
+                </Dropdown>
+              );
+            })()}
             <Text className="!text-sm !text-zinc-500">
               {t('workOrders.detail.lastUpdated', { time: formatRelativeTime(workOrder.updatedAt) })}
             </Text>

@@ -134,12 +134,32 @@ describe('WorkOrderDetailPage', () => {
     expect(screen.getByText(/not started/i)).toBeInTheDocument();
   });
 
-  it('renders priority badge', async () => {
+  it('hides the priority chip on the default NORMAL priority', async () => {
     mockApiResponses();
     renderPage();
     await waitFor(() => {
-      // Two badges (header + left strip) — both render priority
-      expect(screen.getAllByText(/normal/i).length).toBeGreaterThan(0);
+      expect(screen.getByText('WO-00010')).toBeInTheDocument();
+    });
+    // Priority renders only when elevated (HIGH/URGENT). Default values
+    // (LOW, NORMAL) are silent — they'd otherwise dilute status visually.
+    expect(screen.queryByText(/^normal$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^low$/i)).not.toBeInTheDocument();
+  });
+
+  it('renders an elevated priority chip in ALL CAPS with heat color when HIGH', async () => {
+    mockApiResponses({ ...mockWorkOrder, priority: 'HIGH' });
+    renderPage();
+    await waitFor(() => {
+      // ALL CAPS label, distinct from the sentence-case status pill.
+      expect(screen.getByText('HIGH')).toBeInTheDocument();
+    });
+  });
+
+  it('renders an elevated priority chip in ALL CAPS when URGENT', async () => {
+    mockApiResponses({ ...mockWorkOrder, priority: 'URGENT' });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('URGENT')).toBeInTheDocument();
     });
   });
 
