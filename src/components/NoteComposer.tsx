@@ -7,15 +7,22 @@ import { Textarea } from './catalyst/textarea';
 
 interface Props {
   workOrderId: string;
+  /**
+   * When true, focus the textarea on mount (and whenever this flips true).
+   * Used by ActivityDrawer so the drawer's empty state lands on the composer
+   * — per §5d, the composer carries the empty state.
+   */
+  autoFocus?: boolean;
 }
 
 /**
- * Inline note composer above the activity stream. Functional in phase 3 —
- * POSTs to /work-orders/:id/notes and invalidates the activity query so the
- * resulting NOTE_ADDED event appears in the feed. The "N" keyboard shortcut
- * focuses the textarea when no other input is focused.
+ * Inline note composer above the activity stream. POSTs to
+ * /work-orders/:id/notes and invalidates the activity query so the resulting
+ * NOTE_ADDED event appears in the feed. The N shortcut refocuses the textarea
+ * when this is mounted and no other input is focused — the page-level handler
+ * owns "open the drawer when it's closed."
  */
-export default function NoteComposer({ workOrderId }: Props) {
+export default function NoteComposer({ workOrderId, autoFocus }: Props) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const [body, setBody] = useState('');
@@ -36,9 +43,17 @@ export default function NoteComposer({ workOrderId }: Props) {
     },
   });
 
-  // N shortcut focuses the textarea — only when no other input has focus and
-  // no modifier keys are held. This is the only shortcut wired up at phase 3;
-  // a shared useKeyboardShortcuts hook can come in phase 5 alongside the rest.
+  // Autofocus on mount / when toggled true. Drawer opens → composer mounts →
+  // textarea grabs focus, so the user can start typing immediately.
+  useEffect(() => {
+    if (autoFocus) {
+      textareaRef.current?.focus();
+    }
+  }, [autoFocus]);
+
+  // N shortcut refocuses the textarea while this composer is mounted
+  // (i.e. while the drawer is open). The page-level handler owns "open the
+  // drawer when N is pressed and the drawer is closed."
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'n' && e.key !== 'N') return;

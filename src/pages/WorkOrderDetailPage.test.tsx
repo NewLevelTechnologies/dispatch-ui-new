@@ -202,21 +202,21 @@ describe('WorkOrderDetailPage', () => {
     expect(screen.getByText('HVAC Service')).toBeInTheDocument();
   });
 
-  it('renders the action bar with the right enabled/disabled state', async () => {
+  it('renders the header-right action cluster (Activity + Edit + overflow) and no top-of-page +CTAs', async () => {
     mockApiResponses();
     renderPage();
     await waitFor(() => {
       expect(screen.getByText('WO-00010')).toBeInTheDocument();
     });
-    // Phase 4 wired up "+ Work Item" — should be enabled on an active WO.
-    const addWorkItemButton = screen.getByRole('button', { name: /add work item/i });
-    expect(addWorkItemButton).not.toBeDisabled();
-    // Edit WO is wired up to the existing WorkOrderFormDialog — enabled on an active WO.
-    const editButton = screen.getByRole('button', { name: /edit/i });
+    // Activity drawer trigger + Edit WO live in the header (§5d). The three
+    // big +CTAs are gone — `+ Work Item` lives at the work items table head,
+    // `+ Dispatch` lands in phase 6 next to the dispatch surface, `+ Note`
+    // lives inside the activity drawer.
+    expect(screen.getAllByRole('button', { name: /activity/i }).length).toBeGreaterThan(0);
+    const editButton = screen.getByRole('button', { name: /^edit$/i });
     expect(editButton).not.toBeDisabled();
-    // + Dispatch remains disabled until phase 6 lands.
-    const addDispatchButton = screen.getByRole('button', { name: /add dispatch/i });
-    expect(addDispatchButton).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /add dispatch/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add note/i })).not.toBeInTheDocument();
   });
 
   it('opens the edit dialog when the Edit button is clicked', async () => {

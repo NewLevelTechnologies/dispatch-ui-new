@@ -17,15 +17,15 @@ import {
   type WorkOrderPriority,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
+import ActivityButton from '../components/ActivityButton';
+import ActivityDrawer from '../components/ActivityDrawer';
 import AppLayout from '../components/AppLayout';
 import EditableField from '../components/EditableField';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentQuickViewDrawer from '../components/EquipmentQuickViewDrawer';
 import WorkItemFormDialog from '../components/WorkItemFormDialog';
 import WorkItemsTable from '../components/WorkItemsTable';
-import WorkOrderActivityRail from '../components/WorkOrderActivityRail';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
-import { SlideOver } from '../components/catalyst/slideover';
 import { formatPhone } from '../utils/formatPhone';
 import { formatRelativeTime } from '../utils/formatRelativeTime';
 import { Heading } from '../components/catalyst/heading';
@@ -50,7 +50,6 @@ import {
   CalendarIcon,
   EllipsisHorizontalIcon,
   PencilIcon,
-  PlusIcon,
 } from '@heroicons/react/24/outline';
 
 const PROGRESS_COLORS: Record<ProgressCategory, 'zinc' | 'sky' | 'blue' | 'amber' | 'lime'> = {
@@ -99,7 +98,7 @@ export default function WorkOrderDetailPage() {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const [copied, setCopied] = useState<'phone' | 'address' | null>(null);
-  const [activitySheetOpen, setActivitySheetOpen] = useState(false);
+  const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
   const [workItemDialogOpen, setWorkItemDialogOpen] = useState(false);
   const [editingWorkItem, setEditingWorkItem] = useState<WorkItemResponse | null>(null);
   const [editWorkOrderDialogOpen, setEditWorkOrderDialogOpen] = useState(false);
@@ -266,10 +265,35 @@ export default function WorkOrderDetailPage() {
     }
   };
 
+  // N shortcut → open the activity drawer when it's closed. Once the drawer
+  // opens the composer mounts and grabs focus via its autoFocus prop; any
+  // subsequent N press while the drawer is open is handled by the composer's
+  // own listener (refocus the textarea if the user clicked elsewhere).
+  useEffect(() => {
+    if (activityDrawerOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'n' && e.key !== 'N') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      setActivityDrawerOpen(true);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [activityDrawerOpen]);
+
   // W shortcut → open the work item dialog in create mode. Mirrors the N
-  // shortcut in NoteComposer: ignored when an input is focused, when modifier
-  // keys are held, or when the dialog is already open. Re-binds on open-state
-  // change so the closed-only check is reliable.
+  // shortcut: ignored when an input is focused, when modifier keys are held,
+  // or when the dialog is already open. Re-binds on open-state change so the
+  // closed-only check is reliable.
   useEffect(() => {
     if (workItemDialogOpen) return; // listener inactive while dialog is open
     const handler = (e: KeyboardEvent) => {
@@ -497,34 +521,18 @@ export default function WorkOrderDetailPage() {
               nothing on a fresh WO and burns vertical real estate; better to
               show nothing until there's something to show. */}
 
-          {/* Action bar — buttons render to lock in the layout; functionality lands in
-              later phases (work-item dialog phase 4, dispatch phase 6, notes phase 5,
-              edit/overflow phase 4+). */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button
-              onClick={() => {
-                setEditingWorkItem(null);
-                setWorkItemDialogOpen(true);
-              }}
-              disabled={isCancelled || isArchived}
-              title={
-                isCancelled || isArchived
-                  ? t('workOrders.detail.frozen')
-                  : undefined
-              }
-            >
-              <PlusIcon className="size-4" />
-              {t('common.actions.add', { entity: getName('work_item') })}
-            </Button>
-            <Button disabled title={t('workOrders.detail.actionPending')}>
-              <PlusIcon className="size-4" />
-              {t('common.actions.add', { entity: getName('dispatch') })}
-            </Button>
-            <Button onClick={() => setActivitySheetOpen(true)}>
-              <PlusIcon className="size-4" />
-              {t('workOrders.detail.addNote')}
-            </Button>
-            <div className="grow" />
+          {/* Header-right cluster (§5d): Activity drawer trigger + Edit + overflow.
+              The full action bar with `+ Work Item / + Dispatch / + Note` was
+              removed in favor of contextual placement — `+ Work Item` lives at
+              the work items table head, `+ Dispatch` will land with phase 6
+              next to the dispatch surface, and `+ Note` is now inside the
+              activity drawer (which is also where you read the stream). */}
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+            <ActivityButton
+              workOrderId={workOrder.id}
+              drawerOpen={activityDrawerOpen}
+              onOpen={() => setActivityDrawerOpen(true)}
+            />
             <Button
               outline
               onClick={() => setEditWorkOrderDialogOpen(true)}
@@ -557,13 +565,10 @@ export default function WorkOrderDetailPage() {
           </div>
         </div>
 
-        {/* Body grid:
+        {/* Body grid (§5d — right rail removed; activity is in a drawer):
             - <lg: stacked, document-level scroll
-            - lg-xl: 2-col (left strip + main); rail accessed via slide-over
-            - xl+: 3-col (left strip + main + right rail)
-            On lg+, the body fills the remaining viewport (flex-1 min-h-0) and
-            each column owns its scroll. */}
-        <div className="p-4 lg:grid lg:grid-cols-[260px_1fr] lg:gap-6 lg:flex-1 lg:min-h-0 lg:overflow-hidden xl:grid-cols-[260px_1fr_360px]">
+            - lg+: 2-col (left strip + main); each column owns its scroll. */}
+        <div className="p-4 lg:grid lg:grid-cols-[260px_1fr] lg:gap-6 lg:flex-1 lg:min-h-0 lg:overflow-hidden">
           <aside className="flex flex-col gap-6 lg:min-h-0 lg:overflow-y-auto">
             {/* Service Location card. Location identity belongs here, not
                 in the header — bold name + multi-line address gives the
@@ -734,6 +739,10 @@ export default function WorkOrderDetailPage() {
               workflows={statusWorkflows}
               enforceWorkflow={workflowConfig?.enforceStatusWorkflow ?? false}
               readOnly={isCancelled || isArchived}
+              onAdd={() => {
+                setEditingWorkItem(null);
+                setWorkItemDialogOpen(true);
+              }}
               onEdit={(wi) => {
                 setEditingWorkItem(wi);
                 setWorkItemDialogOpen(true);
@@ -746,41 +755,18 @@ export default function WorkOrderDetailPage() {
               onAddSubUnit={handleAddSubUnit}
             />
           </main>
-
-          {/* Right rail (xl+ only) — same content also appears in the slide-over below. */}
-          {/* Right rail — visible on xl+. Independent scroll within its column
-              (parent body grid is overflow-hidden + flex-1, so each column owns
-              its scroll viewport). */}
-          {/* px-1 keeps the rail content (chips, etc.) away from the aside's
-              overflow boundary so focus outlines aren't clipped. The
-              ActivityStream's sticky header uses -mx-1 px-1 to extend its bg
-              back to the aside's edge for a clean visual bleed. */}
-          <aside className="mt-6 hidden xl:mt-0 xl:block xl:min-h-0 xl:overflow-y-auto xl:px-1">
-            <WorkOrderActivityRail workOrderId={workOrder.id} />
-          </aside>
         </div>
       </div>
 
-      {/* Slide-over for non-xl viewports (and as the "+ Note" entry point on any viewport).
-          Catalyst SlideOver only mounts content when `open`, so React Query duplication
-          is bounded to the moment the sheet is visible. */}
-      <SlideOver
-        open={activitySheetOpen}
-        onClose={setActivitySheetOpen}
-        className="!max-w-md"
-      >
-        <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-          <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">
-            {t('workOrders.activity.heading')}
-          </h2>
-          <Button plain onClick={() => setActivitySheetOpen(false)}>
-            {t('common.close')}
-          </Button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4">
-          <WorkOrderActivityRail workOrderId={workOrder.id} />
-        </div>
-      </SlideOver>
+      {/* Activity drawer (§5d) — single page-level entry point for both reading
+          activity and writing notes. Composer at top autofocuses on open;
+          stream below virtualizes its history. ActiveDispatchesWidget lives
+          elsewhere once phase 6 ships. */}
+      <ActivityDrawer
+        open={activityDrawerOpen}
+        onClose={() => setActivityDrawerOpen(false)}
+        workOrderId={workOrder.id}
+      />
 
       <WorkItemFormDialog
         isOpen={workItemDialogOpen}
