@@ -8,7 +8,7 @@ import {
 } from '../api';
 import { Button } from './catalyst/button';
 import { Textarea } from './catalyst/textarea';
-import { PencilIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { ChevronRightIcon, PencilIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { formatRelativeTime } from '../utils/formatRelativeTime';
 
 interface Props {
@@ -25,6 +25,13 @@ interface Props {
   /** Cancelled / archived WOs collapse the composer + edit / delete
    *  affordances. Existing notes still display read-only. */
   readOnly?: boolean;
+  /** When true, the section starts collapsed and shows just a clickable
+   *  summary row (chevron + heading + first-note preview). Click expands
+   *  the section to reveal helper text, composer, and the full notes list.
+   *  Used on dense surfaces (WO row expansion) where notes are second-pass
+   *  reference, not first-scan content. Defaults to false (always-expanded
+   *  legacy behavior, used by the equipment detail page + quickview drawer). */
+  collapsible?: boolean;
 }
 
 /**
@@ -49,11 +56,16 @@ export default function EquipmentNotesSection({
   recentNotes,
   noteCount,
   readOnly = false,
+  collapsible = false,
 }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [isComposing, setIsComposing] = useState(false);
   const [draft, setDraft] = useState('');
+  // Collapsed by default when collapsible=true. The summary row stays
+  // clickable to toggle; clicking + Add note while collapsed auto-expands
+  // and starts the composer in one motion.
+  const [isExpanded, setIsExpanded] = useState(!collapsible);
 
   // recentNotes affects WorkItemEquipmentSummary projections (WO row
   // expansion), EquipmentResponse (drawer + detail page), AND the
@@ -111,6 +123,15 @@ export default function EquipmentNotesSection({
   };
 
   const overflow = noteCount - recentNotes.length;
+  const previewBody = recentNotes[0]?.body;
+  const showFull = !collapsible || isExpanded;
+
+  // + Add note while collapsed: expand AND open composer in one click,
+  // so the user goes straight from the summary row to a focused textarea.
+  const handleAddClick = () => {
+    setIsExpanded(true);
+    setIsComposing(true);
+  };
 
   return (
     <section
@@ -118,14 +139,39 @@ export default function EquipmentNotesSection({
       className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800"
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          {t('equipment.notes.headingWithCount', { count: noteCount })}
-        </div>
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={() => setIsExpanded((v) => !v)}
+            aria-expanded={isExpanded}
+            className="-m-1 flex min-w-0 flex-1 items-center gap-2 rounded p-1 text-left hover:bg-zinc-100/60 dark:hover:bg-white/5"
+          >
+            <ChevronRightIcon
+              className={
+                'size-3.5 shrink-0 text-zinc-500 transition-transform' +
+                (isExpanded ? ' rotate-90' : '')
+              }
+              aria-hidden
+            />
+            <span className="whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              {t('equipment.notes.headingWithCount', { count: noteCount })}
+            </span>
+            {!isExpanded && previewBody && (
+              <span className="min-w-0 flex-1 truncate text-xs italic text-zinc-500 dark:text-zinc-400">
+                — {previewBody}
+              </span>
+            )}
+          </button>
+        ) : (
+          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            {t('equipment.notes.headingWithCount', { count: noteCount })}
+          </div>
+        )}
         {!readOnly && !isComposing && (
           <button
             type="button"
-            onClick={() => setIsComposing(true)}
-            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline dark:text-blue-400"
+            onClick={handleAddClick}
+            className="inline-flex shrink-0 items-center gap-1 text-sm text-blue-600 hover:underline dark:text-blue-400"
           >
             <PlusIcon className="size-4" />
             {t('equipment.notes.addNote')}
@@ -134,13 +180,19 @@ export default function EquipmentNotesSection({
       </div>
       {/* Helper text — disambiguates from WO activity rail notes. CSRs
           coming from legacy systems wrote per-equipment service knowledge
-          where the new system put per-WO conversation; this line redirects. */}
-      <p className="mt-0.5 text-xs italic text-zinc-500 dark:text-zinc-400">
-        {t('equipment.notes.helper')}
-      </p>
+          where the new system put per-WO conversation; this line redirects.
+          Hidden in the collapsed state on dense surfaces — the summary
+          row's preview already telegraphs that these are saved-with-the-
+          equipment notes, and the line is the heaviest vertical chunk we
+          can drop. */}
+      {showFull && (
+        <p className="mt-0.5 text-xs italic text-zinc-500 dark:text-zinc-400">
+          {t('equipment.notes.helper')}
+        </p>
+      )}
 
       {/* Composer */}
-      {!readOnly && isComposing && (
+      {showFull && !readOnly && isComposing && (
         <div className="mt-2 space-y-2">
           <Textarea
             value={draft}
@@ -170,7 +222,7 @@ export default function EquipmentNotesSection({
       {/* Recent notes preview — divided list (no per-note card chrome)
           so the section reads as part of the surrounding equipment block
           density rather than an inset surface. */}
-      {recentNotes.length > 0 && (
+      {showFull && recentNotes.length > 0 && (
         <ul className="mt-2 divide-y divide-zinc-200 dark:divide-zinc-800">
           {recentNotes.map((note) => (
             <NoteRow
@@ -197,7 +249,7 @@ export default function EquipmentNotesSection({
       {/* Overflow hint when more notes exist than the recentNotes
           projection includes. Routes the user to the equipment detail
           page where the full list lives. */}
-      {overflow > 0 && (
+      {showFull && overflow > 0 && (
         <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
           {t('equipment.notes.viewAll', { count: overflow })}
         </p>
