@@ -911,6 +911,88 @@ describe('EquipmentDetailPage', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
+  it('hides the Recent Service History and Recent Notes cards on Overview when both lists are empty', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    // Identification header still shows; Recent cards do not.
+    expect(screen.getByText('Identification')).toBeInTheDocument();
+    expect(screen.queryByText(/recent work orders/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/recent notes/i)).not.toBeInTheDocument();
+  });
+
+  it('renders Recent Service History on Overview and View all jumps to the Service History tab', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockWorkOrdersGetAll.mockResolvedValue({
+      content: [
+        {
+          id: 'wo-1',
+          workOrderNumber: 'WO-00010',
+          customerId: 'c-1',
+          serviceLocationId: 'loc-1',
+          lifecycleState: 'ACTIVE',
+          progressCategory: 'IN_PROGRESS',
+          priority: 'NORMAL',
+          scheduledDate: '2026-04-24',
+          createdAt: '2026-04-20T12:00:00Z',
+          updatedAt: '2026-04-24T12:00:00Z',
+        },
+      ],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 25,
+      first: true,
+      last: true,
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    expect(await screen.findByText(/recent work orders/i)).toBeInTheDocument();
+    // The WO row links to its detail page
+    const woLink = screen.getByRole('link', { name: /WO-00010/i });
+    expect(woLink).toHaveAttribute('href', '/work-orders/wo-1');
+
+    // "View all" jumps to the Service History tab
+    await user.click(screen.getByRole('button', { name: /view all/i }));
+    await waitFor(() => {
+      // Service history tab content is the WorkOrdersList component;
+      // the recent card disappears because we're no longer on Overview.
+      expect(screen.queryByText(/recent work orders/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('renders Recent Notes on Overview with the latest 3 entries', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockNotesList.mockResolvedValue([
+      { id: 'n-1', body: 'Replaced compressor', authorUserId: 'u-1', authorName: 'Jane', createdAt: '2026-05-01T12:00:00Z', updatedAt: '2026-05-01T12:00:00Z' },
+      { id: 'n-2', body: 'Filter due', authorUserId: 'u-2', authorName: 'Bob', createdAt: '2026-04-20T09:00:00Z', updatedAt: '2026-04-20T09:00:00Z' },
+      { id: 'n-3', body: 'Loud rattle on startup', authorUserId: 'u-3', authorName: 'Sue', createdAt: '2026-04-10T09:00:00Z', updatedAt: '2026-04-10T09:00:00Z' },
+      { id: 'n-4', body: 'Should not appear in the recent card', authorUserId: 'u-4', authorName: 'Joe', createdAt: '2026-04-01T09:00:00Z', updatedAt: '2026-04-01T09:00:00Z' },
+    ]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    expect(await screen.findByText(/recent notes/i)).toBeInTheDocument();
+    expect(screen.getByText('Replaced compressor')).toBeInTheDocument();
+    expect(screen.getByText('Filter due')).toBeInTheDocument();
+    expect(screen.getByText('Loud rattle on startup')).toBeInTheDocument();
+    // The 4th note isn't on the Overview card (capped at 3) — but it WILL
+    // render on the Notes tab via EquipmentNotesSection. We assert the
+    // cap by counting that the 4th body string isn't surfaced.
+    expect(screen.queryByText(/should not appear/i)).not.toBeInTheDocument();
+  });
+
   it('renders an empty Notes tab with the Add note affordance', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     const user = userEvent.setup();

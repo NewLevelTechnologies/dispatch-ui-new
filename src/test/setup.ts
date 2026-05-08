@@ -114,6 +114,7 @@ vi.mock('react-i18next', () => {
     'common.search': 'Search...',
     'common.show': 'Show',
     'common.view': 'View',
+    'common.viewAll': 'View all',
     'common.form.accessInstructions': 'Access Instructions',
     'common.form.address': 'Address',
     'common.form.addressLine2': 'Address Line 2',
