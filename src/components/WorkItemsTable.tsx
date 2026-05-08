@@ -4,8 +4,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   equipmentApi,
+  equipmentFiltersApi,
   equipmentImagesApi,
   EquipmentStatus,
+  type EquipmentFilter,
   type EquipmentImage,
   type EquipmentNote,
   type StatusWorkflowRule,
@@ -14,6 +16,7 @@ import {
   type WorkItemResponse,
   type WorkItemStatus,
 } from '../api';
+import { formatFilterSize } from '../utils/formatFilterSize';
 import { useGlossary } from '../contexts/GlossaryContext';
 import EquipmentNotesSection from './EquipmentNotesSection';
 import EquipmentThumbnail from './EquipmentThumbnail';
@@ -506,6 +509,16 @@ function EquipmentBlockBody({
     queryFn: () => equipmentImagesApi.list(equipment.id),
   });
 
+  // Lazy-fetch filters for the same reason — the WorkItemEquipmentSummary
+  // projection doesn't carry them, but they're often consulted in the
+  // repair flow ("what filter size do I need to pick up?"). Same cache key
+  // shape as EquipmentDetailPage's filter list so the two surfaces stay
+  // in lockstep.
+  const { data: filters = [] } = useQuery({
+    queryKey: ['equipment-filters', equipment.id],
+    queryFn: () => equipmentFiltersApi.getAll(equipment.id),
+  });
+
   // Sort defensively: profile-first then sortOrder. Same contract the
   // PhotosSection used to enforce internally.
   const orderedImages = [...images].sort((a, b) => {
@@ -618,42 +631,48 @@ function EquipmentBlockBody({
         />
       </div>
 
-      {/* Inline-edit grid: Make / Model on row 1, Serial / Location on
-          row 2. Deeper fields (asset tag, install date, warranty,
-          description) live behind "Edit all" — asset tag in particular is
-          a tech/scanner field, not a CSR scan field, so it doesn't earn
-          the inline real estate. */}
-      <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[max-content_1fr_max-content_1fr]">
-        <FieldRow
-          label={t('equipment.form.make')}
-          value={equipment.make ?? ''}
-          onSave={(v) => saveField('make', v || null)}
-          ariaLabel={t('equipment.form.make')}
-          readOnly={readOnly}
-        />
-        <FieldRow
-          label={t('equipment.form.model')}
-          value={equipment.model ?? ''}
-          onSave={(v) => saveField('model', v || null)}
-          ariaLabel={t('equipment.form.model')}
-          readOnly={readOnly}
-        />
-        <FieldRow
-          label={t('equipment.form.serialNumber')}
-          value={equipment.serialNumber ?? ''}
-          onSave={(v) => saveField('serialNumber', v || null)}
-          ariaLabel={t('equipment.form.serialNumber')}
-          readOnly={readOnly}
-          className="font-mono"
-        />
-        <FieldRow
-          label={t('equipment.form.locationOnSite')}
-          value={equipment.locationOnSite ?? ''}
-          onSave={(v) => saveField('locationOnSite', v || null)}
-          ariaLabel={t('equipment.form.locationOnSite')}
-          readOnly={readOnly}
-        />
-      </dl>
+      {/* Inline-edit grid (Make / Model / Serial / Location) on the left
+          and a compact Filters summary on the right when filters exist —
+          flex row so the two share the available width without forcing a
+          new vertical band. The grid uses minmax-bounded value columns
+          (instead of `1fr`) so it sizes to content and leaves room on the
+          right; values still keep a sane min-width for the click-to-edit
+          input. Wraps stacked on narrow screens. Deeper fields (asset
+          tag, install date, warranty, description) live behind "Edit all".  */}
+      <div className="mt-2 flex flex-wrap items-start gap-x-6 gap-y-2">
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[max-content_minmax(7rem,auto)_max-content_minmax(7rem,auto)]">
+          <FieldRow
+            label={t('equipment.form.make')}
+            value={equipment.make ?? ''}
+            onSave={(v) => saveField('make', v || null)}
+            ariaLabel={t('equipment.form.make')}
+            readOnly={readOnly}
+          />
+          <FieldRow
+            label={t('equipment.form.model')}
+            value={equipment.model ?? ''}
+            onSave={(v) => saveField('model', v || null)}
+            ariaLabel={t('equipment.form.model')}
+            readOnly={readOnly}
+          />
+          <FieldRow
+            label={t('equipment.form.serialNumber')}
+            value={equipment.serialNumber ?? ''}
+            onSave={(v) => saveField('serialNumber', v || null)}
+            ariaLabel={t('equipment.form.serialNumber')}
+            readOnly={readOnly}
+            className="font-mono"
+          />
+          <FieldRow
+            label={t('equipment.form.locationOnSite')}
+            value={equipment.locationOnSite ?? ''}
+            onSave={(v) => saveField('locationOnSite', v || null)}
+            ariaLabel={t('equipment.form.locationOnSite')}
+            readOnly={readOnly}
+          />
+        </dl>
+        <FiltersInline filters={filters} />
+      </div>
 
       <SubUnitsRow
         descendants={equipment.descendants}
@@ -854,6 +873,38 @@ function SectionHeader({ label, actions }: SectionHeaderProps) {
         {label}
       </div>
       {actions && <div className="flex items-center gap-1">{actions}</div>}
+    </div>
+  );
+}
+
+interface FiltersInlineProps {
+  filters: EquipmentFilter[];
+}
+
+/**
+ * Compact read-only summary of the equipment's filter sizes, rendered to
+ * the right of the inline-edit grid (flex sibling) so it occupies space
+ * that would otherwise be empty rather than burning a vertical row.
+ * Surfaced here because techs / CSRs often coordinate filter changes
+ * during repairs ("what size do I need to pick up?"). Hidden when no
+ * filters; full management still lives on the equipment detail page's
+ * Filters tab. Comma-joined sizes with "×N" for quantity > 1. Wraps
+ * below the grid on narrow screens via the parent's flex-wrap.
+ */
+function FiltersInline({ filters }: FiltersInlineProps) {
+  const { t } = useTranslation();
+  if (filters.length === 0) return null;
+  const summary = filters
+    .map((f) =>
+      f.quantity > 1 ? `${formatFilterSize(f)} ×${f.quantity}` : formatFilterSize(f)
+    )
+    .join(', ');
+  return (
+    <div className="flex items-baseline gap-2 text-sm">
+      <span className="whitespace-nowrap text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        {t('equipment.tabs.filters')}:
+      </span>
+      <span className="text-zinc-700 dark:text-zinc-300">{summary}</span>
     </div>
   );
 }

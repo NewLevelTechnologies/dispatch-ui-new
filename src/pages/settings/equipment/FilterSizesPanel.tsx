@@ -33,15 +33,10 @@ import {
   ChevronDownIcon,
   EllipsisVerticalIcon,
 } from '@heroicons/react/16/solid';
+import { formatFilterSize } from '../../../utils/formatFilterSize';
 
 const QUERY_KEY = ['tenant-filter-sizes'] as const;
 
-function formatInches(n: number): string {
-  return String(n);
-}
-function formatSize(s: TenantFilterSize): string {
-  return `${formatInches(s.lengthIn)}×${formatInches(s.widthIn)}×${formatInches(s.thicknessIn)}`;
-}
 
 export default function FilterSizesPanel() {
   const { t } = useTranslation();
@@ -120,7 +115,7 @@ export default function FilterSizesPanel() {
     setIsDialogOpen(true);
   };
   const handleDelete = (item: TenantFilterSize) => {
-    if (window.confirm(t('settings.taxonomy.deleteConfirm', { name: formatSize(item) }))) {
+    if (window.confirm(t('settings.taxonomy.deleteConfirm', { name: formatFilterSize(item) }))) {
       deleteMutation.mutate(item.id);
     }
   };
@@ -189,7 +184,7 @@ export default function FilterSizesPanel() {
           <TableBody>
             {sorted.map((item, index) => (
               <TableRow key={item.id}>
-                <TableCell>{formatSize(item)}</TableCell>
+                <TableCell>{formatFilterSize(item)}</TableCell>
                 <TableCell>
                   {canEdit && (
                     <div className="flex items-center gap-0.5">

@@ -63,6 +63,7 @@ import {
   StarIcon as StarIconOutline,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
+import { formatFilterSize } from '../utils/formatFilterSize';
 import { formatRelativeTime } from '../utils/formatRelativeTime';
 
 type TabId = 'overview' | 'notes' | 'photos' | 'filters' | 'service-history' | 'components';
@@ -101,10 +102,6 @@ function formatDate(iso: string | null | undefined): string {
   });
 }
 
-// JS Number.toString() naturally drops trailing zeros, so 20.00 → "20" and 1.5 stays "1.5".
-function formatInches(n: number): string {
-  return String(n);
-}
 
 export default function EquipmentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -472,9 +469,6 @@ export default function EquipmentDetailPage() {
       deleteFilterMutation.mutate(f.id);
     }
   };
-
-  const formatFilterSize = (f: { lengthIn: number; widthIn: number; thicknessIn: number }) =>
-    `${formatInches(f.lengthIn)}×${formatInches(f.widthIn)}×${formatInches(f.thicknessIn)}`;
 
   const handleSetProfileImage = (img: EquipmentImage) => {
     if (img.isProfile) return;
