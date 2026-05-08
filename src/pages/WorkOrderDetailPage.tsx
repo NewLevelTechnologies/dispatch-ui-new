@@ -428,10 +428,12 @@ export default function WorkOrderDetailPage() {
             </Button>
           </div>
 
-          {/* Row 1 — identity & state. Priority pill is now click-to-edit
-              (matches the work-item status pill pattern); the previous
-              row in the WO Info card is gone in this same change. */}
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          {/* Row 1 — identity & state on the left, action cluster on the
+              right. Priority pill is click-to-edit (matches the work-item
+              status pill pattern). The action cluster (Activity / Edit /
+              overflow) lives on the right edge of this row instead of in its
+              own row — three small buttons don't earn a dedicated strip. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Heading className="!text-lg">{woDisplayNumber}</Heading>
             <Badge color={PROGRESS_COLORS[workOrder.progressCategory]}>
               {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[workOrder.progressCategory]}`)}
@@ -483,6 +485,42 @@ export default function WorkOrderDetailPage() {
             <Text className="!text-sm !text-zinc-500">
               {t('workOrders.detail.lastUpdated', { time: formatRelativeTime(workOrder.updatedAt) })}
             </Text>
+            <div className="ml-auto flex items-center gap-2">
+              <ActivityButton
+                workOrderId={workOrder.id}
+                drawerOpen={activityDrawerOpen}
+                onOpen={() => setActivityDrawerOpen(true)}
+              />
+              <Button
+                outline
+                onClick={() => setEditWorkOrderDialogOpen(true)}
+                disabled={isCancelled || isArchived}
+                title={
+                  isCancelled || isArchived
+                    ? t('workOrders.detail.frozen')
+                    : undefined
+                }
+              >
+                <PencilIcon className="size-4" />
+                {t('common.edit')}
+              </Button>
+              <Dropdown>
+                <DropdownButton plain aria-label={t('common.moreOptions')}>
+                  <EllipsisHorizontalIcon className="size-5" />
+                </DropdownButton>
+                <DropdownMenu anchor="bottom end">
+                  <DropdownItem disabled>
+                    <DropdownLabel>{t('workOrders.detail.print')}</DropdownLabel>
+                  </DropdownItem>
+                  <DropdownItem disabled>
+                    <DropdownLabel>{t('workOrders.detail.duplicate')}</DropdownLabel>
+                  </DropdownItem>
+                  <DropdownItem onClick={handleDeleteWorkOrder}>
+                    <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+            </div>
           </div>
 
           {/* Row 2 — B2B context + ETA. Customer name is a thin breadcrumb;
@@ -520,49 +558,6 @@ export default function WorkOrderDetailPage() {
               drawer + live values). A row of "$ —" placeholders communicates
               nothing on a fresh WO and burns vertical real estate; better to
               show nothing until there's something to show. */}
-
-          {/* Header-right cluster (§5d): Activity drawer trigger + Edit + overflow.
-              The full action bar with `+ Work Item / + Dispatch / + Note` was
-              removed in favor of contextual placement — `+ Work Item` lives at
-              the work items table head, `+ Dispatch` will land with phase 6
-              next to the dispatch surface, and `+ Note` is now inside the
-              activity drawer (which is also where you read the stream). */}
-          <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-            <ActivityButton
-              workOrderId={workOrder.id}
-              drawerOpen={activityDrawerOpen}
-              onOpen={() => setActivityDrawerOpen(true)}
-            />
-            <Button
-              outline
-              onClick={() => setEditWorkOrderDialogOpen(true)}
-              disabled={isCancelled || isArchived}
-              title={
-                isCancelled || isArchived
-                  ? t('workOrders.detail.frozen')
-                  : undefined
-              }
-            >
-              <PencilIcon className="size-4" />
-              {t('common.edit')}
-            </Button>
-            <Dropdown>
-              <DropdownButton plain aria-label={t('common.moreOptions')}>
-                <EllipsisHorizontalIcon className="size-5" />
-              </DropdownButton>
-              <DropdownMenu anchor="bottom end">
-                <DropdownItem disabled>
-                  <DropdownLabel>{t('workOrders.detail.print')}</DropdownLabel>
-                </DropdownItem>
-                <DropdownItem disabled>
-                  <DropdownLabel>{t('workOrders.detail.duplicate')}</DropdownLabel>
-                </DropdownItem>
-                <DropdownItem onClick={handleDeleteWorkOrder}>
-                  <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-          </div>
         </div>
 
         {/* Body grid (§5d — right rail removed; activity is in a drawer):
