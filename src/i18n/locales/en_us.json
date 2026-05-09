@@ -1117,7 +1117,7 @@
       "errorLoading": "Couldn't load activity.",
       "fieldLabel": {
         "completedDate": "Completed Date",
-        "customerOrderNumber": "Customer PO / Order #",
+        "customerOrderNumber": "Customer PO",
         "priority": "Priority",
         "scheduledDate": "Scheduled Date",
         "workOrderTypeId": "Type"
@@ -1206,7 +1206,7 @@
       "searchPlaceholder": "Search by WO#, customer, phone, address…"
     },
     "form": {
-      "customerOrderNumber": "Customer PO / Order #",
+      "customerOrderNumber": "Customer PO",
       "customerOrderNumberPlaceholder": "e.g., PO-12345",
       "customerPlaceholder": "Select a customer...",
       "customerRequired": "Please select a customer",
@@ -1217,6 +1217,9 @@
       "firstWorkItemRequired": "Please describe the first work item.",
       "newCustomer": "New {{entity, lowercase}}",
       "newCustomerDetails": "New {{entity}} Details",
+      "notToExceed": "NTE",
+      "notToExceedInvalid": "NTE must be a non-negative number.",
+      "notToExceedPlaceholder": "e.g., 1500.00",
       "priority": "Priority",
       "progressLabel": "Progress",
       "progressHelper": "Derived automatically from work item statuses.",

@@ -120,6 +120,10 @@ export interface WorkOrderSummary {
   completedDate?: string | null;
   customerOrderNumber?: string | null;
 
+  // Not-to-exceed cap (currency). Backend stores as BigDecimal; serialized as
+  // a JSON number. Null/absent = no cap. Backend rejects negatives.
+  notToExceed?: number | null;
+
   // Enriched display fields. Site-contact and other extras are only populated by
   // the detail endpoint, but typed as optional here so the same shape is usable
   // on the list page without casts.
@@ -219,6 +223,8 @@ export interface UpdateWorkOrderRequest {
   scheduledDate?: string;
   completedDate?: string;
   customerOrderNumber?: string;
+  // JsonNullable on the backend: omit = no change, null = clear, value = set.
+  notToExceed?: number | null;
 }
 
 export interface CancelWorkOrderRequest {
