@@ -119,6 +119,11 @@ function formatDate(iso: string | null | undefined): string {
   });
 }
 
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+});
+
 export default function WorkOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -707,6 +712,37 @@ export default function WorkOrderDetailPage() {
                     placeholder={t('workOrders.form.customerOrderNumberPlaceholder')}
                     ariaLabel={t('workOrders.form.customerOrderNumber')}
                     className="font-mono"
+                  />
+                </DescriptionDetails>
+
+                <DescriptionTerm>{t('workOrders.form.notToExceed')}</DescriptionTerm>
+                <DescriptionDetails>
+                  <EditableField
+                    value={workOrder.notToExceed != null ? String(workOrder.notToExceed) : ''}
+                    onSave={async (raw) => {
+                      const trimmed = raw.trim().replace(/[$,\s]/g, '');
+                      if (trimmed === '') {
+                        await handleSaveWorkOrderField('notToExceed', null);
+                        return;
+                      }
+                      const num = Number(trimmed);
+                      if (!Number.isFinite(num) || num < 0) {
+                        alert(t('workOrders.form.notToExceedInvalid'));
+                        // Throw so EditableField stays in edit mode for retry/cancel.
+                        throw new Error('invalid NTE');
+                      }
+                      await handleSaveWorkOrderField('notToExceed', num);
+                    }}
+                    disabled={isCancelled || isArchived}
+                    placeholder={t('workOrders.form.notToExceedPlaceholder')}
+                    ariaLabel={t('workOrders.form.notToExceed')}
+                    renderDisplay={(v) =>
+                      v ? (
+                        currencyFormatter.format(Number(v))
+                      ) : (
+                        <span className="text-zinc-400 italic dark:text-zinc-500">—</span>
+                      )
+                    }
                   />
                 </DescriptionDetails>
 

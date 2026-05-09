@@ -170,6 +170,7 @@ Always visible while scrolling.
 - **Row 3 — Money summary chips:** `$ quoted · $ invoiced · $ paid · NTE · Balance`
   - Each segment is a clickable chip that opens the Financial detail drawer (§3.5) directly to the matching tab.
   - **Zero-value chips remain clickable.** `$0 paid` opens the Payments tab to an empty state. Consistency over special-casing.
+  - **NTE single-surface consolidation (decided 2026-05-09):** NTE was originally specced in *both* the header chip row and the Order Info card (§3.2). By the time phase 7 ships, two surfaces for the same number is clutter — the header chip becomes the canonical home (read in spend-vs-cap context next to invoiced/paid/balance) and NTE drops out of Order Info. Unlike the other money chips (which are derived from invoices/quotes/payments), NTE is settable, so the chip needs inline-edit or click-to-edit behavior — same pattern as the status/priority pills in row 1. Until phase 7 lands the row stays hidden and NTE entry lives in the Order Info card as a temporary home.
 - ~~**Action bar:** `+ Work Item` · `+ Dispatch` · `+ Note` · `Edit WO ▾` · overflow `⋯` (Delete, Print, Duplicate, Convert to Recurring).~~ <br/> **Revised 2026-05-08:** action bar removed. Only `[Edit WO ▾]` + overflow `[⋯]` (Delete, Print, Duplicate, Convert to Recurring) remain, clustered at the right edge of header row 1. `+ Work Item` / `+ Dispatch` / `+ Note` redistribute to their natural homes per §5d. The earlier "compose button in both places" rationale is moot once the always-on composer is gone.
 
 ### 3.2 Left strip (~240px, collapsible)
@@ -195,7 +196,7 @@ Dense Catalyst `Table` of work items with click-to-expand rows. **No tabs in thi
     - 2-col inline-edit grid: Make / Model · Serial / Location-on-Site · (Asset Tag when projected on the summary).
     - Sub-units chip row when descendants exist: `Sub-units (3): [Compressor →] [Coil →] [Fan →]`. Each chip links to that sub-unit's detail page.
     - Empty state when no equipment linked: section header + `+ Add Equipment` action that opens `EquipmentFormDialog` in CREATE mode with the WO's service location pre-locked. On save the new equipment auto-links to the work item via `EquipmentFormDialog.onCreated`.
-  - **PHOTOS sub-section** (nested under Equipment, not a peer): row of thumbnails + count + `[Manage →]` link. Hides when empty. Sourced from existing `equipmentImagesApi`.
+    - Photos: `+ Add Photo` action in the block header + small inline thumbnails alongside the identity grid. (A vertical PHOTOS sub-section nested under EQUIPMENT was tried and removed — burned vertical real estate without commensurate value. Inline thumbnails communicate "photos exist" without claiming a row.)
   - **EQUIPMENT NOTES sub-section** (nested, persistent service knowledge — *not* WO-scoped notes): muted helper text *"Saved with this equipment, not this work order"* under the heading so CSRs from legacy don't confuse this with WO conversation. Always renders with a `+ Add note` affordance even when empty (encourages capture). Needs a new `equipment_notes` sub-resource on the backend.
   - **LINKED block** (peer-level, *outside* Equipment): chips for any Quote / Invoice / PO that references this work item. Driven by the optional `InvoiceLineItem.workItemId` from §2.3. Clicking a chip opens the financial detail drawer to that record.
   - **Footer line** (outside any block): muted italic *"Updated 2d ago by Jamie"* — this is the work item's `updatedAt`, not the equipment's. Putting it inside Equipment would conflate two entities.
@@ -298,7 +299,7 @@ Everything else — header layout, `DescriptionList`, money chips, action bar, d
 
 Each phase produces a working page that's better than the previous. We don't ship a page that requires phase 7 to be useful. The activity rail lands early because it's the highest-value surface; inline status edit lands in phase 2 because without it phase 2 is a placeholder, not a useful page.
 
-**Status as of 2026-05-04:** phases 1–5 shipped. Row expansion v2 shipped (with equipment as a first-class inline-edit surface, see §5a below). Phase 6 (Dispatch) and phase 7 (Financial drawer) not started. Several action-bar buttons (Edit WO, Print, Duplicate, Delete) still render disabled placeholders pending follow-up work.
+**Status as of 2026-05-09:** phases 1–5, 5a, 5b, 5d, and §5c NTE entry shipped. Phase 6 (Dispatch) and phase 7 (Financial drawer) not started.
 
 1. **Page skeleton** — sticky header (3 rows + action bar; click-to-copy phone behavior, money chips render values but the drawer doesn't exist yet so chip clicks no-op) + left strip with `DescriptionList` cards (Service Location, Order Info, Billing-if-different). Reachable from the WO list at `/work-orders/:id`. Header status pill renders read-only. ✅ shipped
 2. **Work items dense table + inline status pill edit.** Catalyst `Table` rendered into the main canvas. Columns: status pill (inline-editable), description, last updated. **Inline status pill edits** wire up here on the header pill and on each row — smallest, highest-frequency inline op, makes phase 2 ship as a useful page rather than a placeholder. Empty state: "No work items on this work order." ✅ shipped (Last Updated column subsequently dropped — moved into the row-expansion footer per §5a)
@@ -338,7 +339,6 @@ What shipped:
 
 What's deferred — slot in as their backends ship, no redesign needed:
 
-- **Equipment Photos sub-section** (nested inside the Equipment block, not a peer). Use existing `equipmentImagesApi` lazy-loaded on row expansion, OR project `recentPhotos[]` onto `WorkItemEquipmentSummary` to avoid the N+1. Hides when empty.
 - **Equipment Notes sub-section** (also nested, with helper text "Saved with this equipment, not this work order" so CSRs don't write WO-scoped content here). Always renders with `+ Add note` even when empty. **Needs new backend sub-resource: `POST/GET/DELETE /equipment/{id}/notes`** with body, author, timestamp. Same shape as legacy "Internal Notes."
 - **Linked-entity chips** (Quote/Invoice/PO chips on work item rows). Needs the optional `InvoiceLineItem.workItemId` from §2.3 — build only when per-work-item profitability reporting earns it.
 
@@ -366,12 +366,12 @@ Backend asks resolved:
 
 Independent of the phase ordering — each is a small, separate branch.
 
-- **Edit WO button** in the header action bar (currently disabled). Wires `onClick` to open the existing `WorkOrderFormDialog`. One-line change once the dialog is verified to still match the page's data shape.
-- **Overflow menu** on the header (Print, Duplicate, Delete). All three currently render disabled; each needs its own scoping pass — Delete is the smallest (confirm + `workOrderApi.delete` + navigate back).
-- **NTE field** in left strip + header chip. Backend doesn't have `WorkOrder.notToExceed` yet; add it as a small backend ask alongside the financial drawer scoping (phase 7 reads from it).
-- **Money chip row reveal logic**: when phase 7 ships and chips have real values, reveal the row when at least one chip has a non-zero value; keep hidden on fresh WOs.
+- ✅ **Edit WO button** — shipped. Lives at the right edge of header row 1 (action bar removed in §5d); wired to `WorkOrderFormDialog`.
+- ✅ **Overflow menu** (Print, Duplicate, Delete) — shipped.
+- ✅ **NTE field** — shipped in the left strip Order Info card as inline-editable `EditableField` (currency-formatted display, non-negative validation, click to edit). This is a **temporary home**; per the §3.1 "NTE single-surface consolidation" note, NTE moves to the header money chip in phase 7 and drops out of Order Info at that point. Don't build the §3.1 chip behavior twice — wait for phase 7 to do the migration in one pass.
+- ⏳ **Money chip row reveal logic**: when phase 7 ships and chips have real values, reveal the row when at least one chip has a non-zero value; keep hidden on fresh WOs.
 
-### 5d. Page reshape (planned 2026-05-08)
+### 5d. Page reshape (shipped 2026-05-08)
 
 Set of cheap, independent wins to ship before phase 6/7. Bundled here so they land together but they're individually deployable on separate branches — none depend on each other or on phase 6/7 backend work.
 
