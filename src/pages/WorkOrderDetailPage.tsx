@@ -23,6 +23,7 @@ import ActivityButton from '../components/ActivityButton';
 import ActivityDrawer from '../components/ActivityDrawer';
 import AppLayout from '../components/AppLayout';
 import AssignTechnicianDialog from '../components/AssignTechnicianDialog';
+import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
 import DispatchesSection from '../components/DispatchesSection';
 import EditableField from '../components/EditableField';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
@@ -167,6 +168,9 @@ export default function WorkOrderDetailPage() {
   const [assignDispatchDialogOpen, setAssignDispatchDialogOpen] = useState(false);
   // Same dialog handles edit — when set, the dialog opens prefilled in PUT mode.
   const [editingDispatch, setEditingDispatch] = useState<Dispatch | null>(null);
+  // Row click opens the read+manage drawer (lifecycle audit, notification
+  // history, edit/delete footer). Null = closed.
+  const [selectedDispatch, setSelectedDispatch] = useState<Dispatch | null>(null);
   // Equipment edit dialog opens from a work-item row's "Edit all" button. We
   // fetch the full Equipment record on demand because WorkItemEquipmentSummary
   // doesn't carry the deeper fields the dialog edits (description, install
@@ -898,6 +902,7 @@ export default function WorkOrderDetailPage() {
                 setEditingDispatch(d);
                 setAssignDispatchDialogOpen(true);
               }}
+              onSelect={(d) => setSelectedDispatch(d)}
             />
           </main>
         </div>
@@ -911,6 +916,39 @@ export default function WorkOrderDetailPage() {
         open={activityDrawerOpen}
         onClose={() => setActivityDrawerOpen(false)}
         workOrderId={workOrder.id}
+      />
+
+      {/* Dispatch detail drawer — row body click opens this with the
+          dispatch's lifecycle audit + notification history. Edit handoff
+          closes the drawer and opens the AssignTechnicianDialog in edit
+          mode. Delete fires the dispatches mutation directly. */}
+      <DispatchDetailDrawer
+        dispatch={selectedDispatch}
+        readOnly={isCancelled || isArchived}
+        onClose={() => setSelectedDispatch(null)}
+        onEdit={(d) => {
+          setSelectedDispatch(null);
+          setEditingDispatch(d);
+          setAssignDispatchDialogOpen(true);
+        }}
+        onDelete={async (d) => {
+          if (!window.confirm(t('workOrders.dispatches.deleteConfirm'))) return;
+          try {
+            await dispatchesApi.delete(d.id);
+            queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+            queryClient.invalidateQueries({
+              queryKey: ['work-order-activity', d.workOrderId],
+            });
+            setSelectedDispatch(null);
+          } catch (err: unknown) {
+            const msg =
+              err instanceof Error && 'response' in err
+                ? (err as { response?: { data?: { message?: string } } })
+                    .response?.data?.message
+                : undefined;
+            alert(msg || t('workOrders.dispatches.deleteError'));
+          }
+        }}
       />
 
       <WorkItemFormDialog
