@@ -367,7 +367,7 @@ export default function AssignTechnicianDialog({
           </Button>
           <Button type="submit" disabled={isSubmitDisabled}>
             {activeMutation.isPending
-              ? t('common.actions.saving')
+              ? t('common.saving')
               : t(
                   isEdit
                     ? 'common.save'

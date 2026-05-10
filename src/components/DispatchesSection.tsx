@@ -333,7 +333,7 @@ function DispatchRow({ dispatch, tech, readOnly, onEdit }: RowProps) {
         : '';
 
   return (
-    <TableRow className="align-top">
+    <TableRow>
       <TableCell>
         <div className="font-medium text-zinc-950 dark:text-white">{techName}</div>
         {dispatch.notes && (
