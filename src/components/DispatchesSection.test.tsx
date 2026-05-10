@@ -63,7 +63,7 @@ describe('DispatchesSection', () => {
     const onAssign = vi.fn();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={onAssign} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={onAssign} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -78,7 +78,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -95,7 +95,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={onAssign} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={onAssign} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     const button = await screen.findByRole('button', {
@@ -110,7 +110,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([mockDispatch()]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -128,7 +128,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -145,7 +145,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -162,7 +162,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -182,7 +182,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([mockDispatch()]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -195,7 +195,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([mockDispatch()]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -209,7 +209,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     // Mark arrived moved into the kebab — Notify is the primary inline action
@@ -236,7 +236,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     const completeBtn = await screen.findByRole('button', {
@@ -262,7 +262,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     // Past section is collapsed by default — expand it first.
@@ -288,7 +288,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -309,7 +309,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     const kebab = await screen.findByRole('button', { name: /more options/i });
@@ -346,7 +346,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -383,7 +383,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -405,7 +405,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     // Dot is a span with aria-label="Overdue" on overdue rows.
@@ -421,7 +421,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     const notifyBtn = await screen.findByRole('button', { name: /^notify$/i });
@@ -444,7 +444,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -457,7 +457,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -473,7 +473,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     const notifyBtn = await screen.findByRole('button', { name: /^notify$/i });
@@ -492,7 +492,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={onEdit} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={onEdit} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -516,7 +516,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     const kebab = await screen.findByRole('button', { name: /more options/i });
@@ -538,7 +538,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     const kebab = await screen.findByRole('button', { name: /more options/i });
@@ -560,7 +560,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     const kebab = await screen.findByRole('button', { name: /more options/i });
@@ -586,7 +586,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     const pastTrigger = await screen.findByRole('button', { name: /past \(1\)/i });
@@ -602,7 +602,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -634,7 +634,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -648,7 +648,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -668,7 +668,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     const pastTrigger = await screen.findByRole('button', { name: /past \(1\)/i });
@@ -688,7 +688,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     const pastTrigger = await screen.findByRole('button', { name: /past \(1\)/i });
@@ -726,7 +726,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} onSelect={vi.fn()} />
     );
 
     const pastTrigger = await screen.findByRole('button', { name: /past \(2\)/i });
@@ -741,5 +741,101 @@ describe('DispatchesSection', () => {
     const techRows = rows.filter((r) => within(r).queryByText(/trip$/i));
     expect(techRows[0]).toHaveTextContent('Newer Trip');
     expect(techRows[1]).toHaveTextContent('Older Trip');
+  });
+
+  it('fires onSelect with the dispatch when the row body is clicked', async () => {
+    mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <DispatchesSection
+        workOrderId="wo-1"
+        onAssign={vi.fn()}
+        onEdit={vi.fn()}
+        onSelect={onSelect}
+      />
+    );
+
+    const techName = await screen.findByText('Jason Smith');
+    await user.click(techName);
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect.mock.calls[0][0].id).toBe('d1');
+  });
+
+  it('does not fire onSelect when the kebab is clicked', async () => {
+    mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <DispatchesSection
+        workOrderId="wo-1"
+        onAssign={vi.fn()}
+        onEdit={vi.fn()}
+        onSelect={onSelect}
+      />
+    );
+
+    const kebab = await screen.findByRole('button', { name: /more options/i });
+    await user.click(kebab);
+
+    // Click on kebab opened the menu; onSelect must NOT have fired (the user
+    // is acting on the control, not the row).
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('does not fire onSelect when the Notify button is clicked', async () => {
+    mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
+    mockDispatchesNotify.mockResolvedValue(undefined);
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <DispatchesSection
+        workOrderId="wo-1"
+        onAssign={vi.fn()}
+        onEdit={vi.fn()}
+        onSelect={onSelect}
+      />
+    );
+
+    const notifyBtn = await screen.findByRole('button', { name: /^notify$/i });
+    await user.click(notifyBtn);
+
+    await waitFor(() => {
+      expect(mockDispatchesNotify).toHaveBeenCalled();
+    });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('fires onSelect for past dispatches too (row click opens audit drawer)', async () => {
+    mockDispatchesGetAll.mockResolvedValue([
+      mockDispatch({
+        status: 'COMPLETED',
+        arrivedAt: '2099-05-15T14:00:00Z',
+        departedAt: '2099-05-15T15:30:00Z',
+      }),
+    ]);
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <DispatchesSection
+        workOrderId="wo-1"
+        onAssign={vi.fn()}
+        onEdit={vi.fn()}
+        onSelect={onSelect}
+      />
+    );
+
+    const pastTrigger = await screen.findByRole('button', { name: /past \(1\)/i });
+    await user.click(pastTrigger);
+    const techName = await screen.findByText('Jason Smith');
+    await user.click(techName);
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect.mock.calls[0][0].id).toBe('d1');
   });
 });

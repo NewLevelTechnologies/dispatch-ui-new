@@ -1195,6 +1195,21 @@
       "completedAt": "Completed {{time}}",
       "deleteConfirm": "Delete this dispatch? The technician assignment will be removed.",
       "deleteError": "Failed to delete dispatch",
+      "drawer": {
+        "contact": "Contact",
+        "copied": "Copied",
+        "copyPhone": "Click to copy",
+        "lifecycle": "Lifecycle",
+        "lifecycleArrived": "Arrived",
+        "lifecycleCreated": "Created",
+        "lifecycleDeparted": "Departed",
+        "lifecycleWindow": "Arrival window",
+        "notes": "Notes",
+        "notifications": "Notification history",
+        "notificationsEmpty": "No notifications sent yet.",
+        "notificationsError": "Couldn't load notification history.",
+        "notificationsLoading": "Loading notifications..."
+      },
       "editTitle": "Edit dispatch",
       "empty": "No {{entity, lowercase}} assigned yet.",
       "form": {

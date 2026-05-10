@@ -169,6 +169,12 @@ interface Props {
    * owns the selection so the dialog (page-mounted) can prefill from it.
    */
   onEdit: (dispatch: Dispatch) => void;
+  /**
+   * Row body click → open the detail drawer. Kebab and primary action elements
+   * stopPropagation so they don't dual-fire (open drawer AND fire their own
+   * handler). Same page-level-state pattern as onEdit.
+   */
+  onSelect: (dispatch: Dispatch) => void;
 }
 
 /**
@@ -182,6 +188,7 @@ export default function DispatchesSection({
   readOnly = false,
   onAssign,
   onEdit,
+  onSelect,
 }: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -271,6 +278,7 @@ export default function DispatchesSection({
               readOnly={readOnly}
               now={now}
               onEdit={onEdit}
+              onSelect={onSelect}
             />
           ))}
           {past.length > 0 && (
@@ -298,6 +306,7 @@ export default function DispatchesSection({
                 tech={usersById.get(d.assignedUserId)}
                 readOnly={readOnly}
                 onEdit={onEdit}
+                onSelect={onSelect}
               />
             ))}
         </TableBody>
@@ -312,11 +321,19 @@ interface RowProps {
   readOnly: boolean;
   now: number;
   onEdit: (dispatch: Dispatch) => void;
+  onSelect: (dispatch: Dispatch) => void;
 }
 
 const NOTIFY_SENT_FLASH_MS = 3000;
 
-function DispatchRow({ dispatch, tech, readOnly, now, onEdit }: RowProps) {
+function DispatchRow({
+  dispatch,
+  tech,
+  readOnly,
+  now,
+  onEdit,
+  onSelect,
+}: RowProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
@@ -377,6 +394,17 @@ function DispatchRow({ dispatch, tech, readOnly, now, onEdit }: RowProps) {
         () => setJustNotified(false),
         NOTIFY_SENT_FLASH_MS
       );
+      // Drawer reads notification_logs scoped to this dispatch — invalidate
+      // so the next mount (or any active query) refetches and shows the new
+      // send. Backend creates the log entry asynchronously off the request,
+      // so the refetch may race briefly; a subsequent open will always show
+      // it. Scoped to this dispatch's key so we don't churn other rows.
+      queryClient.invalidateQueries({
+        queryKey: [
+          'notification-logs',
+          { entityType: 'DISPATCH', entityId: dispatch.id },
+        ],
+      });
     },
     onError: (err: unknown) => {
       const msg =
@@ -448,8 +476,16 @@ function DispatchRow({ dispatch, tech, readOnly, now, onEdit }: RowProps) {
     deleteMutation.mutate();
   };
 
+  // Row body opens the detail drawer. Action button + kebab stop propagation
+  // on their own cell so they don't dual-fire (open drawer AND fire their
+  // handler) — the user clicked the *control*, not the row.
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+
   return (
-    <TableRow>
+    <TableRow
+      onClick={() => onSelect(dispatch)}
+      className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-white/5"
+    >
       <TableCell className="!py-1 w-px">
         <span
           aria-label={overdue ? t('workOrders.dispatches.overdue') : undefined}
@@ -474,10 +510,13 @@ function DispatchRow({ dispatch, tech, readOnly, now, onEdit }: RowProps) {
           {t(`workOrders.dispatches.status.${dispatch.status}`)}
         </Badge>
       </TableCell>
-      <TableCell className="!py-1 w-px whitespace-nowrap text-right">
+      <TableCell
+        className="!py-1 w-px whitespace-nowrap text-right"
+        onClick={stop}
+      >
         {primaryAction}
       </TableCell>
-      <TableCell className="!py-1 w-px whitespace-nowrap">
+      <TableCell className="!py-1 w-px whitespace-nowrap" onClick={stop}>
         {canManage && (
           <Dropdown>
             <DropdownButton
@@ -514,9 +553,16 @@ interface PastRowProps {
   tech: User | undefined;
   readOnly: boolean;
   onEdit: (dispatch: Dispatch) => void;
+  onSelect: (dispatch: Dispatch) => void;
 }
 
-function PastDispatchRow({ dispatch, tech, readOnly, onEdit }: PastRowProps) {
+function PastDispatchRow({
+  dispatch,
+  tech,
+  readOnly,
+  onEdit,
+  onSelect,
+}: PastRowProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
@@ -556,8 +602,13 @@ function PastDispatchRow({ dispatch, tech, readOnly, onEdit }: PastRowProps) {
   const mutedClass =
     'text-zinc-500 dark:text-zinc-400' + (cancelled ? ' line-through' : '');
 
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+
   return (
-    <TableRow>
+    <TableRow
+      onClick={() => onSelect(dispatch)}
+      className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-white/5"
+    >
       {/* Empty dot slot — past rows have no dot (Past header carries the
           section). Empty cell preserves column alignment with active rows. */}
       <TableCell className="!py-1 w-px" aria-hidden />
@@ -571,7 +622,7 @@ function PastDispatchRow({ dispatch, tech, readOnly, onEdit }: PastRowProps) {
           cells keep column alignment so kebabs line up with active rows. */}
       <TableCell className="!py-1 w-px" aria-hidden />
       <TableCell className="!py-1 w-px" aria-hidden />
-      <TableCell className="!py-1 w-px whitespace-nowrap">
+      <TableCell className="!py-1 w-px whitespace-nowrap" onClick={stop}>
         {canManage && (
           <Dropdown>
             <DropdownButton
