@@ -1218,6 +1218,7 @@
         "estimatedDurationOptional": "Estimated Duration (optional, minutes)",
         "notifyNow": "Send SMS to technician now",
         "notifyNowDescription": "Off by default — send manually from the row when you're ready to confirm.",
+        "status": "Status",
         "technician": "Technician",
         "windowEndAfterStart": "Window end must be after window start."
       },

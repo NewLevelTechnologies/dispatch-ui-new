@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { dispatchesApi, userApi, type Dispatch } from '../api';
+import {
+  dispatchesApi,
+  userApi,
+  type Dispatch,
+  type DispatchStatus,
+} from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
@@ -83,6 +88,11 @@ export default function AssignTechnicianDialog({
   // which translates to omitting the field on submit.
   const [duration, setDuration] = useState<string>('');
   const [notes, setNotes] = useState('');
+  // Status is editable in edit mode only — on create the backend defaults
+  // SCHEDULED. The select covers the realistic "undo a misclick" + "cancel
+  // this dispatch but keep the audit trail" cases that the row's
+  // forward-only Mark arrived / Mark completed actions can't address.
+  const [status, setStatus] = useState<DispatchStatus>('SCHEDULED');
   // Default OFF: dispatchers commonly schedule in advance and notify the tech
   // later from the dispatches row. Same-day emergencies just tick the box.
   const [notifyTech, setNotifyTech] = useState(false);
@@ -104,6 +114,7 @@ export default function AssignTechnicianDialog({
       );
       setNotes(dispatch.notes ?? '');
       setNotifyTech(false);
+      setStatus(dispatch.status);
     } else {
       const start = defaultWindowStart();
       setAssignedUserId('');
@@ -112,6 +123,7 @@ export default function AssignTechnicianDialog({
       setDuration('');
       setNotes('');
       setNotifyTech(false);
+      setStatus('SCHEDULED');
     }
   }, [isOpen, dispatch]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -221,6 +233,10 @@ export default function AssignTechnicianDialog({
             ? durationNum
             : undefined,
         notes: notes.trim() || undefined,
+        // Only send status when it differs from the existing value — keeps
+        // the payload honest and avoids spurious "status changed" audit
+        // events when the dispatcher only touched other fields.
+        status: status !== dispatch.status ? status : undefined,
       });
     },
     onSuccess: onMutationSuccess,
@@ -341,6 +357,38 @@ export default function AssignTechnicianDialog({
               rows={2}
             />
           </Field>
+
+          {/* Status — edit-only. The row's Mark arrived / Mark completed
+              cover the forward path; this select covers undo of a misclick,
+              CANCELLED, and any other corrective transition the row can't
+              express. Backend's UpdateDispatchRequest.status accepts any
+              valid DispatchStatus and stamps arrivedAt/departedAt forward
+              if missing (it never nulls them, so backward transitions
+              preserve audit). */}
+          {isEdit && (
+            <Field>
+              <Label>{t('workOrders.dispatches.form.status')}</Label>
+              <Select
+                name="status"
+                value={status}
+                onChange={(e) => setStatus(e.target.value as DispatchStatus)}
+                className="!max-w-[220px]"
+              >
+                <option value="SCHEDULED">
+                  {t('workOrders.dispatches.status.SCHEDULED')}
+                </option>
+                <option value="IN_PROGRESS">
+                  {t('workOrders.dispatches.status.IN_PROGRESS')}
+                </option>
+                <option value="COMPLETED">
+                  {t('workOrders.dispatches.status.COMPLETED')}
+                </option>
+                <option value="CANCELLED">
+                  {t('workOrders.dispatches.status.CANCELLED')}
+                </option>
+              </Select>
+            </Field>
+          )}
 
           {/* Default OFF — dispatchers usually schedule silently and notify
               from the row when ready. Tech needs a phone number on their
