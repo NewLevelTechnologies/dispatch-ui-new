@@ -1193,7 +1193,10 @@
       "assign": "Assign",
       "assignDescription": "The window is the customer commitment; duration is optional.",
       "assignTechnician": "Assign technician",
+      "deleteConfirm": "Delete this dispatch? The technician assignment will be removed.",
+      "deleteError": "Failed to delete dispatch",
       "departedAt": "Departed {{time}}",
+      "editTitle": "Edit dispatch",
       "empty": "No {{entity, lowercase}} assigned yet.",
       "form": {
         "arrivalWindowEnd": "Arrival Window End",

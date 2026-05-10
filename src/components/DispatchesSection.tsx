@@ -12,6 +12,13 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { Badge } from './catalyst/badge';
 import { Button } from './catalyst/button';
 import {
+  Dropdown,
+  DropdownButton,
+  DropdownItem,
+  DropdownLabel,
+  DropdownMenu,
+} from './catalyst/dropdown';
+import {
   Table,
   TableBody,
   TableCell,
@@ -19,7 +26,12 @@ import {
   TableHeader,
   TableRow,
 } from './catalyst/table';
-import { CalendarIcon, CheckIcon, PlusIcon } from '@heroicons/react/24/outline';
+import {
+  CalendarIcon,
+  CheckIcon,
+  EllipsisVerticalIcon,
+  PlusIcon,
+} from '@heroicons/react/24/outline';
 
 const STATUS_COLORS: Record<DispatchStatus, 'sky' | 'blue' | 'lime' | 'zinc'> = {
   SCHEDULED: 'sky',
@@ -81,6 +93,11 @@ interface Props {
   /** Cancelled / archived WOs render rows read-only and hide the assign CTA. */
   readOnly?: boolean;
   onAssign: () => void;
+  /**
+   * Open the dialog in edit mode for the given dispatch. Page-level state
+   * owns the selection so the dialog (page-mounted) can prefill from it.
+   */
+  onEdit: (dispatch: Dispatch) => void;
 }
 
 /**
@@ -89,7 +106,12 @@ interface Props {
  * state. Status advance is a single-click button (Mark arrived / Mark completed)
  * rather than a dropdown — the linear flow makes a menu unnecessary friction.
  */
-export default function DispatchesSection({ workOrderId, readOnly = false, onAssign }: Props) {
+export default function DispatchesSection({
+  workOrderId,
+  readOnly = false,
+  onAssign,
+  onEdit,
+}: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
 
@@ -188,6 +210,7 @@ export default function DispatchesSection({ workOrderId, readOnly = false, onAss
               dispatch={d}
               tech={usersById.get(d.assignedUserId)}
               readOnly={readOnly}
+              onEdit={onEdit}
             />
           ))}
         </TableBody>
@@ -200,11 +223,12 @@ interface RowProps {
   dispatch: Dispatch;
   tech: User | undefined;
   readOnly: boolean;
+  onEdit: (dispatch: Dispatch) => void;
 }
 
 const NOTIFY_SENT_FLASH_MS = 3000;
 
-function DispatchRow({ dispatch, tech, readOnly }: RowProps) {
+function DispatchRow({ dispatch, tech, readOnly, onEdit }: RowProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
@@ -234,6 +258,26 @@ function DispatchRow({ dispatch, tech, readOnly }: RowProps) {
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
       alert(msg || t('workOrders.dispatches.statusUpdateError'));
+    },
+  });
+
+  // Hard delete. Scoped to SCHEDULED in the UI so we never destroy field
+  // history (arrivedAt / departedAt). Confirms before firing — common-case
+  // is "wrong tech / typo / window changed before any tech action."
+  const deleteMutation = useMutation({
+    mutationFn: () => dispatchesApi.delete(dispatch.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      queryClient.invalidateQueries({
+        queryKey: ['work-order-activity', dispatch.workOrderId],
+      });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('workOrders.dispatches.deleteError'));
     },
   });
 
@@ -267,6 +311,17 @@ function DispatchRow({ dispatch, tech, readOnly }: RowProps) {
   // arrived/completed/cancelled, the SMS is moot.
   const canNotify =
     !readOnly && dispatch.status === 'SCHEDULED' && !notifyMutation.isPending;
+  // Edit + delete are open on every status during dev so we can freely
+  // recover from typos / experiment. Pre-prod we'll re-scope to SCHEDULED
+  // only — protecting field history (arrivedAt/departedAt) once a tech has
+  // interacted with the row.
+  const canManage = !readOnly;
+
+  const handleDelete = () => {
+    if (deleteMutation.isPending) return;
+    if (!window.confirm(t('workOrders.dispatches.deleteConfirm'))) return;
+    deleteMutation.mutate();
+  };
   // The action verb depends on the transition: SCHEDULED→IN_PROGRESS is
   // "Mark arrived" (backend stamps arrivedAt); IN_PROGRESS→COMPLETED is
   // "Mark completed" (backend stamps departedAt).
@@ -348,6 +403,21 @@ function DispatchRow({ dispatch, tech, readOnly }: RowProps) {
             <Button plain onClick={() => advanceMutation.mutate(next)}>
               {advanceLabel}
             </Button>
+          )}
+          {canManage && (
+            <Dropdown>
+              <DropdownButton plain aria-label={t('common.moreOptions')}>
+                <EllipsisVerticalIcon className="size-5" />
+              </DropdownButton>
+              <DropdownMenu anchor="bottom end">
+                <DropdownItem onClick={() => onEdit(dispatch)}>
+                  <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                </DropdownItem>
+                <DropdownItem onClick={handleDelete}>
+                  <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
           )}
         </div>
       </TableCell>

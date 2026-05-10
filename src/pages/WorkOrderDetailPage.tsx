@@ -11,6 +11,7 @@ import {
   workItemStatusesApi,
   statusWorkflowsApi,
   workflowConfigApi,
+  type Dispatch,
   type Equipment,
   type ProgressCategory,
   type UpdateWorkOrderRequest,
@@ -164,6 +165,8 @@ export default function WorkOrderDetailPage() {
   const [editingWorkItem, setEditingWorkItem] = useState<WorkItemResponse | null>(null);
   const [editWorkOrderDialogOpen, setEditWorkOrderDialogOpen] = useState(false);
   const [assignDispatchDialogOpen, setAssignDispatchDialogOpen] = useState(false);
+  // Same dialog handles edit — when set, the dialog opens prefilled in PUT mode.
+  const [editingDispatch, setEditingDispatch] = useState<Dispatch | null>(null);
   // Equipment edit dialog opens from a work-item row's "Edit all" button. We
   // fetch the full Equipment record on demand because WorkItemEquipmentSummary
   // doesn't carry the deeper fields the dialog edits (description, install
@@ -863,7 +866,14 @@ export default function WorkOrderDetailPage() {
             <DispatchesSection
               workOrderId={workOrder.id}
               readOnly={isCancelled || isArchived}
-              onAssign={() => setAssignDispatchDialogOpen(true)}
+              onAssign={() => {
+                setEditingDispatch(null);
+                setAssignDispatchDialogOpen(true);
+              }}
+              onEdit={(d) => {
+                setEditingDispatch(d);
+                setAssignDispatchDialogOpen(true);
+              }}
             />
             <WorkItemsTable
               workOrderId={workOrder.id}
@@ -921,8 +931,12 @@ export default function WorkOrderDetailPage() {
 
       <AssignTechnicianDialog
         isOpen={assignDispatchDialogOpen}
-        onClose={() => setAssignDispatchDialogOpen(false)}
+        onClose={() => {
+          setAssignDispatchDialogOpen(false);
+          setEditingDispatch(null);
+        }}
         workOrderId={workOrder.id}
+        dispatch={editingDispatch}
       />
 
       <EquipmentFormDialog

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { dispatchesApi, userApi } from '../api';
+import { dispatchesApi, userApi, type Dispatch } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
@@ -21,6 +21,9 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   workOrderId: string;
+  // When provided, the dialog operates in edit mode: prefilled, no notify
+  // checkbox (resend lives on the row), submits via PUT instead of POST.
+  dispatch?: Dispatch | null;
 }
 
 const DEFAULT_WINDOW_HOURS = 2;
@@ -53,10 +56,24 @@ function defaultWindowEnd(startLocal: string): string {
   return toLocalInput(end);
 }
 
-export default function AssignTechnicianDialog({ isOpen, onClose, workOrderId }: Props) {
+// Reverse of toLocalInput: backend stores arrival window as UTC instants;
+// the datetime-local input wants local "YYYY-MM-DDTHH:mm" with no timezone.
+function isoToLocalInput(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return toLocalInput(d);
+}
+
+export default function AssignTechnicianDialog({
+  isOpen,
+  onClose,
+  workOrderId,
+  dispatch,
+}: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
+  const isEdit = !!dispatch;
 
   const [assignedUserId, setAssignedUserId] = useState('');
   const [windowStart, setWindowStart] = useState(() => defaultWindowStart());
@@ -76,7 +93,18 @@ export default function AssignTechnicianDialog({ isOpen, onClose, workOrderId }:
   // other *FormDialog components.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+    if (dispatch) {
+      // Edit mode: prefill from the existing dispatch.
+      setAssignedUserId(dispatch.assignedUserId);
+      setWindowStart(isoToLocalInput(dispatch.arrivalWindowStart));
+      setWindowEnd(isoToLocalInput(dispatch.arrivalWindowEnd));
+      setDuration(
+        dispatch.estimatedDuration != null ? String(dispatch.estimatedDuration) : ''
+      );
+      setNotes(dispatch.notes ?? '');
+      setNotifyTech(false);
+    } else {
       const start = defaultWindowStart();
       setAssignedUserId('');
       setWindowStart(start);
@@ -85,7 +113,7 @@ export default function AssignTechnicianDialog({ isOpen, onClose, workOrderId }:
       setNotes('');
       setNotifyTech(false);
     }
-  }, [isOpen]);
+  }, [isOpen, dispatch]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // When the dispatcher changes the window start, push the end forward by the
@@ -131,6 +159,27 @@ export default function AssignTechnicianDialog({ isOpen, onClose, workOrderId }:
     [users]
   );
 
+  const onMutationSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+    queryClient.invalidateQueries({
+      queryKey: ['work-order-activity', workOrderId],
+    });
+    onClose();
+  };
+
+  const onMutationError = (err: unknown) => {
+    const msg =
+      err instanceof Error && 'response' in err
+        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined;
+    alert(
+      msg ||
+        t(isEdit ? 'common.form.errorUpdate' : 'common.form.errorCreate', {
+          entity: getName('dispatch'),
+        })
+    );
+  };
+
   const createMutation = useMutation({
     mutationFn: () => {
       const startIso = new Date(windowStart).toISOString();
@@ -149,20 +198,33 @@ export default function AssignTechnicianDialog({ isOpen, onClose, workOrderId }:
         notifyAssignedUser: notifyTech || undefined,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
-      queryClient.invalidateQueries({
-        queryKey: ['work-order-activity', workOrderId],
+    onSuccess: onMutationSuccess,
+    onError: onMutationError,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: () => {
+      if (!dispatch) throw new Error('updateMutation called without a dispatch');
+      const startIso = new Date(windowStart).toISOString();
+      const endIso = new Date(windowEnd).toISOString();
+      const durationNum = duration.trim() === '' ? undefined : Number(duration);
+      // Send the full editable surface — backend treats null/missing as
+      // "no change," and explicit values as the new state. Notes set to ''
+      // gets coerced to undefined so a user clearing the field doesn't write
+      // an empty-string row in audit.
+      return dispatchesApi.update(dispatch.id, {
+        assignedUserId,
+        arrivalWindowStart: startIso,
+        arrivalWindowEnd: endIso,
+        estimatedDuration:
+          durationNum != null && Number.isFinite(durationNum) && durationNum > 0
+            ? durationNum
+            : undefined,
+        notes: notes.trim() || undefined,
       });
-      onClose();
     },
-    onError: (err: unknown) => {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorCreate', { entity: getName('dispatch') }));
-    },
+    onSuccess: onMutationSuccess,
+    onError: onMutationError,
   });
 
   // Window must be a non-empty range (end strictly after start). Without this
@@ -172,18 +234,26 @@ export default function AssignTechnicianDialog({ isOpen, onClose, workOrderId }:
     !!windowEnd &&
     new Date(windowEnd).getTime() > new Date(windowStart).getTime();
 
+  const activeMutation = isEdit ? updateMutation : createMutation;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!assignedUserId || !windowValid) return;
-    createMutation.mutate();
+    activeMutation.mutate();
   };
 
   const isSubmitDisabled =
-    !assignedUserId || !windowValid || createMutation.isPending;
+    !assignedUserId || !windowValid || activeMutation.isPending;
 
   return (
     <Dialog open={isOpen} onClose={onClose}>
-      <DialogTitle>{t('workOrders.dispatches.assignTechnician')}</DialogTitle>
+      <DialogTitle>
+        {t(
+          isEdit
+            ? 'workOrders.dispatches.editTitle'
+            : 'workOrders.dispatches.assignTechnician'
+        )}
+      </DialogTitle>
       <DialogDescription>
         {t('workOrders.dispatches.assignDescription', {
           entity: getName('technician'),
@@ -274,27 +344,35 @@ export default function AssignTechnicianDialog({ isOpen, onClose, workOrderId }:
 
           {/* Default OFF — dispatchers usually schedule silently and notify
               from the row when ready. Tech needs a phone number on their
-              user profile or the SMS won't go out. */}
-          <CheckboxField>
-            <Checkbox
-              name="notifyAssignedUser"
-              checked={notifyTech}
-              onChange={setNotifyTech}
-            />
-            <Label>{t('workOrders.dispatches.form.notifyNow')}</Label>
-            <Description>
-              {t('workOrders.dispatches.form.notifyNowDescription')}
-            </Description>
-          </CheckboxField>
+              user profile or the SMS won't go out. Hidden in edit mode:
+              resend lives on the row, where the dispatcher can see context
+              (last status, current window) and decide. */}
+          {!isEdit && (
+            <CheckboxField>
+              <Checkbox
+                name="notifyAssignedUser"
+                checked={notifyTech}
+                onChange={setNotifyTech}
+              />
+              <Label>{t('workOrders.dispatches.form.notifyNow')}</Label>
+              <Description>
+                {t('workOrders.dispatches.form.notifyNowDescription')}
+              </Description>
+            </CheckboxField>
+          )}
         </DialogBody>
         <DialogActions>
           <Button plain onClick={onClose} type="button">
             {t('common.cancel')}
           </Button>
           <Button type="submit" disabled={isSubmitDisabled}>
-            {createMutation.isPending
+            {activeMutation.isPending
               ? t('common.actions.saving')
-              : t('workOrders.dispatches.assign')}
+              : t(
+                  isEdit
+                    ? 'common.save'
+                    : 'workOrders.dispatches.assign'
+                )}
           </Button>
         </DialogActions>
       </form>
