@@ -792,6 +792,7 @@ vi.mock('react-i18next', () => {
     'workOrders.dispatches.form.estimatedDurationOptional': 'Estimated Duration (optional, minutes)',
     'workOrders.dispatches.form.notifyNow': 'Send SMS to technician now',
     'workOrders.dispatches.form.notifyNowDescription': "Off by default — send manually from the row when you're ready to confirm.",
+    'workOrders.dispatches.form.status': 'Status',
     'workOrders.dispatches.form.technician': 'Technician',
     'workOrders.dispatches.form.windowEndAfterStart': 'Window end must be after window start.',
     'workOrders.dispatches.markArrived': 'Mark arrived',

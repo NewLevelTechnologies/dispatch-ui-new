@@ -457,4 +457,168 @@ describe('AssignTechnicianDialog', () => {
     expect(onClose).toHaveBeenCalled();
     expect(mockDispatchesCreate).not.toHaveBeenCalled();
   });
+
+  it('omits the Status select in create mode', async () => {
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    // No Status label / select in create mode — backend defaults to SCHEDULED
+    // and the row's forward-only actions handle the rest until edit is needed.
+    expect(screen.queryByLabelText('Status')).not.toBeInTheDocument();
+  });
+
+  it('renders the Status select in edit mode prefilled with the dispatch status', async () => {
+    const existing: Dispatch = {
+      id: 'd-edit',
+      workOrderId: 'wo-1',
+      assignedUserId: 'u1',
+      arrivalWindowStart: '2026-06-01T15:00:00Z',
+      arrivalWindowEnd: '2026-06-01T17:00:00Z',
+      estimatedDuration: null,
+      status: 'IN_PROGRESS',
+      arrivedAt: '2026-06-01T15:05:00Z',
+      departedAt: null,
+      notes: null,
+      createdAt: '2026-05-30T00:00:00Z',
+      updatedAt: '2026-05-30T00:00:00Z',
+    };
+
+    renderWithProviders(
+      <AssignTechnicianDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        workOrderId="wo-1"
+        dispatch={existing}
+      />
+    );
+
+    const statusSelect = (await screen.findByLabelText('Status')) as HTMLSelectElement;
+    expect(statusSelect.value).toBe('IN_PROGRESS');
+  });
+
+  it('sends the new status in the update payload when the dispatcher changes it', async () => {
+    mockDispatchesUpdate.mockResolvedValue({ id: 'd-edit' });
+    const user = userEvent.setup();
+    const existing: Dispatch = {
+      id: 'd-edit',
+      workOrderId: 'wo-1',
+      assignedUserId: 'u1',
+      arrivalWindowStart: '2026-06-01T15:00:00Z',
+      arrivalWindowEnd: '2026-06-01T17:00:00Z',
+      estimatedDuration: null,
+      status: 'IN_PROGRESS',
+      arrivedAt: '2026-06-01T15:05:00Z',
+      departedAt: null,
+      notes: null,
+      createdAt: '2026-05-30T00:00:00Z',
+      updatedAt: '2026-05-30T00:00:00Z',
+    };
+
+    renderWithProviders(
+      <AssignTechnicianDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        workOrderId="wo-1"
+        dispatch={existing}
+      />
+    );
+
+    // Reset back to SCHEDULED — undoing an accidental Mark arrived.
+    const statusSelect = await screen.findByLabelText('Status');
+    await user.selectOptions(statusSelect, 'SCHEDULED');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(mockDispatchesUpdate).toHaveBeenCalled();
+    });
+    const [, payload] = mockDispatchesUpdate.mock.calls[0];
+    expect(payload.status).toBe('SCHEDULED');
+  });
+
+  it('omits status from the update payload when unchanged', async () => {
+    mockDispatchesUpdate.mockResolvedValue({ id: 'd-edit' });
+    const user = userEvent.setup();
+    const existing: Dispatch = {
+      id: 'd-edit',
+      workOrderId: 'wo-1',
+      assignedUserId: 'u1',
+      arrivalWindowStart: '2026-06-01T15:00:00Z',
+      arrivalWindowEnd: '2026-06-01T17:00:00Z',
+      estimatedDuration: null,
+      status: 'SCHEDULED',
+      arrivedAt: null,
+      departedAt: null,
+      notes: null,
+      createdAt: '2026-05-30T00:00:00Z',
+      updatedAt: '2026-05-30T00:00:00Z',
+    };
+
+    renderWithProviders(
+      <AssignTechnicianDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        workOrderId="wo-1"
+        dispatch={existing}
+      />
+    );
+
+    // Touch a different field (notes) so the form submits, but leave status alone.
+    await waitFor(() => {
+      expect(screen.getByLabelText('Status')).toBeInTheDocument();
+    });
+    const notes = screen.getByLabelText('Notes');
+    await user.type(notes, 'arriving soon');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(mockDispatchesUpdate).toHaveBeenCalled();
+    });
+    const [, payload] = mockDispatchesUpdate.mock.calls[0];
+    // Unchanged status → omitted from payload (backend treats undefined as
+    // "no change," keeping the audit/event log honest).
+    expect(payload.status).toBeUndefined();
+    expect(payload.notes).toBe('arriving soon');
+  });
+
+  it('supports cancelling a dispatch via the Status select', async () => {
+    mockDispatchesUpdate.mockResolvedValue({ id: 'd-edit' });
+    const user = userEvent.setup();
+    const existing: Dispatch = {
+      id: 'd-edit',
+      workOrderId: 'wo-1',
+      assignedUserId: 'u1',
+      arrivalWindowStart: '2026-06-01T15:00:00Z',
+      arrivalWindowEnd: '2026-06-01T17:00:00Z',
+      estimatedDuration: null,
+      status: 'SCHEDULED',
+      arrivedAt: null,
+      departedAt: null,
+      notes: null,
+      createdAt: '2026-05-30T00:00:00Z',
+      updatedAt: '2026-05-30T00:00:00Z',
+    };
+
+    renderWithProviders(
+      <AssignTechnicianDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        workOrderId="wo-1"
+        dispatch={existing}
+      />
+    );
+
+    const statusSelect = await screen.findByLabelText('Status');
+    await user.selectOptions(statusSelect, 'CANCELLED');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(mockDispatchesUpdate).toHaveBeenCalled();
+    });
+    const [, payload] = mockDispatchesUpdate.mock.calls[0];
+    expect(payload.status).toBe('CANCELLED');
+  });
 });
