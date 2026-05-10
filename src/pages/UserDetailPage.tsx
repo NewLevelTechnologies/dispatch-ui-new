@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { userApi, dispatchRegionApi } from '../api';
+import { formatPhone } from '../utils/formatPhone';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import UserFormDialog from '../components/UserFormDialog';
@@ -133,6 +134,24 @@ export default function UserDetailPage() {
             </Heading>
             <Text className="mt-1">
               {user.email}
+              {user.phoneNumber && (
+                // Phone is rendered inline next to email so the contact
+                // identity reads as one block — dispatchers know who to
+                // text vs email at a glance. tel: link works on tablet
+                // and mobile; on desktop it's a no-op (browsers handle
+                // the protocol gracefully) so we don't need to gate it.
+                <>
+                  <span className="mx-2 text-zinc-300 dark:text-zinc-700">
+                    ·
+                  </span>
+                  <a
+                    href={`tel:${user.phoneNumber.replace(/\D/g, '')}`}
+                    className="hover:text-blue-600 hover:underline dark:hover:text-blue-400"
+                  >
+                    {formatPhone(user.phoneNumber)}
+                  </a>
+                </>
+              )}
             </Text>
           </div>
           {canEditUsers && (

@@ -34,10 +34,21 @@ export default function DispatchesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDispatch, setSelectedDispatch] = useState<Dispatch | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [formData, setFormData] = useState<CreateDispatchRequest>({
+  // Form state stores a date-only string for the window start (the form input
+  // is `<Input type="date" />`); on submit we convert to an ISO instant and
+  // derive `arrivalWindowEnd` as start + 2h. This page's CRUD is a stop-gap
+  // surface — the dispatch board (PR #380) is the real UX. The WO detail
+  // page's AssignTechnicianDialog handles full window editing.
+  const [formData, setFormData] = useState<{
+    workOrderId: string;
+    assignedUserId: string;
+    arrivalWindowStart: string;
+    estimatedDuration: number;
+    notes: string;
+  }>({
     workOrderId: '',
     assignedUserId: '',
-    scheduledDate: new Date().toISOString().split('T')[0],
+    arrivalWindowStart: new Date().toISOString().split('T')[0],
     estimatedDuration: 60,
     notes: '',
   });
@@ -132,7 +143,7 @@ export default function DispatchesPage() {
     setFormData({
       workOrderId: item.workOrderId,
       assignedUserId: item.assignedUserId,
-      scheduledDate: new Date(item.scheduledDate).toISOString().split('T')[0],
+      arrivalWindowStart: new Date(item.arrivalWindowStart).toISOString().split('T')[0],
       estimatedDuration: item.estimatedDuration || 60,
       notes: item.notes || '',
     });
@@ -147,9 +158,17 @@ export default function DispatchesPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Date-only input → ISO instant at midnight local; window end = start + 2h
+    // (placeholder default; the WO detail page is the real edit surface).
+    const startInstant = new Date(formData.arrivalWindowStart);
+    const endInstant = new Date(startInstant.getTime() + 2 * 60 * 60 * 1000);
     const request = {
-      ...formData,
-      scheduledDate: new Date(formData.scheduledDate).toISOString(),
+      workOrderId: formData.workOrderId,
+      assignedUserId: formData.assignedUserId,
+      arrivalWindowStart: startInstant.toISOString(),
+      arrivalWindowEnd: endInstant.toISOString(),
+      estimatedDuration: formData.estimatedDuration,
+      notes: formData.notes,
     };
     if (selectedDispatch) {
       updateMutation.mutate({ id: selectedDispatch.id, data: request });
@@ -162,7 +181,7 @@ export default function DispatchesPage() {
     setFormData({
       workOrderId: '',
       assignedUserId: '',
-      scheduledDate: new Date().toISOString().split('T')[0],
+      arrivalWindowStart: new Date().toISOString().split('T')[0],
       estimatedDuration: 60,
       notes: '',
     });
@@ -240,7 +259,7 @@ export default function DispatchesPage() {
               <TableRow>
                 <TableHeader>{t('scheduling.table.workOrder')}</TableHeader>
                 <TableHeader>{t('scheduling.table.assignedUser')}</TableHeader>
-                <TableHeader>{t('scheduling.table.scheduledDate')}</TableHeader>
+                <TableHeader>{t('scheduling.table.arrivalWindowStart')}</TableHeader>
                 <TableHeader>{t('scheduling.table.estimatedDuration')}</TableHeader>
                 <TableHeader>{t('common.form.status')}</TableHeader>
                 <TableHeader></TableHeader>
@@ -253,7 +272,7 @@ export default function DispatchesPage() {
                     {getWorkOrderDescription(item.workOrderId)}
                   </TableCell>
                   <TableCell>{item.assignedUserId}</TableCell>
-                  <TableCell>{formatDateTime(item.scheduledDate)}</TableCell>
+                  <TableCell>{formatDateTime(item.arrivalWindowStart)}</TableCell>
                   <TableCell>
                     {item.estimatedDuration ? `${item.estimatedDuration} min` : '-'}
                   </TableCell>
@@ -327,12 +346,12 @@ export default function DispatchesPage() {
                 </Field>
 
                 <Field>
-                  <Label>{t('scheduling.form.scheduledDate')} *</Label>
+                  <Label>{t('scheduling.form.arrivalWindowStart')} *</Label>
                   <Input
                     type="date"
-                    name="scheduledDate"
-                    value={formData.scheduledDate}
-                    onChange={(e) => setFormData({ ...formData, scheduledDate: e.target.value })}
+                    name="arrivalWindowStart"
+                    value={formData.arrivalWindowStart}
+                    onChange={(e) => setFormData({ ...formData, arrivalWindowStart: e.target.value })}
                     required
                   />
                 </Field>

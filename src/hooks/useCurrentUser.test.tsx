@@ -37,6 +37,7 @@ const mockUser: User = {
   email: 'test@example.com',
   firstName: 'Test',
   lastName: 'User',
+  phoneNumber: null,
   enabled: true,
   capabilities: ['VIEW_USERS', 'EDIT_USERS', 'VIEW_CUSTOMERS'],
   roles: [],

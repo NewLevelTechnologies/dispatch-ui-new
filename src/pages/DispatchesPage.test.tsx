@@ -24,7 +24,8 @@ const mockDispatches = [
     id: '1',
     workOrderId: 'wo1',
     assignedUserId: 'user1',
-    scheduledDate: '2024-03-20T10:00:00Z',
+    arrivalWindowStart: '2024-03-20T10:00:00Z',
+    arrivalWindowEnd: '2024-03-20T12:00:00Z',
     estimatedDuration: 120,
     status: 'SCHEDULED',
   },
@@ -32,7 +33,8 @@ const mockDispatches = [
     id: '2',
     workOrderId: 'wo2',
     assignedUserId: 'user2',
-    scheduledDate: '2024-03-21T14:00:00Z',
+    arrivalWindowStart: '2024-03-21T14:00:00Z',
+    arrivalWindowEnd: '2024-03-21T15:00:00Z',
     estimatedDuration: 60,
     status: 'COMPLETED',
   },
@@ -166,8 +168,8 @@ describe('DispatchesPage', () => {
     const dispatchesWithStatuses = [
       { ...mockDispatches[0], status: 'SCHEDULED' },
       { ...mockDispatches[1], status: 'COMPLETED' },
-      { id: '3', workOrderId: 'wo3', assignedUserId: 'user3', scheduledDate: '2024-03-22T10:00:00Z', estimatedDuration: 90, status: 'IN_PROGRESS' },
-      { id: '4', workOrderId: 'wo4', assignedUserId: 'user4', scheduledDate: '2024-03-23T10:00:00Z', estimatedDuration: 60, status: 'CANCELLED' },
+      { id: '3', workOrderId: 'wo3', assignedUserId: 'user3', arrivalWindowStart: '2024-03-22T10:00:00Z', arrivalWindowEnd: '2024-03-22T11:30:00Z', estimatedDuration: 90, status: 'IN_PROGRESS' },
+      { id: '4', workOrderId: 'wo4', assignedUserId: 'user4', arrivalWindowStart: '2024-03-23T10:00:00Z', arrivalWindowEnd: '2024-03-23T11:00:00Z', estimatedDuration: 60, status: 'CANCELLED' },
     ];
     mockDispatchesGetAll.mockResolvedValue(dispatchesWithStatuses);
 

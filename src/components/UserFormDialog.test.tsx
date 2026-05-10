@@ -53,6 +53,58 @@ describe('UserFormDialog', () => {
       expect(screen.getByRole('checkbox', { name: /manager/i })).toBeInTheDocument();
     });
 
+    it('renders an empty phone input', () => {
+      renderWithProviders(<UserFormDialog isOpen={true} onClose={mockOnClose} roles={mockRoles} />);
+
+      const phoneInput = screen.getByLabelText('Phone') as HTMLInputElement;
+      expect(phoneInput).toBeInTheDocument();
+      expect(phoneInput.value).toBe('');
+      expect(phoneInput.type).toBe('tel');
+    });
+
+    it('submits the entered phone number in the create payload', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'user-123' } });
+
+      renderWithProviders(<UserFormDialog isOpen={true} onClose={mockOnClose} roles={mockRoles} />);
+
+      await user.type(screen.getByLabelText('First Name *'), 'John');
+      await user.type(screen.getByLabelText('Last Name *'), 'Doe');
+      await user.type(screen.getByLabelText('Email *'), 'john@example.com');
+      await user.type(screen.getByLabelText('Phone'), '5551234567');
+      await user.click(screen.getByRole('checkbox', { name: /technician/i }));
+
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/users',
+          expect.objectContaining({ phoneNumber: '5551234567' })
+        );
+      });
+    });
+
+    it('sends phoneNumber: null when the field is left blank', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'user-123' } });
+
+      renderWithProviders(<UserFormDialog isOpen={true} onClose={mockOnClose} roles={mockRoles} />);
+
+      await user.type(screen.getByLabelText('First Name *'), 'John');
+      await user.type(screen.getByLabelText('Last Name *'), 'Doe');
+      await user.type(screen.getByLabelText('Email *'), 'john@example.com');
+      await user.click(screen.getByRole('checkbox', { name: /technician/i }));
+
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/users',
+          expect.objectContaining({ phoneNumber: null })
+        );
+      });
+    });
+
     it('displays send invite checkbox by default', () => {
       renderWithProviders(<UserFormDialog isOpen={true} onClose={mockOnClose} roles={mockRoles} />);
 
@@ -255,13 +307,14 @@ describe('UserFormDialog', () => {
   });
 
   describe('Edit mode', () => {
-    const existingUser = {
+    const existingUser: User = {
       id: 'user-123',
       tenantId: 'tenant-1',
       cognitoSub: 'cognito-abc',
       email: 'john@example.com',
       firstName: 'John',
       lastName: 'Doe',
+      phoneNumber: '5551234567',
       enabled: true,
       roles: [mockRoles[1]], // Technician
       capabilities: ['customers:read', 'work_orders:read'],
@@ -287,7 +340,49 @@ describe('UserFormDialog', () => {
       expect(screen.getByDisplayValue('John')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Doe')).toBeInTheDocument();
       expect(screen.getByDisplayValue('john@example.com')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('5551234567')).toBeInTheDocument();
       expect(screen.getByRole('checkbox', { name: /technician/i })).toBeChecked();
+    });
+
+    it('submits the edited phone number', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.put).mockResolvedValue({ data: existingUser });
+
+      renderWithProviders(
+        <UserFormDialog isOpen={true} onClose={mockOnClose} user={existingUser} roles={mockRoles} />
+      );
+
+      const phoneInput = screen.getByDisplayValue('5551234567');
+      await user.clear(phoneInput);
+      await user.type(phoneInput, '5559998888');
+
+      await user.click(screen.getByRole('button', { name: /update/i }));
+
+      await waitFor(() => {
+        expect(apiClient.put).toHaveBeenCalledWith(
+          '/users/user-123',
+          expect.objectContaining({ phoneNumber: '5559998888' })
+        );
+      });
+    });
+
+    it('clearing the phone field sends phoneNumber: null', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.put).mockResolvedValue({ data: existingUser });
+
+      renderWithProviders(
+        <UserFormDialog isOpen={true} onClose={mockOnClose} user={existingUser} roles={mockRoles} />
+      );
+
+      await user.clear(screen.getByDisplayValue('5551234567'));
+      await user.click(screen.getByRole('button', { name: /update/i }));
+
+      await waitFor(() => {
+        expect(apiClient.put).toHaveBeenCalledWith(
+          '/users/user-123',
+          expect.objectContaining({ phoneNumber: null })
+        );
+      });
     });
 
     it('disables email field in edit mode', () => {
@@ -328,11 +423,12 @@ describe('UserFormDialog', () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        // Should update profile first
+        // Should update profile first — phoneNumber carries through unchanged
+        // because we didn't touch the field on this edit.
         expect(apiClient.put).toHaveBeenCalledWith('/users/user-123', {
           firstName: 'Johnny',
           lastName: 'Doe',
-          phoneNumber: null,
+          phoneNumber: '5551234567',
         });
 
         // Then update roles
@@ -487,13 +583,14 @@ describe('UserFormDialog', () => {
     });
 
     it('updates form when switching from create to edit mode', () => {
-      const existingUser = {
+      const existingUser: User = {
         id: 'user-123',
         tenantId: 'tenant-1',
         cognitoSub: 'cognito-abc',
         email: 'john@example.com',
         firstName: 'John',
         lastName: 'Doe',
+        phoneNumber: null,
         enabled: true,
         roles: [mockRoles[1]],
         capabilities: [],
@@ -520,13 +617,14 @@ describe('UserFormDialog', () => {
     });
 
     it('clears sendInvite flag when switching to edit mode', () => {
-      const existingUser = {
+      const existingUser: User = {
         id: 'user-123',
         tenantId: 'tenant-1',
         cognitoSub: 'cognito-abc',
         email: 'john@example.com',
         firstName: 'John',
         lastName: 'Doe',
+        phoneNumber: null,
         enabled: true,
         roles: [mockRoles[1]],
         capabilities: [],
@@ -605,6 +703,7 @@ describe('UserFormDialog', () => {
         firstName: 'John',
         lastName: 'Doe',
         email: 'john@example.com',
+        phoneNumber: null,
         enabled: true,
         roles: [mockRoles[1]],
         dispatchRegionIds: ['region-1', 'region-2'],
@@ -633,6 +732,7 @@ describe('UserFormDialog', () => {
         firstName: 'John',
         lastName: 'Doe',
         email: 'john@example.com',
+        phoneNumber: null,
         enabled: true,
         roles: [mockRoles[1]],
         dispatchRegionIds: ['region-1'],

@@ -3,15 +3,24 @@ import apiClient from './client';
 
 // ========== DISPATCHES ==========
 
+export type DispatchStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+
+// Per WORK_ORDER_DETAIL_DESIGN.md / PHASE_6_FINAL_PLAN.md: dispatches commit a
+// customer-facing arrival WINDOW (e.g. "Tue 8–10 AM") rather than a single
+// scheduled point. The window is two timestamps; estimatedDuration is a
+// separate, optional internal capacity estimate (used for utilization metrics
+// and conflict detection on the dispatch board), not a customer commitment.
 export interface Dispatch {
   id: string;
-  tenantId: string;
   workOrderId: string;
   assignedUserId: string;
-  scheduledDate: string;
-  estimatedDuration?: number;
-  status: string;
-  notes?: string;
+  arrivalWindowStart: string;
+  arrivalWindowEnd: string;
+  estimatedDuration: number | null;
+  status: DispatchStatus;
+  arrivedAt: string | null;
+  departedAt: string | null;
+  notes: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -19,16 +28,17 @@ export interface Dispatch {
 export interface CreateDispatchRequest {
   workOrderId: string;
   assignedUserId: string;
-  scheduledDate: string;
+  arrivalWindowStart: string;
+  arrivalWindowEnd: string;
   estimatedDuration?: number;
   notes?: string;
 }
 
 export interface UpdateDispatchRequest {
-  assignedUserId?: string;
-  scheduledDate?: string;
+  arrivalWindowStart?: string;
+  arrivalWindowEnd?: string;
   estimatedDuration?: number;
-  status?: string;
+  status?: DispatchStatus;
   notes?: string;
 }
 
