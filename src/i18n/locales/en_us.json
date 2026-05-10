@@ -1209,7 +1209,7 @@
       "notify": "Notify",
       "notifyError": "Failed to send notification",
       "notifyMissingPhone": "Technician has no phone number on file. SMS will fail.",
-      "notifySent": "Notification sent.",
+      "notifySent": "Sent",
       "status": {
         "CANCELLED": "Cancelled",
         "COMPLETED": "Completed",

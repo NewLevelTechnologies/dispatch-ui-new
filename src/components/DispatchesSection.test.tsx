@@ -366,10 +366,12 @@ describe('DispatchesSection', () => {
     await waitFor(() => {
       expect(mockDispatchesNotify).toHaveBeenCalledWith('d1');
     });
-    // Confirms inline so the dispatcher knows the request went out.
+    // Inline success state replaces the button — no modal alert on success.
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith('Notification sent.');
+      expect(screen.getByText('Sent')).toBeInTheDocument();
     });
+    expect(screen.queryByRole('button', { name: /^notify$/i })).not.toBeInTheDocument();
+    expect(alertSpy).not.toHaveBeenCalled();
     alertSpy.mockRestore();
   });
 
@@ -417,8 +419,8 @@ describe('DispatchesSection', () => {
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalled();
     });
-    // Failure path should NOT show the success message.
-    expect(alertSpy).not.toHaveBeenCalledWith('Notification sent.');
+    // Failure path should NOT flip the row to the success state.
+    expect(screen.queryByText('Sent')).not.toBeInTheDocument();
     alertSpy.mockRestore();
   });
 });

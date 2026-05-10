@@ -784,7 +784,7 @@ vi.mock('react-i18next', () => {
     'workOrders.dispatches.notify': 'Notify',
     'workOrders.dispatches.notifyError': 'Failed to send notification',
     'workOrders.dispatches.notifyMissingPhone': 'Technician has no phone number on file. SMS will fail.',
-    'workOrders.dispatches.notifySent': 'Notification sent.',
+    'workOrders.dispatches.notifySent': 'Sent',
     'workOrders.dispatches.status.CANCELLED': 'Cancelled',
     'workOrders.dispatches.status.COMPLETED': 'Completed',
     'workOrders.dispatches.status.IN_PROGRESS': 'In Progress',
