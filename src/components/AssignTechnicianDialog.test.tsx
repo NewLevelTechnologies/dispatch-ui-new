@@ -199,6 +199,8 @@ describe('AssignTechnicianDialog', () => {
     expect(payload.arrivalWindowEnd).toMatch(/2026-05-15T/);
     // Duration is optional; not provided in this test, must be omitted.
     expect(payload.estimatedDuration).toBeUndefined();
+    // Default is "schedule silently"; payload should omit notifyAssignedUser.
+    expect(payload.notifyAssignedUser).toBeUndefined();
 
     await waitFor(() => {
       expect(onClose).toHaveBeenCalled();
@@ -274,6 +276,57 @@ describe('AssignTechnicianDialog', () => {
     });
     expect(onClose).not.toHaveBeenCalled();
     alertSpy.mockRestore();
+  });
+
+  it('sets notifyAssignedUser true when the dispatcher ticks the checkbox', async () => {
+    mockDispatchesCreate.mockResolvedValue({ id: 'd-new' });
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText('Technician'), 'u1');
+    await user.click(screen.getByLabelText('Send SMS to technician now'));
+    await user.click(screen.getByRole('button', { name: /^assign$/i }));
+
+    await waitFor(() => {
+      expect(mockDispatchesCreate).toHaveBeenCalled();
+    });
+    expect(mockDispatchesCreate.mock.calls[0][0].notifyAssignedUser).toBe(true);
+  });
+
+  it('resets the notify checkbox when the dialog is reopened', async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
+    });
+
+    const checkbox = screen.getByLabelText('Send SMS to technician now');
+    await user.click(checkbox);
+    // Headless UI checkbox uses aria-checked, not the input checked attribute.
+    await waitFor(() => {
+      expect(checkbox).toHaveAttribute('aria-checked', 'true');
+    });
+
+    // Close + reopen — fresh draft, fresh default OFF.
+    rerender(
+      <AssignTechnicianDialog isOpen={false} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+    rerender(
+      <AssignTechnicianDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+
+    const reopened = await screen.findByLabelText('Send SMS to technician now');
+    expect(reopened).toHaveAttribute('aria-checked', 'false');
   });
 
   it('cancel triggers onClose without submitting', async () => {

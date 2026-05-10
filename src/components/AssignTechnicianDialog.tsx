@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { dispatchesApi, userApi } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Button } from './catalyst/button';
+import { Checkbox, CheckboxField } from './catalyst/checkbox';
 import {
   Dialog,
   DialogActions,
@@ -11,7 +12,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from './catalyst/dialog';
-import { Field, Label } from './catalyst/fieldset';
+import { Description, Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Select } from './catalyst/select';
 import { Textarea } from './catalyst/textarea';
@@ -65,6 +66,9 @@ export default function AssignTechnicianDialog({ isOpen, onClose, workOrderId }:
   // which translates to omitting the field on submit.
   const [duration, setDuration] = useState<string>('');
   const [notes, setNotes] = useState('');
+  // Default OFF: dispatchers commonly schedule in advance and notify the tech
+  // later from the dispatches row. Same-day emergencies just tick the box.
+  const [notifyTech, setNotifyTech] = useState(false);
 
   // Re-seed every time the dialog opens so a previous draft doesn't leak into
   // the next assignment. Cheaper than resetting on close (avoids a flash of
@@ -79,6 +83,7 @@ export default function AssignTechnicianDialog({ isOpen, onClose, workOrderId }:
       setWindowEnd(defaultWindowEnd(start));
       setDuration('');
       setNotes('');
+      setNotifyTech(false);
     }
   }, [isOpen]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -141,6 +146,7 @@ export default function AssignTechnicianDialog({ isOpen, onClose, workOrderId }:
             ? durationNum
             : undefined,
         notes: notes.trim() || undefined,
+        notifyAssignedUser: notifyTech || undefined,
       });
     },
     onSuccess: () => {
@@ -265,6 +271,21 @@ export default function AssignTechnicianDialog({ isOpen, onClose, workOrderId }:
               rows={2}
             />
           </Field>
+
+          {/* Default OFF — dispatchers usually schedule silently and notify
+              from the row when ready. Tech needs a phone number on their
+              user profile or the SMS won't go out. */}
+          <CheckboxField>
+            <Checkbox
+              name="notifyAssignedUser"
+              checked={notifyTech}
+              onChange={setNotifyTech}
+            />
+            <Label>{t('workOrders.dispatches.form.notifyNow')}</Label>
+            <Description>
+              {t('workOrders.dispatches.form.notifyNowDescription')}
+            </Description>
+          </CheckboxField>
         </DialogBody>
         <DialogActions>
           <Button plain onClick={onClose} type="button">

@@ -224,11 +224,34 @@ function DispatchRow({ dispatch, tech, readOnly }: RowProps) {
     },
   });
 
+  // Manual SMS trigger. Idempotent on the backend, so this also serves as a
+  // resend when the window or notes change. No history is surfaced today —
+  // dispatchers can hit it again without harm.
+  const notifyMutation = useMutation({
+    mutationFn: () => dispatchesApi.notify(dispatch.id),
+    onSuccess: () => {
+      // Backend logs the send; UI just confirms inline so the dispatcher knows
+      // the request went out without leaving the page.
+      alert(t('workOrders.dispatches.notifySent'));
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('workOrders.dispatches.notifyError'));
+    },
+  });
+
   const techName = tech
     ? `${tech.firstName} ${tech.lastName}`.trim() || tech.email
     : '—';
   const next = NEXT_STATUS[dispatch.status];
   const canAdvance = !readOnly && !!next && !advanceMutation.isPending;
+  // Only meaningful while the dispatch is still on the books — once a tech is
+  // arrived/completed/cancelled, the SMS is moot.
+  const canNotify =
+    !readOnly && dispatch.status === 'SCHEDULED' && !notifyMutation.isPending;
   // The action verb depends on the transition: SCHEDULED→IN_PROGRESS is
   // "Mark arrived" (backend stamps arrivedAt); IN_PROGRESS→COMPLETED is
   // "Mark completed" (backend stamps departedAt).
@@ -284,11 +307,26 @@ function DispatchRow({ dispatch, tech, readOnly }: RowProps) {
         </Badge>
       </TableCell>
       <TableCell className="whitespace-nowrap">
-        {canAdvance && next && (
-          <Button plain onClick={() => advanceMutation.mutate(next)}>
-            {advanceLabel}
-          </Button>
-        )}
+        <div className="flex items-center justify-end gap-1">
+          {canNotify && (
+            <Button
+              plain
+              onClick={() => notifyMutation.mutate()}
+              title={
+                tech?.phoneNumber
+                  ? undefined
+                  : t('workOrders.dispatches.notifyMissingPhone')
+              }
+            >
+              {t('workOrders.dispatches.notify')}
+            </Button>
+          )}
+          {canAdvance && next && (
+            <Button plain onClick={() => advanceMutation.mutate(next)}>
+              {advanceLabel}
+            </Button>
+          )}
+        </div>
       </TableCell>
     </TableRow>
   );

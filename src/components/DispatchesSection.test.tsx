@@ -6,6 +6,7 @@ import type { Dispatch, DispatchStatus, User } from '../api';
 
 const mockDispatchesGetAll = vi.fn();
 const mockDispatchesUpdate = vi.fn();
+const mockDispatchesNotify = vi.fn();
 const mockUserGetAll = vi.fn();
 
 // Mocking the source modules — the barrel re-exports from these, so component
@@ -14,6 +15,7 @@ vi.mock('../api/schedulingApi', () => ({
   dispatchesApi: {
     getAll: (...args: unknown[]) => mockDispatchesGetAll(...args),
     update: (...args: unknown[]) => mockDispatchesUpdate(...args),
+    notify: (...args: unknown[]) => mockDispatchesNotify(...args),
   },
 }));
 vi.mock('../api/userApi', () => ({
@@ -346,5 +348,77 @@ describe('DispatchesSection', () => {
     // Header is row[0]; first data row should be the earlier-scheduled one.
     expect(rows[1]).toHaveTextContent('Alice A');
     expect(rows[2]).toHaveTextContent('Bob B');
+  });
+
+  it('shows the Notify button on SCHEDULED rows and calls dispatchesApi.notify', async () => {
+    mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
+    mockDispatchesNotify.mockResolvedValue(undefined);
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+    );
+
+    const notifyBtn = await screen.findByRole('button', { name: /^notify$/i });
+    await user.click(notifyBtn);
+
+    await waitFor(() => {
+      expect(mockDispatchesNotify).toHaveBeenCalledWith('d1');
+    });
+    // Confirms inline so the dispatcher knows the request went out.
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith('Notification sent.');
+    });
+    alertSpy.mockRestore();
+  });
+
+  it('hides the Notify button for non-SCHEDULED dispatches', async () => {
+    mockDispatchesGetAll.mockResolvedValue([
+      mockDispatch({ status: 'IN_PROGRESS', arrivedAt: '2026-05-15T14:05:00Z' }),
+    ]);
+
+    renderWithProviders(
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: /^notify$/i })).not.toBeInTheDocument();
+  });
+
+  it('hides the Notify button in read-only mode', async () => {
+    mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
+
+    renderWithProviders(
+      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: /^notify$/i })).not.toBeInTheDocument();
+  });
+
+  it('alerts when notify fails', async () => {
+    mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
+    mockDispatchesNotify.mockRejectedValue(new Error('boom'));
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+    );
+
+    const notifyBtn = await screen.findByRole('button', { name: /^notify$/i });
+    await user.click(notifyBtn);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalled();
+    });
+    // Failure path should NOT show the success message.
+    expect(alertSpy).not.toHaveBeenCalledWith('Notification sent.');
+    alertSpy.mockRestore();
   });
 });

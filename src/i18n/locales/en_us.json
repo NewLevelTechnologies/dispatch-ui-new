@@ -1199,11 +1199,17 @@
         "arrivalWindowEnd": "Arrival Window End",
         "arrivalWindowStart": "Arrival Window Start",
         "estimatedDurationOptional": "Estimated Duration (optional, minutes)",
+        "notifyNow": "Send SMS to technician now",
+        "notifyNowDescription": "Off by default — send manually from the row when you're ready to confirm.",
         "technician": "Technician",
         "windowEndAfterStart": "Window end must be after window start."
       },
       "markArrived": "Mark arrived",
       "markCompleted": "Mark completed",
+      "notify": "Notify",
+      "notifyError": "Failed to send notification",
+      "notifyMissingPhone": "Technician has no phone number on file. SMS will fail.",
+      "notifySent": "Notification sent.",
       "status": {
         "CANCELLED": "Cancelled",
         "COMPLETED": "Completed",
