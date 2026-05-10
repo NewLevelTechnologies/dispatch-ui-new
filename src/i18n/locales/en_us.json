@@ -1189,13 +1189,12 @@
       "print": "Print"
     },
     "dispatches": {
-      "arrivedAt": "Arrived {{time}}",
       "assign": "Assign",
       "assignDescription": "The window is the customer commitment; duration is optional.",
       "assignTechnician": "Assign technician",
+      "completedAt": "Completed {{time}}",
       "deleteConfirm": "Delete this dispatch? The technician assignment will be removed.",
       "deleteError": "Failed to delete dispatch",
-      "departedAt": "Departed {{time}}",
       "editTitle": "Edit dispatch",
       "empty": "No {{entity, lowercase}} assigned yet.",
       "form": {
@@ -1213,19 +1212,17 @@
       "notifyError": "Failed to send notification",
       "notifyMissingPhone": "Technician has no phone number on file. SMS will fail.",
       "notifySent": "Sent",
+      "onSitePast": "On site {{start}}–{{end}} ({{duration}})",
+      "onSiteSince": "On site since {{time}}",
+      "overdue": "Overdue",
+      "past": "Past ({{count}})",
       "status": {
         "CANCELLED": "Cancelled",
         "COMPLETED": "Completed",
         "IN_PROGRESS": "In Progress",
         "SCHEDULED": "Scheduled"
       },
-      "statusUpdateError": "Failed to update dispatch status",
-      "table": {
-        "duration": "Duration",
-        "status": "Status",
-        "tech": "Technician",
-        "window": "Window"
-      }
+      "statusUpdateError": "Failed to update dispatch status"
     },
     "filters": {
       "all": "All",

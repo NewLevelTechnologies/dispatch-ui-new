@@ -858,23 +858,13 @@ export default function WorkOrderDetailPage() {
             </Card>
           </aside>
 
-          {/* Main canvas — dispatches section sits above work items because
-              "who is going, when" is the question CSRs answer most often on a
-              live customer call (see the comment above the ETA chip). Both
-              sections render read-only when the WO is frozen. */}
+          {/* Main canvas — work items sit above dispatches because work items
+              are the substance of the WO ("what's wrong with my service?" is
+              the highest-volume CSR question on inbound calls), while the
+              sticky header's primary ETA already answers "who's coming next?"
+              without scrolling. Both sections render read-only when the WO is
+              frozen. */}
           <main className="mt-6 lg:mt-0 lg:min-h-0 lg:overflow-y-auto">
-            <DispatchesSection
-              workOrderId={workOrder.id}
-              readOnly={isCancelled || isArchived}
-              onAssign={() => {
-                setEditingDispatch(null);
-                setAssignDispatchDialogOpen(true);
-              }}
-              onEdit={(d) => {
-                setEditingDispatch(d);
-                setAssignDispatchDialogOpen(true);
-              }}
-            />
             <WorkItemsTable
               workOrderId={workOrder.id}
               workItems={workOrder.workItems ?? []}
@@ -896,6 +886,18 @@ export default function WorkOrderDetailPage() {
               onAddEquipment={handleAddEquipmentToWorkItem}
               onSelectSubUnit={handleSelectSubUnit}
               onAddSubUnit={handleAddSubUnit}
+            />
+            <DispatchesSection
+              workOrderId={workOrder.id}
+              readOnly={isCancelled || isArchived}
+              onAssign={() => {
+                setEditingDispatch(null);
+                setAssignDispatchDialogOpen(true);
+              }}
+              onEdit={(d) => {
+                setEditingDispatch(d);
+                setAssignDispatchDialogOpen(true);
+              }}
             />
           </main>
         </div>
