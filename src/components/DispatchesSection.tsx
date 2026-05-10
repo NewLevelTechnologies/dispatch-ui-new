@@ -394,6 +394,17 @@ function DispatchRow({
         () => setJustNotified(false),
         NOTIFY_SENT_FLASH_MS
       );
+      // Drawer reads notification_logs scoped to this dispatch — invalidate
+      // so the next mount (or any active query) refetches and shows the new
+      // send. Backend creates the log entry asynchronously off the request,
+      // so the refetch may race briefly; a subsequent open will always show
+      // it. Scoped to this dispatch's key so we don't churn other rows.
+      queryClient.invalidateQueries({
+        queryKey: [
+          'notification-logs',
+          { entityType: 'DISPATCH', entityId: dispatch.id },
+        ],
+      });
     },
     onError: (err: unknown) => {
       const msg =
