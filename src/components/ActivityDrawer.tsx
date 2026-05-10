@@ -17,9 +17,6 @@ interface Props {
  * one entry point on the page (an `Activity ●` button) opens this for both
  * reading and writing. Composer autofocuses on open so the empty state of a
  * fresh WO doesn't read as a deserted log.
- *
- * ActiveDispatchesWidget intentionally *not* mounted here — its placement
- * is part of the phase 6 dispatch design pass.
  */
 export default function ActivityDrawer({ open, onClose, workOrderId }: Props) {
   const { t } = useTranslation();

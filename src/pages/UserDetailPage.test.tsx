@@ -178,6 +178,43 @@ describe('UserDetailPage', () => {
     expect(screen.getByText('Enabled')).toBeInTheDocument();
   });
 
+  it('renders the formatted phone number with a tel: link when present', async () => {
+    setupStandardMocks({
+      user: { ...mockUser, phoneNumber: '5551234567' },
+    });
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+    });
+
+    const phoneLink = screen.getByRole('link', { name: '(555) 123-4567' });
+    expect(phoneLink).toHaveAttribute('href', 'tel:5551234567');
+  });
+
+  it('omits the phone block when the user has no phone number', async () => {
+    setupStandardMocks({
+      user: { ...mockUser, phoneNumber: null },
+    });
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByRole('link', { name: /\(.*\) .*-.*/ })
+    ).not.toBeInTheDocument();
+  });
+
   it('opens edit dialog when edit button is clicked', async () => {
     setupStandardMocks({});
 
@@ -420,6 +457,7 @@ describe('UserDetailPage', () => {
     const userWithoutRegions: User = {
       ...mockUser,
       tenantId: 'tenant-123',
+      phoneNumber: null,
       dispatchRegionIds: undefined,
     };
     setupStandardMocks({ user: userWithoutRegions });

@@ -32,12 +32,14 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
     firstName: string;
     lastName: string;
     email: string;
+    phoneNumber: string;
     roleIds: string[];
     dispatchRegionIds: string[];
   }>({
     firstName: '',
     lastName: '',
     email: '',
+    phoneNumber: '',
     roleIds: [],
     dispatchRegionIds: [],
   });
@@ -55,6 +57,7 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
+        phoneNumber: user.phoneNumber ?? '',
         roleIds: user.roles?.map((role) => role.id) || [],
         dispatchRegionIds: user.dispatchRegionIds || [],
       });
@@ -66,6 +69,7 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
         firstName: '',
         lastName: '',
         email: '',
+        phoneNumber: '',
         roleIds: [],
         dispatchRegionIds: [],
       });
@@ -75,14 +79,16 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
   }, [user, isOpen]);
 
   const createMutation = useMutation({
-    mutationFn: (data: { firstName: string; lastName: string; email: string; roleIds: string[]; dispatchRegionIds: string[]; sendInvite?: boolean }) =>
+    mutationFn: (data: { firstName: string; lastName: string; email: string; phoneNumber: string; roleIds: string[]; dispatchRegionIds: string[]; sendInvite?: boolean }) =>
       userApi.create({
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
         roleIds: data.roleIds,
         dispatchRegionIds: data.dispatchRegionIds,
-        phoneNumber: null,
+        // Empty input → null so the backend stores "no phone" rather than
+        // an empty string. Trimmed to drop accidental whitespace.
+        phoneNumber: data.phoneNumber.trim() || null,
         sendInvite: data.sendInvite,
       }),
     onSuccess: () => {
@@ -98,11 +104,11 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: (data: { firstName: string; lastName: string }) =>
+    mutationFn: (data: { firstName: string; lastName: string; phoneNumber: string }) =>
       userApi.updateProfile(user!.id!, {
         firstName: data.firstName,
         lastName: data.lastName,
-        phoneNumber: null,
+        phoneNumber: data.phoneNumber.trim() || null,
       }),
     onError: (error: unknown) => {
       const errorMessage = error instanceof Error && 'response' in error
@@ -152,6 +158,7 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
         await updateProfileMutation.mutateAsync({
           firstName: formData.firstName,
           lastName: formData.lastName,
+          phoneNumber: formData.phoneNumber,
         });
 
         // Then update roles
@@ -172,7 +179,10 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
     }
   };
 
-  const handleChange = (field: 'firstName' | 'lastName' | 'email', value: string) => {
+  const handleChange = (
+    field: 'firstName' | 'lastName' | 'email' | 'phoneNumber',
+    value: string
+  ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -239,18 +249,36 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
               </Field>
             </div>
 
-            {/* Email Row */}
-            <Field className="mt-4">
-              <Label className="text-xs">{t('common.form.email')} *</Label>
-              <Input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={(e) => handleChange('email', e.target.value)}
-                required
-                disabled={isEdit}
-              />
-            </Field>
+            {/* Contact Row — email + phone live on the same row. Both are
+                contact methods and read as a unit; pairing them keeps the
+                dialog dense per the form-density convention. Phone is
+                optional (backend nullable); email is required and locked
+                after creation since it ties to the Cognito identity. */}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <Field>
+                <Label className="text-xs">{t('common.form.email')} *</Label>
+                <Input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={(e) => handleChange('email', e.target.value)}
+                  required
+                  disabled={isEdit}
+                  autoComplete="email"
+                />
+              </Field>
+              <Field>
+                <Label className="text-xs">{t('common.form.phone')}</Label>
+                <Input
+                  type="tel"
+                  inputMode="tel"
+                  name="phoneNumber"
+                  value={formData.phoneNumber}
+                  onChange={(e) => handleChange('phoneNumber', e.target.value)}
+                  autoComplete="tel"
+                />
+              </Field>
+            </div>
 
             {/* Roles */}
             <Field className="mt-4">

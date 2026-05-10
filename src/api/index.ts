@@ -180,6 +180,7 @@ export {
   availabilityApi,
   recurringOrdersApi,
   type Dispatch,
+  type DispatchStatus,
   type CreateDispatchRequest,
   type UpdateDispatchRequest,
   type Availability,

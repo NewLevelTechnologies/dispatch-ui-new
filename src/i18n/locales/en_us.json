@@ -789,6 +789,7 @@
       "nextScheduledDate": "Next Scheduled Date",
       "reason": "Reason",
       "reasonPlaceholder": "e.g., Vacation, Training, Meeting",
+      "arrivalWindowStart": "Arrival Window Start",
       "scheduledDate": "Scheduled Date",
       "startTime": "Start Time",
       "user": "User",
@@ -810,6 +811,7 @@
       "assignedUser": "Assigned User",
       "customer": "Customer",
       "date": "Date",
+      "arrivalWindowStart": "Arrival Window",
       "endTime": "End Time",
       "equipment": "Equipment",
       "estimatedDuration": "Duration",
@@ -1185,6 +1187,36 @@
         "quoted": "Quoted"
       },
       "print": "Print"
+    },
+    "dispatches": {
+      "arrivedAt": "Arrived {{time}}",
+      "assign": "Assign",
+      "assignDescription": "The window is the customer commitment; duration is optional.",
+      "assignTechnician": "Assign technician",
+      "departedAt": "Departed {{time}}",
+      "empty": "No {{entity, lowercase}} assigned yet.",
+      "form": {
+        "arrivalWindowEnd": "Arrival Window End",
+        "arrivalWindowStart": "Arrival Window Start",
+        "estimatedDurationOptional": "Estimated Duration (optional, minutes)",
+        "technician": "Technician",
+        "windowEndAfterStart": "Window end must be after window start."
+      },
+      "markArrived": "Mark arrived",
+      "markCompleted": "Mark completed",
+      "status": {
+        "CANCELLED": "Cancelled",
+        "COMPLETED": "Completed",
+        "IN_PROGRESS": "In Progress",
+        "SCHEDULED": "Scheduled"
+      },
+      "statusUpdateError": "Failed to update dispatch status",
+      "table": {
+        "duration": "Duration",
+        "status": "Status",
+        "tech": "Technician",
+        "window": "Window"
+      }
     },
     "filters": {
       "all": "All",

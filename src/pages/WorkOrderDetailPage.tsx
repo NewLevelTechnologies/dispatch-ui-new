@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
+  dispatchesApi,
   equipmentApi,
   workOrderApi,
   workOrderTypesApi,
@@ -20,6 +21,8 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import ActivityButton from '../components/ActivityButton';
 import ActivityDrawer from '../components/ActivityDrawer';
 import AppLayout from '../components/AppLayout';
+import AssignTechnicianDialog from '../components/AssignTechnicianDialog';
+import DispatchesSection from '../components/DispatchesSection';
 import EditableField from '../components/EditableField';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentQuickViewDrawer from '../components/EquipmentQuickViewDrawer';
@@ -119,6 +122,31 @@ function formatDate(iso: string | null | undefined): string {
   });
 }
 
+// Header ETA chip needs a compact same-day window format ("Fri 8–10 AM") so
+// the chip stays a single short string. Cross-date windows are rare for service
+// commitments; we degrade gracefully to date+time on each side when they happen.
+const ETA_DATE = new Intl.DateTimeFormat('en-US', {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+});
+const ETA_TIME = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: '2-digit',
+});
+function formatEtaWindow(startIso: string, endIso: string): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  const sameDay =
+    start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth() &&
+    start.getDate() === end.getDate();
+  if (sameDay) {
+    return `${ETA_DATE.format(start)} ${ETA_TIME.format(start)}–${ETA_TIME.format(end)}`;
+  }
+  return `${ETA_DATE.format(start)} ${ETA_TIME.format(start)} – ${ETA_DATE.format(end)} ${ETA_TIME.format(end)}`;
+}
+
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
@@ -135,6 +163,7 @@ export default function WorkOrderDetailPage() {
   const [workItemDialogOpen, setWorkItemDialogOpen] = useState(false);
   const [editingWorkItem, setEditingWorkItem] = useState<WorkItemResponse | null>(null);
   const [editWorkOrderDialogOpen, setEditWorkOrderDialogOpen] = useState(false);
+  const [assignDispatchDialogOpen, setAssignDispatchDialogOpen] = useState(false);
   // Equipment edit dialog opens from a work-item row's "Edit all" button. We
   // fetch the full Equipment record on demand because WorkItemEquipmentSummary
   // doesn't carry the deeper fields the dialog edits (description, install
@@ -386,6 +415,14 @@ export default function WorkOrderDetailPage() {
     queryFn: () => workflowConfigApi.get(),
   });
 
+  // Same query key as DispatchesSection — React Query dedupes the actual fetch.
+  // Read here so the header ETA can derive from the next non-cancelled dispatch.
+  const { data: dispatches = [] } = useQuery({
+    queryKey: ['dispatches', { workOrderId: id }],
+    queryFn: () => dispatchesApi.getAll({ workOrderId: id! }),
+    enabled: !!id,
+  });
+
   const handleCopy = async (kind: 'phone' | 'address', value: string) => {
     if (!value) return;
     // Per design §3.1: tel: handler is only useful on tablet/mobile (≥1024px viewport
@@ -567,10 +604,13 @@ export default function WorkOrderDetailPage() {
               the operational location identity (name + address + site
               contact) lives in the Service Location card on the left strip,
               not here. ETA is read-only display: a WO can have multiple
-              dispatches with their own scheduled dates, so editing a single
-              "WO ETA" doesn't model reality — the field will be derived
-              from the next dispatch when phase 6 ships. Until then,
-              workOrder.scheduledDate is editable via the Edit WO dialog. */}
+              dispatches and each commits a customer-facing arrival WINDOW
+              (e.g. "Fri 8–10 AM") rather than a single point. The chip
+              prefers the next non-cancelled dispatch's window as the
+              authoritative "when is this happening" answer. Falls back to
+              workOrder.scheduledDate (editable via Edit WO dialog) when no
+              dispatches exist yet — that's the planning-stage ETA before
+              anyone is actually assigned, and is intentionally date-only. */}
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
             {customer && (
               // Permanent affordance: darker than the surrounding muted row
@@ -584,14 +624,33 @@ export default function WorkOrderDetailPage() {
                 {customer.name}
               </CatLink>
             )}
-            <span className="inline-flex items-center gap-1">
-              <CalendarIcon className="size-4" />
-              <span>
-                {workOrder.scheduledDate
-                  ? t('workOrders.detail.eta', { date: formatDate(workOrder.scheduledDate) })
-                  : t('workOrders.detail.notScheduled')}
-              </span>
-            </span>
+            {(() => {
+              const nextDispatch = [...dispatches]
+                .filter((d) => d.status !== 'CANCELLED')
+                .sort(
+                  (a, b) =>
+                    new Date(a.arrivalWindowStart).getTime() -
+                    new Date(b.arrivalWindowStart).getTime()
+                )[0];
+              const etaText = nextDispatch
+                ? formatEtaWindow(
+                    nextDispatch.arrivalWindowStart,
+                    nextDispatch.arrivalWindowEnd
+                  )
+                : workOrder.scheduledDate
+                  ? formatDate(workOrder.scheduledDate)
+                  : null;
+              return (
+                <span className="inline-flex items-center gap-1">
+                  <CalendarIcon className="size-4" />
+                  <span>
+                    {etaText
+                      ? t('workOrders.detail.eta', { date: etaText })
+                      : t('workOrders.detail.notScheduled')}
+                  </span>
+                </span>
+              );
+            })()}
           </div>
 
           {/* Row 3 — money chips, hidden until phase 7 (financial detail
@@ -796,8 +855,16 @@ export default function WorkOrderDetailPage() {
             </Card>
           </aside>
 
-          {/* Main canvas — work items table. Cancelled WOs render the pills read-only. */}
+          {/* Main canvas — dispatches section sits above work items because
+              "who is going, when" is the question CSRs answer most often on a
+              live customer call (see the comment above the ETA chip). Both
+              sections render read-only when the WO is frozen. */}
           <main className="mt-6 lg:mt-0 lg:min-h-0 lg:overflow-y-auto">
+            <DispatchesSection
+              workOrderId={workOrder.id}
+              readOnly={isCancelled || isArchived}
+              onAssign={() => setAssignDispatchDialogOpen(true)}
+            />
             <WorkItemsTable
               workOrderId={workOrder.id}
               workItems={workOrder.workItems ?? []}
@@ -850,6 +917,12 @@ export default function WorkOrderDetailPage() {
         isOpen={editWorkOrderDialogOpen}
         onClose={() => setEditWorkOrderDialogOpen(false)}
         workOrder={workOrder}
+      />
+
+      <AssignTechnicianDialog
+        isOpen={assignDispatchDialogOpen}
+        onClose={() => setAssignDispatchDialogOpen(false)}
+        workOrderId={workOrder.id}
       />
 
       <EquipmentFormDialog

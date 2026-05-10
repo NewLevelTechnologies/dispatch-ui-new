@@ -1,0 +1,296 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import { renderWithProviders, userEvent } from '../test/utils';
+import AssignTechnicianDialog from './AssignTechnicianDialog';
+import type { User } from '../api';
+
+const mockDispatchesCreate = vi.fn();
+const mockUserGetAll = vi.fn();
+
+vi.mock('../api/schedulingApi', () => ({
+  dispatchesApi: {
+    create: (...args: unknown[]) => mockDispatchesCreate(...args),
+  },
+}));
+vi.mock('../api/userApi', () => ({
+  userApi: { getAll: (...args: unknown[]) => mockUserGetAll(...args) },
+  default: { getAll: (...args: unknown[]) => mockUserGetAll(...args) },
+}));
+
+const mockUser = (id: string, first: string, last: string, enabled = true): User => ({
+  id,
+  tenantId: 't1',
+  cognitoSub: `sub-${id}`,
+  email: `${first.toLowerCase()}@example.com`,
+  firstName: first,
+  lastName: last,
+  phoneNumber: null,
+  enabled,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+});
+
+describe('AssignTechnicianDialog', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUserGetAll.mockResolvedValue([
+      mockUser('u1', 'Jason', 'Smith'),
+      mockUser('u2', 'Maria', 'Lopez'),
+      mockUser('u3', 'Disabled', 'User', false),
+    ]);
+  });
+
+  it('does not render the form when closed', () => {
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={false} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('renders the form fields when open', async () => {
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText('Technician')).toBeInTheDocument();
+    expect(screen.getByLabelText('Arrival Window Start')).toBeInTheDocument();
+    expect(screen.getByLabelText('Arrival Window End')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Estimated Duration (optional, minutes)')
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Notes')).toBeInTheDocument();
+  });
+
+  it('only lists enabled users in the technician picker', async () => {
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+
+    await waitFor(() => {
+      // Sorted by lastName asc — Lopez before Smith.
+      expect(screen.getByText('Maria Lopez')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Jason Smith')).toBeInTheDocument();
+    expect(screen.queryByText('Disabled User')).not.toBeInTheDocument();
+  });
+
+  it('seeds window end to two hours after the default start', async () => {
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+
+    const start = (await screen.findByLabelText(
+      'Arrival Window Start'
+    )) as HTMLInputElement;
+    const end = (await screen.findByLabelText(
+      'Arrival Window End'
+    )) as HTMLInputElement;
+
+    expect(start.value).toBeTruthy();
+    expect(end.value).toBeTruthy();
+    const startMs = new Date(start.value).getTime();
+    const endMs = new Date(end.value).getTime();
+    expect(endMs - startMs).toBe(2 * 60 * 60 * 1000);
+  });
+
+  it('preserves the window width when the dispatcher changes the start', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+
+    const start = (await screen.findByLabelText(
+      'Arrival Window Start'
+    )) as HTMLInputElement;
+    const end = (await screen.findByLabelText(
+      'Arrival Window End'
+    )) as HTMLInputElement;
+    const initialWidthMs = new Date(end.value).getTime() - new Date(start.value).getTime();
+
+    await user.clear(start);
+    await user.type(start, '2026-06-01T09:00');
+
+    // After the user moves start, end should track by the same width.
+    const newWidthMs = new Date(end.value).getTime() - new Date(start.value).getTime();
+    expect(newWidthMs).toBe(initialWidthMs);
+  });
+
+  it('disables submit until a tech is selected', async () => {
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    const submit = screen.getByRole('button', { name: /^assign$/i });
+    expect(submit).toBeDisabled();
+  });
+
+  it('disables submit and surfaces a hint when window end is not after start', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
+    });
+    await user.selectOptions(screen.getByLabelText('Technician'), 'u1');
+
+    // Force end to equal start — degenerate window. Use clear+type so the
+    // change handler fires (datetime-local needs full ISO-ish string).
+    const startInput = screen.getByLabelText(
+      'Arrival Window Start'
+    ) as HTMLInputElement;
+    const endInput = screen.getByLabelText(
+      'Arrival Window End'
+    ) as HTMLInputElement;
+    await user.clear(endInput);
+    await user.type(endInput, startInput.value);
+
+    expect(
+      screen.getByText(/window end must be after window start/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^assign$/i })).toBeDisabled();
+  });
+
+  it('submits a create request with the selected tech and window', async () => {
+    mockDispatchesCreate.mockResolvedValue({ id: 'd-new' });
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={onClose} workOrderId="wo-1" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText('Technician'), 'u1');
+
+    // Set a deterministic window so the assertion doesn't drift across runs.
+    const start = screen.getByLabelText('Arrival Window Start');
+    const end = screen.getByLabelText('Arrival Window End');
+    await user.clear(start);
+    await user.type(start, '2026-05-15T08:00');
+    await user.clear(end);
+    await user.type(end, '2026-05-15T10:00');
+
+    await user.type(screen.getByLabelText('Notes'), 'Bring ladder');
+
+    await user.click(screen.getByRole('button', { name: /^assign$/i }));
+
+    await waitFor(() => {
+      expect(mockDispatchesCreate).toHaveBeenCalledTimes(1);
+    });
+    const payload = mockDispatchesCreate.mock.calls[0][0];
+    expect(payload.workOrderId).toBe('wo-1');
+    expect(payload.assignedUserId).toBe('u1');
+    expect(payload.notes).toBe('Bring ladder');
+    expect(typeof payload.arrivalWindowStart).toBe('string');
+    expect(typeof payload.arrivalWindowEnd).toBe('string');
+    expect(payload.arrivalWindowStart).toMatch(/2026-05-15T/);
+    expect(payload.arrivalWindowEnd).toMatch(/2026-05-15T/);
+    // Duration is optional; not provided in this test, must be omitted.
+    expect(payload.estimatedDuration).toBeUndefined();
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it('includes estimatedDuration in the payload when set', async () => {
+    mockDispatchesCreate.mockResolvedValue({ id: 'd-new' });
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText('Technician'), 'u1');
+    await user.type(
+      screen.getByLabelText('Estimated Duration (optional, minutes)'),
+      '90'
+    );
+    await user.click(screen.getByRole('button', { name: /^assign$/i }));
+
+    await waitFor(() => {
+      expect(mockDispatchesCreate).toHaveBeenCalled();
+    });
+    expect(mockDispatchesCreate.mock.calls[0][0].estimatedDuration).toBe(90);
+  });
+
+  it('omits notes from the payload when blank', async () => {
+    mockDispatchesCreate.mockResolvedValue({ id: 'd-new' });
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText('Technician'), 'u1');
+    await user.click(screen.getByRole('button', { name: /^assign$/i }));
+
+    await waitFor(() => {
+      expect(mockDispatchesCreate).toHaveBeenCalled();
+    });
+    const payload = mockDispatchesCreate.mock.calls[0][0];
+    expect(payload.notes).toBeUndefined();
+  });
+
+  it('alerts on create error and keeps the dialog open', async () => {
+    mockDispatchesCreate.mockRejectedValue(new Error('boom'));
+    const onClose = vi.fn();
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={onClose} workOrderId="wo-1" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText('Technician'), 'u1');
+    await user.click(screen.getByRole('button', { name: /^assign$/i }));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalled();
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it('cancel triggers onClose without submitting', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <AssignTechnicianDialog isOpen={true} onClose={onClose} workOrderId="wo-1" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect(onClose).toHaveBeenCalled();
+    expect(mockDispatchesCreate).not.toHaveBeenCalled();
+  });
+});
