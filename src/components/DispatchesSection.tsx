@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from './catalyst/table';
-import { CalendarIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { CalendarIcon, CheckIcon, PlusIcon } from '@heroicons/react/24/outline';
 
 const STATUS_COLORS: Record<DispatchStatus, 'sky' | 'blue' | 'lime' | 'zinc'> = {
   SCHEDULED: 'sky',
@@ -202,9 +202,22 @@ interface RowProps {
   readOnly: boolean;
 }
 
+const NOTIFY_SENT_FLASH_MS = 3000;
+
 function DispatchRow({ dispatch, tech, readOnly }: RowProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+
+  // Transient "Sent ✓" state on the Notify button after a successful send.
+  // Anchored to the row that triggered it — no toast/floating UI needed for
+  // a single confirmation. Errors still alert because they need attention.
+  const [justNotified, setJustNotified] = useState(false);
+  const notifiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (notifiedTimerRef.current) clearTimeout(notifiedTimerRef.current);
+    };
+  }, []);
 
   const advanceMutation = useMutation({
     mutationFn: (next: DispatchStatus) =>
@@ -225,14 +238,16 @@ function DispatchRow({ dispatch, tech, readOnly }: RowProps) {
   });
 
   // Manual SMS trigger. Idempotent on the backend, so this also serves as a
-  // resend when the window or notes change. No history is surfaced today —
-  // dispatchers can hit it again without harm.
+  // resend when the window or notes change.
   const notifyMutation = useMutation({
     mutationFn: () => dispatchesApi.notify(dispatch.id),
     onSuccess: () => {
-      // Backend logs the send; UI just confirms inline so the dispatcher knows
-      // the request went out without leaving the page.
-      alert(t('workOrders.dispatches.notifySent'));
+      setJustNotified(true);
+      if (notifiedTimerRef.current) clearTimeout(notifiedTimerRef.current);
+      notifiedTimerRef.current = setTimeout(
+        () => setJustNotified(false),
+        NOTIFY_SENT_FLASH_MS
+      );
     },
     onError: (err: unknown) => {
       const msg =
@@ -308,19 +323,27 @@ function DispatchRow({ dispatch, tech, readOnly }: RowProps) {
       </TableCell>
       <TableCell className="whitespace-nowrap">
         <div className="flex items-center justify-end gap-1">
-          {canNotify && (
-            <Button
-              plain
-              onClick={() => notifyMutation.mutate()}
-              title={
-                tech?.phoneNumber
-                  ? undefined
-                  : t('workOrders.dispatches.notifyMissingPhone')
-              }
-            >
-              {t('workOrders.dispatches.notify')}
-            </Button>
-          )}
+          {canNotify &&
+            (justNotified ? (
+              // Inline success state replaces the alert. Anchored to the row
+              // that triggered it; auto-reverts after NOTIFY_SENT_FLASH_MS.
+              <span className="inline-flex items-center gap-1 px-2 text-sm text-lime-600 dark:text-lime-400">
+                <CheckIcon className="size-4" />
+                {t('workOrders.dispatches.notifySent')}
+              </span>
+            ) : (
+              <Button
+                plain
+                onClick={() => notifyMutation.mutate()}
+                title={
+                  tech?.phoneNumber
+                    ? undefined
+                    : t('workOrders.dispatches.notifyMissingPhone')
+                }
+              >
+                {t('workOrders.dispatches.notify')}
+              </Button>
+            ))}
           {canAdvance && next && (
             <Button plain onClick={() => advanceMutation.mutate(next)}>
               {advanceLabel}
