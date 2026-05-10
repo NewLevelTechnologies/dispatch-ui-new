@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { TFunction } from 'i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -18,34 +19,31 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from './catalyst/dropdown';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from './catalyst/table';
+import { Table, TableBody, TableCell, TableRow } from './catalyst/table';
 import {
   CalendarIcon,
   CheckIcon,
+  ChevronRightIcon,
   EllipsisVerticalIcon,
   PlusIcon,
 } from '@heroicons/react/24/outline';
 
-const STATUS_COLORS: Record<DispatchStatus, 'sky' | 'blue' | 'lime' | 'zinc'> = {
+const STATUS_BADGE: Record<DispatchStatus, 'sky' | 'blue' | 'lime' | 'zinc'> = {
   SCHEDULED: 'sky',
   IN_PROGRESS: 'blue',
   COMPLETED: 'lime',
   CANCELLED: 'zinc',
 };
 
-// Linear flow per backend guide: SCHEDULED → IN_PROGRESS sets arrivedAt,
-// IN_PROGRESS → COMPLETED sets departedAt. Cancel/reassign live in a follow-up.
+// Linear flow per backend: SCHEDULED → IN_PROGRESS sets arrivedAt,
+// IN_PROGRESS → COMPLETED sets departedAt.
 const NEXT_STATUS: Partial<Record<DispatchStatus, DispatchStatus>> = {
   SCHEDULED: 'IN_PROGRESS',
   IN_PROGRESS: 'COMPLETED',
 };
+
+const PAST_STATES: ReadonlyArray<DispatchStatus> = ['COMPLETED', 'CANCELLED'];
+const isPast = (s: DispatchStatus) => PAST_STATES.includes(s);
 
 const DATE_PART = new Intl.DateTimeFormat('en-US', {
   weekday: 'short',
@@ -57,13 +55,6 @@ const TIME_PART = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit',
 });
 
-/**
- * Format an arrival window for display. Same-day windows render once-per-date
- * with a time range ("Fri, May 15 · 8:00 – 10:00 AM"); cross-date windows
- * fall back to the full instant on each side ("May 15 8:00 PM – May 16 6:00 AM"
- * pattern). The same-day case is the overwhelmingly common one — service
- * commitments rarely span midnight.
- */
 function formatWindow(startIso: string, endIso: string): string {
   const start = new Date(startIso);
   const end = new Date(endIso);
@@ -88,6 +79,86 @@ function formatDuration(minutes: number): string {
   return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
+/**
+ * Overdue = SLA window has fully expired and the dispatcher hasn't progressed
+ * past SCHEDULED. The window-end (not start) is the tripwire — windowStart-passed
+ * is normal "in window" operation. Today's backend has only SCHEDULED in the
+ * pre-arrival state set; if NOTIFIED / EN_ROUTE land later, extend here.
+ */
+function isOverdue(d: Dispatch, now: number): boolean {
+  if (d.status !== 'SCHEDULED') return false;
+  return new Date(d.arrivalWindowEnd).getTime() < now;
+}
+
+/**
+ * Two-tier sort for active rows: overdue pinned top (oldest end-of-window
+ * first), then everything else chronologically by arrivalWindowStart.
+ * Past rows live in their own collapsed section, sorted most-recent-first.
+ */
+function partitionAndSort(dispatches: Dispatch[], now: number) {
+  const past: Dispatch[] = [];
+  const overdue: Dispatch[] = [];
+  const onTrack: Dispatch[] = [];
+  for (const d of dispatches) {
+    if (isPast(d.status)) past.push(d);
+    else if (isOverdue(d, now)) overdue.push(d);
+    else onTrack.push(d);
+  }
+  past.sort((a, b) => {
+    const aTime = a.departedAt ?? a.updatedAt;
+    const bTime = b.departedAt ?? b.updatedAt;
+    return new Date(bTime).getTime() - new Date(aTime).getTime();
+  });
+  overdue.sort(
+    (a, b) =>
+      new Date(a.arrivalWindowEnd).getTime() -
+      new Date(b.arrivalWindowEnd).getTime()
+  );
+  onTrack.sort(
+    (a, b) =>
+      new Date(a.arrivalWindowStart).getTime() -
+      new Date(b.arrivalWindowStart).getTime()
+  );
+  return { active: [...overdue, ...onTrack], past };
+}
+
+function getDotColor(d: Dispatch, now: number): string {
+  if (isOverdue(d, now)) return 'bg-rose-500';
+  if (d.status === 'IN_PROGRESS') return 'bg-lime-500';
+  return 'bg-sky-500';
+}
+
+function formatActiveTimestamp(d: Dispatch, t: TFunction): string {
+  if (d.status === 'IN_PROGRESS' && d.arrivedAt) {
+    return t('workOrders.dispatches.onSiteSince', {
+      time: formatTimeOnly(d.arrivedAt),
+    });
+  }
+  return formatWindow(d.arrivalWindowStart, d.arrivalWindowEnd);
+}
+
+function formatPastTimestamp(d: Dispatch, t: TFunction): string {
+  if (d.status === 'CANCELLED') {
+    return t('workOrders.dispatches.status.CANCELLED');
+  }
+  if (d.arrivedAt && d.departedAt) {
+    const ms =
+      new Date(d.departedAt).getTime() - new Date(d.arrivedAt).getTime();
+    const dur = formatDuration(Math.max(1, Math.round(ms / 60000)));
+    return t('workOrders.dispatches.onSitePast', {
+      start: formatTimeOnly(d.arrivedAt),
+      end: formatTimeOnly(d.departedAt),
+      duration: dur,
+    });
+  }
+  if (d.departedAt) {
+    return t('workOrders.dispatches.completedAt', {
+      time: formatTimeOnly(d.departedAt),
+    });
+  }
+  return t('workOrders.dispatches.status.COMPLETED');
+}
+
 interface Props {
   workOrderId: string;
   /** Cancelled / archived WOs render rows read-only and hide the assign CTA. */
@@ -102,9 +173,9 @@ interface Props {
 
 /**
  * Operational "who is going, when" section directly above WorkItemsTable.
- * For most WOs there are 0–1 dispatches; the section reads cleanly in either
- * state. Status advance is a single-click button (Mark arrived / Mark completed)
- * rather than a dropdown — the linear flow makes a menu unnecessary friction.
+ * Active dispatches render as dense single-line rows; past dispatches collapse
+ * into a "Past (N) ▸" trigger so a long-running WO doesn't bury the work item
+ * table under historical visits.
  */
 export default function DispatchesSection({
   workOrderId,
@@ -121,9 +192,6 @@ export default function DispatchesSection({
     enabled: !!workOrderId,
   });
 
-  // Used to resolve assignedUserId → "First Last" for row display. One query
-  // for the page (not N+1 per row); React Query dedupes with the dialog's
-  // identical key.
   const { data: users = [] } = useQuery({
     queryKey: ['users'],
     queryFn: () => userApi.getAll(),
@@ -134,17 +202,17 @@ export default function DispatchesSection({
     return map;
   }, [users]);
 
-  // Stable order: arrival window start ASC. Backend may already return this
-  // order, but we sort client-side defensively.
-  const sorted = useMemo(
-    () =>
-      [...dispatches].sort(
-        (a, b) =>
-          new Date(a.arrivalWindowStart).getTime() -
-          new Date(b.arrivalWindowStart).getTime()
-      ),
+  // Single "now" reference per render. Overdue is a derived predicate; the
+  // boundary doesn't shift mid-paint, and recomputing on the next data fetch
+  // is more than fast enough for a CSR session.
+  const now = Date.now();
+  const { active, past } = useMemo(
+    () => partitionAndSort(dispatches, now),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [dispatches]
   );
+
+  const [showPast, setShowPast] = useState(false);
 
   const showAssign = !readOnly;
   const headerBar = (
@@ -172,7 +240,7 @@ export default function DispatchesSection({
     );
   }
 
-  if (sorted.length === 0) {
+  if (active.length === 0 && past.length === 0) {
     return (
       <section aria-label={getName('dispatch', true)} className="mb-6">
         {headerBar}
@@ -190,29 +258,44 @@ export default function DispatchesSection({
     <section aria-label={getName('dispatch', true)} className="mb-6">
       {headerBar}
       <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-        <TableHead>
-          <TableRow>
-            <TableHeader>{t('workOrders.dispatches.table.tech')}</TableHeader>
-            <TableHeader>{t('workOrders.dispatches.table.window')}</TableHeader>
-            <TableHeader className="w-px whitespace-nowrap">
-              {t('workOrders.dispatches.table.duration')}
-            </TableHeader>
-            <TableHeader className="w-px whitespace-nowrap">
-              {t('workOrders.dispatches.table.status')}
-            </TableHeader>
-            <TableHeader className="w-px" aria-hidden />
-          </TableRow>
-        </TableHead>
         <TableBody>
-          {sorted.map((d) => (
+          {active.map((d) => (
             <DispatchRow
               key={d.id}
               dispatch={d}
               tech={usersById.get(d.assignedUserId)}
               readOnly={readOnly}
+              now={now}
               onEdit={onEdit}
             />
           ))}
+          {past.length > 0 && (
+            <TableRow>
+              <TableCell colSpan={4} className="!py-1">
+                <button
+                  type="button"
+                  onClick={() => setShowPast((s) => !s)}
+                  aria-expanded={showPast}
+                  className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                >
+                  <ChevronRightIcon
+                    className={`size-3 transition-transform ${showPast ? 'rotate-90' : ''}`}
+                  />
+                  {t('workOrders.dispatches.past', { count: past.length })}
+                </button>
+              </TableCell>
+            </TableRow>
+          )}
+          {showPast &&
+            past.map((d) => (
+              <PastDispatchRow
+                key={d.id}
+                dispatch={d}
+                tech={usersById.get(d.assignedUserId)}
+                readOnly={readOnly}
+                onEdit={onEdit}
+              />
+            ))}
         </TableBody>
       </Table>
     </section>
@@ -223,18 +306,19 @@ interface RowProps {
   dispatch: Dispatch;
   tech: User | undefined;
   readOnly: boolean;
+  now: number;
   onEdit: (dispatch: Dispatch) => void;
 }
 
 const NOTIFY_SENT_FLASH_MS = 3000;
 
-function DispatchRow({ dispatch, tech, readOnly, onEdit }: RowProps) {
+function DispatchRow({ dispatch, tech, readOnly, now, onEdit }: RowProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  // Transient "Sent ✓" state on the Notify button after a successful send.
-  // Anchored to the row that triggered it — no toast/floating UI needed for
-  // a single confirmation. Errors still alert because they need attention.
+  // Transient "Sent ✓" replaces the Notify button briefly after a successful
+  // send. The button reverts because notify is idempotent on the backend —
+  // dispatcher can resend (window changed, tech missed it) without state churn.
   const [justNotified, setJustNotified] = useState(false);
   const notifiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -255,15 +339,13 @@ function DispatchRow({ dispatch, tech, readOnly, onEdit }: RowProps) {
     onError: (err: unknown) => {
       const msg =
         err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          ? (err as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
           : undefined;
       alert(msg || t('workOrders.dispatches.statusUpdateError'));
     },
   });
 
-  // Hard delete. Scoped to SCHEDULED in the UI so we never destroy field
-  // history (arrivedAt / departedAt). Confirms before firing — common-case
-  // is "wrong tech / typo / window changed before any tech action."
   const deleteMutation = useMutation({
     mutationFn: () => dispatchesApi.delete(dispatch.id),
     onSuccess: () => {
@@ -275,14 +357,13 @@ function DispatchRow({ dispatch, tech, readOnly, onEdit }: RowProps) {
     onError: (err: unknown) => {
       const msg =
         err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          ? (err as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
           : undefined;
       alert(msg || t('workOrders.dispatches.deleteError'));
     },
   });
 
-  // Manual SMS trigger. Idempotent on the backend, so this also serves as a
-  // resend when the window or notes change.
   const notifyMutation = useMutation({
     mutationFn: () => dispatchesApi.notify(dispatch.id),
     onSuccess: () => {
@@ -296,7 +377,8 @@ function DispatchRow({ dispatch, tech, readOnly, onEdit }: RowProps) {
     onError: (err: unknown) => {
       const msg =
         err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          ? (err as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
           : undefined;
       alert(msg || t('workOrders.dispatches.notifyError'));
     },
@@ -306,15 +388,149 @@ function DispatchRow({ dispatch, tech, readOnly, onEdit }: RowProps) {
     ? `${tech.firstName} ${tech.lastName}`.trim() || tech.email
     : '—';
   const next = NEXT_STATUS[dispatch.status];
-  const canAdvance = !readOnly && !!next && !advanceMutation.isPending;
-  // Only meaningful while the dispatch is still on the books — once a tech is
-  // arrived/completed/cancelled, the SMS is moot.
-  const canNotify =
-    !readOnly && dispatch.status === 'SCHEDULED' && !notifyMutation.isPending;
-  // Edit + delete are open on every status during dev so we can freely
-  // recover from typos / experiment. Pre-prod we'll re-scope to SCHEDULED
-  // only — protecting field history (arrivedAt/departedAt) once a tech has
-  // interacted with the row.
+  const overdue = isOverdue(dispatch, now);
+  const canManage = !readOnly;
+
+  // State-aware single primary action. SCHEDULED → Notify (Mark arrived lives
+  // in the kebab as the secondary path for "tech walked up unannounced");
+  // IN_PROGRESS → Mark completed (advances to COMPLETED). Backend doesn't
+  // currently track a NOTIFIED state, so post-notify the button reverts —
+  // notify is idempotent, dispatcher can resend if needed.
+  let primaryAction: React.ReactNode = null;
+  if (!readOnly) {
+    if (dispatch.status === 'SCHEDULED') {
+      primaryAction = justNotified ? (
+        <span className="inline-flex items-center gap-1 px-2 text-sm text-lime-600 dark:text-lime-400">
+          <CheckIcon className="size-4" />
+          {t('workOrders.dispatches.notifySent')}
+        </span>
+      ) : (
+        <Button
+          plain
+          onClick={() => notifyMutation.mutate()}
+          disabled={notifyMutation.isPending}
+          title={
+            tech?.phoneNumber
+              ? undefined
+              : t('workOrders.dispatches.notifyMissingPhone')
+          }
+        >
+          {t('workOrders.dispatches.notify')}
+        </Button>
+      );
+    } else if (dispatch.status === 'IN_PROGRESS' && next) {
+      primaryAction = (
+        <Button
+          plain
+          onClick={() => advanceMutation.mutate(next)}
+          disabled={advanceMutation.isPending}
+        >
+          {t('workOrders.dispatches.markCompleted')}
+        </Button>
+      );
+    }
+  }
+
+  const handleDelete = () => {
+    if (deleteMutation.isPending) return;
+    if (!window.confirm(t('workOrders.dispatches.deleteConfirm'))) return;
+    deleteMutation.mutate();
+  };
+
+  return (
+    <TableRow>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <span
+            aria-label={
+              overdue ? t('workOrders.dispatches.overdue') : undefined
+            }
+            className={`inline-block size-2 shrink-0 rounded-full ${getDotColor(dispatch, now)}`}
+          />
+          <div>
+            <div className="font-medium text-zinc-950 dark:text-white">
+              {techName}
+            </div>
+            {dispatch.notes && (
+              <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                {dispatch.notes}
+              </div>
+            )}
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="whitespace-nowrap">
+        {formatActiveTimestamp(dispatch, t)}
+      </TableCell>
+      <TableCell className="w-px whitespace-nowrap">
+        <Badge color={STATUS_BADGE[dispatch.status]}>
+          {t(`workOrders.dispatches.status.${dispatch.status}`)}
+        </Badge>
+      </TableCell>
+      <TableCell className="w-px whitespace-nowrap">
+        <div className="flex items-center justify-end gap-1">
+          {primaryAction}
+          {canManage && (
+            <Dropdown>
+              <DropdownButton plain aria-label={t('common.moreOptions')}>
+                <EllipsisVerticalIcon className="size-5" />
+              </DropdownButton>
+              <DropdownMenu anchor="bottom end">
+                {dispatch.status === 'SCHEDULED' && next && (
+                  <DropdownItem onClick={() => advanceMutation.mutate(next)}>
+                    <DropdownLabel>
+                      {t('workOrders.dispatches.markArrived')}
+                    </DropdownLabel>
+                  </DropdownItem>
+                )}
+                <DropdownItem onClick={() => onEdit(dispatch)}>
+                  <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                </DropdownItem>
+                <DropdownItem onClick={handleDelete}>
+                  <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+interface PastRowProps {
+  dispatch: Dispatch;
+  tech: User | undefined;
+  readOnly: boolean;
+  onEdit: (dispatch: Dispatch) => void;
+}
+
+function PastDispatchRow({ dispatch, tech, readOnly, onEdit }: PastRowProps) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: () => dispatchesApi.delete(dispatch.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      queryClient.invalidateQueries({
+        queryKey: ['work-order-activity', dispatch.workOrderId],
+      });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
+          : undefined;
+      alert(msg || t('workOrders.dispatches.deleteError'));
+    },
+  });
+
+  const techName = tech
+    ? `${tech.firstName} ${tech.lastName}`.trim() || tech.email
+    : '—';
+  const cancelled = dispatch.status === 'CANCELLED';
   const canManage = !readOnly;
 
   const handleDelete = () => {
@@ -322,88 +538,24 @@ function DispatchRow({ dispatch, tech, readOnly, onEdit }: RowProps) {
     if (!window.confirm(t('workOrders.dispatches.deleteConfirm'))) return;
     deleteMutation.mutate();
   };
-  // The action verb depends on the transition: SCHEDULED→IN_PROGRESS is
-  // "Mark arrived" (backend stamps arrivedAt); IN_PROGRESS→COMPLETED is
-  // "Mark completed" (backend stamps departedAt).
-  const advanceLabel =
-    dispatch.status === 'SCHEDULED'
-      ? t('workOrders.dispatches.markArrived')
-      : dispatch.status === 'IN_PROGRESS'
-        ? t('workOrders.dispatches.markCompleted')
-        : '';
+
+  // Past rows: muted text + no dot (the Past (N) header carries the section).
+  // Cancelled rows add strikethrough so "this didn't happen" reads at a glance
+  // without a separate sub-divider.
+  const mutedClass =
+    'text-zinc-500 dark:text-zinc-400' + (cancelled ? ' line-through' : '');
 
   return (
     <TableRow>
       <TableCell>
-        <div className="font-medium text-zinc-950 dark:text-white">{techName}</div>
-        {dispatch.notes && (
-          <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-            {dispatch.notes}
-          </div>
-        )}
+        <div className={mutedClass}>{techName}</div>
       </TableCell>
-      <TableCell>
-        <div>
-          {formatWindow(dispatch.arrivalWindowStart, dispatch.arrivalWindowEnd)}
-        </div>
-        {(dispatch.arrivedAt || dispatch.departedAt) && (
-          <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-            {dispatch.arrivedAt && (
-              <span>
-                {t('workOrders.dispatches.arrivedAt', {
-                  time: formatTimeOnly(dispatch.arrivedAt),
-                })}
-              </span>
-            )}
-            {dispatch.arrivedAt && dispatch.departedAt && <span> · </span>}
-            {dispatch.departedAt && (
-              <span>
-                {t('workOrders.dispatches.departedAt', {
-                  time: formatTimeOnly(dispatch.departedAt),
-                })}
-              </span>
-            )}
-          </div>
-        )}
+      <TableCell className={`whitespace-nowrap ${mutedClass}`}>
+        {formatPastTimestamp(dispatch, t)}
       </TableCell>
-      <TableCell className="whitespace-nowrap">
-        {dispatch.estimatedDuration != null
-          ? formatDuration(dispatch.estimatedDuration)
-          : '—'}
-      </TableCell>
-      <TableCell>
-        <Badge color={STATUS_COLORS[dispatch.status]}>
-          {t(`workOrders.dispatches.status.${dispatch.status}`)}
-        </Badge>
-      </TableCell>
-      <TableCell className="whitespace-nowrap">
+      <TableCell className="w-px" aria-hidden />
+      <TableCell className="w-px whitespace-nowrap">
         <div className="flex items-center justify-end gap-1">
-          {canNotify &&
-            (justNotified ? (
-              // Inline success state replaces the alert. Anchored to the row
-              // that triggered it; auto-reverts after NOTIFY_SENT_FLASH_MS.
-              <span className="inline-flex items-center gap-1 px-2 text-sm text-lime-600 dark:text-lime-400">
-                <CheckIcon className="size-4" />
-                {t('workOrders.dispatches.notifySent')}
-              </span>
-            ) : (
-              <Button
-                plain
-                onClick={() => notifyMutation.mutate()}
-                title={
-                  tech?.phoneNumber
-                    ? undefined
-                    : t('workOrders.dispatches.notifyMissingPhone')
-                }
-              >
-                {t('workOrders.dispatches.notify')}
-              </Button>
-            ))}
-          {canAdvance && next && (
-            <Button plain onClick={() => advanceMutation.mutate(next)}>
-              {advanceLabel}
-            </Button>
-          )}
           {canManage && (
             <Dropdown>
               <DropdownButton plain aria-label={t('common.moreOptions')}>
