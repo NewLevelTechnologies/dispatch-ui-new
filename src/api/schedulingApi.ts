@@ -39,6 +39,9 @@ export interface CreateDispatchRequest {
 }
 
 export interface UpdateDispatchRequest {
+  // Reassignment mid-flight is rare but supported by the backend (e.g. tech
+  // calls in sick before arrival). Editable only while SCHEDULED in the UI.
+  assignedUserId?: string;
   arrivalWindowStart?: string;
   arrivalWindowEnd?: string;
   estimatedDuration?: number;

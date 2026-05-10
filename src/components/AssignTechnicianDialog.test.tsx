@@ -2,14 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import AssignTechnicianDialog from './AssignTechnicianDialog';
-import type { User } from '../api';
+import type { Dispatch, User } from '../api';
 
 const mockDispatchesCreate = vi.fn();
+const mockDispatchesUpdate = vi.fn();
 const mockUserGetAll = vi.fn();
 
 vi.mock('../api/schedulingApi', () => ({
   dispatchesApi: {
     create: (...args: unknown[]) => mockDispatchesCreate(...args),
+    update: (...args: unknown[]) => mockDispatchesUpdate(...args),
   },
 }));
 vi.mock('../api/userApi', () => ({
@@ -327,6 +329,115 @@ describe('AssignTechnicianDialog', () => {
 
     const reopened = await screen.findByLabelText('Send SMS to technician now');
     expect(reopened).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('renders in edit mode with prefilled values, no notify checkbox', async () => {
+    const existing: Dispatch = {
+      id: 'd-edit',
+      workOrderId: 'wo-1',
+      assignedUserId: 'u2',
+      arrivalWindowStart: '2026-06-01T15:00:00Z',
+      arrivalWindowEnd: '2026-06-01T17:00:00Z',
+      estimatedDuration: 75,
+      status: 'SCHEDULED',
+      arrivedAt: null,
+      departedAt: null,
+      notes: 'Side door',
+      createdAt: '2026-05-30T00:00:00Z',
+      updatedAt: '2026-05-30T00:00:00Z',
+    };
+
+    renderWithProviders(
+      <AssignTechnicianDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        workOrderId="wo-1"
+        dispatch={existing}
+      />
+    );
+
+    // Title flips to edit copy.
+    await waitFor(() => {
+      expect(screen.getByText('Edit dispatch')).toBeInTheDocument();
+    });
+    // Tech preselected — wait for the users query to populate options first
+    // so the select can hold a non-empty value.
+    await waitFor(() => {
+      expect(
+        (screen.getByLabelText('Technician') as HTMLSelectElement).value
+      ).toBe('u2');
+    });
+    // Numeric fields preserved.
+    expect(
+      (screen.getByLabelText(
+        'Estimated Duration (optional, minutes)'
+      ) as HTMLInputElement).value
+    ).toBe('75');
+    // Notes preserved.
+    expect((screen.getByLabelText('Notes') as HTMLTextAreaElement).value).toBe(
+      'Side door'
+    );
+    // No notify checkbox in edit mode — resend lives on the row.
+    expect(
+      screen.queryByLabelText('Send SMS to technician now')
+    ).not.toBeInTheDocument();
+  });
+
+  it('submits an update via dispatchesApi.update in edit mode', async () => {
+    mockDispatchesUpdate.mockResolvedValue({ id: 'd-edit' });
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    const existing: Dispatch = {
+      id: 'd-edit',
+      workOrderId: 'wo-1',
+      assignedUserId: 'u1',
+      arrivalWindowStart: '2026-06-01T15:00:00Z',
+      arrivalWindowEnd: '2026-06-01T17:00:00Z',
+      estimatedDuration: null,
+      status: 'SCHEDULED',
+      arrivedAt: null,
+      departedAt: null,
+      notes: null,
+      createdAt: '2026-05-30T00:00:00Z',
+      updatedAt: '2026-05-30T00:00:00Z',
+    };
+
+    renderWithProviders(
+      <AssignTechnicianDialog
+        isOpen={true}
+        onClose={onClose}
+        workOrderId="wo-1"
+        dispatch={existing}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit dispatch')).toBeInTheDocument();
+    });
+    // Wait for the users query to resolve so the picker has the second tech.
+    await waitFor(() => {
+      expect(screen.getByText('Maria Lopez')).toBeInTheDocument();
+    });
+
+    // Reassign mid-flight: u1 → u2.
+    await user.selectOptions(screen.getByLabelText('Technician'), 'u2');
+    // Submit button copy is "Save" in edit mode.
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(mockDispatchesUpdate).toHaveBeenCalledTimes(1);
+    });
+    const [id, payload] = mockDispatchesUpdate.mock.calls[0];
+    expect(id).toBe('d-edit');
+    expect(payload.assignedUserId).toBe('u2');
+    // Window is preserved.
+    expect(payload.arrivalWindowStart).toMatch(/2026-06-01T/);
+    // Create wasn't called.
+    expect(mockDispatchesCreate).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
   });
 
   it('cancel triggers onClose without submitting', async () => {

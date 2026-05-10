@@ -7,6 +7,7 @@ import type { Dispatch, DispatchStatus, User } from '../api';
 const mockDispatchesGetAll = vi.fn();
 const mockDispatchesUpdate = vi.fn();
 const mockDispatchesNotify = vi.fn();
+const mockDispatchesDelete = vi.fn();
 const mockUserGetAll = vi.fn();
 
 // Mocking the source modules — the barrel re-exports from these, so component
@@ -16,6 +17,7 @@ vi.mock('../api/schedulingApi', () => ({
     getAll: (...args: unknown[]) => mockDispatchesGetAll(...args),
     update: (...args: unknown[]) => mockDispatchesUpdate(...args),
     notify: (...args: unknown[]) => mockDispatchesNotify(...args),
+    delete: (...args: unknown[]) => mockDispatchesDelete(...args),
   },
 }));
 vi.mock('../api/userApi', () => ({
@@ -63,7 +65,7 @@ describe('DispatchesSection', () => {
     const onAssign = vi.fn();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={onAssign} />
+      <DispatchesSection workOrderId="wo-1" onAssign={onAssign} onEdit={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -78,7 +80,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -95,7 +97,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={onAssign} />
+      <DispatchesSection workOrderId="wo-1" onAssign={onAssign} onEdit={vi.fn()} />
     );
 
     const button = await screen.findByRole('button', {
@@ -110,7 +112,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([mockDispatch()]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -131,7 +133,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -148,7 +150,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     // Tech name renders, so the row mounted; em-dash sits in the duration cell.
@@ -164,7 +166,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -182,7 +184,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -203,7 +205,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([mockDispatch()]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -216,7 +218,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([mockDispatch()]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     // The em-dash renders in the Tech cell when the userId resolves to nothing.
@@ -231,7 +233,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     const arriveBtn = await screen.findByRole('button', { name: /mark arrived/i });
@@ -252,7 +254,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     const completeBtn = await screen.findByRole('button', {
@@ -273,7 +275,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -289,7 +291,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -305,7 +307,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     const arriveBtn = await screen.findByRole('button', { name: /mark arrived/i });
@@ -338,7 +340,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -357,7 +359,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     const notifyBtn = await screen.findByRole('button', { name: /^notify$/i });
@@ -381,7 +383,7 @@ describe('DispatchesSection', () => {
     ]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -394,7 +396,7 @@ describe('DispatchesSection', () => {
     mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -410,7 +412,7 @@ describe('DispatchesSection', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} />
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
     );
 
     const notifyBtn = await screen.findByRole('button', { name: /^notify$/i });
@@ -422,5 +424,127 @@ describe('DispatchesSection', () => {
     // Failure path should NOT flip the row to the success state.
     expect(screen.queryByText('Sent')).not.toBeInTheDocument();
     alertSpy.mockRestore();
+  });
+
+  it('opens the kebab menu and invokes onEdit with the dispatch', async () => {
+    mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
+    const onEdit = vi.fn();
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={onEdit} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
+    });
+
+    // Kebab is the only "More options" button on the row.
+    const kebab = screen.getByRole('button', { name: /more options/i });
+    await user.click(kebab);
+
+    const editItem = await screen.findByRole('menuitem', { name: /edit/i });
+    await user.click(editItem);
+
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(onEdit.mock.calls[0][0].id).toBe('d1');
+  });
+
+  it('confirms before deleting and calls dispatchesApi.delete', async () => {
+    mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
+    mockDispatchesDelete.mockResolvedValue(undefined);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+    );
+
+    const kebab = await screen.findByRole('button', { name: /more options/i });
+    await user.click(kebab);
+
+    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
+    await user.click(deleteItem);
+
+    expect(confirmSpy).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockDispatchesDelete).toHaveBeenCalledWith('d1');
+    });
+    confirmSpy.mockRestore();
+  });
+
+  it('does not delete when the dispatcher cancels the confirm', async () => {
+    mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+    );
+
+    const kebab = await screen.findByRole('button', { name: /more options/i });
+    await user.click(kebab);
+
+    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
+    await user.click(deleteItem);
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(mockDispatchesDelete).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('alerts when delete fails', async () => {
+    mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
+    mockDispatchesDelete.mockRejectedValue(new Error('boom'));
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+    );
+
+    const kebab = await screen.findByRole('button', { name: /more options/i });
+    await user.click(kebab);
+    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
+    await user.click(deleteItem);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalled();
+    });
+    confirmSpy.mockRestore();
+    alertSpy.mockRestore();
+  });
+
+  it('shows the kebab on non-SCHEDULED rows during dev', async () => {
+    // Pre-prod scoping will hide this; today edit/delete are open on every
+    // status so dispatchers can recover from typos at any point.
+    mockDispatchesGetAll.mockResolvedValue([
+      mockDispatch({ status: 'COMPLETED' }),
+    ]);
+
+    renderWithProviders(
+      <DispatchesSection workOrderId="wo-1" onAssign={vi.fn()} onEdit={vi.fn()} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /more options/i })).toBeInTheDocument();
+  });
+
+  it('hides the kebab in read-only mode', async () => {
+    mockDispatchesGetAll.mockResolvedValue([mockDispatch({ status: 'SCHEDULED' })]);
+
+    renderWithProviders(
+      <DispatchesSection workOrderId="wo-1" readOnly onAssign={vi.fn()} onEdit={vi.fn()} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole('button', { name: /more options/i })
+    ).not.toBeInTheDocument();
   });
 });
