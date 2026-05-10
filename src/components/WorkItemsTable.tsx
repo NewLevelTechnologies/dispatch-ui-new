@@ -192,7 +192,7 @@ export default function WorkItemsTable({
       <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         {getName('work_item', true)}
       </h2>
-      <Button outline onClick={onAdd} className="!py-1 !px-2.5 !text-sm">
+      <Button onClick={onAdd}>
         <PlusIcon className="size-4" />
         {t('common.actions.add', { entity: getName('work_item') })}
       </Button>

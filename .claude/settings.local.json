@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_USE_BEDROCK": "0"
+  },
   "permissions": {
     "allow": [
       "Bash(npm run lint)",
@@ -40,7 +43,8 @@
       "Bash(chmod +x /tmp/update_tests.sh)",
       "Bash(/tmp/update_tests.sh)",
       "Bash(git reset *)",
-      "WebFetch(domain:catalyst.tailwindui.com)"
+      "WebFetch(domain:catalyst.tailwindui.com)",
+      "Read(//Users/paulwilcox/Documents/dispatch-api/**)"
     ]
   }
 }

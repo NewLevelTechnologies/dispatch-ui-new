@@ -19,6 +19,7 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from './catalyst/dropdown';
+import { Table, TableBody, TableCell, TableRow } from './catalyst/table';
 import {
   CalendarIcon,
   CheckIcon,
@@ -220,7 +221,7 @@ export default function DispatchesSection({
         {getName('dispatch', true)}
       </h2>
       {showAssign && (
-        <Button outline onClick={onAssign} className="!py-1 !px-2.5 !text-sm">
+        <Button onClick={onAssign}>
           <PlusIcon className="size-4" />
           {t('workOrders.dispatches.assignTechnician')}
         </Button>
@@ -256,48 +257,51 @@ export default function DispatchesSection({
   return (
     <section aria-label={getName('dispatch', true)} className="mb-6">
       {headerBar}
-      {/* Flex row list (not a Catalyst Table). Single-line dense rows pack
-          content to the left and float the action cluster to the right with
-          ml-auto, so a short row reads tight instead of stretched across
-          1000+px. role="table"/"row" preserves the test surface and keyboard
-          a11y patterns without inheriting table-cell padding. */}
-      <div role="table" className="border-t border-zinc-200 text-sm dark:border-zinc-800">
-        {active.map((d) => (
-          <DispatchRow
-            key={d.id}
-            dispatch={d}
-            tech={usersById.get(d.assignedUserId)}
-            readOnly={readOnly}
-            now={now}
-            onEdit={onEdit}
-          />
-        ))}
-        {past.length > 0 && (
-          <div className="border-b border-zinc-200 px-2 py-1 dark:border-zinc-800">
-            <button
-              type="button"
-              onClick={() => setShowPast((s) => !s)}
-              aria-expanded={showPast}
-              className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-            >
-              <ChevronRightIcon
-                className={`size-3 transition-transform ${showPast ? 'rotate-90' : ''}`}
-              />
-              {t('workOrders.dispatches.past', { count: past.length })}
-            </button>
-          </div>
-        )}
-        {showPast &&
-          past.map((d) => (
-            <PastDispatchRow
+      {/* Catalyst Table for cross-row column alignment (name, timestamp,
+          pill, action, kebab all line up). Tightened gutter + !py-1 cells +
+          dense buttons keep rows ~32px tall — table mechanics give us
+          alignment for free, we just have to override the default padding. */}
+      <Table dense className="[--gutter:theme(spacing.2)] text-sm">
+        <TableBody>
+          {active.map((d) => (
+            <DispatchRow
               key={d.id}
               dispatch={d}
               tech={usersById.get(d.assignedUserId)}
               readOnly={readOnly}
+              now={now}
               onEdit={onEdit}
             />
           ))}
-      </div>
+          {past.length > 0 && (
+            <TableRow>
+              <TableCell colSpan={6} className="!py-1">
+                <button
+                  type="button"
+                  onClick={() => setShowPast((s) => !s)}
+                  aria-expanded={showPast}
+                  className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                >
+                  <ChevronRightIcon
+                    className={`size-3 transition-transform ${showPast ? 'rotate-90' : ''}`}
+                  />
+                  {t('workOrders.dispatches.past', { count: past.length })}
+                </button>
+              </TableCell>
+            </TableRow>
+          )}
+          {showPast &&
+            past.map((d) => (
+              <PastDispatchRow
+                key={d.id}
+                dispatch={d}
+                tech={usersById.get(d.assignedUserId)}
+                readOnly={readOnly}
+                onEdit={onEdit}
+              />
+            ))}
+        </TableBody>
+      </Table>
     </section>
   );
 }
@@ -445,15 +449,14 @@ function DispatchRow({ dispatch, tech, readOnly, now, onEdit }: RowProps) {
   };
 
   return (
-    <div
-      role="row"
-      className="flex items-center gap-3 border-b border-zinc-200 px-2 py-1 dark:border-zinc-800"
-    >
-      <span
-        aria-label={overdue ? t('workOrders.dispatches.overdue') : undefined}
-        className={`size-2 shrink-0 rounded-full ${getDotColor(dispatch, now)}`}
-      />
-      <div className="min-w-0">
+    <TableRow>
+      <TableCell className="!py-1 w-px">
+        <span
+          aria-label={overdue ? t('workOrders.dispatches.overdue') : undefined}
+          className={`block size-2 shrink-0 rounded-full ${getDotColor(dispatch, now)}`}
+        />
+      </TableCell>
+      <TableCell className="!py-1 whitespace-nowrap">
         <div className="font-medium text-zinc-950 dark:text-white">
           {techName}
         </div>
@@ -462,15 +465,19 @@ function DispatchRow({ dispatch, tech, readOnly, now, onEdit }: RowProps) {
             {dispatch.notes}
           </div>
         )}
-      </div>
-      <div className="whitespace-nowrap text-zinc-600 dark:text-zinc-300">
+      </TableCell>
+      <TableCell className="!py-1 w-full whitespace-nowrap text-zinc-600 dark:text-zinc-300">
         {formatActiveTimestamp(dispatch, t)}
-      </div>
-      <div className="ml-auto flex items-center gap-2">
+      </TableCell>
+      <TableCell className="!py-1 w-px whitespace-nowrap">
         <Badge color={STATUS_BADGE[dispatch.status]}>
           {t(`workOrders.dispatches.status.${dispatch.status}`)}
         </Badge>
+      </TableCell>
+      <TableCell className="!py-1 w-px whitespace-nowrap text-right">
         {primaryAction}
+      </TableCell>
+      <TableCell className="!py-1 w-px whitespace-nowrap">
         {canManage && (
           <Dropdown>
             <DropdownButton
@@ -497,8 +504,8 @@ function DispatchRow({ dispatch, tech, readOnly, now, onEdit }: RowProps) {
             </DropdownMenu>
           </Dropdown>
         )}
-      </div>
-    </div>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -550,18 +557,21 @@ function PastDispatchRow({ dispatch, tech, readOnly, onEdit }: PastRowProps) {
     'text-zinc-500 dark:text-zinc-400' + (cancelled ? ' line-through' : '');
 
   return (
-    <div
-      role="row"
-      className="flex items-center gap-3 border-b border-zinc-200 px-2 py-1 dark:border-zinc-800"
-    >
-      {/* No dot on past rows — the Past (N) header carries the section.
-          Pad-left matches active rows so the dot column lines up visually. */}
-      <span className="size-2 shrink-0" aria-hidden />
-      <div className={mutedClass}>{techName}</div>
-      <div className={`whitespace-nowrap ${mutedClass}`}>
+    <TableRow>
+      {/* Empty dot slot — past rows have no dot (Past header carries the
+          section). Empty cell preserves column alignment with active rows. */}
+      <TableCell className="!py-1 w-px" aria-hidden />
+      <TableCell className={`!py-1 whitespace-nowrap ${mutedClass}`}>
+        {techName}
+      </TableCell>
+      <TableCell className={`!py-1 w-full whitespace-nowrap ${mutedClass}`}>
         {formatPastTimestamp(dispatch, t)}
-      </div>
-      <div className="ml-auto flex items-center gap-2">
+      </TableCell>
+      {/* Empty pill + action slots — past rows have neither, but the empty
+          cells keep column alignment so kebabs line up with active rows. */}
+      <TableCell className="!py-1 w-px" aria-hidden />
+      <TableCell className="!py-1 w-px" aria-hidden />
+      <TableCell className="!py-1 w-px whitespace-nowrap">
         {canManage && (
           <Dropdown>
             <DropdownButton
@@ -581,7 +591,7 @@ function PastDispatchRow({ dispatch, tech, readOnly, onEdit }: PastRowProps) {
             </DropdownMenu>
           </Dropdown>
         )}
-      </div>
-    </div>
+      </TableCell>
+    </TableRow>
   );
 }
