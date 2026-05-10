@@ -32,6 +32,10 @@ export interface CreateDispatchRequest {
   arrivalWindowEnd: string;
   estimatedDuration?: number;
   notes?: string;
+  // Opt-in SMS to the assigned technician on create. Default workflow is to
+  // schedule silently and notify later from the dispatch row, so this defaults
+  // to false / omitted.
+  notifyAssignedUser?: boolean;
 }
 
 export interface UpdateDispatchRequest {
@@ -71,6 +75,12 @@ export const dispatchesApi = {
 
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/scheduling/dispatches/${id}`);
+  },
+
+  // Manually trigger an SMS to the assigned technician. Idempotent on the
+  // backend, so this safely doubles as a resend when window/notes change.
+  notify: async (id: string): Promise<void> => {
+    await apiClient.post(`/scheduling/dispatches/${id}/notify`);
   },
 };
 
