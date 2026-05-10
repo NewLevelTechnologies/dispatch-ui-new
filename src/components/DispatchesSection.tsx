@@ -231,7 +231,7 @@ export default function DispatchesSection({
 
   if (isLoading) {
     return (
-      <section aria-label={getName('dispatch', true)} className="mb-6">
+      <section aria-label={getName('dispatch', true)} className="mt-3 mb-6">
         {headerBar}
         <div className="rounded-lg border border-dashed border-zinc-200 p-3 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
           {t('common.actions.loading', { entities: getName('dispatch', true) })}
@@ -242,7 +242,7 @@ export default function DispatchesSection({
 
   if (active.length === 0 && past.length === 0) {
     return (
-      <section aria-label={getName('dispatch', true)} className="mb-6">
+      <section aria-label={getName('dispatch', true)} className="mt-3 mb-6">
         {headerBar}
         <div className="flex items-center gap-2 rounded-lg border border-dashed border-zinc-200 p-3 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
           <CalendarIcon className="size-4 text-zinc-400" />
@@ -255,7 +255,7 @@ export default function DispatchesSection({
   }
 
   return (
-    <section aria-label={getName('dispatch', true)} className="mb-6">
+    <section aria-label={getName('dispatch', true)} className="mt-3 mb-6">
       {headerBar}
       {/* Catalyst Table for cross-row column alignment (name, timestamp,
           pill, action, kebab all line up). Tightened gutter + !py-1 cells +
