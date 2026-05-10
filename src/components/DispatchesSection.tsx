@@ -220,7 +220,7 @@ export default function DispatchesSection({
         {getName('dispatch', true)}
       </h2>
       {showAssign && (
-        <Button onClick={onAssign}>
+        <Button outline onClick={onAssign} className="!py-1 !px-2.5 !text-sm">
           <PlusIcon className="size-4" />
           {t('workOrders.dispatches.assignTechnician')}
         </Button>
