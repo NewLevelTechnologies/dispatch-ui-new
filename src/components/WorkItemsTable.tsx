@@ -604,13 +604,13 @@ function EquipmentBlockBody({
         }
       />
 
-      {/* Identity row: hero thumbnail + photo strip cluster on the left
-          (visual identity reads as one photo group, not two separate
-          things), name + status pill + type/category subline take the
-          remaining width. Hero is the click target for the lightbox when
-          images exist; the strip routes to specific indices. Previously the
-          strip sat at the far right of this row, which floated it away
-          from the hero and made the two photo elements read as orphaned. */}
+      {/* Identity row: thumbnail (48px) + name + status pill + type/category subline.
+          Hero thumbnail becomes a click target when images exist — opens the
+          shared lightbox at index 0 (the profile image, by sort contract).
+          Photo strip lives at the right end of this row (when 2+ photos
+          exist) so visual identity content clusters together rather than
+          stacking a labeled PHOTOS section below — saves vertical and
+          reads as "here's the unit, and here are more views of it." */}
       <div className="mt-1 flex items-start gap-3">
         {heroClickable ? (
           <button
@@ -624,10 +624,6 @@ function EquipmentBlockBody({
         ) : (
           heroThumbnail
         )}
-        <PhotoStrip
-          images={orderedImages}
-          onSelect={(i) => setLightboxIndex(i)}
-        />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {readOnly ? (
@@ -659,18 +655,21 @@ function EquipmentBlockBody({
             </div>
           )}
         </div>
+        <PhotoStrip
+          images={orderedImages}
+          onSelect={(i) => setLightboxIndex(i)}
+        />
       </div>
 
-      {/* Inline-edit grid: Make/Model on row 1, Serial/Location on row 2 —
-          two pairs of label-left/value-right cells in a single 4-col grid
-          so labels align vertically across rows. minmax-bounded value
-          columns keep the layout content-sized but leave room for the
-          click-to-edit input. Filters used to share this row, but it's a
-          variable-length list (not a single identifier) and floating it
-          beside the grid broke the column alignment — moved to its own
-          row beneath. Deeper fields (asset tag, install date, warranty,
-          description) live behind "Edit all". */}
-      <div className="mt-2">
+      {/* Inline-edit grid (Make / Model / Serial / Location) on the left
+          and a compact Filters summary on the right when filters exist —
+          flex row so the two share the available width without forcing a
+          new vertical band. The grid uses minmax-bounded value columns
+          (instead of `1fr`) so it sizes to content and leaves room on the
+          right; values still keep a sane min-width for the click-to-edit
+          input. Wraps stacked on narrow screens. Deeper fields (asset
+          tag, install date, warranty, description) live behind "Edit all".  */}
+      <div className="mt-2 flex flex-wrap items-start gap-x-6 gap-y-2">
         <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[max-content_minmax(7rem,auto)_max-content_minmax(7rem,auto)]">
           <FieldRow
             label={t('equipment.form.make')}
@@ -702,11 +701,7 @@ function EquipmentBlockBody({
             readOnly={readOnly}
           />
         </dl>
-        {filters.length > 0 && (
-          <div className="mt-1">
-            <FiltersInline filters={filters} />
-          </div>
-        )}
+        <FiltersInline filters={filters} />
       </div>
 
       <SubUnitsRow
