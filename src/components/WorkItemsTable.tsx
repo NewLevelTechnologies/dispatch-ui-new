@@ -661,28 +661,25 @@ function EquipmentBlockBody({
         />
       </div>
 
-      {/* Inline-edit grid (Make / Model / Serial / Location) on the left
-          and a compact Filters summary on the right when filters exist —
-          flex row so the two share the available width without forcing a
-          new vertical band. The grid uses minmax-bounded value columns
-          (instead of `1fr`) so it sizes to content and leaves room on the
-          right; values still keep a sane min-width for the click-to-edit
-          input. Wraps stacked on narrow screens. Deeper fields (asset
-          tag, install date, warranty, description) live behind "Edit all".  */}
+      {/* Inline-edit grid (Make/Serial pair + Model/Location pair) on the
+          left, a compact Filters summary on the right when filters exist —
+          flex row so the three share the available width without a new
+          vertical band (filters are 0–3 values, they earn an inline spot,
+          not a separate row). Split into two 2-col grids instead of one
+          4-col so label-to-value pairing is tight (gap-x-3) while the gap
+          between the two pairs stays generous (flex gap-x-6). Value-column
+          min dropped from 7rem to 4rem — short values like "GOODMAN" no
+          longer carry wide trailing whitespace before the next label, and
+          the click-to-edit input still has 64px to render into. Wraps
+          stacked on narrow screens. Deeper fields (asset tag, install
+          date, warranty, description) live behind "Edit all". */}
       <div className="mt-2 flex flex-wrap items-start gap-x-6 gap-y-2">
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[max-content_minmax(7rem,auto)_max-content_minmax(7rem,auto)]">
+        <dl className="grid grid-cols-[max-content_minmax(4rem,auto)] gap-x-3 gap-y-1 text-sm">
           <FieldRow
             label={t('equipment.form.make')}
             value={equipment.make ?? ''}
             onSave={(v) => saveField('make', v || null)}
             ariaLabel={t('equipment.form.make')}
-            readOnly={readOnly}
-          />
-          <FieldRow
-            label={t('equipment.form.model')}
-            value={equipment.model ?? ''}
-            onSave={(v) => saveField('model', v || null)}
-            ariaLabel={t('equipment.form.model')}
             readOnly={readOnly}
           />
           <FieldRow
@@ -692,6 +689,15 @@ function EquipmentBlockBody({
             ariaLabel={t('equipment.form.serialNumber')}
             readOnly={readOnly}
             className="font-mono"
+          />
+        </dl>
+        <dl className="grid grid-cols-[max-content_minmax(4rem,auto)] gap-x-3 gap-y-1 text-sm">
+          <FieldRow
+            label={t('equipment.form.model')}
+            value={equipment.model ?? ''}
+            onSave={(v) => saveField('model', v || null)}
+            ariaLabel={t('equipment.form.model')}
+            readOnly={readOnly}
           />
           <FieldRow
             label={t('equipment.form.locationOnSite')}
