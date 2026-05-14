@@ -1190,6 +1190,25 @@
       "print": "Print",
       "setNte": "Set NTE"
     },
+    "financialDrawer": {
+      "comingSoon": "Coming soon",
+      "ghosts": {
+        "invoice": "Invoice"
+      },
+      "stubBlockers": {
+        "invoices": "Waiting on backend ask #2 (WO-scoped invoice list) and #6 (lump-sum create contract).",
+        "payments": "Waiting on backend asks #3 (WO-scoped payment list) and #4 (payment void endpoint).",
+        "purchaseOrders": "Deferred to phase 7c — no backend entity yet.",
+        "quotes": "Quotes ship in phase 7b — waiting on backend asks #7–#10."
+      },
+      "tabs": {
+        "invoices": "Invoices",
+        "payments": "Payments",
+        "purchaseOrders": "POs",
+        "quotes": "Quotes"
+      },
+      "title": "Financials · WO #{{number}}"
+    },
     "dispatches": {
       "assign": "Assign",
       "assignDescription": "The window is the customer commitment; duration is optional.",

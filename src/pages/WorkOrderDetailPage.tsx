@@ -30,6 +30,7 @@ import DispatchesSection from '../components/DispatchesSection';
 import EditableField from '../components/EditableField';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentQuickViewDrawer from '../components/EquipmentQuickViewDrawer';
+import FinancialDrawer, { type FinancialTab } from '../components/FinancialDrawer';
 import WorkItemFormDialog from '../components/WorkItemFormDialog';
 import WorkItemsTable from '../components/WorkItemsTable';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
@@ -180,6 +181,16 @@ export default function WorkOrderDetailPage() {
   const { getName } = useGlossary();
   const [copied, setCopied] = useState<'phone' | 'address' | null>(null);
   const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
+  const [financialDrawerOpen, setFinancialDrawerOpen] = useState(false);
+  const [financialDrawerInitialTab, setFinancialDrawerInitialTab] =
+    useState<FinancialTab>('invoices');
+
+  // Open the financial drawer at the matching tab. Used by the chip-row
+  // click handlers (§3.2 routing) and the typed-ghost cluster (§5.3).
+  const openFinancialDrawer = (tab: FinancialTab) => {
+    setFinancialDrawerInitialTab(tab);
+    setFinancialDrawerOpen(true);
+  };
   const [workItemDialogOpen, setWorkItemDialogOpen] = useState(false);
   const [editingWorkItem, setEditingWorkItem] = useState<WorkItemResponse | null>(null);
   const [editWorkOrderDialogOpen, setEditWorkOrderDialogOpen] = useState(false);
@@ -689,29 +700,29 @@ export default function WorkOrderDetailPage() {
           </div>
 
           {/* Row 3 — money chips (Phase 7 §5).
-              §5.3 reveal logic: row renders when NTE is set OR the financial
-              summary has any non-zero value. Truly fresh WOs (no NTE, no
-              activity) hide the row entirely — a row of zeros communicates
-              nothing.
-              Within the row:
-                NTE slot      → "NTE $12K" when set; muted "[+ Set NTE]"
-                                ghost when unset and the row is rendered for
-                                another reason (i.e., derived activity).
-                                Cancelled/archived: read-only when set;
-                                omitted when unset.
-                Derived chips → "$X invoiced · $Y paid · Bal $Z". Render as
-                                a cluster (§5.3 "once any has activity, the
-                                whole cluster renders") so $0 paid still
-                                shows alongside invoiced/balance.
-              §5.2 Bal color:
-                zinc          → balance 0, or partial-pay with nothing late
-                amber         → invoiced > 0 and paid = 0
-                rose          → any invoice OVERDUE (deferred — needs ask
-                                #2's WO-scoped invoice list to detect)
+              §5.3 reveal logic (post-drawer-shell): the row is the canonical
+              financial entry surface, not just a display.
+                Active WO  → row always renders. NTE on the left (set or
+                             ghost); right cluster is either live derived
+                             chips (when summary non-zero) or a typed ghost
+                             cluster ("+ Invoice") that opens the drawer at
+                             the matching tab.
+                Frozen WO  → row renders only when there's something to
+                             show (NTE set OR non-zero summary). No ghost
+                             affordances — cancelled/archived WOs can't
+                             invoice.
+              §5.2 Bal color: zinc default; amber when invoiced > 0 AND
+              paid = 0. Rose-on-OVERDUE waits on ask #2.
               BigDecimal handling: amounts arrive as strings (see
               WorkOrderFinancialSummary). parseFloat is fine for display
               decisions (formatter and >0 checks); never use parseFloat
-              output for write-side arithmetic. */}
+              output for write-side arithmetic.
+              Click routing (§3.2):
+                $ invoiced  → drawer, Invoices tab
+                $ paid      → drawer, Payments tab
+                Bal         → drawer, Invoices tab
+                [+ Invoice] → drawer, Invoices tab (create dialog will
+                              auto-open here once step 7 ships) */}
           {(() => {
             const hasNte = workOrder.notToExceed != null;
             const invoicedAmt = financialSummary
@@ -725,16 +736,26 @@ export default function WorkOrderDetailPage() {
               : 0;
             const hasDerivedActivity =
               invoicedAmt > 0 || paidAmt > 0 || balanceAmt > 0;
-
-            if (!hasNte && !hasDerivedActivity) return null;
-
             const frozen = isCancelled || isArchived;
+
+            // Frozen WOs: only render the row when there's something
+            // worth showing. Active WOs always render — the typed ghost
+            // cluster fills the row's bootstrap role.
+            if (frozen && !hasNte && !hasDerivedActivity) return null;
+
             const showNteSlot = hasNte || !frozen;
+            const showTypedGhosts = !frozen && !hasDerivedActivity;
             // §5.2 Bal palette — rose-on-OVERDUE waits on ask #2.
             const balIsAmber = invoicedAmt > 0 && paidAmt === 0;
             const balClasses = balIsAmber
               ? 'bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300'
               : 'bg-zinc-100 text-zinc-700 dark:bg-white/5 dark:text-zinc-300';
+            // Shared chip-button affordance: hover ring + pointer cursor.
+            // Catalyst Button is too heavy for inline chips; a plain
+            // <button> with the chip surface styling keeps the visual
+            // density while staying accessible.
+            const chipButtonClass =
+              'inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
 
             const nteValueChip = (num: number) => (
               <span
@@ -777,9 +798,6 @@ export default function WorkOrderDetailPage() {
                         }}
                         placeholder={t('workOrders.form.notToExceedPlaceholder')}
                         ariaLabel={t('workOrders.form.notToExceed')}
-                        // Override Catalyst's default `block w-full` Input
-                        // sizing so the inline editor stays chip-sized
-                        // instead of spanning the header row.
                         inputClassName="!w-32"
                         renderDisplay={(v) => {
                           if (!v) {
@@ -794,7 +812,7 @@ export default function WorkOrderDetailPage() {
                       />
                     ))}
 
-                {showNteSlot && hasDerivedActivity && (
+                {showNteSlot && (hasDerivedActivity || showTypedGhosts) && (
                   <span
                     className="inline-block h-4 w-px bg-zinc-300 dark:bg-zinc-600"
                     aria-hidden="true"
@@ -803,9 +821,12 @@ export default function WorkOrderDetailPage() {
 
                 {hasDerivedActivity && (
                   <>
-                    <span
-                      className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-white/5 dark:text-zinc-300"
+                    <button
+                      type="button"
+                      onClick={() => openFinancialDrawer('invoices')}
                       title={currencyFormatter.format(invoicedAmt)}
+                      aria-label={t('workOrders.financialDrawer.tabs.invoices')}
+                      className={`${chipButtonClass} bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10`}
                     >
                       <span className="font-medium tabular-nums">
                         {formatCompactCurrency(invoicedAmt)}
@@ -813,16 +834,19 @@ export default function WorkOrderDetailPage() {
                       <span className="text-xs text-zinc-500 dark:text-zinc-400">
                         {t('workOrders.detail.money.invoiced')}
                       </span>
-                    </span>
+                    </button>
                     <span
                       className="text-zinc-300 dark:text-zinc-600"
                       aria-hidden="true"
                     >
                       ·
                     </span>
-                    <span
-                      className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-white/5 dark:text-zinc-300"
+                    <button
+                      type="button"
+                      onClick={() => openFinancialDrawer('payments')}
                       title={currencyFormatter.format(paidAmt)}
+                      aria-label={t('workOrders.financialDrawer.tabs.payments')}
+                      className={`${chipButtonClass} bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10`}
                     >
                       <span className="font-medium tabular-nums">
                         {formatCompactCurrency(paidAmt)}
@@ -830,16 +854,23 @@ export default function WorkOrderDetailPage() {
                       <span className="text-xs text-zinc-500 dark:text-zinc-400">
                         {t('workOrders.detail.money.paid')}
                       </span>
-                    </span>
+                    </button>
                     <span
                       className="text-zinc-300 dark:text-zinc-600"
                       aria-hidden="true"
                     >
                       ·
                     </span>
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 ${balClasses}`}
+                    <button
+                      type="button"
+                      onClick={() => openFinancialDrawer('invoices')}
                       title={currencyFormatter.format(balanceAmt)}
+                      aria-label={t('workOrders.detail.money.balance')}
+                      className={`${chipButtonClass} ${balClasses} ${
+                        balIsAmber
+                          ? 'hover:bg-amber-100 dark:hover:bg-amber-500/20'
+                          : 'hover:bg-zinc-200 dark:hover:bg-white/10'
+                      }`}
                     >
                       <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                         {t('workOrders.detail.money.balanceShort')}
@@ -847,8 +878,22 @@ export default function WorkOrderDetailPage() {
                       <span className="font-medium tabular-nums">
                         {formatCompactCurrency(balanceAmt)}
                       </span>
-                    </span>
+                    </button>
                   </>
+                )}
+
+                {showTypedGhosts && (
+                  // Typed ghost cluster (§5.3) — bootstrap entry to the
+                  // drawer when summary is zero. 7a ships only +Invoice;
+                  // [+ Quote] joins in 7b once the Quotes tab is real.
+                  <button
+                    type="button"
+                    onClick={() => openFinancialDrawer('invoices')}
+                    aria-label={t('workOrders.financialDrawer.tabs.invoices')}
+                    className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-300 px-1.5 py-0.5 text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
+                  >
+                    + {t('workOrders.financialDrawer.ghosts.invoice')}
+                  </button>
                 )}
               </div>
             );
@@ -1078,6 +1123,17 @@ export default function WorkOrderDetailPage() {
         open={activityDrawerOpen}
         onClose={() => setActivityDrawerOpen(false)}
         workOrderId={workOrder.id}
+      />
+
+      {/* Financial drawer (§3) — opened from chip-row clicks. Single mount;
+          `initialTab` controls which tab is active on each open. Tab content
+          is stubbed in this branch ("Coming soon") and fills in as backend
+          asks #2–#6 land. */}
+      <FinancialDrawer
+        open={financialDrawerOpen}
+        onClose={() => setFinancialDrawerOpen(false)}
+        workOrderNumber={woDisplayNumber}
+        initialTab={financialDrawerInitialTab}
       />
 
       {/* Dispatch detail drawer — row body click opens this with the
