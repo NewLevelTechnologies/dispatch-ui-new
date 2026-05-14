@@ -45,8 +45,8 @@ This applies the "don't pre-implement future state" rule explicitly. The earlier
 ### 3.1 Shell
 
 - One `SlideOver`, `!max-w-[800px]` (mid-range of §3.5's 760–840). Single mount; content swaps on tab change. Reference implementations: `EquipmentQuickViewDrawer` (480px), `ActivityDrawer` (~448px). Financial is the widest by design because of tabular density.
-- **Tabs across the top: `Quotes · POs · Invoices · Payments`.** WO-lifecycle (chronological) order — Quote (estimate-before-work, sometimes) → PO (mid-job procurement, sometimes) → Invoice (bill after work, always) → Payment (customer pays, always, last). The earlier "click-frequency order" framing was a telemetry-free guess; chronological matches the CSR mental model of "where is this WO in its arc?" and reads consistently regardless of which stage a given WO is in. Default landing tab is still Invoices (the live billable surface) when no specific tab is requested.
-- **Tab badge counts**: `Invoices (3)`, `Payments (2)`. Stub tabs show no count.
+- **Tabs across the top: `Quotes · POs · Invoices`.** WO-lifecycle (chronological) order — Quote (estimate-before-work, sometimes) → PO (mid-job procurement, sometimes) → Invoice (bill after work, always). Payments are **not a sibling tab** — they nest under each invoice's row expansion since they're structurally child-of-invoice (see §3.3). Default landing tab is Invoices (the live billable surface).
+- **Tab badge counts**: `Invoices (3)`. Stub tabs show no count.
 - **Drawer header**: `Financials · WO #1234` + close. Below the tabs, a one-line summary strip mirrors the chip-row numbers so totals stay visible while scanning a tab.
 - **Drawer-over-drawer / dialog-over-drawer** behavior is the established pattern (§3.5, EquipmentQuickViewDrawer in §5b). Drawer stays mounted under dialogs, visually dimmed. `Esc` closes topmost — formalized here as canonical across all surfaces.
 
@@ -58,7 +58,7 @@ Determined by which chip the user clicked:
 |---|---|---|
 | `$ invoiced` | Invoices | none |
 | `Bal` | Invoices | none |
-| `$ paid` | Payments | none |
+| `$ paid` | — (plain text, no click target) | n/a |
 | `$ quoted` (7b) | Quotes | none |
 | `[+ Invoice]` ghost | Invoices | open create dialog |
 | `[+ Quote]` ghost (7b) | Quotes | open create dialog |
@@ -66,40 +66,64 @@ Determined by which chip the user clicked:
 
 `Bal` does not apply a "balance > 0" table filter in v1 — the Invoices tab is short on most WOs and the Balance column already makes outstanding items visible without filtering. Add a default filter later if WOs commonly accumulate >5 invoices (§7).
 
+`$ paid` is **plain text, not a button** (revised 2026-05-14). It still appears in the header row for the at-a-glance reconciled story (`$3.2K invoiced · $3.2K paid · Bal $0`), but with no click target — payments nest under invoices in the drawer (§3.3), so there's no single tab to route this chip to. Demoting it to plain display keeps the number visible without pretending a useful nav target exists.
+
 Ghost chips (`[+ Invoice]`, `[+ Quote]`) are the bootstrap entry from the chip row when summary is zero (§5.3). They land on the matching tab AND open the create dialog in one click — the disambiguation step that a generic `[+ Financials]` chip would have forced.
 
 ### 3.3 Tab tables
 
 Dense Catalyst `Table` with the `dense` prop + `[--gutter:theme(spacing.1)] text-sm` per CSR patterns. Status pills inline-editable. `⋯` per-row menu for workflow actions.
 
-**`+ New Invoice` button** in the Invoices tab header (right-aligned) opens the minimal lump-sum invoice dialog (§4.2). Ships in 7a.
+**Invoices tab header**: two right-aligned CTAs.
+- **`+ New Invoice`** opens the minimal lump-sum invoice dialog (§4.2). Ships in 7a.
+- **`+ Record Payment`** opens the payment dialog (§4.4) with the invoice picker (the customer-on-the-phone scenario: "I'm paying $500 on this job" — no invoice number ready). Picker shows this WO's invoices with `balanceDue > 0`. Disabled when none have outstanding balance.
 
-**`+ New Quote` button** in the Quotes tab header — ships in **7b**, blocked on backend ask #6 (`Quote.workOrderId`). In 7a the Quotes tab is a stub with "Coming soon" copy.
+Both CTAs live at the tab level because they each cover a real CSR scenario: invoice creation is parent-less (always), and payment recording is sometimes parent-less when the CSR is starting from "I have money" rather than from a specific invoice row.
 
-**No `+ New` button on the Payments tab header** — payment creation lives behind the `+ Record Payment` button at the top of the tab body, which opens the Payment dialog (§4.3). Functionally the same; the wording emphasizes that payments are *recorded against an existing invoice*, not standalone documents.
+**`+ New Quote` button** in the Quotes tab header — ships in **7b**, blocked on backend ask #7 (`Quote.workOrderId`). In 7a the Quotes tab is a stub with "Coming soon" copy.
 
-**Empty states** for Invoices/Quotes/Payments: muted copy. Invoices and Payments empty states include the same `+ New X` / `+ Record Payment` button as the tab header. Use `getName('invoice', true)` per glossary patterns.
+**Empty states** for Invoices/Quotes: muted copy. Invoices empty state includes the `+ New Invoice` button (no payments to record when there are no invoices, so `+ Record Payment` is hidden in the empty state). Use `getName('invoice', true)` per glossary patterns.
 
 | Tab | Columns | Row click | Row `⋯` |
 |---|---|---|---|
-| Invoices | `Invoice # · Date · Due · Status · Total · Paid · Balance` | Inline-expand line items (read-only) + notes | Send · Mark paid · Void · Print |
-| Payments | `Payment # · Date · Method · Amount · Invoice # · Reference` | No expansion (flat record) | Void (with confirm) |
-| Quotes (7b) | `Quote # · Date · Expires · Status · Total` | Inline-expand line items (read-only) | Send · Mark accepted · Mark declined |
+| Invoices | `Invoice # · Date · Due · Status · Total · Paid · Balance` | Inline-expand: line items (read-only) + **payments list** + notes | Mark paid · Void |
+| Quotes (7b) | `Quote # · Date · Expires · Status · Total` | Inline-expand line items (read-only) | Mark accepted · Mark declined |
 | POs | — | — | — |
+
+**Send and Print row actions are deferred** — Send needs an email endpoint, Print is §7's open PDF render question. Better to ship them when the endpoints land than to render disabled-with-tooltip lies (see [[no-workaround-recipes]]).
 
 **Status pill colors:**
 
 - Invoices: `zinc` DRAFT · `sky` SENT · `lime` PAID · `amber` OVERDUE · `zinc` CANCELLED/VOID
 - Quotes: `zinc` DRAFT · `sky` SENT · `lime` ACCEPTED · `rose` DECLINED · `amber` EXPIRED
-- Payments: no status pill in v1 (voided rows render with muted styling)
+- Payments (within invoice expansion): no status pill; voided payments render with muted styling.
 
-**Invoice # chip in Payments tab**: click switches active tab to Invoices and expands the matching row.
+**Invoice row expansion structure** (§3.4 + payments fold):
+
+```
+[v] INV-001 · May 10 · Jun 9 · SENT · $1,500 · $500 · $1,000  [⋯]
+    │ LINE ITEMS
+    │   Diagnostic                 1    $1,500    $1,500
+    │ PAYMENTS
+    │   PMT-A · May 12 · Check · $250 · ref:1234  [⋯ Void]
+    │   PMT-B · May 15 · ACH   · $250 · ref:trx-x [⋯ Void]
+    │   [+ Payment]
+    │ NOTES
+    │   Customer requested invoice via email.
+```
+
+The expansion is a single inline area with three labeled subsections: Line items → Payments → Notes. Order matters — line items establish what was billed, payments show what was received, notes are contextual at the bottom. The `+ Payment` button inside the Payments subsection opens the same dialog as the tab-level `+ Record Payment` but pre-filled with this invoice — no picker needed. Voided payment rows render muted, `⋯ Void` becomes inert.
 
 **Stub tabs (Quotes in 7a, POs in 7a/7b)**: empty state, no `+ New` button, copy "Coming soon." Reserves the architecture without misleading the user.
 
-### 3.4 Row expansion (read-only line items)
+### 3.4 Row expansion
 
-When a CSR expands an invoice or quote row, render the current line items as a small read-only sub-table inside the row. Today's placeholder line-item shape (description · qty · unit price · total) is fine for read; we are explicitly **not** investing in inline editing, fancy formatting, or part-picker hooks here. When inventory lands the line-item renderer gets rebuilt as part of §8.
+**Invoice row expansion** is a three-subsection area (see §3.3 sketch):
+1. **Line items** (read-only). Today's placeholder shape (description · qty · unit price · total) is fine for read; we are explicitly **not** investing in inline editing, fancy formatting, or part-picker hooks here. When inventory lands the line-item renderer gets rebuilt as part of §8.
+2. **Payments** (read + per-row Void via `⋯`, plus `+ Payment` button). Payments are inherently child-of-invoice (single FK), so they belong here rather than in a sibling tab. This eliminates the Payments tab and the cross-tab `Invoice #` chip click that the earlier design needed to re-associate payments with their invoice.
+3. **Notes** (read-only, when present).
+
+**Quote row expansion** stays line-items-only (quotes don't have payments).
 
 ### 3.5 Closing the drawer
 
@@ -168,12 +192,22 @@ Same shape, two differences from the invoice dialog: `Due Date` → `Expiration 
 
 ### 4.4 Payment dialog (7a)
 
-Recording a payment doesn't create a new financial document — it's a transaction against an existing invoice. Simplest of the three dialogs.
+Recording a payment doesn't create a new financial document — it's a transaction against an existing invoice.
+
+**Two entry points, one dialog:**
+
+| Entry | Picker visible? | Invoice preselected |
+|---|---|---|
+| Invoices tab header → `+ Record Payment` | yes | top-of-list, or single open invoice if exactly one |
+| Invoice row expansion → `+ Payment` | hidden (locked to this invoice) | this row |
+
+The tab-header entry covers the customer-on-the-phone scenario ("I'm paying $500 on the Henderson job" — no invoice number ready). The row-level entry covers the looking-at-an-invoice scenario (CSR is reviewing the row, knows which to apply against). Same dialog component; the picker hides itself when the parent already specified the invoice.
 
 ```
 Locked context strip: Work Order #1234 · Customer Name
 
 Invoice         [dropdown — this WO's invoices with balanceDue > 0, format "INV-001 · Bal $1,234"]
+                (hidden in the row-level entry path; replaced by a read-only "Invoice: INV-001" line)
 Payment Date    [date, default today]      Method       [select]
 Amount          [currency, auto-fill to selected invoice's balanceDue]
 Reference #     [text, optional — check number / transaction id]
@@ -186,14 +220,16 @@ Notes           [textarea, optional]
 
 **Behavior:**
 
-- Invoice picker preselects when exactly one open invoice exists. Disabled with helper "No outstanding invoices on this WO" when none — the `+ Record Payment` button in the tab header is also disabled in that state, with the same helper.
+- Invoice picker preselects when exactly one open invoice exists. Disabled with helper "No outstanding invoices on this WO" when none — the tab-header `+ Record Payment` button is also disabled in that state, with the same helper. (Row-level `+ Payment` is naturally unavailable when the parent row has `balanceDue == 0`.)
 - Amount auto-fills to the selected invoice's `balanceDue` (pay-in-full is the common case). CSR can override for partial payments. No validation enforcing `amount ≤ balanceDue` — allow overpayment, let accounting resolve.
 - Method options: `CASH · CHECK · CREDIT_CARD · DEBIT_CARD · ACH · WIRE_TRANSFER · OTHER`.
 - On submit: create payment. Backend reduces `amountPaid`/`balanceDue` on the selected invoice and auto-promotes status to `PAID` at zero balance (backend ask #5).
 
 ### 4.5 Payment void flow
 
-Payments tab `⋯ → Void` shows a confirmation dialog ("Void payment for $1,234 against INV-001? This cannot be undone."), then calls `POST /financial/payments/{id}/void` (backend ask #4). Backend reverses `amountPaid`/`balanceDue` on the invoice and demotes its status from PAID if applicable. UI invalidates `['financial-summary', woId]` and the invoice/payment list queries.
+Inside the invoice row expansion's Payments subsection, each payment row carries a `⋯ → Void` action. Click shows a confirmation dialog ("Void payment for $1,234 against INV-001? This cannot be undone."), then calls `POST /financial/payments/{id}/void` (backend ask #4). Backend reverses `amountPaid`/`balanceDue` on the invoice and demotes its status from PAID if applicable. UI invalidates `['financialSummary', woId]` and `['workOrderInvoices', woId]` (which carries nested payments per ask #2 / #3 fold).
+
+Voided payments stay visible in the audit list under their invoice, rendered muted with their `⋯` menu inert.
 
 ---
 
@@ -213,7 +249,8 @@ NTE $12K  │  $9.8K quoted · $3.2K invoiced · $0 paid · Bal $3.2K     (7b, f
 (Layout states after the drawer-shell branch lands. The current chip-row branch ships the "full" states only — the typed-ghost states require the drawer as their click target. See §5.3 implementation phasing.)
 
 - **NTE on the left** with a leading separator from the right cluster. NTE is settable (contract cap) and represents a different role than derived totals — different visual weight.
-- **Right cluster on the right**, separated by middot. Each chip clickable → drawer at the matching tab. Live chips (derived totals) and ghost chips (typed entry points) share the same separator vocabulary — the visual rule is "everything to the right of the `│` is a financial document or its entry point."
+- **Right cluster on the right**, separated by middot. Clickable chips: `$ invoiced` → Invoices tab, `Bal` → Invoices tab, `$ quoted` (7b) → Quotes tab. Ghost chips (`[+ Invoice]`, `[+ Quote]`) → drawer + create dialog.
+- **`$ paid` is plain text, not a chip.** It still appears in the right cluster for the at-a-glance reconciled story but has no click target — payments live inside invoice row expansions (§3.3), so there's no dedicated tab to route to. Demoting to plain display preserves the number without pretending a useful nav path exists.
 - **Compact display**: `$9.8K`, `$1.2M`, `$847`. Full precision in `title` tooltip and inside the drawer. CSRs scan from the header; they don't audit from it.
 
 ### 5.2 Bal chip color signal
@@ -272,8 +309,8 @@ Block 7a until 1–4 land. "Backend-first when there's a gap" applies — no cli
 | # | Ask | Why |
 |---|---|---|
 | 1 | `GET /financial/work-orders/{id}/summary` → `{ invoiced: BigDecimal, paid: BigDecimal, balance: BigDecimal, currency: String }` (add `quoted` in 7b). **Lives on financial-service**, not work-order-service. Live aggregation — no caching, no denormalization onto `work_orders`. Returns 200 with zero totals when nothing matches (RLS makes "no activity" / "wrong tenant" / "doesn't exist" indistinguishable; trying to distinguish them is a leak anyway). Frontend pairs this with `GET /work-orders/{id}` as parallel React Query calls. See §11 for why caching was rejected. | Chip row is in the sticky header — must be cheap, must not drift from drawer-table sums. Live `SUM` over `invoices.work_order_id` + `payments.invoice_id` on existing indexes is sub-50ms on realistic data; caching only adds drift risk and cross-service write coupling without buying anything. |
-| 2 | `GET /work-orders/{id}/invoices` | Today only `getByCustomer` exists; client-side filtering loads more than needed. |
-| 3 | `GET /work-orders/{id}/payments` | Payment is invoice-scoped today; one WO-rollup endpoint beats client-side stitching. |
+| 2 | `GET /financial/work-orders/{id}/invoices` returns each invoice with a nested `payments: Payment[]` array (additive contract change — fold of the original ask #3). **Shipped without payments;** the payments-nested extension is the reissued part. Each payment row should include `paymentNumber, paymentDate, amount, paymentMethod, status (RECEIVED/VOID), referenceNumber, notes, createdAt`. Server-sorted within each invoice by `paymentDate DESC`. Voided payments included for audit visibility. | One round-trip per drawer load. The earlier draft had a sibling `/payments` endpoint with cross-invoice flat ordering; folding payments to live under their parent invoice (§3.3 row expansion) eliminates the cross-tab `Invoice #` chip click the old design needed. Sub-50ms on realistic data — N invoices × ~3-5 payments each is tiny. |
+| ~~3~~ | **Collapsed into ask #2.** Was: standalone `GET /work-orders/{id}/payments`. After §3.3 fold, payments are child rows nested under their invoice — no separate endpoint needed. Kept here as a marker for why the contract changed. | — |
 | 4 | `POST /financial/payments/{id}/void` (or `PATCH /financial/payments/{id}/status` with `VOID`) | Payments are voided not deleted (audit). Backend reverses `amountPaid`/`balanceDue` on the invoice and demotes status from PAID if applicable. |
 | 5 | Auto-promote invoice → `PAID` at zero balance | Confirm backend already does this on payment creation, or add. Frontend should not infer status from amounts. |
 | 6 | Confirm `POST /financial/invoices` accepts a single-line-item body shaped `{ workOrderId, customerId, invoiceDate, dueDate, notes, lineItems: [{description, quantity: 1, unitPrice: amount}] }` and returns the created invoice with status DRAFT | Powers the minimal lump-sum invoice dialog (§4.2). Should require no new endpoint — just contract confirmation. If the existing endpoint enforces a stricter shape (e.g. requires a `partId` per line), file a small follow-up to relax it. |
@@ -393,10 +430,10 @@ Each step is a separate branch from `dev`. Steps within a slice are mostly seque
 2. **Backend ask #1 lands** (`GET /financial/work-orders/{id}/summary` on financial-service, live aggregation). **Shipped.**
 3. **Chip row goes live (derived chips)** — wire ask #1, render `$ invoiced · $ paid · Bal` cluster, §5.2 Bal color signal (zinc/amber; rose deferred until ask #2). Chips display but are non-clickable until step 4. **Shipped.**
 4. **Drawer shell + typed-ghost cluster** — `FinancialDrawer` component using `SlideOver` at 800px, four tabs (Invoices, Payments, Quotes, POs; last three stubbed until their backend asks land). Wire chip click → drawer at matching tab. Add typed-ghost cluster (`[+ Invoice]` in 7a) to the chip row when summary is zero (§5.3). `Esc` close-topmost formalized. Retire the legacy "hide row on truly fresh WO" predicate here — the typed ghosts always render and *are* the row's purpose on fresh WOs.
-5. **Backend asks #2–#6 land.** Block subsequent steps. (#6 is a contract confirmation, likely no work.)
-6. **Invoices tab read + status edits** — wire ask #2, dense table, inline read-only line-item expansion, status pill edits, `⋯` actions.
-7. **Minimal invoice create dialog (§4.2)** — `+ New Invoice` button in Invoices tab header, Save as Draft / Save & Send. The `[+ Invoice]` ghost chip (step 4) lands on this dialog.
-8. **Payments tab + Record Payment dialog + Void flow** — wire asks #3, #4.
+5. **Backend asks #2, #4, #6 land.** Block subsequent steps. (Ask #3 collapsed into ask #2's response per §6; #6 is a contract confirmation, likely no work.)
+6. **Invoices tab read + status edits** — wire ask #2 (without payments yet), dense table, inline read-only line-item expansion, status pill edits, `⋯` actions. **Shipped.**
+7. **Payments fold into invoice expansion (§3.3 / §3.4)** — wire ask #2's nested `payments: Payment[]`, render the Payments subsection inside each invoice row expansion, add the `+ Payment` button per row, wire `⋯ Void` per payment via ask #4. The `$ paid` chip demotes to plain text here (no Payments tab to route to). Removes the Payments tab from the drawer.
+8. **Minimal invoice create dialog (§4.2) + tab-level `+ Record Payment` CTA** — `+ New Invoice` button + dialog (Save as Draft / Save & Send), and the second payment entry point with the invoice picker. `[+ Invoice]` ghost (step 4) and `+ New Invoice` both land on the same dialog.
 9. **Bal rose-on-OVERDUE** — once ask #2's invoice list is wired, the chip row can detect any OVERDUE invoice and apply rose color per §5.2. Small follow-up.
 
 **7b (after inventory work begins or in parallel if backend bandwidth):**
@@ -426,6 +463,7 @@ Each step is a separate branch from `dev`. Steps within a slice are mostly seque
 - Recurring / scheduled invoicing
 - Customer-facing invoice render or payment portal
 - Refund flow
+- **Per-WO chronological payment scan** — "show me all payments on this WO in date order, ignoring which invoice they belong to" used to be one tab in the earlier design. After the §3.3 fold, payments group under their invoice; cross-invoice chronological scan becomes "expand each invoice and mentally merge." Genuinely rare per-WO (most have 1–2 invoices); for installment / progress-billed work it's noticeable. The right home for cross-invoice payment forensics is the **global Payments page**, not per-WO.
 
 ---
 
@@ -437,6 +475,7 @@ Each step is a separate branch from `dev`. Steps within a slice are mostly seque
 - **Lump-sum muscle memory.** Once CSRs are creating invoices/quotes via the minimal dialog, the inventory-aware version in §8.1 needs to feel like an *upgrade*, not a regression. Mitigation: keep the lump-sum amount field as a primary path in the post-inventory dialog (line items collapsed by default). If a CSR's WO doesn't have parts to itemize, the flow should still be a single-field entry.
 - **Backend ask #6 surprise.** If the existing `POST /financial/invoices` enforces a stricter line-item shape (e.g. requires `partId`), the minimal dialog needs the contract relaxed before it can ship. Verify in the design-handoff conversation with backend, not partway through frontend work.
 - **Dialog stacking depth.** Drawer → create dialog is fine (§3.5 carved out). Don't open sub-dialogs from edit dialogs — that's a smell.
+- **Invoice expansion height on installment WOs.** Per §3.3, an expanded invoice row carries line items + payments + notes inline. For multi-invoice WOs with several payments each, expanding everything at once gets tall. Mitigation: keep subsections visually distinct (sub-headers "Line items" / "Payments" / "Notes") and let the expansion be CSR-toggled per row rather than forcing all-open. Revisit if real WOs routinely exceed ~5 payments per invoice.
 
 ---
 
