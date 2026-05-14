@@ -78,6 +78,21 @@ export const invoicesApi = {
     return response.data;
   },
 
+  /**
+   * WO-scoped invoice list (Phase 7 backend ask #2). Server-sorted
+   * `invoiceDate DESC, createdAt DESC` — don't re-sort on the client. Returns
+   * `[]` when the WO has no invoices, doesn't exist, or belongs to a different
+   * tenant (RLS-indistinguishable, security default). Includes VOID and
+   * CANCELLED rows — the tab is the audit surface, the summary endpoint is
+   * what excludes them from totals.
+   */
+  getByWorkOrder: async (workOrderId: string): Promise<Invoice[]> => {
+    const response = await apiClient.get<Invoice[]>(
+      `/financial/work-orders/${workOrderId}/invoices`,
+    );
+    return response.data;
+  },
+
   create: async (request: CreateInvoiceRequest): Promise<Invoice> => {
     const response = await apiClient.post<Invoice>('/financial/invoices', request);
     return response.data;

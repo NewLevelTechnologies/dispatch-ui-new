@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import FinancialInvoicesTab from './FinancialInvoicesTab';
 import { Button } from './catalyst/button';
 import { SlideOver } from './catalyst/slideover';
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from './catalyst/tabs';
@@ -20,11 +21,12 @@ const TAB_ORDER: FinancialTab[] = ['quotes', 'purchaseOrders', 'invoices', 'paym
 interface Props {
   open: boolean;
   onClose: () => void;
+  workOrderId: string;
   workOrderNumber: string;
   /**
    * Tab to land on when the drawer opens. Chip-row click handlers set this
    * based on which chip was clicked (§3.2 routing). Defaults to `invoices` —
-   * the most-trafficked surface per §3.1 click-frequency order.
+   * the live billable surface in 7a.
    *
    * Implemented via `key` remounting (not controlled `selectedIndex`) so the
    * user can switch tabs inside the drawer without parent re-renders fighting
@@ -36,25 +38,22 @@ interface Props {
 
 /**
  * Right-edge slide-over (~800px) that hosts the WO's financial documents in
- * four tabs: Invoices · Payments · Quotes · POs. Click-frequency order per
- * §3.1 — not lifecycle order — because Invoices is the most-clicked surface.
+ * four tabs in WO-lifecycle order: Quotes · POs · Invoices · Payments.
  *
- * This branch ships the shell only. All four tabs render a "Coming soon"
- * stub. Tab content fills in as backend asks land:
- *   - Invoices read    → backend ask #2 (in flight)
- *   - Invoice create   → backend ask #6
- *   - Payments         → backend asks #3, #4
+ * Tab content fills in as backend asks land:
+ *   - Invoices read    → backend ask #2 (live)
+ *   - Invoice create   → backend ask #6 (still pending; tab header CTA later)
+ *   - Payments         → backend asks #3, #4 (pending)
  *   - Quotes           → 7b (backend asks #7–#10)
  *   - POs              → 7c (deferred)
  *
  * The `initialTab` prop lets the chip row land on the matching tab in one
- * click (e.g. `$ invoiced` → invoices, `$ paid` → payments). When the drawer
- * remains mounted across opens, we reset the selected tab on each transition
- * from closed → open so the next-click landing is honored.
+ * click (e.g. `$ invoiced` → invoices, `$ paid` → payments).
  */
 export default function FinancialDrawer({
   open,
   onClose,
+  workOrderId,
   workOrderNumber,
   initialTab = 'invoices',
 }: Props) {
@@ -100,10 +99,7 @@ export default function FinancialDrawer({
               />
             </TabPanel>
             <TabPanel>
-              <ComingSoon
-                tab="invoices"
-                blockers={t('workOrders.financialDrawer.stubBlockers.invoices')}
-              />
+              <FinancialInvoicesTab workOrderId={workOrderId} />
             </TabPanel>
             <TabPanel>
               <ComingSoon
