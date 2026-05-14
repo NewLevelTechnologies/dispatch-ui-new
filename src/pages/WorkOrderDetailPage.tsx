@@ -154,6 +154,22 @@ const currencyFormatter = new Intl.NumberFormat('en-US', {
   currency: 'USD',
 });
 
+// Compact money formatter for header chips: $847, $9.8K, $1.2M.
+// Full precision lives in the title tooltip and inside the financial drawer;
+// chips are for scanning, not auditing (Phase 7 design §5.1).
+function formatCompactCurrency(amount: number): string {
+  const abs = Math.abs(amount);
+  if (abs < 1000) return `$${Math.round(amount)}`;
+  if (abs < 1_000_000) {
+    const k = amount / 1000;
+    const rounded = Math.round(k * 10) / 10;
+    return `$${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)}K`;
+  }
+  const m = amount / 1_000_000;
+  const rounded = Math.round(m * 10) / 10;
+  return `$${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)}M`;
+}
+
 export default function WorkOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -660,10 +676,86 @@ export default function WorkOrderDetailPage() {
             })()}
           </div>
 
-          {/* Row 3 — money chips, hidden until phase 7 (financial detail
-              drawer + live values). A row of "$ —" placeholders communicates
-              nothing on a fresh WO and burns vertical real estate; better to
-              show nothing until there's something to show. */}
+          {/* Row 3 — money chips (Phase 7 §5).
+              Step 1 of 7a ships only the NTE chip (single-surface migration
+              per §5.4). Derived chips ($ invoiced · $ paid · Bal) join once
+              backend ask #1 (financial-summary endpoint) lands, at which
+              point §5.3's reveal logic ("hide row on truly fresh WO") takes
+              effect. Until then the NTE chip is the only entry point for
+              setting NTE on the WO page, so the row always renders.
+              NTE display:
+                - set   → "NTE $12K" chip, click to inline-edit
+                - unset → muted "[+ Set NTE]" ghost chip, click to inline-edit
+              Wiring is the same handleSaveWorkOrderField('notToExceed', ...)
+              previously used by the Order Info card row (now removed). */}
+          {(() => {
+            if (isCancelled || isArchived) {
+              // Read-only render: skip the row entirely when NTE is unset to
+              // avoid offering a control the user can't act on. When set,
+              // show the value (no edit affordance).
+              if (workOrder.notToExceed == null) return null;
+              return (
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-white/5 dark:text-zinc-300"
+                    title={currencyFormatter.format(workOrder.notToExceed)}
+                  >
+                    <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      {t('workOrders.form.notToExceed')}
+                    </span>
+                    <span className="font-medium tabular-nums">
+                      {formatCompactCurrency(workOrder.notToExceed)}
+                    </span>
+                  </span>
+                </div>
+              );
+            }
+            return (
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                <EditableField
+                  value={workOrder.notToExceed != null ? String(workOrder.notToExceed) : ''}
+                  onSave={async (raw) => {
+                    const trimmed = raw.trim().replace(/[$,\s]/g, '');
+                    if (trimmed === '') {
+                      await handleSaveWorkOrderField('notToExceed', null);
+                      return;
+                    }
+                    const num = Number(trimmed);
+                    if (!Number.isFinite(num) || num < 0) {
+                      alert(t('workOrders.form.notToExceedInvalid'));
+                      throw new Error('invalid NTE');
+                    }
+                    await handleSaveWorkOrderField('notToExceed', num);
+                  }}
+                  placeholder={t('workOrders.form.notToExceedPlaceholder')}
+                  ariaLabel={t('workOrders.form.notToExceed')}
+                  renderDisplay={(v) => {
+                    if (!v) {
+                      return (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-dashed border-zinc-300 px-1.5 py-0.5 text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
+                          + {t('workOrders.detail.setNte')}
+                        </span>
+                      );
+                    }
+                    const num = Number(v);
+                    return (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-white/5 dark:text-zinc-300"
+                        title={currencyFormatter.format(num)}
+                      >
+                        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                          {t('workOrders.form.notToExceed')}
+                        </span>
+                        <span className="font-medium tabular-nums">
+                          {formatCompactCurrency(num)}
+                        </span>
+                      </span>
+                    );
+                  }}
+                />
+              </div>
+            );
+          })()}
         </div>
 
         {/* Body grid (§5d — right rail removed; activity is in a drawer):
@@ -781,36 +873,9 @@ export default function WorkOrderDetailPage() {
                   />
                 </DescriptionDetails>
 
-                <DescriptionTerm>{t('workOrders.form.notToExceed')}</DescriptionTerm>
-                <DescriptionDetails>
-                  <EditableField
-                    value={workOrder.notToExceed != null ? String(workOrder.notToExceed) : ''}
-                    onSave={async (raw) => {
-                      const trimmed = raw.trim().replace(/[$,\s]/g, '');
-                      if (trimmed === '') {
-                        await handleSaveWorkOrderField('notToExceed', null);
-                        return;
-                      }
-                      const num = Number(trimmed);
-                      if (!Number.isFinite(num) || num < 0) {
-                        alert(t('workOrders.form.notToExceedInvalid'));
-                        // Throw so EditableField stays in edit mode for retry/cancel.
-                        throw new Error('invalid NTE');
-                      }
-                      await handleSaveWorkOrderField('notToExceed', num);
-                    }}
-                    disabled={isCancelled || isArchived}
-                    placeholder={t('workOrders.form.notToExceedPlaceholder')}
-                    ariaLabel={t('workOrders.form.notToExceed')}
-                    renderDisplay={(v) =>
-                      v ? (
-                        currencyFormatter.format(Number(v))
-                      ) : (
-                        <span className="text-zinc-400 italic dark:text-zinc-500">—</span>
-                      )
-                    }
-                  />
-                </DescriptionDetails>
+                {/* NTE moved to header chip row (Phase 7 §5.4 single-surface
+                    migration). Wiring preserved verbatim — same EditableField,
+                    same handleSaveWorkOrderField('notToExceed', ...) path. */}
 
                 <DescriptionTerm>{getName('division')}</DescriptionTerm>
                 <DescriptionDetails>
