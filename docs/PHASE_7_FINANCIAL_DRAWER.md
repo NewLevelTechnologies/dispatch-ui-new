@@ -45,7 +45,7 @@ This applies the "don't pre-implement future state" rule explicitly. The earlier
 ### 3.1 Shell
 
 - One `SlideOver`, `!max-w-[800px]` (mid-range of §3.5's 760–840). Single mount; content swaps on tab change. Reference implementations: `EquipmentQuickViewDrawer` (480px), `ActivityDrawer` (~448px). Financial is the widest by design because of tabular density.
-- **Tabs across the top: `Invoices · Payments · Quotes · POs`.** Click-frequency order, not lifecycle order. Invoices are the most-clicked surface; POs are the deferred stub and sit last.
+- **Tabs across the top: `Quotes · POs · Invoices · Payments`.** WO-lifecycle (chronological) order — Quote (estimate-before-work, sometimes) → PO (mid-job procurement, sometimes) → Invoice (bill after work, always) → Payment (customer pays, always, last). The earlier "click-frequency order" framing was a telemetry-free guess; chronological matches the CSR mental model of "where is this WO in its arc?" and reads consistently regardless of which stage a given WO is in. Default landing tab is still Invoices (the live billable surface) when no specific tab is requested.
 - **Tab badge counts**: `Invoices (3)`, `Payments (2)`. Stub tabs show no count.
 - **Drawer header**: `Financials · WO #1234` + close. Below the tabs, a one-line summary strip mirrors the chip-row numbers so totals stay visible while scanning a tab.
 - **Drawer-over-drawer / dialog-over-drawer** behavior is the established pattern (§3.5, EquipmentQuickViewDrawer in §5b). Drawer stays mounted under dialogs, visually dimmed. `Esc` closes topmost — formalized here as canonical across all surfaces.
