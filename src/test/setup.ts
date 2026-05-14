@@ -927,6 +927,7 @@ vi.mock('react-i18next', () => {
     'workOrders.detail.money.placeholder': '{{label}}: —',
     'workOrders.detail.money.quoted': 'Quoted',
     'workOrders.detail.print': 'Print',
+    'workOrders.detail.setNte': 'Set NTE',
     'workOrders.workItems.changeStatus': 'Change status (currently {{current}})',
     'workOrders.workItems.backToEntity': 'Back to {{entity}}',
     'workOrders.workItems.collapseRow': 'Hide details',

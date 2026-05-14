@@ -193,18 +193,100 @@ describe('WorkOrderDetailPage', () => {
     expect(screen.getByText(/Atlanta, GA 30306-3035/i)).toBeInTheDocument();
   });
 
-  it('hides the money chip row until phase 7 (financial detail drawer)', async () => {
+  it('hides derived money chips (quoted / invoiced / balance) until backend ask #1 lands', async () => {
     mockApiResponses();
     renderPage();
-    // Wait for the page to settle then assert no chip placeholders render —
-    // a row of "$ —" stubs communicates nothing on a fresh WO and is hidden
-    // until live values flow in phase 7.
+    // Phase 7 step 1 ships only the NTE chip. The derived rollup chips wait
+    // on the financial-summary endpoint and must not render placeholder text.
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /WO-/i })).toBeInTheDocument();
     });
     expect(screen.queryByText(/quoted/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/invoiced/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/balance/i)).not.toBeInTheDocument();
+  });
+
+  describe('NTE header chip (Phase 7 §5.4)', () => {
+    it('renders the NTE value compactly with the label when set', async () => {
+      mockApiResponses({ ...mockWorkOrder, notToExceed: 12000 });
+      renderPage();
+      await waitFor(() => {
+        expect(screen.getByText('$12K')).toBeInTheDocument();
+      });
+      // Compact value sits next to the "NTE" label in the chip.
+      expect(screen.getByText(/^NTE$/)).toBeInTheDocument();
+    });
+
+    it('renders a ghost "+ Set NTE" affordance when unset and active', async () => {
+      mockApiResponses(); // notToExceed undefined
+      renderPage();
+      await waitFor(() => {
+        // The ghost chip is a button (EditableField display mode).
+        expect(
+          screen.getByRole('button', { name: /not to exceed|nte/i })
+        ).toBeInTheDocument();
+      });
+      expect(screen.getByText(/\+ Set NTE/i)).toBeInTheDocument();
+    });
+
+    it('removes the NTE row from the Order Info card', async () => {
+      mockApiResponses({ ...mockWorkOrder, notToExceed: 1500 });
+      renderPage();
+      await waitFor(() => {
+        expect(screen.getByText('PO-12345')).toBeInTheDocument();
+      });
+      // Order Info card used to render an "NTE" DescriptionTerm row. After
+      // the §5.4 migration the field lives only in the header chip row, so
+      // there's exactly one "NTE" surface on the page (the chip), not two.
+      const nteOccurrences = screen.getAllByText(/^NTE$/);
+      expect(nteOccurrences).toHaveLength(1);
+    });
+
+    it('renders read-only NTE (no edit affordance) on a cancelled WO', async () => {
+      mockApiResponses({
+        ...mockWorkOrder,
+        notToExceed: 5000,
+        lifecycleState: 'CANCELLED',
+        cancellationReason: 'customer canceled',
+        cancelledAt: '2026-05-01T00:00:00Z',
+      });
+      renderPage();
+      await waitFor(() => {
+        expect(screen.getByText('$5K')).toBeInTheDocument();
+      });
+      // No button (would be the EditableField edit affordance) for the NTE
+      // value — cancelled WOs are frozen.
+      expect(
+        screen.queryByRole('button', { name: /not to exceed|nte/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it('saves a new NTE value via the inline-edit chip', async () => {
+      const user = userEvent.setup();
+      mockApiResponses();
+      vi.mocked(apiClient.patch).mockResolvedValue({
+        data: { ...mockWorkOrder, notToExceed: 750 },
+      });
+      renderPage();
+
+      const ghost = await screen.findByRole('button', {
+        name: /not to exceed|nte/i,
+      });
+      await user.click(ghost);
+
+      const input = await screen.findByRole('textbox', {
+        name: /not to exceed|nte/i,
+      });
+      await user.type(input, '750');
+      await user.keyboard('{Enter}');
+
+      await waitFor(() => {
+        expect(apiClient.patch).toHaveBeenCalledWith(
+          expect.stringMatching(/\/work-orders\/wo-1$/),
+          expect.objectContaining({ notToExceed: 750 })
+        );
+      });
+    });
   });
 
   it('renders the Service Location card with location name and address linked', async () => {

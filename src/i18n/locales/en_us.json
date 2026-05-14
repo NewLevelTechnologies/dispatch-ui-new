@@ -1186,7 +1186,8 @@
         "placeholder": "{{label}}: —",
         "quoted": "Quoted"
       },
-      "print": "Print"
+      "print": "Print",
+      "setNte": "Set NTE"
     },
     "dispatches": {
       "assign": "Assign",
