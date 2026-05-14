@@ -248,18 +248,34 @@ describe('WorkOrderDetailPage', () => {
       expect(screen.getByText(/\+ Set NTE/i)).toBeInTheDocument();
     });
 
-    it('hides the row entirely when NTE is unset and summary is all-zero (§5.3)', async () => {
-      mockApiResponses(); // unset NTE, zero summary
+    it('renders both bootstrap ghosts on a fresh active WO (§5.3 Option B)', async () => {
+      mockApiResponses(); // active WO, unset NTE, zero summary
+      renderPage();
+      // Post-drawer-shell the chip row is always rendered for active WOs —
+      // typed ghost cluster provides the bootstrap entry to the drawer
+      // even when there's no activity yet. Both the NTE ghost and the
+      // [+ Invoice] typed ghost are present.
+      await waitFor(() => {
+        expect(screen.getByText(/\+ Set NTE/i)).toBeInTheDocument();
+      });
+      expect(screen.getByText(/\+ Invoice/i)).toBeInTheDocument();
+    });
+
+    it('still hides the row on a frozen WO with no NTE and zero summary', async () => {
+      mockApiResponses({
+        ...mockWorkOrder,
+        lifecycleState: 'CANCELLED',
+        cancellationReason: 'no longer needed',
+        cancelledAt: '2026-05-01T00:00:00Z',
+      });
       renderPage();
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: /WO-/i })).toBeInTheDocument();
       });
-      // No NTE affordance — neither value nor ghost — when there is nothing
-      // to anchor the row.
-      expect(
-        screen.queryByRole('button', { name: /not to exceed|nte/i })
-      ).not.toBeInTheDocument();
+      // Cancelled/archived WOs without NTE or activity have nothing to
+      // show — no ghosts because the WO can't be invoiced anyway.
       expect(screen.queryByText(/\+ Set NTE/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/\+ Invoice/i)).not.toBeInTheDocument();
     });
 
     it('removes the NTE row from the Order Info card', async () => {
@@ -375,6 +391,64 @@ describe('WorkOrderDetailPage', () => {
         expect(screen.getByText('invoiced')).toBeInTheDocument();
       });
       expect(screen.getByText(/\+ Set NTE/i)).toBeInTheDocument();
+    });
+
+    it('does not render the typed [+ Invoice] ghost when activity exists', async () => {
+      mockApiResponses(mockWorkOrder, {
+        invoiced: '500.00',
+        paid: '0.00',
+        balance: '500.00',
+        currency: 'USD',
+      });
+      renderPage();
+      await waitFor(() => {
+        expect(screen.getByText('invoiced')).toBeInTheDocument();
+      });
+      // Typed ghost is bootstrap-only — once derived chips appear, the
+      // ghost retires (in-drawer +New buttons take over for create flows).
+      expect(screen.queryByText(/\+ Invoice/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Chip → financial drawer routing (Phase 7 §3.2)', () => {
+    const summaryWithActivity = {
+      invoiced: '3245.00',
+      paid: '1000.00',
+      balance: '2245.00',
+      currency: 'USD',
+    };
+
+    it('opens the drawer on the Invoices tab when $ invoiced is clicked', async () => {
+      const user = userEvent.setup();
+      mockApiResponses(mockWorkOrder, summaryWithActivity);
+      renderPage();
+      const invoicedChip = await screen.findByRole('button', { name: /invoices/i });
+      await user.click(invoicedChip);
+      // Drawer title surfaces the WO number; Invoices tab is selected.
+      expect(await screen.findByText(/Financials · WO/i)).toBeInTheDocument();
+      const invoicesTab = screen.getByRole('tab', { name: 'Invoices' });
+      expect(invoicesTab).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('opens the drawer on the Payments tab when $ paid is clicked', async () => {
+      const user = userEvent.setup();
+      mockApiResponses(mockWorkOrder, summaryWithActivity);
+      renderPage();
+      const paidChip = await screen.findByRole('button', { name: /payments/i });
+      await user.click(paidChip);
+      const paymentsTab = await screen.findByRole('tab', { name: 'Payments' });
+      expect(paymentsTab).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('opens the drawer on the Invoices tab when the [+ Invoice] ghost is clicked', async () => {
+      const user = userEvent.setup();
+      mockApiResponses(); // fresh active WO — typed ghost is the entry point
+      renderPage();
+      const ghost = await screen.findByText(/\+ Invoice/i);
+      await user.click(ghost);
+      expect(await screen.findByText(/Financials · WO/i)).toBeInTheDocument();
+      const invoicesTab = screen.getByRole('tab', { name: 'Invoices' });
+      expect(invoicesTab).toHaveAttribute('aria-selected', 'true');
     });
   });
 

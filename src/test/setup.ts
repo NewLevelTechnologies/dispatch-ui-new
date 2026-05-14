@@ -929,6 +929,21 @@ vi.mock('react-i18next', () => {
     'workOrders.detail.money.quoted': 'quoted',
     'workOrders.detail.print': 'Print',
     'workOrders.detail.setNte': 'Set NTE',
+    'workOrders.financialDrawer.comingSoon': 'Coming soon',
+    'workOrders.financialDrawer.ghosts.invoice': 'Invoice',
+    'workOrders.financialDrawer.stubBlockers.invoices':
+      'Waiting on backend ask #2 (WO-scoped invoice list) and #6 (lump-sum create contract).',
+    'workOrders.financialDrawer.stubBlockers.payments':
+      'Waiting on backend asks #3 (WO-scoped payment list) and #4 (payment void endpoint).',
+    'workOrders.financialDrawer.stubBlockers.purchaseOrders':
+      'Deferred to phase 7c — no backend entity yet.',
+    'workOrders.financialDrawer.stubBlockers.quotes':
+      'Quotes ship in phase 7b — waiting on backend asks #7–#10.',
+    'workOrders.financialDrawer.tabs.invoices': 'Invoices',
+    'workOrders.financialDrawer.tabs.payments': 'Payments',
+    'workOrders.financialDrawer.tabs.purchaseOrders': 'POs',
+    'workOrders.financialDrawer.tabs.quotes': 'Quotes',
+    'workOrders.financialDrawer.title': 'Financials · WO #{{number}}',
     'workOrders.workItems.changeStatus': 'Change status (currently {{current}})',
     'workOrders.workItems.backToEntity': 'Back to {{entity}}',
     'workOrders.workItems.collapseRow': 'Hide details',
