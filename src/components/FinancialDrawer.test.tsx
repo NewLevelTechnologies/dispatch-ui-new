@@ -16,17 +16,17 @@ describe('FinancialDrawer', () => {
     expect(screen.getByText('Financials · WO #WO-00010')).toBeInTheDocument();
   });
 
-  it('renders all four tab labels in click-frequency order', () => {
+  it('renders all four tab labels in WO-lifecycle (chronological) order', () => {
     renderWithProviders(<FinancialDrawer {...defaults} />);
     const tabs = screen.getAllByRole('tab');
     expect(tabs).toHaveLength(4);
-    expect(tabs[0]).toHaveTextContent('Invoices');
-    expect(tabs[1]).toHaveTextContent('Payments');
-    expect(tabs[2]).toHaveTextContent('Quotes');
-    expect(tabs[3]).toHaveTextContent('POs');
+    expect(tabs[0]).toHaveTextContent('Quotes');
+    expect(tabs[1]).toHaveTextContent('POs');
+    expect(tabs[2]).toHaveTextContent('Invoices');
+    expect(tabs[3]).toHaveTextContent('Payments');
   });
 
-  it('selects the Invoices tab by default', () => {
+  it('selects the Invoices tab by default (live billable surface in 7a)', () => {
     renderWithProviders(<FinancialDrawer {...defaults} />);
     const invoicesTab = screen.getByRole('tab', { name: 'Invoices' });
     expect(invoicesTab).toHaveAttribute('aria-selected', 'true');

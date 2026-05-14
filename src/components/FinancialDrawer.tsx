@@ -5,9 +5,17 @@ import { SlideOver } from './catalyst/slideover';
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from './catalyst/tabs';
 import { Text } from './catalyst/text';
 
-export type FinancialTab = 'invoices' | 'payments' | 'quotes' | 'purchaseOrders';
+export type FinancialTab = 'quotes' | 'purchaseOrders' | 'invoices' | 'payments';
 
-const TAB_ORDER: FinancialTab[] = ['invoices', 'payments', 'quotes', 'purchaseOrders'];
+// Chronological order matching WO lifecycle (§3.1):
+//   1. Quote     — estimate-before-work (sometimes)
+//   2. PO        — mid-job procurement (sometimes)
+//   3. Invoice   — bill after work (always)
+//   4. Payment   — customer pays (always, last)
+// CSRs scan in lifecycle progression. Earlier "click-frequency order"
+// reasoning was a guess without telemetry; chronological matches the
+// mental model of "where is this WO in its arc."
+const TAB_ORDER: FinancialTab[] = ['quotes', 'purchaseOrders', 'invoices', 'payments'];
 
 interface Props {
   open: boolean;
@@ -72,25 +80,13 @@ export default function FinancialDrawer({
           className="flex flex-1 flex-col overflow-hidden"
         >
           <TabList className="!gap-4 px-4">
-            <Tab>{t('workOrders.financialDrawer.tabs.invoices')}</Tab>
-            <Tab>{t('workOrders.financialDrawer.tabs.payments')}</Tab>
             <Tab>{t('workOrders.financialDrawer.tabs.quotes')}</Tab>
             <Tab>{t('workOrders.financialDrawer.tabs.purchaseOrders')}</Tab>
+            <Tab>{t('workOrders.financialDrawer.tabs.invoices')}</Tab>
+            <Tab>{t('workOrders.financialDrawer.tabs.payments')}</Tab>
           </TabList>
 
           <TabPanels className="!mt-0 flex-1 overflow-y-auto p-4">
-            <TabPanel>
-              <ComingSoon
-                tab="invoices"
-                blockers={t('workOrders.financialDrawer.stubBlockers.invoices')}
-              />
-            </TabPanel>
-            <TabPanel>
-              <ComingSoon
-                tab="payments"
-                blockers={t('workOrders.financialDrawer.stubBlockers.payments')}
-              />
-            </TabPanel>
             <TabPanel>
               <ComingSoon
                 tab="quotes"
@@ -101,6 +97,18 @@ export default function FinancialDrawer({
               <ComingSoon
                 tab="purchaseOrders"
                 blockers={t('workOrders.financialDrawer.stubBlockers.purchaseOrders')}
+              />
+            </TabPanel>
+            <TabPanel>
+              <ComingSoon
+                tab="invoices"
+                blockers={t('workOrders.financialDrawer.stubBlockers.invoices')}
+              />
+            </TabPanel>
+            <TabPanel>
+              <ComingSoon
+                tab="payments"
+                blockers={t('workOrders.financialDrawer.stubBlockers.payments')}
               />
             </TabPanel>
           </TabPanels>
