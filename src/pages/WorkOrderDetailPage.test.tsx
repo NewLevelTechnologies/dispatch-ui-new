@@ -52,8 +52,21 @@ describe('WorkOrderDetailPage', () => {
     vi.clearAllMocks();
   });
 
-  const mockApiResponses = (workOrder: WorkOrder | null = mockWorkOrder) => {
+  const ZERO_SUMMARY = {
+    invoiced: '0.00',
+    paid: '0.00',
+    balance: '0.00',
+    currency: 'USD',
+  };
+
+  const mockApiResponses = (
+    workOrder: WorkOrder | null = mockWorkOrder,
+    summary: typeof ZERO_SUMMARY = ZERO_SUMMARY,
+  ) => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url.match(/\/financial\/work-orders\/[^/]+\/summary$/)) {
+        return Promise.resolve({ data: summary });
+      }
       if (url.includes('/work-orders/config/types')) {
         return Promise.resolve({
           data: [{ id: 'type-1', name: 'HVAC Service', code: 'HVAC', isActive: true, sortOrder: 0 }],
@@ -193,17 +206,17 @@ describe('WorkOrderDetailPage', () => {
     expect(screen.getByText(/Atlanta, GA 30306-3035/i)).toBeInTheDocument();
   });
 
-  it('hides derived money chips (quoted / invoiced / balance) until backend ask #1 lands', async () => {
+  it('hides derived money chips when the financial summary is all-zero', async () => {
     mockApiResponses();
     renderPage();
-    // Phase 7 step 1 ships only the NTE chip. The derived rollup chips wait
-    // on the financial-summary endpoint and must not render placeholder text.
+    // §5.3 reveal logic — when summary has no activity, derived chips don't
+    // render. A row of zero-value chips communicates nothing.
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /WO-/i })).toBeInTheDocument();
     });
-    expect(screen.queryByText(/quoted/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/invoiced/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/balance/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^quoted$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^invoiced$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Bal$/)).not.toBeInTheDocument();
   });
 
   describe('NTE header chip (Phase 7 §5.4)', () => {
@@ -217,16 +230,36 @@ describe('WorkOrderDetailPage', () => {
       expect(screen.getByText(/^NTE$/)).toBeInTheDocument();
     });
 
-    it('renders a ghost "+ Set NTE" affordance when unset and active', async () => {
-      mockApiResponses(); // notToExceed undefined
+    it('renders a ghost "+ Set NTE" affordance when unset and the row is revealed by derived activity', async () => {
+      // NTE is unset but the WO has invoiced activity, so §5.3 reveals the
+      // row and the NTE slot renders the ghost entry point.
+      mockApiResponses(mockWorkOrder, {
+        invoiced: '500.00',
+        paid: '0.00',
+        balance: '500.00',
+        currency: 'USD',
+      });
       renderPage();
       await waitFor(() => {
-        // The ghost chip is a button (EditableField display mode).
         expect(
           screen.getByRole('button', { name: /not to exceed|nte/i })
         ).toBeInTheDocument();
       });
       expect(screen.getByText(/\+ Set NTE/i)).toBeInTheDocument();
+    });
+
+    it('hides the row entirely when NTE is unset and summary is all-zero (§5.3)', async () => {
+      mockApiResponses(); // unset NTE, zero summary
+      renderPage();
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /WO-/i })).toBeInTheDocument();
+      });
+      // No NTE affordance — neither value nor ghost — when there is nothing
+      // to anchor the row.
+      expect(
+        screen.queryByRole('button', { name: /not to exceed|nte/i })
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/\+ Set NTE/i)).not.toBeInTheDocument();
     });
 
     it('removes the NTE row from the Order Info card', async () => {
@@ -263,20 +296,23 @@ describe('WorkOrderDetailPage', () => {
 
     it('saves a new NTE value via the inline-edit chip', async () => {
       const user = userEvent.setup();
-      mockApiResponses();
+      // Use a WO that already has NTE set, so the chip is rendered and
+      // editable without depending on derived activity to reveal the row.
+      mockApiResponses({ ...mockWorkOrder, notToExceed: 100 });
       vi.mocked(apiClient.patch).mockResolvedValue({
         data: { ...mockWorkOrder, notToExceed: 750 },
       });
       renderPage();
 
-      const ghost = await screen.findByRole('button', {
+      const chip = await screen.findByRole('button', {
         name: /not to exceed|nte/i,
       });
-      await user.click(ghost);
+      await user.click(chip);
 
       const input = await screen.findByRole('textbox', {
         name: /not to exceed|nte/i,
       });
+      await user.clear(input);
       await user.type(input, '750');
       await user.keyboard('{Enter}');
 
@@ -286,6 +322,59 @@ describe('WorkOrderDetailPage', () => {
           expect.objectContaining({ notToExceed: 750 })
         );
       });
+    });
+  });
+
+  describe('Derived financial chips (Phase 7 §5.1–5.3)', () => {
+    it('renders invoiced · paid · Bal chips when the summary has activity', async () => {
+      mockApiResponses(mockWorkOrder, {
+        invoiced: '3245.00',
+        paid: '1000.00',
+        balance: '2245.00',
+        currency: 'USD',
+      });
+      renderPage();
+      await waitFor(() => {
+        expect(screen.getByText('invoiced')).toBeInTheDocument();
+      });
+      expect(screen.getByText('paid')).toBeInTheDocument();
+      expect(screen.getByText('Bal')).toBeInTheDocument();
+      // Compact values per §5.1 formatter.
+      expect(screen.getByText('$3.2K')).toBeInTheDocument();
+      expect(screen.getByText('$1K')).toBeInTheDocument();
+      expect(screen.getByText('$2.2K')).toBeInTheDocument();
+    });
+
+    it('renders $0 paid alongside invoiced when paid is zero (cluster reveals together per §5.3)', async () => {
+      mockApiResponses(mockWorkOrder, {
+        invoiced: '500.00',
+        paid: '0.00',
+        balance: '500.00',
+        currency: 'USD',
+      });
+      renderPage();
+      await waitFor(() => {
+        expect(screen.getByText('invoiced')).toBeInTheDocument();
+      });
+      // Zero-paid chip still renders — the whole cluster appears once any
+      // member has activity, so partial states aren't hidden.
+      expect(screen.getByText('paid')).toBeInTheDocument();
+      expect(screen.getByText('$0')).toBeInTheDocument();
+    });
+
+    it('reveals the row when summary has activity even when NTE is unset', async () => {
+      mockApiResponses(mockWorkOrder, {
+        invoiced: '500.00',
+        paid: '0.00',
+        balance: '500.00',
+        currency: 'USD',
+      });
+      renderPage();
+      // Derived chips are present AND the ghost NTE entry point appears.
+      await waitFor(() => {
+        expect(screen.getByText('invoiced')).toBeInTheDocument();
+      });
+      expect(screen.getByText(/\+ Set NTE/i)).toBeInTheDocument();
     });
   });
 

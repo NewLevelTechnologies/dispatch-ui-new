@@ -157,6 +157,7 @@ export {
   invoicesApi,
   quotesApi,
   paymentsApi,
+  financialSummaryApi,
   InvoiceStatus,
   QuoteStatus,
   PaymentMethod,
@@ -172,6 +173,7 @@ export {
   type UpdateQuoteStatusRequest,
   type Payment,
   type CreatePaymentRequest,
+  type WorkOrderFinancialSummary,
 } from './financialApi';
 
 // Scheduling APIs

@@ -231,11 +231,42 @@ export const paymentsApi = {
   },
 };
 
+// ========== WORK-ORDER FINANCIAL SUMMARY ==========
+
+/**
+ * Rollup of invoiced / paid / balance for a single WO. Computed live on
+ * financial-service (no caching, no denormalization onto work_orders). The
+ * three amounts are BigDecimal serialized as strings to preserve precision —
+ * keep them as strings for any arithmetic; only `parseFloat` for display.
+ *
+ * The endpoint returns 200 with all-zero totals when:
+ *   - the WO exists but has no invoices
+ *   - the WO id doesn't exist anywhere
+ *   - the WO id belongs to a different tenant (RLS isolation)
+ * These three are intentionally indistinguishable (security default).
+ */
+export interface WorkOrderFinancialSummary {
+  invoiced: string;
+  paid: string;
+  balance: string;
+  currency: string;
+}
+
+export const financialSummaryApi = {
+  getByWorkOrder: async (workOrderId: string): Promise<WorkOrderFinancialSummary> => {
+    const response = await apiClient.get<WorkOrderFinancialSummary>(
+      `/financial/work-orders/${workOrderId}/summary`,
+    );
+    return response.data;
+  },
+};
+
 // Export combined API
 export const financialApi = {
   invoices: invoicesApi,
   quotes: quotesApi,
   payments: paymentsApi,
+  summary: financialSummaryApi,
 };
 
 export default financialApi;

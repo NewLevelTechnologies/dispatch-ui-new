@@ -39,6 +39,13 @@ interface BaseProps {
   /** Class applied to the *display* (read mode) span. */
   className?: string;
   /**
+   * Class applied to the edit-mode Input / Textarea / Select. Useful when the
+   * surrounding layout wants the editor at a constrained width (e.g. a chip
+   * row where a full-width input would dominate the header). Catalyst inputs
+   * default to `block w-full`; pass `w-28` etc. to override.
+   */
+  inputClassName?: string;
+  /**
    * Optional custom renderer for the display (read) state. Use when you want a
    * Badge or other styled element shown when not editing — e.g. priority
    * renders as a colored Badge in display mode but an <option> dropdown in edit
@@ -64,7 +71,7 @@ interface SelectProps extends BaseProps {
 type Props = TextProps | TextareaProps | SelectProps;
 
 export default function EditableField(props: Props) {
-  const { value, onSave, disabled = false, placeholder, emptyDisplay = '—', ariaLabel, className } = props;
+  const { value, onSave, disabled = false, placeholder, emptyDisplay = '—', ariaLabel, className, inputClassName } = props;
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [isSaving, setIsSaving] = useState(false);
@@ -173,6 +180,7 @@ export default function EditableField(props: Props) {
         placeholder={placeholder}
         disabled={isSaving}
         aria-label={ariaLabel}
+        className={inputClassName}
       />
     );
   }
@@ -202,6 +210,7 @@ export default function EditableField(props: Props) {
         }}
         disabled={isSaving}
         aria-label={ariaLabel}
+        className={inputClassName}
       >
         {props.options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -223,6 +232,7 @@ export default function EditableField(props: Props) {
       placeholder={placeholder}
       disabled={isSaving}
       aria-label={ariaLabel}
+      className={inputClassName}
     />
   );
 }
