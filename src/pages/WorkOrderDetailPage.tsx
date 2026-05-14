@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
   dispatchesApi,
   equipmentApi,
+  financialSummaryApi,
   workOrderApi,
   workOrderTypesApi,
   divisionsApi,
@@ -16,6 +17,7 @@ import {
   type ProgressCategory,
   type UpdateWorkOrderRequest,
   type WorkItemResponse,
+  type WorkOrderFinancialSummary,
   type WorkOrderPriority,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -411,6 +413,16 @@ export default function WorkOrderDetailPage() {
     enabled: !!id,
   });
 
+  // Phase 7 §6 ask #1 — live financial rollup from financial-service.
+  // Fires in parallel with the WO query (per backend handoff). Endpoint
+  // always returns 200 with zero totals when the WO has no activity OR
+  // doesn't exist (RLS) — treat zeros as "nothing to show," not as error.
+  const { data: financialSummary } = useQuery<WorkOrderFinancialSummary>({
+    queryKey: ['financialSummary', id],
+    queryFn: () => financialSummaryApi.getByWorkOrder(id!),
+    enabled: !!id,
+  });
+
   const { data: workOrderTypes } = useQuery({
     queryKey: ['work-order-types'],
     queryFn: () => workOrderTypesApi.getAll(),
@@ -677,82 +689,167 @@ export default function WorkOrderDetailPage() {
           </div>
 
           {/* Row 3 — money chips (Phase 7 §5).
-              Step 1 of 7a ships only the NTE chip (single-surface migration
-              per §5.4). Derived chips ($ invoiced · $ paid · Bal) join once
-              backend ask #1 (financial-summary endpoint) lands, at which
-              point §5.3's reveal logic ("hide row on truly fresh WO") takes
-              effect. Until then the NTE chip is the only entry point for
-              setting NTE on the WO page, so the row always renders.
-              NTE display:
-                - set   → "NTE $12K" chip, click to inline-edit
-                - unset → muted "[+ Set NTE]" ghost chip, click to inline-edit
-              Wiring is the same handleSaveWorkOrderField('notToExceed', ...)
-              previously used by the Order Info card row (now removed). */}
+              §5.3 reveal logic: row renders when NTE is set OR the financial
+              summary has any non-zero value. Truly fresh WOs (no NTE, no
+              activity) hide the row entirely — a row of zeros communicates
+              nothing.
+              Within the row:
+                NTE slot      → "NTE $12K" when set; muted "[+ Set NTE]"
+                                ghost when unset and the row is rendered for
+                                another reason (i.e., derived activity).
+                                Cancelled/archived: read-only when set;
+                                omitted when unset.
+                Derived chips → "$X invoiced · $Y paid · Bal $Z". Render as
+                                a cluster (§5.3 "once any has activity, the
+                                whole cluster renders") so $0 paid still
+                                shows alongside invoiced/balance.
+              §5.2 Bal color:
+                zinc          → balance 0, or partial-pay with nothing late
+                amber         → invoiced > 0 and paid = 0
+                rose          → any invoice OVERDUE (deferred — needs ask
+                                #2's WO-scoped invoice list to detect)
+              BigDecimal handling: amounts arrive as strings (see
+              WorkOrderFinancialSummary). parseFloat is fine for display
+              decisions (formatter and >0 checks); never use parseFloat
+              output for write-side arithmetic. */}
           {(() => {
-            if (isCancelled || isArchived) {
-              // Read-only render: skip the row entirely when NTE is unset to
-              // avoid offering a control the user can't act on. When set,
-              // show the value (no edit affordance).
-              if (workOrder.notToExceed == null) return null;
-              return (
-                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                  <span
-                    className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-white/5 dark:text-zinc-300"
-                    title={currencyFormatter.format(workOrder.notToExceed)}
-                  >
-                    <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                      {t('workOrders.form.notToExceed')}
-                    </span>
-                    <span className="font-medium tabular-nums">
-                      {formatCompactCurrency(workOrder.notToExceed)}
-                    </span>
-                  </span>
-                </div>
-              );
-            }
+            const hasNte = workOrder.notToExceed != null;
+            const invoicedAmt = financialSummary
+              ? parseFloat(financialSummary.invoiced) || 0
+              : 0;
+            const paidAmt = financialSummary
+              ? parseFloat(financialSummary.paid) || 0
+              : 0;
+            const balanceAmt = financialSummary
+              ? parseFloat(financialSummary.balance) || 0
+              : 0;
+            const hasDerivedActivity =
+              invoicedAmt > 0 || paidAmt > 0 || balanceAmt > 0;
+
+            if (!hasNte && !hasDerivedActivity) return null;
+
+            const frozen = isCancelled || isArchived;
+            const showNteSlot = hasNte || !frozen;
+            // §5.2 Bal palette — rose-on-OVERDUE waits on ask #2.
+            const balIsAmber = invoicedAmt > 0 && paidAmt === 0;
+            const balClasses = balIsAmber
+              ? 'bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300'
+              : 'bg-zinc-100 text-zinc-700 dark:bg-white/5 dark:text-zinc-300';
+
+            const nteValueChip = (num: number) => (
+              <span
+                className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-white/5 dark:text-zinc-300"
+                title={currencyFormatter.format(num)}
+              >
+                <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  {t('workOrders.detail.money.nte')}
+                </span>
+                <span className="font-medium tabular-nums">
+                  {formatCompactCurrency(num)}
+                </span>
+              </span>
+            );
+
             return (
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                <EditableField
-                  value={workOrder.notToExceed != null ? String(workOrder.notToExceed) : ''}
-                  onSave={async (raw) => {
-                    const trimmed = raw.trim().replace(/[$,\s]/g, '');
-                    if (trimmed === '') {
-                      await handleSaveWorkOrderField('notToExceed', null);
-                      return;
-                    }
-                    const num = Number(trimmed);
-                    if (!Number.isFinite(num) || num < 0) {
-                      alert(t('workOrders.form.notToExceedInvalid'));
-                      throw new Error('invalid NTE');
-                    }
-                    await handleSaveWorkOrderField('notToExceed', num);
-                  }}
-                  placeholder={t('workOrders.form.notToExceedPlaceholder')}
-                  ariaLabel={t('workOrders.form.notToExceed')}
-                  renderDisplay={(v) => {
-                    if (!v) {
-                      return (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-dashed border-zinc-300 px-1.5 py-0.5 text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
-                          + {t('workOrders.detail.setNte')}
-                        </span>
-                      );
-                    }
-                    const num = Number(v);
-                    return (
-                      <span
-                        className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-white/5 dark:text-zinc-300"
-                        title={currencyFormatter.format(num)}
-                      >
-                        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                          {t('workOrders.form.notToExceed')}
-                        </span>
-                        <span className="font-medium tabular-nums">
-                          {formatCompactCurrency(num)}
-                        </span>
+                {showNteSlot &&
+                  (frozen
+                    ? nteValueChip(workOrder.notToExceed as number)
+                    : (
+                      <EditableField
+                        value={
+                          workOrder.notToExceed != null
+                            ? String(workOrder.notToExceed)
+                            : ''
+                        }
+                        onSave={async (raw) => {
+                          const trimmed = raw.trim().replace(/[$,\s]/g, '');
+                          if (trimmed === '') {
+                            await handleSaveWorkOrderField('notToExceed', null);
+                            return;
+                          }
+                          const num = Number(trimmed);
+                          if (!Number.isFinite(num) || num < 0) {
+                            alert(t('workOrders.form.notToExceedInvalid'));
+                            throw new Error('invalid NTE');
+                          }
+                          await handleSaveWorkOrderField('notToExceed', num);
+                        }}
+                        placeholder={t('workOrders.form.notToExceedPlaceholder')}
+                        ariaLabel={t('workOrders.form.notToExceed')}
+                        // Override Catalyst's default `block w-full` Input
+                        // sizing so the inline editor stays chip-sized
+                        // instead of spanning the header row.
+                        inputClassName="!w-32"
+                        renderDisplay={(v) => {
+                          if (!v) {
+                            return (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-dashed border-zinc-300 px-1.5 py-0.5 text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
+                                + {t('workOrders.detail.setNte')}
+                              </span>
+                            );
+                          }
+                          return nteValueChip(Number(v));
+                        }}
+                      />
+                    ))}
+
+                {showNteSlot && hasDerivedActivity && (
+                  <span
+                    className="inline-block h-4 w-px bg-zinc-300 dark:bg-zinc-600"
+                    aria-hidden="true"
+                  />
+                )}
+
+                {hasDerivedActivity && (
+                  <>
+                    <span
+                      className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-white/5 dark:text-zinc-300"
+                      title={currencyFormatter.format(invoicedAmt)}
+                    >
+                      <span className="font-medium tabular-nums">
+                        {formatCompactCurrency(invoicedAmt)}
                       </span>
-                    );
-                  }}
-                />
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                        {t('workOrders.detail.money.invoiced')}
+                      </span>
+                    </span>
+                    <span
+                      className="text-zinc-300 dark:text-zinc-600"
+                      aria-hidden="true"
+                    >
+                      ·
+                    </span>
+                    <span
+                      className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-white/5 dark:text-zinc-300"
+                      title={currencyFormatter.format(paidAmt)}
+                    >
+                      <span className="font-medium tabular-nums">
+                        {formatCompactCurrency(paidAmt)}
+                      </span>
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                        {t('workOrders.detail.money.paid')}
+                      </span>
+                    </span>
+                    <span
+                      className="text-zinc-300 dark:text-zinc-600"
+                      aria-hidden="true"
+                    >
+                      ·
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 ${balClasses}`}
+                      title={currencyFormatter.format(balanceAmt)}
+                    >
+                      <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        {t('workOrders.detail.money.balanceShort')}
+                      </span>
+                      <span className="font-medium tabular-nums">
+                        {formatCompactCurrency(balanceAmt)}
+                      </span>
+                    </span>
+                  </>
+                )}
               </div>
             );
           })()}

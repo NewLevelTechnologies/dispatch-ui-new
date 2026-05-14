@@ -1180,11 +1180,12 @@
       "lastUpdated": "Updated {{time}}",
       "money": {
         "balance": "Balance",
-        "invoiced": "Invoiced",
+        "balanceShort": "Bal",
+        "invoiced": "invoiced",
         "nte": "NTE",
-        "paid": "Paid",
+        "paid": "paid",
         "placeholder": "{{label}}: —",
-        "quoted": "Quoted"
+        "quoted": "quoted"
       },
       "print": "Print",
       "setNte": "Set NTE"
