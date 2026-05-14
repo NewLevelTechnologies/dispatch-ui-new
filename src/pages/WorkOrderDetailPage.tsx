@@ -1132,6 +1132,7 @@ export default function WorkOrderDetailPage() {
       <FinancialDrawer
         open={financialDrawerOpen}
         onClose={() => setFinancialDrawerOpen(false)}
+        workOrderId={workOrder.id}
         workOrderNumber={woDisplayNumber}
         initialTab={financialDrawerInitialTab}
       />

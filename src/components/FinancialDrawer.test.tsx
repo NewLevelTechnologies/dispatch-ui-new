@@ -1,13 +1,25 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import FinancialDrawer from './FinancialDrawer';
+import apiClient from '../api/client';
+
+vi.mock('../api/client');
 
 describe('FinancialDrawer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // FinancialInvoicesTab inside the Invoices panel fires a fetch on
+    // mount; stub it with an empty list so these shell-level tests don't
+    // hit the "unmocked endpoint" path.
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+  });
+
   const defaults = {
     open: true,
     onClose: vi.fn(),
+    workOrderId: 'wo-1',
     workOrderNumber: 'WO-00010',
   };
 
@@ -46,19 +58,25 @@ describe('FinancialDrawer', () => {
     expect(quotesTab).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('renders the "Coming soon" stub on each tab with the matching blocker copy', async () => {
+  it('renders the live Invoices tab on default (no "Coming soon" stub)', async () => {
+    renderWithProviders(<FinancialDrawer {...defaults} />);
+    // Invoices is live (FinancialInvoicesTab renders its own empty/loading
+    // states from the WO-scoped list endpoint).
+    expect(
+      await screen.findByText(/No invoices on this work order yet/i),
+    ).toBeInTheDocument();
+  });
+
+  it('renders the "Coming soon" stub on the still-stubbed tabs with matching blocker copy', async () => {
     const user = userEvent.setup();
     renderWithProviders(<FinancialDrawer {...defaults} />);
-    // Invoices tab — default
-    expect(screen.getByText(/Coming soon/i)).toBeInTheDocument();
-    expect(screen.getByText(/backend ask #2/i)).toBeInTheDocument();
-    // Switch to Payments tab
+    // Switch to Payments tab — still stubbed (waits on asks #3, #4)
     await user.click(screen.getByRole('tab', { name: 'Payments' }));
     expect(screen.getByText(/backend asks #3/i)).toBeInTheDocument();
-    // Quotes tab
+    // Quotes tab — 7b
     await user.click(screen.getByRole('tab', { name: 'Quotes' }));
     expect(screen.getByText(/phase 7b/i)).toBeInTheDocument();
-    // POs tab
+    // POs tab — 7c
     await user.click(screen.getByRole('tab', { name: 'POs' }));
     expect(screen.getByText(/Deferred to phase 7c/i)).toBeInTheDocument();
   });

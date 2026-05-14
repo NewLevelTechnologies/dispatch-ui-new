@@ -931,8 +931,39 @@ vi.mock('react-i18next', () => {
     'workOrders.detail.setNte': 'Set NTE',
     'workOrders.financialDrawer.comingSoon': 'Coming soon',
     'workOrders.financialDrawer.ghosts.invoice': 'Invoice',
-    'workOrders.financialDrawer.stubBlockers.invoices':
-      'Waiting on backend ask #2 (WO-scoped invoice list) and #6 (lump-sum create contract).',
+    'workOrders.financialDrawer.invoicesTab.actions.markPaid': 'Mark paid',
+    'workOrders.financialDrawer.invoicesTab.actions.void': 'Void',
+    'workOrders.financialDrawer.invoicesTab.changeStatus':
+      'Change status (currently {{current}})',
+    'workOrders.financialDrawer.invoicesTab.collapseRow': 'Hide line items',
+    'workOrders.financialDrawer.invoicesTab.columns.balance': 'Balance',
+    'workOrders.financialDrawer.invoicesTab.columns.date': 'Date',
+    'workOrders.financialDrawer.invoicesTab.columns.due': 'Due',
+    'workOrders.financialDrawer.invoicesTab.columns.invoiceNumber': 'Invoice #',
+    'workOrders.financialDrawer.invoicesTab.columns.paid': 'Paid',
+    'workOrders.financialDrawer.invoicesTab.columns.status': 'Status',
+    'workOrders.financialDrawer.invoicesTab.columns.total': 'Total',
+    'workOrders.financialDrawer.invoicesTab.empty':
+      'No invoices on this work order yet.',
+    'workOrders.financialDrawer.invoicesTab.errorLoading':
+      'Failed to load invoices.',
+    'workOrders.financialDrawer.invoicesTab.expandRow': 'Show line items',
+    'workOrders.financialDrawer.invoicesTab.lineColumns.description': 'Description',
+    'workOrders.financialDrawer.invoicesTab.lineColumns.lineTotal': 'Total',
+    'workOrders.financialDrawer.invoicesTab.lineColumns.quantity': 'Qty',
+    'workOrders.financialDrawer.invoicesTab.lineColumns.unitPrice': 'Unit price',
+    'workOrders.financialDrawer.invoicesTab.lineItemsHeading': 'Line items',
+    'workOrders.financialDrawer.invoicesTab.loading': 'Loading invoices…',
+    'workOrders.financialDrawer.invoicesTab.noLineItems': 'No line items.',
+    'workOrders.financialDrawer.invoicesTab.notesHeading': 'Notes',
+    'workOrders.financialDrawer.invoicesTab.statuses.cancelled': 'Cancelled',
+    'workOrders.financialDrawer.invoicesTab.statuses.draft': 'Draft',
+    'workOrders.financialDrawer.invoicesTab.statuses.overdue': 'Overdue',
+    'workOrders.financialDrawer.invoicesTab.statuses.paid': 'Paid',
+    'workOrders.financialDrawer.invoicesTab.statuses.sent': 'Sent',
+    'workOrders.financialDrawer.invoicesTab.statuses.void': 'Void',
+    'workOrders.financialDrawer.invoicesTab.voidConfirm':
+      'Void invoice {{number}} for {{amount}}? This cannot be undone.',
     'workOrders.financialDrawer.stubBlockers.payments':
       'Waiting on backend asks #3 (WO-scoped payment list) and #4 (payment void endpoint).',
     'workOrders.financialDrawer.stubBlockers.purchaseOrders':
