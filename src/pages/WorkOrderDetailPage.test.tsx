@@ -5,7 +5,7 @@ import { renderWithProviders } from '../test/utils';
 import WorkOrderDetailPage from './WorkOrderDetailPage';
 import apiClient from '../api/client';
 import type { RouteObject } from 'react-router-dom';
-import type { WorkOrder } from '../api';
+import type { WorkOrder, WorkOrderFinancialSummary } from '../api';
 
 vi.mock('../api/client');
 
@@ -52,7 +52,7 @@ describe('WorkOrderDetailPage', () => {
     vi.clearAllMocks();
   });
 
-  const ZERO_SUMMARY = {
+  const ZERO_SUMMARY: WorkOrderFinancialSummary = {
     invoiced: '0.00',
     paid: '0.00',
     balance: '0.00',
@@ -61,7 +61,7 @@ describe('WorkOrderDetailPage', () => {
 
   const mockApiResponses = (
     workOrder: WorkOrder | null = mockWorkOrder,
-    summary: typeof ZERO_SUMMARY = ZERO_SUMMARY,
+    summary: WorkOrderFinancialSummary = ZERO_SUMMARY,
     invoices: unknown[] = [],
   ) => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
