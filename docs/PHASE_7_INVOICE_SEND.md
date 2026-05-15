@@ -325,8 +325,10 @@ Content-Security-Policy: default-src 'self'; ...   # full policy TBD with FE —
 | 2 | HTTP response headers | `Referrer-Policy: no-referrer` set on every public-route response (or at CDN per §7.3) |
 | 3 | Outbound links on public page | `rel="noopener noreferrer"` on every `<a>` tag |
 | 4 | Sentry / error reporter | Path-pattern scrubbing rule for `/p/(invoice|quote)/:token` URLs |
-| 5 | CloudFront access logs | Disabled on `/p/*` behavior (per §7.1); if re-enabled later, CloudFront Function rewrites URI before logging (per §7.2) |
-| 6 | Email-send job logs (notification-service) | Same `:token` scrubbing on rendered URLs in dispatch logs (per §5.2) |
+| 5 | CloudFront access logs | Distribution-wide standard logging stays off — per §7.1, AWS doesn't expose a per-behavior toggle for standard logs, so the rule has to be distribution-scoped. Terraform comment on the distribution block guards future re-enablement. Real-time logs (Kinesis) ARE per-behavior; if introduced later, omit on `/p/*`. If standard logging is re-enabled distribution-wide later, CloudFront Function URI rewrite (per §7.2) becomes the fallback. |
+| 6 | S3 access logs (SPA origin) | Same distribution-wide-off stance — the `/p/invoice/:token` HTML request hits S3 (returns 403, CloudFront maps to `/index.html`). S3 access logs would capture the token-bearing path if enabled. Stays off. |
+| 7 | ALB access logs | The SPA's follow-up `GET /api/v1/public/invoices/:token` fetch transits ALB. If ALB access logs are enabled, they capture the full URI including the token. Either keep ALB access logs off for the LB fronting financial-service, or route the public-API calls through a path that the ALB logs scrub before write. Confirm current state — wasn't in the original checklist. |
+| 8 | Email-send job logs (notification-service) | Same `:token` scrubbing on rendered URLs in dispatch logs (per §5.2) |
 
 ---
 
@@ -370,6 +372,7 @@ Content-Security-Policy: default-src 'self'; ...   # full policy TBD with FE —
 4. **`view_count` semantics — what counts as a view?** Includes bot prefetches from corporate scanners. Document this as "request count, not human view count" in the response field's description so callers don't trust it as engagement signal.
 5. **`FRONTEND_URL` config source:** ~~open~~ **resolved.** Financial-service receives `FRONTEND_URL` as an ECS env var injected by infra (`modules/ecs/main.tf` financial-service task definition, value from `var.frontend_url` already wired in `environments/dev/main.tf` = `https://dev.dispatch.newleveltech.net`). Same env var name and value scheduling-service already consumes — no fork in convention. Financial-service composes `${FRONTEND_URL}/p/invoice/${token}` at event-publish time; notification-service stays generic and just renders whatever `{{share_url}}` it gets handed.
 6. **`invoice_created` rename to `invoice_sent`:** backend's call. Nothing publishes the old name today so renaming is zero-risk; the tenant-facing display name in the template editor needs updating in lockstep if so.
+7. **ALB access logs state:** Surfaced by the infra update to §7.1 — the public-API call (`GET /api/v1/public/invoices/:token`) transits ALB, and if access logs are enabled they'd capture the token. Confirm whether ALB access logs are currently on for the financial-service-fronting LB. If on: either disable, scrub before write, or accept the surface and document mitigations. If off: Terraform comment to keep them off while `/p/*` is live, mirroring the CloudFront stance.
 
 ---
 
