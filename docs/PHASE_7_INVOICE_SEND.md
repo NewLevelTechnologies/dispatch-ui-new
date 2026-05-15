@@ -148,12 +148,18 @@ Headers:
   "tenant": {
     "displayName": "Acme HVAC",
     "logoUrl": "https://...",
+    "streetAddress": "123 Main St",
+    "city": "Springfield",
+    "state": "IL",
+    "zipCode": "62701",
     "supportEmail": "support@acmehvac.com",
     "supportPhone": "+1..."
   },
   "customer": { "id": "...", "name": "..." }
 }
 ```
+
+Address fields are nullable — tenant settings doesn't require them, so the public page renders them only when present. All fields source from existing `tenant_settings` columns (`logoMediumUrl` is the right size for the public page header; `streetAddress` / `city` / `state` / `zipCode` map straight across).
 
 Quote variant: same shape, `quote` instead of `invoice`.
 
