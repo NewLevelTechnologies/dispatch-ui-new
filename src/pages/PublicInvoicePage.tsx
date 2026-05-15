@@ -1,0 +1,345 @@
+import { useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import axios from 'axios';
+import {
+  publicFinancialApi,
+  InvoiceStatus,
+  type PublicInvoiceResponse,
+} from '../api';
+import TenantBrandingHeader from '../components/TenantBrandingHeader';
+import CliffPage from '../components/CliffPage';
+import { Badge } from '../components/catalyst/badge';
+
+/**
+ * Customer-facing read-only invoice view, rendered when a customer clicks
+ * the `View Invoice` link from a send email. Route: `/p/invoice/:token`.
+ *
+ * Design: card-style mobile-first hosted invoice (Phase 7 §6.1). Big
+ * "Amount Due" hero, status badge, billed-to, line items, totals, sender
+ * footer. `@media print` rules collapse the cards into a paper-style
+ * document so customers can browser-print until v2 ships a real PDF
+ * endpoint (§10 out-of-scope).
+ *
+ * Outside `AppLayout` and `GlossaryProvider` — this page is unauthenticated
+ * and viewers don't share the tenant's glossary customization context.
+ * Entity labels here are customer-facing and translated via i18n, not via
+ * glossary (which is tenant-internal naming).
+ */
+
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+});
+
+const formatMoney = (value: number | string | null | undefined): string =>
+  currencyFormatter.format(Number(value ?? 0) || 0);
+
+const formatDate = (iso: string | null | undefined): string => {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+};
+
+type InvoiceBadgeProps = {
+  status: PublicInvoiceResponse['invoice']['status'];
+};
+
+const InvoiceStatusBadge = ({ status }: InvoiceBadgeProps) => {
+  const { t } = useTranslation();
+  switch (status) {
+    case InvoiceStatus.PAID:
+      return <Badge color="lime">{t('public.invoice.status.paid')}</Badge>;
+    case InvoiceStatus.OVERDUE:
+      return <Badge color="rose">{t('public.invoice.status.pastDue')}</Badge>;
+    case InvoiceStatus.CANCELLED:
+      return <Badge color="zinc">{t('public.invoice.status.cancelled')}</Badge>;
+    case InvoiceStatus.SENT:
+      return <Badge color="sky">{t('public.invoice.status.outstanding')}</Badge>;
+    case InvoiceStatus.DRAFT:
+      return <Badge color="zinc">{t('public.invoice.status.draft')}</Badge>;
+    case InvoiceStatus.VOID:
+      // Voided invoices show the loud full-width banner instead of a pill.
+      return null;
+    default:
+      return null;
+  }
+};
+
+export default function PublicInvoicePage() {
+  const { t } = useTranslation();
+  const { token = '' } = useParams<{ token: string }>();
+
+  const { data, isLoading, isError, error } = useQuery<
+    PublicInvoiceResponse,
+    unknown
+  >({
+    queryKey: ['publicInvoice', token],
+    queryFn: () => publicFinancialApi.getInvoiceByToken(token),
+    enabled: !!token,
+    retry: false,
+  });
+
+  if (!token) {
+    return <CliffPage />;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
+        <div className="text-zinc-500">{t('public.invoice.loading')}</div>
+      </div>
+    );
+  }
+
+  // 404 from the public endpoint (token not found / revoked / expired) is
+  // the cliff. Any other error is surfaced as cliff too — leaking server
+  // error details to a customer-facing page is worse than a friendly
+  // "contact us" message.
+  if (isError || !data) {
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+    return <CliffPage reason={status === 404 ? 'invalid' : 'error'} />;
+  }
+
+  const { invoice, tenant, customer } = data;
+  const isVoid = invoice.status === InvoiceStatus.VOID;
+  const isPaid = invoice.status === InvoiceStatus.PAID;
+  const isPastDue = invoice.status === InvoiceStatus.OVERDUE;
+
+  return (
+    <div className="min-h-screen bg-zinc-50 print:bg-white">
+      {isVoid && (
+        <div className="bg-rose-600 px-4 py-4 text-center text-white print:bg-white print:text-rose-700">
+          <p className="text-lg font-semibold sm:text-xl">
+            {t('public.invoice.voidedHeadline')}
+          </p>
+          <p className="mt-0.5 text-sm text-rose-100 print:text-rose-700">
+            {t('public.invoice.voidedSubline', { tenant: tenant.displayName })}
+          </p>
+        </div>
+      )}
+
+      <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10 print:max-w-none print:p-0">
+        <TenantBrandingHeader tenant={tenant} />
+
+        {/* Hero card — invoice number, status, amount due, due date.
+            The single most-asked question gets the most prominent answer. */}
+        <section
+          className={`mt-6 rounded-lg border bg-white p-6 shadow-sm print:border-zinc-300 print:shadow-none ${
+            isPastDue
+              ? 'border-rose-200'
+              : isPaid
+              ? 'border-lime-200'
+              : 'border-zinc-200'
+          }`}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-zinc-500">
+                {t('public.invoice.label')}
+              </p>
+              <p className="mt-1 text-lg font-semibold text-zinc-900">
+                #{invoice.invoiceNumber}
+              </p>
+            </div>
+            <InvoiceStatusBadge status={invoice.status} />
+          </div>
+
+          <div className="mt-6">
+            <p className="text-xs uppercase tracking-wide text-zinc-500">
+              {isPaid
+                ? t('public.invoice.amountPaid')
+                : t('public.invoice.amountDue')}
+            </p>
+            <p
+              className={`mt-1 text-4xl font-bold tracking-tight ${
+                isPastDue ? 'text-rose-700' : 'text-zinc-900'
+              }`}
+            >
+              {isPaid
+                ? formatMoney(invoice.totalAmount)
+                : formatMoney(invoice.balanceDue)}
+            </p>
+            {!isPaid && (
+              <p
+                className={`mt-1 text-sm ${
+                  isPastDue ? 'text-rose-700' : 'text-zinc-600'
+                }`}
+              >
+                {t('public.invoice.dueOn', {
+                  date: formatDate(invoice.dueDate),
+                })}
+              </p>
+            )}
+          </div>
+
+          <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-zinc-100 pt-4 text-sm">
+            <div>
+              <dt className="text-zinc-500">{t('public.invoice.billedTo')}</dt>
+              <dd className="mt-0.5 text-zinc-900">{customer.name}</dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">
+                {t('public.invoice.invoiceDate')}
+              </dt>
+              <dd className="mt-0.5 text-zinc-900">
+                {formatDate(invoice.invoiceDate)}
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        {/* Line items. Mobile collapses the table into stacked rows via
+            per-row flex; desktop uses a real table. */}
+        <section className="mt-4 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm print:shadow-none">
+          <h2 className="border-b border-zinc-100 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            {t('public.invoice.items')}
+          </h2>
+          <ul className="divide-y divide-zinc-100">
+            {invoice.lineItems.map((item) => (
+              <li
+                key={item.id}
+                className="flex flex-col gap-1 px-6 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-zinc-900">{item.description}</p>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    {item.quantity} × {formatMoney(item.unitPrice)}
+                  </p>
+                </div>
+                <div className="text-sm font-medium text-zinc-900 sm:text-right">
+                  {formatMoney(item.lineTotal)}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* Totals card. Right-aligned values, balance bolded. */}
+        <section className="mt-4 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm print:shadow-none">
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-zinc-600">{t('public.invoice.subtotal')}</dt>
+              <dd className="text-zinc-900">{formatMoney(invoice.subtotal)}</dd>
+            </div>
+            {Number(invoice.taxAmount) > 0 && (
+              <div className="flex justify-between">
+                <dt className="text-zinc-600">
+                  {invoice.taxRate
+                    ? t('public.invoice.taxWithRate', { rate: invoice.taxRate })
+                    : t('public.invoice.tax')}
+                </dt>
+                <dd className="text-zinc-900">{formatMoney(invoice.taxAmount)}</dd>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-zinc-100 pt-2">
+              <dt className="font-medium text-zinc-900">
+                {t('public.invoice.total')}
+              </dt>
+              <dd className="font-medium text-zinc-900">
+                {formatMoney(invoice.totalAmount)}
+              </dd>
+            </div>
+            {Number(invoice.amountPaid) > 0 && (
+              <div className="flex justify-between">
+                <dt className="text-zinc-600">{t('public.invoice.paid')}</dt>
+                <dd className="text-zinc-900">
+                  −{formatMoney(invoice.amountPaid)}
+                </dd>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-zinc-200 pt-2 text-base">
+              <dt className="font-semibold text-zinc-900">
+                {t('public.invoice.balanceDue')}
+              </dt>
+              <dd
+                className={`font-semibold ${
+                  isPastDue ? 'text-rose-700' : 'text-zinc-900'
+                }`}
+              >
+                {formatMoney(invoice.balanceDue)}
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        {/* Optional notes from the CSR. Hide section entirely when blank. */}
+        {invoice.notes && invoice.notes.trim() && (
+          <section className="mt-4 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm print:shadow-none">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              {t('public.invoice.notes')}
+            </h2>
+            <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-700">
+              {invoice.notes}
+            </p>
+          </section>
+        )}
+
+        {/* Payment history — shown only when payments exist. Voided payment
+            rows are muted but present (audit transparency, same rule as the
+            in-app drawer's expansion). */}
+        {invoice.payments.length > 0 && (
+          <section className="mt-4 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm print:shadow-none">
+            <h2 className="border-b border-zinc-100 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              {t('public.invoice.paymentsReceived')}
+            </h2>
+            <ul className="divide-y divide-zinc-100">
+              {invoice.payments.map((payment) => {
+                const isVoidedPayment = payment.status === 'VOID';
+                return (
+                  <li
+                    key={payment.id}
+                    className={`flex flex-col gap-1 px-6 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6 ${
+                      isVoidedPayment ? 'text-zinc-400 line-through' : ''
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm">{formatDate(payment.paymentDate)}</p>
+                      <p className="mt-0.5 text-xs text-zinc-500">
+                        {payment.paymentMethod.replace(/_/g, ' ').toLowerCase()}
+                        {payment.referenceNumber
+                          ? ` · ${payment.referenceNumber}`
+                          : ''}
+                      </p>
+                    </div>
+                    <div className="text-sm sm:text-right">
+                      {formatMoney(payment.amount)}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
+        {/* Footer — questions / contact. Same info as the header so customers
+            don't have to scroll back up to find the phone number. */}
+        <footer className="mt-8 text-center text-sm text-zinc-500 print:mt-4">
+          <p>{t('public.invoice.questions')}</p>
+          <p className="mt-1 text-zinc-700">
+            {t('public.invoice.contactCta', { tenant: tenant.displayName })}
+            {tenant.supportPhone
+              ? t('public.common.contactPhone', { phone: tenant.supportPhone })
+              : ''}
+            {tenant.supportEmail ? (
+              <>
+                {' · '}
+                <a
+                  href={`mailto:${tenant.supportEmail}`}
+                  rel="noopener noreferrer"
+                  className="text-sky-700 underline"
+                >
+                  {tenant.supportEmail}
+                </a>
+              </>
+            ) : null}
+          </p>
+        </footer>
+      </div>
+    </div>
+  );
+}

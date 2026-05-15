@@ -179,6 +179,15 @@ export {
   type WorkOrderFinancialSummary,
 } from './financialApi';
 
+// Public Financial APIs (share-link unauthenticated)
+export {
+  publicFinancialApi,
+  type PublicTenantBranding,
+  type PublicCustomerSummary,
+  type PublicInvoiceResponse,
+  type PublicQuoteResponse,
+} from './publicFinancialApi';
+
 // Scheduling APIs
 export {
   dispatchesApi,
