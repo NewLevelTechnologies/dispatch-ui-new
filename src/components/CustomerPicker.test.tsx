@@ -1,0 +1,97 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { renderWithProviders } from '../test/utils';
+import CustomerPicker from './CustomerPicker';
+import apiClient from '../api/client';
+import type { CustomerSearchResult } from '../api';
+
+vi.mock('../api/client');
+
+const standard: CustomerSearchResult = {
+  id: 'c-1',
+  name: 'Acme Plumbing',
+  type: 'STANDARD',
+  displayMode: 'STANDARD',
+};
+
+describe('CustomerPicker', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default: never-resolving search so query state never settles into
+    // results during these synchronous tests (which exercise render-time
+    // behavior — selection display, placeholder, disabled, dropdown open
+    // -on-focus). Tests that drive the result list end-to-end live in
+    // FinancialQuotesTab / QuoteDialog / InvoiceDialog where the
+    // surrounding component already paces the flow.
+    vi.mocked(apiClient.get).mockReturnValue(new Promise(() => {}));
+  });
+
+  it('renders the placeholder when no customer is selected', () => {
+    renderWithProviders(<CustomerPicker value={null} onChange={vi.fn()} />);
+    expect(screen.getByPlaceholderText(/search customers/i)).toBeInTheDocument();
+  });
+
+  it('shows the selected customer name as the resting input value', () => {
+    renderWithProviders(<CustomerPicker value={standard} onChange={vi.fn()} />);
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    expect(input.value).toBe('Acme Plumbing');
+  });
+
+  it('respects the disabled prop', () => {
+    renderWithProviders(
+      <CustomerPicker value={null} onChange={vi.fn()} disabled />,
+    );
+    expect(screen.getByRole('textbox')).toBeDisabled();
+  });
+
+  it('uses a custom placeholder when provided', () => {
+    renderWithProviders(
+      <CustomerPicker
+        value={null}
+        onChange={vi.fn()}
+        placeholder="Pick a payer"
+      />,
+    );
+    expect(screen.getByPlaceholderText('Pick a payer')).toBeInTheDocument();
+  });
+
+  it('opens the dropdown on focus and prompts to type when below threshold', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CustomerPicker value={null} onChange={vi.fn()} />);
+    await user.click(screen.getByRole('textbox'));
+    expect(
+      await screen.findByText(/type to search|type at least/i),
+    ).toBeInTheDocument();
+  });
+
+  it('uses the picker label as the aria-label when ariaLabel is provided', () => {
+    renderWithProviders(
+      <CustomerPicker
+        value={null}
+        onChange={vi.fn()}
+        ariaLabel="Bill to"
+      />,
+    );
+    expect(screen.getByLabelText('Bill to')).toBeInTheDocument();
+  });
+
+  it('closes the dropdown when clicking outside', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <div>
+        <CustomerPicker value={null} onChange={vi.fn()} />
+        <button type="button">outside</button>
+      </div>,
+    );
+    await user.click(screen.getByRole('textbox'));
+    expect(
+      await screen.findByText(/type to search|type at least/i),
+    ).toBeInTheDocument();
+    // Click outside the picker — mousedown listener closes it.
+    await user.click(screen.getByRole('button', { name: /outside/i }));
+    expect(
+      screen.queryByText(/type to search|type at least/i),
+    ).not.toBeInTheDocument();
+  });
+});
