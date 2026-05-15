@@ -6,23 +6,28 @@ import { SlideOver } from './catalyst/slideover';
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from './catalyst/tabs';
 import { Text } from './catalyst/text';
 
-export type FinancialTab = 'quotes' | 'purchaseOrders' | 'invoices' | 'payments';
+export type FinancialTab = 'quotes' | 'purchaseOrders' | 'invoices';
 
 // Chronological order matching WO lifecycle (§3.1):
 //   1. Quote     — estimate-before-work (sometimes)
 //   2. PO        — mid-job procurement (sometimes)
 //   3. Invoice   — bill after work (always)
-//   4. Payment   — customer pays (always, last)
-// CSRs scan in lifecycle progression. Earlier "click-frequency order"
-// reasoning was a guess without telemetry; chronological matches the
-// mental model of "where is this WO in its arc."
-const TAB_ORDER: FinancialTab[] = ['quotes', 'purchaseOrders', 'invoices', 'payments'];
+// Payments are NOT a sibling tab — per §3.3 they nest under each invoice's
+// row expansion (1:N child relationship; recording-from-CSR-context flows
+// through the invoice). The earlier 4-tab design with a Payments sibling
+// was folded out 2026-05-14 to align with the structural model.
+const TAB_ORDER: FinancialTab[] = ['quotes', 'purchaseOrders', 'invoices'];
 
 interface Props {
   open: boolean;
   onClose: () => void;
   workOrderId: string;
   workOrderNumber: string;
+  /**
+   * Customer name for the locked-context strip in the Payment dialog
+   * (§4.1) — read-only contextual header, not a field.
+   */
+  customerName: string;
   /**
    * Tab to land on when the drawer opens. Chip-row click handlers set this
    * based on which chip was clicked (§3.2 routing). Defaults to `invoices` —
@@ -55,6 +60,7 @@ export default function FinancialDrawer({
   onClose,
   workOrderId,
   workOrderNumber,
+  customerName,
   initialTab = 'invoices',
 }: Props) {
   const { t } = useTranslation();
@@ -82,7 +88,6 @@ export default function FinancialDrawer({
             <Tab>{t('workOrders.financialDrawer.tabs.quotes')}</Tab>
             <Tab>{t('workOrders.financialDrawer.tabs.purchaseOrders')}</Tab>
             <Tab>{t('workOrders.financialDrawer.tabs.invoices')}</Tab>
-            <Tab>{t('workOrders.financialDrawer.tabs.payments')}</Tab>
           </TabList>
 
           <TabPanels className="!mt-0 flex-1 overflow-y-auto p-4">
@@ -99,12 +104,10 @@ export default function FinancialDrawer({
               />
             </TabPanel>
             <TabPanel>
-              <FinancialInvoicesTab workOrderId={workOrderId} />
-            </TabPanel>
-            <TabPanel>
-              <ComingSoon
-                tab="payments"
-                blockers={t('workOrders.financialDrawer.stubBlockers.payments')}
+              <FinancialInvoicesTab
+                workOrderId={workOrderId}
+                workOrderNumber={workOrderNumber}
+                customerName={customerName}
               />
             </TabPanel>
           </TabPanels>

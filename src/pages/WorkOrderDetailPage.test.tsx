@@ -430,14 +430,21 @@ describe('WorkOrderDetailPage', () => {
       expect(invoicesTab).toHaveAttribute('aria-selected', 'true');
     });
 
-    it('opens the drawer on the Payments tab when $ paid is clicked', async () => {
-      const user = userEvent.setup();
+    it('renders $ paid as plain text, not a button (no Payments tab to route to)', async () => {
+      // §3.2 / §5.1: payments fold into invoice expansions, so $ paid has
+      // no dedicated tab to navigate to. The chip stays for visual
+      // reconciliation but is non-interactive.
       mockApiResponses(mockWorkOrder, summaryWithActivity);
       renderPage();
-      const paidChip = await screen.findByRole('button', { name: /payments/i });
-      await user.click(paidChip);
-      const paymentsTab = await screen.findByRole('tab', { name: 'Payments' });
-      expect(paymentsTab).toHaveAttribute('aria-selected', 'true');
+      // Wait for chips to render.
+      await screen.findByText('$3.2K');
+      // No button labeled "Payments" — the previous design routed there.
+      expect(
+        screen.queryByRole('button', { name: /^payments$/i }),
+      ).not.toBeInTheDocument();
+      // The paid value + label are still in the DOM as plain text.
+      expect(screen.getByText('$1K')).toBeInTheDocument();
+      expect(screen.getByText('paid')).toBeInTheDocument();
     });
 
     it('opens the drawer on the Invoices tab when the [+ Invoice] ghost is clicked', async () => {

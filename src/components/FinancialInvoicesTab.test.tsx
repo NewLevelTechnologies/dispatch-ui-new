@@ -35,10 +35,20 @@ const makeInvoice = (overrides: Partial<Invoice> = {}): Invoice => ({
       lineTotal: '1500.00' as unknown as number,
     },
   ],
+  payments: [],
   createdAt: '2026-05-10T14:23:11Z',
   updatedAt: '2026-05-10T14:23:11Z',
   ...overrides,
 });
+
+const renderTab = () =>
+  renderWithProviders(
+    <FinancialInvoicesTab
+      workOrderId="wo-1"
+      workOrderNumber="WO-00010"
+      customerName="Tenant 2 Inc."
+    />,
+  );
 
 describe('FinancialInvoicesTab', () => {
   beforeEach(() => {
@@ -47,7 +57,7 @@ describe('FinancialInvoicesTab', () => {
 
   it('shows the empty state when the WO has no invoices', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
-    renderWithProviders(<FinancialInvoicesTab workOrderId="wo-1" />);
+    renderTab();
     expect(
       await screen.findByText(/No invoices on this work order yet/i),
     ).toBeInTheDocument();
@@ -55,7 +65,7 @@ describe('FinancialInvoicesTab', () => {
 
   it('renders an invoice row with formatted money and date columns', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [makeInvoice()] });
-    renderWithProviders(<FinancialInvoicesTab workOrderId="wo-1" />);
+    renderTab();
     expect(await screen.findByText('INV-0042')).toBeInTheDocument();
     expect(screen.getByText('$1,500.00')).toBeInTheDocument();
     expect(screen.getByText('$500.00')).toBeInTheDocument();
@@ -66,7 +76,7 @@ describe('FinancialInvoicesTab', () => {
 
   it('uses the WO-scoped endpoint, not the customer endpoint', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
-    renderWithProviders(<FinancialInvoicesTab workOrderId="wo-1" />);
+    renderTab();
     await waitFor(() => {
       expect(apiClient.get).toHaveBeenCalledWith(
         '/financial/work-orders/wo-1/invoices',
@@ -77,7 +87,7 @@ describe('FinancialInvoicesTab', () => {
   it('expands a row to show line items when the chevron is clicked', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.get).mockResolvedValue({ data: [makeInvoice()] });
-    renderWithProviders(<FinancialInvoicesTab workOrderId="wo-1" />);
+    renderTab();
     const expandBtn = await screen.findByRole('button', { name: /show line items/i });
     await user.click(expandBtn);
     expect(screen.getByText('Line items')).toBeInTheDocument();
@@ -92,7 +102,7 @@ describe('FinancialInvoicesTab', () => {
     vi.mocked(apiClient.patch).mockResolvedValue({
       data: makeInvoice({ status: 'SENT' }),
     });
-    renderWithProviders(<FinancialInvoicesTab workOrderId="wo-1" />);
+    renderTab();
     const pillButton = await screen.findByRole('button', { name: /change status/i });
     await user.click(pillButton);
     await user.click(await screen.findByRole('menuitem', { name: /^sent$/i }));
@@ -112,7 +122,7 @@ describe('FinancialInvoicesTab', () => {
     vi.mocked(apiClient.patch).mockResolvedValue({
       data: makeInvoice({ status: 'PAID' }),
     });
-    renderWithProviders(<FinancialInvoicesTab workOrderId="wo-1" />);
+    renderTab();
     await screen.findByText('INV-0042');
     const overflow = screen
       .getAllByRole('button', { name: /more options/i })
@@ -134,7 +144,7 @@ describe('FinancialInvoicesTab', () => {
     vi.mocked(apiClient.patch).mockResolvedValue({
       data: makeInvoice({ status: 'VOID' }),
     });
-    renderWithProviders(<FinancialInvoicesTab workOrderId="wo-1" />);
+    renderTab();
     await screen.findByText('INV-0042');
     const overflow = screen
       .getAllByRole('button', { name: /more options/i })
@@ -155,7 +165,7 @@ describe('FinancialInvoicesTab', () => {
     vi.mocked(apiClient.get).mockResolvedValue({
       data: [makeInvoice({ status: 'VOID' })],
     });
-    renderWithProviders(<FinancialInvoicesTab workOrderId="wo-1" />);
+    renderTab();
     await screen.findByText('INV-0042');
     expect(
       screen.queryByRole('button', { name: /change status/i }),
@@ -172,8 +182,131 @@ describe('FinancialInvoicesTab', () => {
         makeInvoice({ id: 'inv-2', invoiceNumber: 'INV-VOID', status: 'VOID' }),
       ],
     });
-    renderWithProviders(<FinancialInvoicesTab workOrderId="wo-1" />);
+    renderTab();
     expect(await screen.findByText('INV-A')).toBeInTheDocument();
     expect(screen.getByText('INV-VOID')).toBeInTheDocument();
+  });
+
+  describe('Payments fold inside invoice expansion (§3.3 / ask #2 nested)', () => {
+    const withPayments = (extraPayments = {}) =>
+      makeInvoice({
+        payments: [
+          {
+            id: 'pay-1',
+            paymentNumber: 'PAY-X9Y1',
+            paymentDate: '2026-05-12T00:00:00Z',
+            amount: '300.00' as unknown as number,
+            paymentMethod: 'CHECK',
+            status: 'RECEIVED',
+            referenceNumber: '1234',
+            notes: undefined,
+            createdAt: '2026-05-12T14:23:11Z',
+            updatedAt: '2026-05-12T14:23:11Z',
+            ...extraPayments,
+          },
+        ],
+      });
+
+    it('renders nested payments inside the expanded invoice row', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [withPayments()] });
+      renderTab();
+      await user.click(await screen.findByRole('button', { name: /show line items/i }));
+      expect(screen.getByText('Payments')).toBeInTheDocument();
+      expect(screen.getByText('PAY-X9Y1')).toBeInTheDocument();
+      expect(screen.getByText('Check')).toBeInTheDocument();
+      expect(screen.getByText('$300.00')).toBeInTheDocument();
+      expect(screen.getByText('1234')).toBeInTheDocument();
+    });
+
+    it('shows the "no payments" empty state when the invoice has none', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [makeInvoice()] });
+      renderTab();
+      await user.click(await screen.findByRole('button', { name: /show line items/i }));
+      expect(
+        screen.getByText(/No payments recorded against this invoice/i),
+      ).toBeInTheDocument();
+    });
+
+    it('mutes voided payment rows', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({
+        data: [withPayments({ status: 'VOID' })],
+      });
+      renderTab();
+      await user.click(await screen.findByRole('button', { name: /show line items/i }));
+      const paymentRow = screen.getByText('PAY-X9Y1').closest('tr');
+      expect(paymentRow?.className).toMatch(/opacity-50/);
+    });
+  });
+
+  describe('Record Payment flow (Phase 7 §4.4)', () => {
+    it('disables the tab-level + Record Payment when no invoice has outstanding balance', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({
+        data: [
+          makeInvoice({
+            balanceDue: '0.00' as unknown as number,
+            amountPaid: '1500.00' as unknown as number,
+          }),
+        ],
+      });
+      renderTab();
+      const cta = await screen.findByRole('button', { name: /record payment/i });
+      expect(cta).toBeDisabled();
+    });
+
+    it('opens the dialog with the picker visible from the tab-level CTA', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [makeInvoice()] });
+      renderTab();
+      const cta = await screen.findByRole('button', { name: /record payment/i });
+      await user.click(cta);
+      // Picker = a combobox / select labeled "Invoice"
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: /invoice/i })).toBeInTheDocument();
+    });
+
+    it('opens the dialog locked to the row when + Payment is clicked inside the expansion', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [makeInvoice()] });
+      renderTab();
+      await user.click(await screen.findByRole('button', { name: /show line items/i }));
+      const addPayment = screen.getByRole('button', { name: /^payment$/i });
+      await user.click(addPayment);
+      // Picker is hidden when locked — no Invoice combobox in this mode.
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('combobox', { name: /invoice/i }),
+      ).not.toBeInTheDocument();
+      // The locked invoice number is displayed as read-only context
+      // inside the dialog (in addition to the table row in the background).
+      const dialog = screen.getByRole('dialog');
+      expect(dialog.textContent).toMatch(/INV-0042/);
+    });
+
+    it('records a payment via the dialog', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [makeInvoice()] });
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: { id: 'pay-new' },
+      });
+      renderTab();
+      const cta = await screen.findByRole('button', { name: /record payment/i });
+      await user.click(cta);
+      // Default amount auto-fills to the open balance ($1000.00). Submit.
+      const submit = await screen.findByRole('button', { name: /^record payment$/i });
+      await user.click(submit);
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/financial/payments',
+          expect.objectContaining({
+            invoiceId: 'inv-1',
+            amount: 1000,
+            paymentMethod: 'CHECK',
+          }),
+        );
+      });
+    });
   });
 });

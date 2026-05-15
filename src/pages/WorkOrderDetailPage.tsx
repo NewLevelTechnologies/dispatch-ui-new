@@ -719,10 +719,11 @@ export default function WorkOrderDetailPage() {
               output for write-side arithmetic.
               Click routing (§3.2):
                 $ invoiced  → drawer, Invoices tab
-                $ paid      → drawer, Payments tab
+                $ paid      → plain text, no click (§5.1 — payments live
+                              inside invoice expansions, no tab to route
+                              to)
                 Bal         → drawer, Invoices tab
-                [+ Invoice] → drawer, Invoices tab (create dialog will
-                              auto-open here once step 7 ships) */}
+                [+ Invoice] → drawer, Invoices tab */}
           {(() => {
             const hasNte = workOrder.notToExceed != null;
             const invoicedAmt = financialSummary
@@ -841,12 +842,15 @@ export default function WorkOrderDetailPage() {
                     >
                       ·
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => openFinancialDrawer('payments')}
+                    {/* $ paid is plain text, not a button (§3.2 / §5.1).
+                        Payments live inside invoice row expansions in the
+                        drawer (§3.3 fold), so there's no single tab to
+                        route this chip to. Demoted to display preserves
+                        the reconciled-story at-a-glance number without
+                        promising a click target that doesn't exist. */}
+                    <span
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 text-zinc-700 dark:text-zinc-300"
                       title={currencyFormatter.format(paidAmt)}
-                      aria-label={t('workOrders.financialDrawer.tabs.payments')}
-                      className={`${chipButtonClass} bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10`}
                     >
                       <span className="font-medium tabular-nums">
                         {formatCompactCurrency(paidAmt)}
@@ -854,7 +858,7 @@ export default function WorkOrderDetailPage() {
                       <span className="text-xs text-zinc-500 dark:text-zinc-400">
                         {t('workOrders.detail.money.paid')}
                       </span>
-                    </button>
+                    </span>
                     <span
                       className="text-zinc-300 dark:text-zinc-600"
                       aria-hidden="true"
@@ -1134,6 +1138,7 @@ export default function WorkOrderDetailPage() {
         onClose={() => setFinancialDrawerOpen(false)}
         workOrderId={workOrder.id}
         workOrderNumber={woDisplayNumber}
+        customerName={customer?.name ?? ''}
         initialTab={financialDrawerInitialTab}
       />
 
