@@ -1276,6 +1276,59 @@
         "saveAsDraft": "Save as Draft",
         "title": "New {{entity}}"
       },
+      "quotesTab": {
+        "actions": {
+          "markAccepted": "Mark accepted",
+          "markDeclined": "Mark declined"
+        },
+        "changeStatus": "Change status (currently {{current}})",
+        "collapseRow": "Hide line items",
+        "columns": {
+          "date": "Date",
+          "expires": "Expires",
+          "quoteNumber": "{{entity}} #",
+          "status": "Status",
+          "total": "Total"
+        },
+        "empty": "No {{entities, lowercase}} on this {{workOrder, lowercase}} yet.",
+        "errorLoading": "Failed to load {{entities, lowercase}}.",
+        "expandRow": "Show line items",
+        "lineColumns": {
+          "description": "Description",
+          "lineTotal": "Total",
+          "quantity": "Qty",
+          "unitPrice": "Unit price"
+        },
+        "lineItemsHeading": "Line items",
+        "loading": "Loading {{entities, lowercase}}…",
+        "newQuote": "New {{entity}}",
+        "noLineItems": "No line items.",
+        "notesHeading": "Notes",
+        "statuses": {
+          "accepted": "Accepted",
+          "declined": "Declined",
+          "draft": "Draft",
+          "expired": "Expired",
+          "sent": "Sent"
+        }
+      },
+      "quoteDialog": {
+        "amount": "Amount",
+        "billTo": "Bill to",
+        "contextStrip": "{{workOrder}} #{{number}} · {{customer}}",
+        "customerRequired": "A bill-to {{entity, lowercase}} is required.",
+        "datesRequired": "Both dates are required.",
+        "description": "Description",
+        "descriptionPlaceholder": "What is this {{entity, lowercase}} for?",
+        "descriptionRequired": "Description is required.",
+        "errorCreate": "Failed to create {{entity, lowercase}}.",
+        "expirationDate": "Expires",
+        "invalidAmount": "Amount must be a positive number.",
+        "quoteDate": "{{entity}} date",
+        "saveAndSend": "Save & Send",
+        "saveAsDraft": "Save as Draft",
+        "title": "New {{entity}}"
+      },
       "paymentDialog": {
         "amount": "Amount",
         "balanceLabel": "Bal {{amount}}",

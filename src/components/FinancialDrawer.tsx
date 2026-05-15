@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import FinancialInvoicesTab from './FinancialInvoicesTab';
+import FinancialQuotesTab from './FinancialQuotesTab';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Button } from './catalyst/button';
 import { SlideOver } from './catalyst/slideover';
@@ -53,6 +54,11 @@ interface Props {
    * dialog.
    */
   openInvoiceCreateSignal?: number;
+  /**
+   * Same signal pattern for the Quotes tab. Driven by the chip-row
+   * `[+ Quote]` ghost.
+   */
+  openQuoteCreateSignal?: number;
 }
 
 /**
@@ -78,6 +84,7 @@ export default function FinancialDrawer({
   customerName,
   initialTab = 'invoices',
   openInvoiceCreateSignal,
+  openQuoteCreateSignal,
 }: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -115,9 +122,12 @@ export default function FinancialDrawer({
 
           <TabPanels className="!mt-0 flex-1 overflow-y-auto p-4">
             <TabPanel>
-              <ComingSoon
-                tabLabel={quotesLabel}
-                blockers={t('workOrders.financialDrawer.stubBlockers.quotes')}
+              <FinancialQuotesTab
+                workOrderId={workOrderId}
+                workOrderNumber={workOrderNumber}
+                customerId={customerId}
+                customerName={customerName}
+                openQuoteCreateSignal={openQuoteCreateSignal}
               />
             </TabPanel>
             <TabPanel>

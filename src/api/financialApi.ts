@@ -168,6 +168,8 @@ export interface QuoteLineItem {
 export interface Quote {
   id: string;
   customerId: string;
+  /** Optional WO link (Phase 7b backend ask #7). Older quotes have null. */
+  workOrderId?: string;
   quoteNumber: string;
   status: QuoteStatus;
   quoteDate: string;
@@ -190,6 +192,8 @@ export interface CreateQuoteLineItemRequest {
 
 export interface CreateQuoteRequest {
   customerId: string;
+  /** Optional WO link (Phase 7b backend ask #7). */
+  workOrderId?: string;
   quoteDate: string;
   expirationDate: string;
   taxRate: number;
@@ -214,6 +218,20 @@ export const quotesApi = {
 
   getByCustomer: async (customerId: string): Promise<Quote[]> => {
     const response = await apiClient.get<Quote[]>(`/financial/quotes/customer/${customerId}`);
+    return response.data;
+  },
+
+  /**
+   * WO-scoped quote list (Phase 7b backend ask #8). Server-sorted
+   * `quoteDate DESC, createdAt DESC`. Returns `[]` when the WO has no
+   * quotes, doesn't exist, or belongs to a different tenant (RLS-
+   * indistinguishable, same security default as the invoices endpoint).
+   * Includes DECLINED and EXPIRED rows for audit — mute on client.
+   */
+  getByWorkOrder: async (workOrderId: string): Promise<Quote[]> => {
+    const response = await apiClient.get<Quote[]>(
+      `/financial/work-orders/${workOrderId}/quotes`,
+    );
     return response.data;
   },
 
@@ -352,6 +370,13 @@ export const paymentsApi = {
  */
 export interface WorkOrderFinancialSummary {
   invoiced: string;
+  /**
+   * Optional. Sum of non-DECLINED, non-EXPIRED quote totals for the WO
+   * (Phase 7b backend ask #9). Always returned on tenants where 7b has
+   * shipped; typed optional so the field can roll out additively
+   * without breaking the chip-row code path during transition.
+   */
+  quoted?: string;
   paid: string;
   balance: string;
   currency: string;
