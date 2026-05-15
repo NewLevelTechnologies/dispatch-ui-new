@@ -10,6 +10,7 @@ import {
 import {
   invoicesApi,
   InvoiceStatus,
+  paymentsApi,
   type Invoice,
   type InvoiceStatus as InvoiceStatusType,
   type NestedInvoicePayment,
@@ -142,6 +143,17 @@ export default function FinancialInvoicesTab({
     },
   });
 
+  const voidPayment = useMutation({
+    mutationFn: (paymentId: string) => paymentsApi.void(paymentId),
+    onSuccess: () => {
+      // Backend cascade may demote PAID → SENT on the parent invoice and
+      // adjust amountPaid/balanceDue across any invoices the payment was
+      // applied to (split-payment case). Invalidate both queries.
+      queryClient.invalidateQueries({ queryKey: ['workOrderInvoices', workOrderId] });
+      queryClient.invalidateQueries({ queryKey: ['financialSummary', workOrderId] });
+    },
+  });
+
   const toggleExpand = (id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -166,6 +178,24 @@ export default function FinancialInvoicesTab({
       )
     ) {
       updateStatus.mutate({ id: invoice.id, status: InvoiceStatus.VOID });
+    }
+  };
+
+  const handleVoidPayment = (payment: NestedInvoicePayment) => {
+    // Confirmation is honest about the cascade: voiding the payment row
+    // here unwinds the FULL payment, not just its slice — backend reverses
+    // amountPaid/balanceDue on every invoice it touched and demotes PAID
+    // → SENT where applicable. The slice amount is shown as the "money
+    // affecting this invoice" context.
+    if (
+      window.confirm(
+        t('workOrders.financialDrawer.invoicesTab.voidPaymentConfirm', {
+          number: payment.paymentNumber,
+          amount: currencyFormatter.format(amt(payment.amount)),
+        }),
+      )
+    ) {
+      voidPayment.mutate(payment.id);
     }
   };
 
@@ -407,6 +437,7 @@ export default function FinancialInvoicesTab({
                         canAddPayment={
                           !isTerminal && amt(invoice.balanceDue) > 0
                         }
+                        onVoidPayment={handleVoidPayment}
                       />
                     </TableCell>
                   </TableRow>
@@ -434,6 +465,7 @@ interface InvoiceExpansionProps {
   invoice: Invoice;
   onAddPayment: () => void;
   canAddPayment: boolean;
+  onVoidPayment: (payment: NestedInvoicePayment) => void;
 }
 
 /**
@@ -442,13 +474,13 @@ interface InvoiceExpansionProps {
  * ask #2 fold; they were a sibling Payments tab in the earlier design.
  *
  * Line-item editing is explicitly NOT here — that waits for inventory
- * (§8.1). The Payments subsection ships read+create now; per-payment
- * Void waits on backend ask #4.
+ * (§8.1).
  */
 function InvoiceExpansion({
   invoice,
   onAddPayment,
   canAddPayment,
+  onVoidPayment,
 }: InvoiceExpansionProps) {
   const { t } = useTranslation();
 
@@ -508,6 +540,7 @@ function InvoiceExpansion({
         invoiceId={invoice.id}
         onAddPayment={onAddPayment}
         canAddPayment={canAddPayment}
+        onVoidPayment={onVoidPayment}
       />
 
       {invoice.notes && (
@@ -527,6 +560,7 @@ interface PaymentsSubsectionProps {
   invoiceId: string;
   onAddPayment: () => void;
   canAddPayment: boolean;
+  onVoidPayment: (payment: NestedInvoicePayment) => void;
 }
 
 const PAYMENT_METHOD_LABEL_KEYS: Record<PaymentMethodType, string> = {
@@ -545,14 +579,17 @@ const PAYMENT_METHOD_LABEL_KEYS: Record<PaymentMethodType, string> = {
  * invoice's payments[] with their respective slice). The `paymentNumber`
  * may repeat across invoices for split payments — that's fine.
  *
- * Void per-row action is intentionally absent in this branch; ships with
- * backend ask #4 (the void endpoint). Voided payments here render muted.
+ * Void per-row action (⋯ menu) unwinds the FULL payment, not just its
+ * slice — the backend cascade reverses every invoice the payment touched
+ * and demotes PAID → SENT where applicable. The confirmation copy makes
+ * this explicit. Voided rows render muted with the ⋯ menu omitted.
  */
 function PaymentsSubsection({
   payments,
   invoiceId,
   onAddPayment,
   canAddPayment,
+  onVoidPayment,
 }: PaymentsSubsectionProps) {
   const { t } = useTranslation();
 
@@ -596,6 +633,7 @@ function PaymentsSubsection({
               <th className="pb-1 font-medium">
                 {t('workOrders.financialDrawer.invoicesTab.paymentColumns.reference')}
               </th>
+              <th className="w-8 pb-1" />
             </tr>
           </thead>
           <tbody>
@@ -623,6 +661,27 @@ function PaymentsSubsection({
                   </td>
                   <td className="py-1 text-zinc-500 dark:text-zinc-400">
                     {p.referenceNumber ?? '—'}
+                  </td>
+                  <td className="py-1">
+                    {!isVoided && (
+                      <Dropdown>
+                        <DropdownButton
+                          plain
+                          aria-label={t('common.moreOptions')}
+                        >
+                          <EllipsisHorizontalIcon className="size-4" />
+                        </DropdownButton>
+                        <DropdownMenu anchor="bottom end">
+                          <DropdownItem onClick={() => onVoidPayment(p)}>
+                            <DropdownLabel>
+                              {t(
+                                'workOrders.financialDrawer.invoicesTab.actions.voidPayment',
+                              )}
+                            </DropdownLabel>
+                          </DropdownItem>
+                        </DropdownMenu>
+                      </Dropdown>
+                    )}
                   </td>
                 </tr>
               );

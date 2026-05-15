@@ -964,6 +964,9 @@ vi.mock('react-i18next', () => {
     'workOrders.financialDrawer.invoicesTab.statuses.void': 'Void',
     'workOrders.financialDrawer.invoicesTab.voidConfirm':
       'Void invoice {{number}} for {{amount}}? This cannot be undone.',
+    'workOrders.financialDrawer.invoicesTab.voidPaymentConfirm':
+      'Void payment {{number}} ({{amount}} applied to this invoice)? This reverses the full payment from every invoice it applies to. Cannot be undone.',
+    'workOrders.financialDrawer.invoicesTab.actions.voidPayment': 'Void payment',
     'workOrders.financialDrawer.invoicesTab.addPayment': 'Payment',
     'workOrders.financialDrawer.invoicesTab.noPayments':
       'No payments recorded against this invoice.',

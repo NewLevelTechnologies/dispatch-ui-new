@@ -188,23 +188,25 @@ describe('FinancialInvoicesTab', () => {
   });
 
   describe('Payments fold inside invoice expansion (§3.3 / ask #2 nested)', () => {
+    const makeNestedPayment = (
+      overrides: Partial<Invoice['payments'][0]> = {},
+    ): Invoice['payments'][0] => ({
+      id: 'pay-1',
+      paymentNumber: 'PAY-X9Y1',
+      paymentDate: '2026-05-12T00:00:00Z',
+      amount: '300.00' as unknown as number,
+      paymentMethod: 'CHECK',
+      status: 'RECEIVED',
+      referenceNumber: '1234',
+      notes: undefined,
+      createdAt: '2026-05-12T14:23:11Z',
+      updatedAt: '2026-05-12T14:23:11Z',
+      ...overrides,
+    });
+
     const withPayments = (extraPayments = {}) =>
       makeInvoice({
-        payments: [
-          {
-            id: 'pay-1',
-            paymentNumber: 'PAY-X9Y1',
-            paymentDate: '2026-05-12T00:00:00Z',
-            amount: '300.00' as unknown as number,
-            paymentMethod: 'CHECK',
-            status: 'RECEIVED',
-            referenceNumber: '1234',
-            notes: undefined,
-            createdAt: '2026-05-12T14:23:11Z',
-            updatedAt: '2026-05-12T14:23:11Z',
-            ...extraPayments,
-          },
-        ],
+        payments: [makeNestedPayment(extraPayments)],
       });
 
     it('renders nested payments inside the expanded invoice row', async () => {
@@ -238,6 +240,79 @@ describe('FinancialInvoicesTab', () => {
       await user.click(await screen.findByRole('button', { name: /show line items/i }));
       const paymentRow = screen.getByText('PAY-X9Y1').closest('tr');
       expect(paymentRow?.className).toMatch(/opacity-50/);
+    });
+
+    it('voids a payment via the ⋯ menu with cascade-aware confirmation', async () => {
+      const user = userEvent.setup();
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [withPayments()] });
+      vi.mocked(apiClient.post).mockResolvedValue({
+        status: 200,
+        data: {
+          id: 'pay-1',
+          status: 'VOID',
+        },
+      });
+      renderTab();
+      await user.click(await screen.findByRole('button', { name: /show line items/i }));
+      // The ⋯ button next to the payment row (last "more options" on the
+      // page since the invoice row's ⋯ comes first in DOM order).
+      const overflows = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(overflows.at(-1)!);
+      await user.click(await screen.findByRole('menuitem', { name: /void payment/i }));
+
+      // Confirmation copy is honest about the cascade.
+      expect(confirmSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/reverses the full payment from every invoice/i),
+      );
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/financial/payments/pay-1/void',
+        );
+      });
+      confirmSpy.mockRestore();
+    });
+
+    it('hides the ⋯ menu on already-VOID payment rows', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({
+        data: [withPayments({ status: 'VOID' })],
+      });
+      renderTab();
+      await user.click(await screen.findByRole('button', { name: /show line items/i }));
+      // The only overflow buttons on the page should be the invoice-row
+      // one(s) — not the payment row.
+      const overflows = screen.getAllByRole('button', { name: /more options/i });
+      for (const btn of overflows) {
+        await user.click(btn);
+        // None of the open menus should offer "Void payment"
+        expect(
+          screen.queryByRole('menuitem', { name: /void payment/i }),
+        ).not.toBeInTheDocument();
+        // Close it (click elsewhere).
+        await user.keyboard('{Escape}');
+      }
+    });
+
+    it('treats a 204 void response as a no-op (cross-tenant / not-found)', async () => {
+      const user = userEvent.setup();
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [withPayments()] });
+      vi.mocked(apiClient.post).mockResolvedValue({ status: 204, data: '' });
+      renderTab();
+      await user.click(await screen.findByRole('button', { name: /show line items/i }));
+      const overflows = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(overflows.at(-1)!);
+      await user.click(await screen.findByRole('menuitem', { name: /void payment/i }));
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/financial/payments/pay-1/void',
+        );
+      });
+      // The mutation completes without throwing; the query invalidation
+      // is the only observable side-effect (covered by the integration
+      // chain — refetch happens regardless of 200 vs 204).
+      confirmSpy.mockRestore();
     });
   });
 
