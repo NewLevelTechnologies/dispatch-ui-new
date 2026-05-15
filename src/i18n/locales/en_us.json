@@ -1198,7 +1198,8 @@
       "invoicesTab": {
         "actions": {
           "markPaid": "Mark paid",
-          "void": "Void"
+          "void": "Void",
+          "voidPayment": "Void payment"
         },
         "addPayment": "Payment",
         "changeStatus": "Change status (currently {{current}})",
@@ -1243,7 +1244,8 @@
           "sent": "Sent",
           "void": "Void"
         },
-        "voidConfirm": "Void invoice {{number}} for {{amount}}? This cannot be undone."
+        "voidConfirm": "Void invoice {{number}} for {{amount}}? This cannot be undone.",
+        "voidPaymentConfirm": "Void payment {{number}} ({{amount}} applied to this invoice)? This reverses the full payment from every invoice it applies to. Cannot be undone."
       },
       "paymentDialog": {
         "amount": "Amount",

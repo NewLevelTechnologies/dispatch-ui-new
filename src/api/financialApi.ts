@@ -285,6 +285,29 @@ export const paymentsApi = {
     const response = await apiClient.post<Payment>('/financial/payments', request);
     return response.data;
   },
+
+  /**
+   * Void a payment (Phase 7 backend ask #4).
+   *
+   *   200 + updated Payment  → success
+   *   200 + Payment          → idempotent re-void (already-VOID)
+   *   204 No Content         → cross-tenant or not-found
+   *                             (RLS-indistinguishable, security default —
+   *                             do NOT treat as error; just no-op refresh)
+   *
+   * Cascade: backend reverts each touched invoice's `amountPaid` /
+   * `balanceDue` and demotes PAID → SENT where applicable. A single void
+   * may affect multiple invoices if the payment was split across them.
+   * Callers should invalidate both the invoice list and the financial
+   * summary for the work order.
+   */
+  void: async (id: string): Promise<Payment | null> => {
+    const response = await apiClient.post<Payment | ''>(
+      `/financial/payments/${id}/void`,
+    );
+    if (response.status === 204) return null;
+    return response.data as Payment;
+  },
 };
 
 // ========== WORK-ORDER FINANCIAL SUMMARY ==========
