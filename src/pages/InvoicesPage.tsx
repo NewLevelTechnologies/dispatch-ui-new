@@ -107,8 +107,10 @@ export default function InvoicesPage() {
       const request: CreateInvoiceRequest = {
         customerId: formData.customerId,
         workOrderId: formData.workOrderId || undefined,
-        invoiceDate: new Date(formData.invoiceDate).toISOString(),
-        dueDate: new Date(formData.dueDate).toISOString(),
+        // Business dates are LocalDate (yyyy-MM-dd) on the wire — pass
+        // the date-input value through raw, not as an ISO Instant.
+        invoiceDate: formData.invoiceDate,
+        dueDate: formData.dueDate,
         taxRate: parseFloat(formData.taxRate),
         notes: formData.notes || undefined,
         lineItems: formData.lineItems,

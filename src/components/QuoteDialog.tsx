@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
-  invoicesApi,
-  InvoiceStatus,
-  type CreateInvoiceRequest,
+  quotesApi,
+  QuoteStatus,
+  type CreateQuoteRequest,
   type CustomerSearchResult,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -30,12 +30,6 @@ interface Props {
   onClose: () => void;
   workOrderId: string;
   workOrderNumber: string;
-  /**
-   * The WO's primary customer (service recipient). Defaults the billing
-   * customer in the picker so the common case is one-click. CSR can switch
-   * to a different customer (e.g. a BILLING_ONLY warranty company) when
-   * billing is routed to a third party.
-   */
   defaultCustomer: { id: string; name: string };
 }
 
@@ -48,21 +42,13 @@ const isoPlusDays = (days: number) => {
 };
 
 /**
- * Minimal lump-sum invoice creation dialog (Phase 7 §4.2). CSR enters a
- * single description + amount; backend stores it as one custom line item
- * (no `partId`, quantity 1). Forward-compatible with the inventory rebuild
- * — when the parts catalog ships, this dialog gains an optional line-items
- * table mode (§8.1) while the lump-sum field stays as a primary path.
- *
- * Two save buttons (§4.2):
- *   - Save as Draft  → POST with status DRAFT
- *   - Save & Send    → POST + chained updateStatus(SENT)
- *
- * Tax handling is intentionally out of scope here — `taxRate: 0` is
- * hardcoded. The standalone Invoices page covers tax-aware creation
- * until inventory lands.
+ * Minimal lump-sum quote creation dialog (Phase 7 §4.3). Mirror of the
+ * invoice dialog — same single-line-item shape on the backend, only the
+ * date pair differs (Quote Date / Expires instead of Invoice Date / Due
+ * Date) and Save & Send moves the quote to SENT status (pre-billing,
+ * no payment chain).
  */
-export default function InvoiceDialog({
+export default function QuoteDialog({
   open,
   onClose,
   workOrderId,
@@ -71,13 +57,13 @@ export default function InvoiceDialog({
 }: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
-  const invoiceLabel = getName('invoice');
+  const quoteLabel = getName('quote');
   const customerLabel = getName('customer');
   const workOrderLabel = getName('work_order');
   const queryClient = useQueryClient();
 
-  const [invoiceDate, setInvoiceDate] = useState(todayIso());
-  const [dueDate, setDueDate] = useState(isoPlusDays(30));
+  const [quoteDate, setQuoteDate] = useState(todayIso());
+  const [expirationDate, setExpirationDate] = useState(isoPlusDays(30));
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
@@ -88,17 +74,12 @@ export default function InvoiceDialog({
   useEffect(() => {
     if (!open) return;
     /* eslint-disable react-hooks/set-state-in-effect -- standard form-init pattern */
-    setInvoiceDate(todayIso());
-    setDueDate(isoPlusDays(30));
+    setQuoteDate(todayIso());
+    setExpirationDate(isoPlusDays(30));
     setDescription('');
     setAmount('');
     setNotes('');
     setError(null);
-    // Default to the WO's customer. Only seed the picker when we actually
-    // have an id — otherwise leave it null so the user must explicitly
-    // pick (caught by validate() before submit). Prevents silent
-    // `customerId: undefined` submissions when the parent's default is
-    // empty for any reason.
     setBillingCustomer(
       defaultCustomer.id
         ? {
@@ -113,30 +94,21 @@ export default function InvoiceDialog({
   }, [open, defaultCustomer]);
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['workOrderInvoices', workOrderId] });
+    queryClient.invalidateQueries({ queryKey: ['workOrderQuotes', workOrderId] });
     queryClient.invalidateQueries({ queryKey: ['financialSummary', workOrderId] });
   };
 
   const createMutation = useMutation({
     mutationFn: async ({ send }: { send: boolean }) => {
       const numeric = parseFloat(amount.replace(/[$,\s]/g, ''));
-      const request: CreateInvoiceRequest = {
+      const request: CreateQuoteRequest = {
         workOrderId,
-        // Bill-to customer — defaults to the WO's customer (service
-        // recipient) but the CSR can pick a different one in the picker
-        // (e.g. a BILLING_ONLY warranty co). The WO's customer remains
-        // the service recipient regardless; only the invoice's
-        // customerId changes.
         customerId: billingCustomer!.id,
-        // Business dates are LocalDate (yyyy-MM-dd) on the wire — only
-        // audit fields (createdAt/updatedAt) are Instant. Pass the date
-        // input value through raw. Earlier this dialog appended T00:00:00Z
-        // because the contract was misread; corrected per backend's wire
-        // -types reference (refactor: business dates use LocalDate).
-        invoiceDate,
-        dueDate,
-        // Lump-sum: a single custom line item, no partId. Backend stores
-        // it as-is per ask #6's contract confirmation.
+        // Quote dates are LocalDate (yyyy-MM-dd), not Instant — different
+        // from the invoice dialog, which DOES need T00:00:00Z. Pass the
+        // date-input value through raw.
+        quoteDate,
+        expirationDate,
         taxRate: 0,
         notes: notes.trim() || undefined,
         lineItems: [
@@ -147,10 +119,10 @@ export default function InvoiceDialog({
           },
         ],
       };
-      const created = await invoicesApi.create(request);
+      const created = await quotesApi.create(request);
       if (send) {
-        await invoicesApi.updateStatus(created.id, {
-          status: InvoiceStatus.SENT,
+        await quotesApi.updateStatus(created.id, {
+          status: QuoteStatus.SENT,
         });
       }
       return created;
@@ -167,8 +139,8 @@ export default function InvoiceDialog({
           : undefined;
       setError(
         msg ??
-          t('workOrders.financialDrawer.invoiceDialog.errorCreate', {
-            entity: invoiceLabel,
+          t('workOrders.financialDrawer.quoteDialog.errorCreate', {
+            entity: quoteLabel,
           }),
       );
     },
@@ -177,23 +149,23 @@ export default function InvoiceDialog({
   const validate = (): boolean => {
     if (!billingCustomer || !billingCustomer.id) {
       setError(
-        t('workOrders.financialDrawer.invoiceDialog.customerRequired', {
+        t('workOrders.financialDrawer.quoteDialog.customerRequired', {
           entity: customerLabel,
         }),
       );
       return false;
     }
     if (!description.trim()) {
-      setError(t('workOrders.financialDrawer.invoiceDialog.descriptionRequired'));
+      setError(t('workOrders.financialDrawer.quoteDialog.descriptionRequired'));
       return false;
     }
     const numeric = parseFloat(amount.replace(/[$,\s]/g, ''));
     if (!Number.isFinite(numeric) || numeric <= 0) {
-      setError(t('workOrders.financialDrawer.invoiceDialog.invalidAmount'));
+      setError(t('workOrders.financialDrawer.quoteDialog.invalidAmount'));
       return false;
     }
-    if (!invoiceDate || !dueDate) {
-      setError(t('workOrders.financialDrawer.invoiceDialog.datesRequired'));
+    if (!quoteDate || !expirationDate) {
+      setError(t('workOrders.financialDrawer.quoteDialog.datesRequired'));
       return false;
     }
     return true;
@@ -210,16 +182,13 @@ export default function InvoiceDialog({
   return (
     <Dialog open={open} onClose={onClose} size="md">
       <DialogTitle>
-        {t('workOrders.financialDrawer.invoiceDialog.title', {
-          entity: invoiceLabel,
+        {t('workOrders.financialDrawer.quoteDialog.title', {
+          entity: quoteLabel,
         })}
       </DialogTitle>
       <DialogBody>
-        {/* Locked context strip (§4.1). Identifies the WO + its service
-            customer. The bill-to customer (which may differ — warranty,
-            insurance, etc.) is the picker field below, not this strip. */}
         <div className="mb-3 rounded-md bg-zinc-50 px-2.5 py-1.5 text-sm text-zinc-700 dark:bg-white/5 dark:text-zinc-300">
-          {t('workOrders.financialDrawer.invoiceDialog.contextStrip', {
+          {t('workOrders.financialDrawer.quoteDialog.contextStrip', {
             workOrder: workOrderLabel,
             number: workOrderNumber,
             customer: defaultCustomer.name,
@@ -233,18 +202,16 @@ export default function InvoiceDialog({
           }}
         >
           <Fieldset>
-            {/* Tighter vertical rhythm than Catalyst's default space-y-8
-                — CSR forms favor density (memory: feedback_form_density). */}
             <FieldGroup className="!space-y-3">
               <Field>
                 <Label>
-                  {t('workOrders.financialDrawer.invoiceDialog.billTo')}
+                  {t('workOrders.financialDrawer.quoteDialog.billTo')}
                 </Label>
                 <CustomerPicker
                   value={billingCustomer}
                   onChange={setBillingCustomer}
                   ariaLabel={t(
-                    'workOrders.financialDrawer.invoiceDialog.billTo',
+                    'workOrders.financialDrawer.quoteDialog.billTo',
                   )}
                 />
               </Field>
@@ -252,27 +219,27 @@ export default function InvoiceDialog({
               <div className="grid grid-cols-2 gap-3">
                 <Field>
                   <Label>
-                    {t('workOrders.financialDrawer.invoiceDialog.invoiceDate', {
-                      entity: invoiceLabel,
+                    {t('workOrders.financialDrawer.quoteDialog.quoteDate', {
+                      entity: quoteLabel,
                     })}
                   </Label>
                   <Input
-                    name="invoiceDate"
+                    name="quoteDate"
                     type="date"
-                    value={invoiceDate}
-                    onChange={(e) => setInvoiceDate(e.target.value)}
+                    value={quoteDate}
+                    onChange={(e) => setQuoteDate(e.target.value)}
                     required
                   />
                 </Field>
                 <Field>
                   <Label>
-                    {t('workOrders.financialDrawer.invoiceDialog.dueDate')}
+                    {t('workOrders.financialDrawer.quoteDialog.expirationDate')}
                   </Label>
                   <Input
-                    name="dueDate"
+                    name="expirationDate"
                     type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
+                    value={expirationDate}
+                    onChange={(e) => setExpirationDate(e.target.value)}
                     required
                   />
                 </Field>
@@ -280,7 +247,7 @@ export default function InvoiceDialog({
 
               <Field>
                 <Label>
-                  {t('workOrders.financialDrawer.invoiceDialog.description')}
+                  {t('workOrders.financialDrawer.quoteDialog.description')}
                 </Label>
                 <Textarea
                   name="description"
@@ -288,8 +255,8 @@ export default function InvoiceDialog({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder={t(
-                    'workOrders.financialDrawer.invoiceDialog.descriptionPlaceholder',
-                    { entity: invoiceLabel },
+                    'workOrders.financialDrawer.quoteDialog.descriptionPlaceholder',
+                    { entity: quoteLabel },
                   )}
                   required
                 />
@@ -297,7 +264,7 @@ export default function InvoiceDialog({
 
               <Field>
                 <Label>
-                  {t('workOrders.financialDrawer.invoiceDialog.amount')}
+                  {t('workOrders.financialDrawer.quoteDialog.amount')}
                 </Label>
                 <Input
                   name="amount"
@@ -333,7 +300,7 @@ export default function InvoiceDialog({
           {t('common.cancel')}
         </Button>
         <Button outline onClick={() => handleSubmit(false)} disabled={submitting}>
-          {t('workOrders.financialDrawer.invoiceDialog.saveAsDraft')}
+          {t('workOrders.financialDrawer.quoteDialog.saveAsDraft')}
         </Button>
         <Button
           color="dark/zinc"
@@ -342,7 +309,7 @@ export default function InvoiceDialog({
         >
           {submitting
             ? t('common.saving')
-            : t('workOrders.financialDrawer.invoiceDialog.saveAndSend')}
+            : t('workOrders.financialDrawer.quoteDialog.saveAndSend')}
         </Button>
       </DialogActions>
     </Dialog>

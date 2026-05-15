@@ -1004,6 +1004,57 @@ vi.mock('react-i18next', () => {
     'workOrders.financialDrawer.invoiceDialog.saveAndSend': 'Save & Send',
     'workOrders.financialDrawer.invoiceDialog.saveAsDraft': 'Save as Draft',
     'workOrders.financialDrawer.invoiceDialog.title': 'New {{entity}}',
+    'workOrders.financialDrawer.quotesTab.actions.markAccepted': 'Mark accepted',
+    'workOrders.financialDrawer.quotesTab.actions.markDeclined': 'Mark declined',
+    'workOrders.financialDrawer.quotesTab.changeStatus':
+      'Change status (currently {{current}})',
+    'workOrders.financialDrawer.quotesTab.collapseRow': 'Hide line items',
+    'workOrders.financialDrawer.quotesTab.columns.date': 'Date',
+    'workOrders.financialDrawer.quotesTab.columns.expires': 'Expires',
+    'workOrders.financialDrawer.quotesTab.columns.quoteNumber': '{{entity}} #',
+    'workOrders.financialDrawer.quotesTab.columns.status': 'Status',
+    'workOrders.financialDrawer.quotesTab.columns.total': 'Total',
+    'workOrders.financialDrawer.quotesTab.empty':
+      'No {{entities, lowercase}} on this {{workOrder, lowercase}} yet.',
+    'workOrders.financialDrawer.quotesTab.errorLoading':
+      'Failed to load {{entities, lowercase}}.',
+    'workOrders.financialDrawer.quotesTab.expandRow': 'Show line items',
+    'workOrders.financialDrawer.quotesTab.lineColumns.description': 'Description',
+    'workOrders.financialDrawer.quotesTab.lineColumns.lineTotal': 'Total',
+    'workOrders.financialDrawer.quotesTab.lineColumns.quantity': 'Qty',
+    'workOrders.financialDrawer.quotesTab.lineColumns.unitPrice': 'Unit price',
+    'workOrders.financialDrawer.quotesTab.lineItemsHeading': 'Line items',
+    'workOrders.financialDrawer.quotesTab.loading': 'Loading {{entities, lowercase}}…',
+    'workOrders.financialDrawer.quotesTab.newQuote': 'New {{entity}}',
+    'workOrders.financialDrawer.quotesTab.noLineItems': 'No line items.',
+    'workOrders.financialDrawer.quotesTab.notesHeading': 'Notes',
+    'workOrders.financialDrawer.quotesTab.statuses.accepted': 'Accepted',
+    'workOrders.financialDrawer.quotesTab.statuses.declined': 'Declined',
+    'workOrders.financialDrawer.quotesTab.statuses.draft': 'Draft',
+    'workOrders.financialDrawer.quotesTab.statuses.expired': 'Expired',
+    'workOrders.financialDrawer.quotesTab.statuses.sent': 'Sent',
+    'workOrders.financialDrawer.quoteDialog.amount': 'Amount',
+    'workOrders.financialDrawer.quoteDialog.billTo': 'Bill to',
+    'workOrders.financialDrawer.quoteDialog.contextStrip':
+      '{{workOrder}} #{{number}} · {{customer}}',
+    'workOrders.financialDrawer.quoteDialog.customerRequired':
+      'A bill-to {{entity, lowercase}} is required.',
+    'workOrders.financialDrawer.quoteDialog.datesRequired':
+      'Both dates are required.',
+    'workOrders.financialDrawer.quoteDialog.description': 'Description',
+    'workOrders.financialDrawer.quoteDialog.descriptionPlaceholder':
+      'What is this {{entity, lowercase}} for?',
+    'workOrders.financialDrawer.quoteDialog.descriptionRequired':
+      'Description is required.',
+    'workOrders.financialDrawer.quoteDialog.errorCreate':
+      'Failed to create {{entity, lowercase}}.',
+    'workOrders.financialDrawer.quoteDialog.expirationDate': 'Expires',
+    'workOrders.financialDrawer.quoteDialog.invalidAmount':
+      'Amount must be a positive number.',
+    'workOrders.financialDrawer.quoteDialog.quoteDate': '{{entity}} date',
+    'workOrders.financialDrawer.quoteDialog.saveAndSend': 'Save & Send',
+    'workOrders.financialDrawer.quoteDialog.saveAsDraft': 'Save as Draft',
+    'workOrders.financialDrawer.quoteDialog.title': 'New {{entity}}',
     'workOrders.financialDrawer.paymentDialog.amount': 'Amount',
     'workOrders.financialDrawer.paymentDialog.balanceLabel': 'Bal {{amount}}',
     'workOrders.financialDrawer.paymentDialog.contextStrip':

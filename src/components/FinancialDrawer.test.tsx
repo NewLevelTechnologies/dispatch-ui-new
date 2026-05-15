@@ -74,15 +74,22 @@ describe('FinancialDrawer', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders the "Coming soon" stub on the still-stubbed tabs with matching blocker copy', async () => {
+  it('renders the "Coming soon" stub on the POs tab (7c, no backend entity)', async () => {
     const user = userEvent.setup();
     renderWithProviders(<FinancialDrawer {...defaults} />);
-    // Quotes tab — 7b
-    await user.click(screen.getByRole('tab', { name: 'Quotes' }));
-    expect(screen.getByText(/phase 7b/i)).toBeInTheDocument();
-    // POs tab — 7c
+    // Quotes tab is now live (7b). POs remain stubbed until 7c.
     await user.click(screen.getByRole('tab', { name: 'POs' }));
     expect(screen.getByText(/Deferred to phase 7c/i)).toBeInTheDocument();
+  });
+
+  it('renders the live Quotes tab (no longer a stub in 7b)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<FinancialDrawer {...defaults} />);
+    await user.click(screen.getByRole('tab', { name: 'Quotes' }));
+    // Empty state with a + New Quote affordance, not the Coming-soon copy.
+    expect(
+      await screen.findByText(/No quotes on this work order yet/i),
+    ).toBeInTheDocument();
   });
 
   it('calls onClose when the close button is clicked', async () => {

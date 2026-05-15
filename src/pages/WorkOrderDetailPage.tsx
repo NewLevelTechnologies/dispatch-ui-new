@@ -185,25 +185,34 @@ export default function WorkOrderDetailPage() {
   const [financialDrawerOpen, setFinancialDrawerOpen] = useState(false);
   const [financialDrawerInitialTab, setFinancialDrawerInitialTab] =
     useState<FinancialTab>('invoices');
-  // Monotonic counter: each increment signals the Invoices tab to
-  // auto-open its create dialog. Used by the chip-row `[+ Invoice]`
-  // ghost so a single click both opens the drawer AND opens the create
-  // dialog (one CSR-visible action, one click).
+  // Monotonic counters — each increment signals the matching tab to
+  // auto-open its create dialog. Used by the chip-row [+ Invoice] /
+  // [+ Quote] ghosts so a single click both opens the drawer at the
+  // tab AND opens the create dialog (one CSR-visible action, one
+  // click).
   const [invoiceCreateSignal, setInvoiceCreateSignal] = useState(0);
+  const [quoteCreateSignal, setQuoteCreateSignal] = useState(0);
 
   // Open the financial drawer at the matching tab. Used by derived chips
-  // ($ invoiced, $ paid, Bal) — explicitly resets the create-invoice
-  // signal so a stale value from a previous ghost click can't trigger
-  // the create dialog to reopen on this navigation.
+  // ($ quoted, $ invoiced, Bal) — explicitly resets BOTH create signals
+  // so a stale value from a previous ghost click can't trigger a create
+  // dialog to reopen on this navigation.
   const openFinancialDrawer = (tab: FinancialTab) => {
     setFinancialDrawerInitialTab(tab);
     setInvoiceCreateSignal(0);
+    setQuoteCreateSignal(0);
     setFinancialDrawerOpen(true);
   };
 
   const openFinancialDrawerForInvoiceCreate = () => {
     setFinancialDrawerInitialTab('invoices');
     setInvoiceCreateSignal((n) => n + 1);
+    setFinancialDrawerOpen(true);
+  };
+
+  const openFinancialDrawerForQuoteCreate = () => {
+    setFinancialDrawerInitialTab('quotes');
+    setQuoteCreateSignal((n) => n + 1);
     setFinancialDrawerOpen(true);
   };
   const [workItemDialogOpen, setWorkItemDialogOpen] = useState(false);
@@ -744,14 +753,19 @@ export default function WorkOrderDetailPage() {
               decisions (formatter and >0 checks); never use parseFloat
               output for write-side arithmetic.
               Click routing (§3.2):
+                $ quoted    → drawer, Quotes tab (7b)
                 $ invoiced  → drawer, Invoices tab
                 $ paid      → plain text, no click (§5.1 — payments live
                               inside invoice expansions, no tab to route
                               to)
                 Bal         → drawer, Invoices tab
+                [+ Quote]   → drawer, Quotes tab (7b)
                 [+ Invoice] → drawer, Invoices tab */}
           {(() => {
             const hasNte = workOrder.notToExceed != null;
+            const quotedAmt = financialSummary?.quoted
+              ? parseFloat(financialSummary.quoted) || 0
+              : 0;
             const invoicedAmt = financialSummary
               ? parseFloat(financialSummary.invoiced) || 0
               : 0;
@@ -762,7 +776,7 @@ export default function WorkOrderDetailPage() {
               ? parseFloat(financialSummary.balance) || 0
               : 0;
             const hasDerivedActivity =
-              invoicedAmt > 0 || paidAmt > 0 || balanceAmt > 0;
+              quotedAmt > 0 || invoicedAmt > 0 || paidAmt > 0 || balanceAmt > 0;
             const frozen = isCancelled || isArchived;
 
             // Frozen WOs: only render the row when there's something
@@ -771,7 +785,20 @@ export default function WorkOrderDetailPage() {
             if (frozen && !hasNte && !hasDerivedActivity) return null;
 
             const showNteSlot = hasNte || !frozen;
-            const showTypedGhosts = !frozen && !hasDerivedActivity;
+            // Both ghosts are bootstrap-only — they retire once the
+            // matching entity has activity on the WO. After that, the
+            // CSR is already going through the drawer for status /
+            // related-record reasons, and the in-drawer + New CTA is
+            // the natural next click.
+            //
+            // Exception worth flagging: a CSR sometimes needs a follow
+            // -up quote (or invoice) on a WO that already has activity
+            // — that path remains 3 clicks (chip → tab → +New). If real
+            // CSR feedback shows that's a friction point on a specific
+            // entity, revisit per-entity.
+            const showQuoteGhost = !frozen && quotedAmt === 0;
+            const showInvoiceGhost = !frozen && invoicedAmt === 0;
+            const showTypedGhosts = showQuoteGhost || showInvoiceGhost;
             // §5.2 Bal palette:
             //   rose  → any invoice on the WO is OVERDUE (highest signal)
             //   amber → invoiced > 0 and paid = 0 (outstanding, not late yet)
@@ -863,6 +890,30 @@ export default function WorkOrderDetailPage() {
 
                 {hasDerivedActivity && (
                   <>
+                    {quotedAmt > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openFinancialDrawer('quotes')}
+                          title={currencyFormatter.format(quotedAmt)}
+                          aria-label={getName('quote', true)}
+                          className={`${chipButtonClass} bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10`}
+                        >
+                          <span className="font-medium tabular-nums">
+                            {formatCompactCurrency(quotedAmt)}
+                          </span>
+                          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                            {t('workOrders.detail.money.quoted')}
+                          </span>
+                        </button>
+                        <span
+                          className="text-zinc-300 dark:text-zinc-600"
+                          aria-hidden="true"
+                        >
+                          ·
+                        </span>
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={() => openFinancialDrawer('invoices')}
@@ -929,20 +980,52 @@ export default function WorkOrderDetailPage() {
                   </>
                 )}
 
+                {hasDerivedActivity && showTypedGhosts && (
+                  // Separate the "data" cluster (live derived chips) from
+                  // the "actions" cluster (create ghosts) with a vertical
+                  // bar — matches the NTE-vs-data divider so the row reads
+                  // as three groups: identity · data · actions.
+                  <span
+                    className="inline-block h-4 w-px bg-zinc-300 dark:bg-zinc-600"
+                    aria-hidden="true"
+                  />
+                )}
+
                 {showTypedGhosts && (
-                  // Typed ghost cluster (§5.3) — bootstrap entry to the
-                  // drawer when summary is zero. 7a ships only +Invoice;
-                  // [+ Quote] joins in 7b once the Quotes tab is real.
-                  // Click lands on Invoices tab AND auto-opens the create
-                  // dialog (one CSR action, one click) per §3.2 routing.
-                  <button
-                    type="button"
-                    onClick={openFinancialDrawerForInvoiceCreate}
-                    aria-label={getName('invoice', true)}
-                    className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-300 px-1.5 py-0.5 text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
-                  >
-                    + {getName('invoice')}
-                  </button>
+                  // Typed ghost create-entry. [+ Quote] always visible on
+                  // active WOs (additional-work-needs-quoting flow).
+                  // [+ Invoice] retires once any invoice exists (§5.3 +
+                  // CSR feedback).
+                  <>
+                    {showQuoteGhost && (
+                      <button
+                        type="button"
+                        onClick={openFinancialDrawerForQuoteCreate}
+                        aria-label={getName('quote', true)}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-300 px-1.5 py-0.5 text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
+                      >
+                        + {getName('quote')}
+                      </button>
+                    )}
+                    {showQuoteGhost && showInvoiceGhost && (
+                      <span
+                        className="text-zinc-300 dark:text-zinc-600"
+                        aria-hidden="true"
+                      >
+                        ·
+                      </span>
+                    )}
+                    {showInvoiceGhost && (
+                      <button
+                        type="button"
+                        onClick={openFinancialDrawerForInvoiceCreate}
+                        aria-label={getName('invoice', true)}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-300 px-1.5 py-0.5 text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
+                      >
+                        + {getName('invoice')}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -1192,6 +1275,7 @@ export default function WorkOrderDetailPage() {
         customerName={customer?.name ?? ''}
         initialTab={financialDrawerInitialTab}
         openInvoiceCreateSignal={invoiceCreateSignal}
+        openQuoteCreateSignal={quoteCreateSignal}
       />
 
       {/* Dispatch detail drawer — row body click opens this with the

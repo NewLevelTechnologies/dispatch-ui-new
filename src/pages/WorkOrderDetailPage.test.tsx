@@ -5,7 +5,7 @@ import { renderWithProviders } from '../test/utils';
 import WorkOrderDetailPage from './WorkOrderDetailPage';
 import apiClient from '../api/client';
 import type { RouteObject } from 'react-router-dom';
-import type { WorkOrder } from '../api';
+import type { WorkOrder, WorkOrderFinancialSummary } from '../api';
 
 vi.mock('../api/client');
 
@@ -52,7 +52,7 @@ describe('WorkOrderDetailPage', () => {
     vi.clearAllMocks();
   });
 
-  const ZERO_SUMMARY = {
+  const ZERO_SUMMARY: WorkOrderFinancialSummary = {
     invoiced: '0.00',
     paid: '0.00',
     balance: '0.00',
@@ -61,7 +61,7 @@ describe('WorkOrderDetailPage', () => {
 
   const mockApiResponses = (
     workOrder: WorkOrder | null = mockWorkOrder,
-    summary: typeof ZERO_SUMMARY = ZERO_SUMMARY,
+    summary: WorkOrderFinancialSummary = ZERO_SUMMARY,
     invoices: unknown[] = [],
   ) => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
@@ -397,7 +397,7 @@ describe('WorkOrderDetailPage', () => {
       expect(screen.getByText(/\+ Set NTE/i)).toBeInTheDocument();
     });
 
-    it('does not render the typed [+ Invoice] ghost when activity exists', async () => {
+    it('does not render the typed [+ Invoice] ghost when invoice activity exists', async () => {
       mockApiResponses(mockWorkOrder, {
         invoiced: '500.00',
         paid: '0.00',
@@ -408,9 +408,47 @@ describe('WorkOrderDetailPage', () => {
       await waitFor(() => {
         expect(screen.getByText('invoiced')).toBeInTheDocument();
       });
-      // Typed ghost is bootstrap-only — once derived chips appear, the
-      // ghost retires (in-drawer +New buttons take over for create flows).
+      // [+ Invoice] is bootstrap-only — retires once any invoice exists.
+      // [+ Quote] still shows because no quote activity yet.
       expect(screen.queryByText(/\+ Invoice/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/\+ Quote/i)).toBeInTheDocument();
+    });
+
+    it('renders the $ quoted chip when summary.quoted > 0 (7b)', async () => {
+      mockApiResponses(mockWorkOrder, {
+        invoiced: '0.00',
+        quoted: '9800.00',
+        paid: '0.00',
+        balance: '0.00',
+        currency: 'USD',
+      });
+      renderPage();
+      // $ quoted joins the live cluster. Once any derived field is
+      // non-zero the whole cluster renders ($0 invoiced / $0 paid show
+      // too) so the row reads as a coherent reconciliation story.
+      await waitFor(() => {
+        expect(screen.getByText('quoted')).toBeInTheDocument();
+      });
+      expect(screen.getByText('$9.8K')).toBeInTheDocument();
+      expect(screen.getByText('invoiced')).toBeInTheDocument();
+      expect(screen.getByText('paid')).toBeInTheDocument();
+    });
+
+    it('retires the [+ Quote] ghost once any quote exists on the WO', async () => {
+      mockApiResponses(mockWorkOrder, {
+        invoiced: '0.00',
+        quoted: '9800.00',
+        paid: '0.00',
+        balance: '0.00',
+        currency: 'USD',
+      });
+      renderPage();
+      await waitFor(() => {
+        expect(screen.getByText('quoted')).toBeInTheDocument();
+      });
+      // Quote ghost retires; Invoice ghost stays (no invoice yet).
+      expect(screen.queryByText(/\+ Quote/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/\+ Invoice/i)).toBeInTheDocument();
     });
   });
 
