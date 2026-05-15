@@ -121,14 +121,20 @@ POST /api/v1/financial/quotes/{id}/send
 ### 4.4 Public render endpoints
 
 ```
-GET /api/v1/public/invoices/{token}
-GET /api/v1/public/quotes/{token}
+GET /api/v1/public/invoices
+GET /api/v1/public/quotes
+
+Headers:
+  X-Share-Token: <opaque-token>      (required)
 ```
 
-**Auth:** none. The token IS the auth. No JWT, no tenant header.
+**Token is passed in a header, NOT in the URL path.** Reason: the SPA (which the email link loads) reads the token from its own URL and then makes this API call itself — it's not a browser following a link, so the SPA controls the request format. Keeping the token off the request URI means ALB access logs, CloudFront API-hop logs, Sentry breadcrumbs, and middleware scrubbing rules all become trivial. The token still lives in the SPA route `/p/invoice/:token` (that's the email link; intrinsically a URL) — distribution-wide CloudFront / S3 logging-off (per §7.1) covers that hop.
+
+**Auth:** the `X-Share-Token` header IS the auth. No JWT, no tenant header.
 
 **Behavior:**
-1. Look up token in `invoice_share_links` / `quote_share_links` (the only DB read that runs **without** TenantContext set).
+1. Read `X-Share-Token` from request headers. Refuse with 401 if absent.
+2. Look up token in `invoice_share_links` / `quote_share_links` (the only DB read that runs **without** TenantContext set).
 2. If row not found OR `revoked_at IS NOT NULL` OR `expires_at < now()` → 404. (All three indistinguishable to caller. Don't leak existence.)
 3. `TenantContext.setTenantId(row.tenant_id)` — same pattern as event consumers (per CLAUDE.md).
 4. Fetch invoice/quote (RLS-filtered) plus tenant branding (logo URL, display name, support email/phone) plus customer name.
@@ -321,13 +327,13 @@ Content-Security-Policy: default-src 'self'; ...   # full policy TBD with FE —
 
 | # | Surface | Mechanism |
 |---|---|---|
-| 1 | Server access logs (financial-service) | Middleware replaces `/p/invoice/{token}` and `/p/quote/{token}` with `:token` placeholder before logging |
+| 1 | Server access logs (financial-service) | Token is in `X-Share-Token` header, not URL path (per §4.4). The public-API URI is `/api/v1/public/invoices` / `.../quotes` — no token segment to scrub. Default Spring/HTTP access-log formats only capture method + URI + status, not request headers, so no leak. Guard: do not add `X-Share-Token` to any custom log format, MDC enrichment, or request-dump error handler |
 | 2 | HTTP response headers | `Referrer-Policy: no-referrer` set on every public-route response (or at CDN per §7.3) |
 | 3 | Outbound links on public page | `rel="noopener noreferrer"` on every `<a>` tag |
 | 4 | Sentry / error reporter | Path-pattern scrubbing rule for `/p/(invoice|quote)/:token` URLs |
 | 5 | CloudFront access logs | Distribution-wide standard logging stays off — per §7.1, AWS doesn't expose a per-behavior toggle for standard logs, so the rule has to be distribution-scoped. Terraform comment on the distribution block guards future re-enablement. Real-time logs (Kinesis) ARE per-behavior; if introduced later, omit on `/p/*`. If standard logging is re-enabled distribution-wide later, CloudFront Function URI rewrite (per §7.2) becomes the fallback. |
 | 6 | S3 access logs (SPA origin) | Same distribution-wide-off stance — the `/p/invoice/:token` HTML request hits S3 (returns 403, CloudFront maps to `/index.html`). S3 access logs would capture the token-bearing path if enabled. Stays off. |
-| 7 | ALB access logs | The SPA's follow-up `GET /api/v1/public/invoices/:token` fetch transits ALB. If ALB access logs are enabled, they capture the full URI including the token. Either keep ALB access logs off for the LB fronting financial-service, or route the public-API calls through a path that the ALB logs scrub before write. Confirm current state — wasn't in the original checklist. |
+| 7 | ALB access logs | Token in `X-Share-Token` header per §4.4 — the SPA's `GET /api/v1/public/invoices` fetch transits ALB but the URI carries no token. AWS's default ALB access log format captures method + URI + user-agent but does NOT capture arbitrary request headers. Logs are safe to enable per normal operational decisions. Guard: if a custom log format that captures specific headers is ever configured on this LB, exclude `X-Share-Token`. (Current state: access logs not configured in Terraform — AWS default = disabled.) |
 | 8 | Email-send job logs (notification-service) | Same `:token` scrubbing on rendered URLs in dispatch logs (per §5.2) |
 
 ---
@@ -372,7 +378,7 @@ Content-Security-Policy: default-src 'self'; ...   # full policy TBD with FE —
 4. **`view_count` semantics — what counts as a view?** Includes bot prefetches from corporate scanners. Document this as "request count, not human view count" in the response field's description so callers don't trust it as engagement signal.
 5. **`FRONTEND_URL` config source:** ~~open~~ **resolved.** Financial-service receives `FRONTEND_URL` as an ECS env var injected by infra (`modules/ecs/main.tf` financial-service task definition, value from `var.frontend_url` already wired in `environments/dev/main.tf` = `https://dev.dispatch.newleveltech.net`). Same env var name and value scheduling-service already consumes — no fork in convention. Financial-service composes `${FRONTEND_URL}/p/invoice/${token}` at event-publish time; notification-service stays generic and just renders whatever `{{share_url}}` it gets handed.
 6. **`invoice_created` rename to `invoice_sent`:** backend's call. Nothing publishes the old name today so renaming is zero-risk; the tenant-facing display name in the template editor needs updating in lockstep if so.
-7. **ALB access logs state:** Surfaced by the infra update to §7.1 — the public-API call (`GET /api/v1/public/invoices/:token`) transits ALB, and if access logs are enabled they'd capture the token. Confirm whether ALB access logs are currently on for the financial-service-fronting LB. If on: either disable, scrub before write, or accept the surface and document mitigations. If off: Terraform comment to keep them off while `/p/*` is live, mirroring the CloudFront stance.
+7. **ALB access logs state:** ~~open~~ **resolved by §4.4 redesign.** Token moved to `X-Share-Token` header — the public-API URI no longer carries it. AWS's default ALB access log format doesn't capture request headers, so logs are not a leak surface. Current Terraform state: no `access_logs` block on `modules/alb/main.tf:38`'s `aws_lb "main"` → AWS default = disabled. Logs can be enabled per normal observability decisions without coupling to this slice's security model.
 
 ---
 
