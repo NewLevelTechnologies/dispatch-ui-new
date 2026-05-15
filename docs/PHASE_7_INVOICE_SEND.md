@@ -169,7 +169,7 @@ What this slice adds:
 share_url = "https://app.dispatch.example/p/invoice/{token}"
 ```
 
-(Domain comes from a configured `PUBLIC_APP_BASE_URL` — see open question #5.)
+(Domain comes from the existing `FRONTEND_URL` env var injected by infra — see §11.5. Financial-service treats it as a bare base URL, no path suffix, and composes `${FRONTEND_URL}/p/invoice/${token}`.)
 
 2. **Update the System Default body** for both `invoice_created` and `quote_sent` to render a CTA button using `{{share_url}}`. Suggested addition to the existing plain-text body:
 
@@ -368,7 +368,7 @@ Content-Security-Policy: default-src 'self'; ...   # full policy TBD with FE —
 2. **Reissue email behavior:** does Reissue automatically re-send the email to `lastSentToEmail` with the new link, or does it just generate a new token that CSR has to manually send? My lean: **just generates the token; CSR clicks Send separately.** Clean separation between "rotate access" and "deliver to customer."
 3. **What email gets used when a customer is BILLING_ONLY with no service location?** Should be `customer.email` directly — these customers exist specifically as billing entities, the email is the primary contact channel. Confirm `customerApi` returns a usable email for `BILLING_ONLY` records.
 4. **`view_count` semantics — what counts as a view?** Includes bot prefetches from corporate scanners. Document this as "request count, not human view count" in the response field's description so callers don't trust it as engagement signal.
-5. **`PUBLIC_APP_BASE_URL` config source:** financial-service needs the dispatch-ui base URL to compose `share_url` (e.g., `https://dev.dispatch.newleveltech.net`). Currently no shared env var for this exists across services. Either (a) add `PUBLIC_APP_BASE_URL` to financial-service config and let infra inject the right value per environment, or (b) financial-service publishes just the token + path (`/p/invoice/{token}`) in `templateData` and notification-service composes the full URL using its own configured base. My lean: (a) — keep notification-service generic to whatever URL it gets handed.
+5. **`FRONTEND_URL` config source:** ~~open~~ **resolved.** Financial-service receives `FRONTEND_URL` as an ECS env var injected by infra (`modules/ecs/main.tf` financial-service task definition, value from `var.frontend_url` already wired in `environments/dev/main.tf` = `https://dev.dispatch.newleveltech.net`). Same env var name and value scheduling-service already consumes — no fork in convention. Financial-service composes `${FRONTEND_URL}/p/invoice/${token}` at event-publish time; notification-service stays generic and just renders whatever `{{share_url}}` it gets handed.
 6. **`invoice_created` rename to `invoice_sent`:** backend's call. Nothing publishes the old name today so renaming is zero-risk; the tenant-facing display name in the template editor needs updating in lockstep if so.
 
 ---
