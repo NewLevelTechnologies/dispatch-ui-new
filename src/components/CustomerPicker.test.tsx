@@ -81,6 +81,7 @@ describe('CustomerPicker', () => {
     renderWithProviders(
       <div>
         <CustomerPicker value={null} onChange={vi.fn()} />
+        {/* eslint-disable-next-line i18next/no-literal-string -- test fixture */}
         <button type="button">outside</button>
       </div>,
     );
