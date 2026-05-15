@@ -100,10 +100,10 @@ POST /api/v1/financial/quotes/{id}/send
 3. Refuse with 422 if bill-to customer has no email on file. Body: `{ "error": "BILL_TO_NO_EMAIL", "message": "..." }` so FE can surface "Add an email to the bill-to customer first."
 4. If no active (non-revoked, non-expired) share-link exists for this invoice/quote → create one. Otherwise reuse the existing one.
 5. Publish `NotificationRequestedEvent`:
-   - `notificationTypeKey = "invoice_sent"` (NOTE: not currently seeded — add per §4.5) or `"quote_sent"` (already seeded)
+   - `notificationTypeKey = "invoice_created"` or `"quote_sent"` — both seeded already in `008-seed-notification-types.yaml`. NOTE: `invoice_created` is the existing slot tenants see in their template editor as "Invoice Created"; it's currently unpublished plumbing. Repurpose it for this send event in v1 rather than introducing an `invoice_sent` sibling that'd confuse tenants. If backend prefers the semantic clarity of `invoice_sent`, rename the existing row at the schema level — zero migration cost since nothing publishes it today.
    - `customerId` from the invoice/quote's `customerId`
    - `entityType`, `entityId` for audit
-   - `templateData` includes the share link URL (`https://app.dispatch.example/p/invoice/{token}`), invoice amount, due date, invoice number, customer name, tenant name + support email
+   - `templateData` — see §4.5 for the full variable list and the `{{share_url}}` addition
 6. Stamp `lastSentAt = now()`, `lastSentToEmail = <resolved email>` on the invoice/quote row (transactional with event publish).
 7. For invoices in `DRAFT` status: auto-flip to `SENT` in the same transaction. (Lets the FE's `Save & Send` route through this endpoint instead of doing a separate `updateStatus(SENT)` call.)
 8. Respond:
@@ -260,12 +260,13 @@ The public route sits behind CloudFront. Tokens in URL paths must not land in Cl
 
 ### 7.1 New cache behavior for `/p/*`
 
-Create a separate CloudFront cache behavior for path pattern `/p/*` with:
+Create a separate CloudFront cache behavior for path pattern `/p/*`. It routes to the S3 frontend origin (same target as the default behavior — `/p/invoice/:token` is an SPA route, served as `/index.html` via the existing 403→`/index.html` custom-error-response mapping; the token sits in the URL bar and is consumed client-side, it never reaches any origin via the URL path). The separate behavior exists to attach the response-headers policy in §7.3 and to keep the route surface explicit so future changes (caching, headers, edge functions) can be scoped to public-render traffic without touching the authenticated app.
 
-```
-LoggingEnabled: false        # standard logging disabled at the behavior level
-RealtimeLogConfig: null      # real-time logs (Kinesis) also disabled if currently enabled at distribution level
-```
+**Logging stance — distribution-wide, not per-behavior:**
+
+CloudFront standard access logs are configured at the **distribution** level — one S3 bucket, all behaviors, all-or-nothing. There is no behavior-level `LoggingEnabled` toggle to flip off for `/p/*`. The rule is therefore distribution-wide: **do not enable `logging_config` on this distribution while `/p/*` is live.** Tokens in `cs-uri-stem` would otherwise land in S3 access logs. Current state: standard logging is not enabled — staying off satisfies acceptance criterion #13. A Terraform-side comment on the distribution block guards against future re-enablement without thinking.
+
+**Real-time logs (Kinesis)** *are* per-behavior, configurable via `realtime_log_config_arn` on each `ordered_cache_behavior`. Not enabled today; if introduced later for the rest of the site, omit it on the `/p/*` behavior.
 
 Origin-side access logs (with `:token` middleware scrubbing per §8) provide all operational visibility. CloudFront logging would be redundant + a token-leak surface.
 
@@ -290,13 +291,13 @@ Origin (financial-service public endpoint) reads `X-Share-Token` header instead 
 
 ### 7.3 Security headers on the public route
 
-Set at the CloudFront response-headers policy level (so origin doesn't have to enforce per-handler):
+Implemented as an `aws_cloudfront_response_headers_policy` attached to the `/p/*` behavior only — **not** distribution-wide. Scoping it avoids forcing `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer` on the authenticated app, which may need embed-friendly or referrer-aware behavior later (e.g. OAuth redirect flows, marketing-page integrations). The auth app inherits whatever the distribution-level defaults are.
 
 ```
 Referrer-Policy: no-referrer
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY                   # no embedding the public page in iframes
-Content-Security-Policy: default-src 'self'; ...   # full policy TBD with FE
+Content-Security-Policy: default-src 'self'; ...   # full policy TBD with FE — defer to v2
 ```
 
 `no-referrer` is critical — prevents the token-bearing URL from leaking via `Referer` headers when the page contains any outbound links (PDF download button in v2, "Pay now" button when payments ship).
