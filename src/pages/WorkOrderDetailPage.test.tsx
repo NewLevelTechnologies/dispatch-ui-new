@@ -62,13 +62,14 @@ describe('WorkOrderDetailPage', () => {
   const mockApiResponses = (
     workOrder: WorkOrder | null = mockWorkOrder,
     summary: typeof ZERO_SUMMARY = ZERO_SUMMARY,
+    invoices: unknown[] = [],
   ) => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
       if (url.match(/\/financial\/work-orders\/[^/]+\/summary$/)) {
         return Promise.resolve({ data: summary });
       }
       if (url.match(/\/financial\/work-orders\/[^/]+\/invoices$/)) {
-        return Promise.resolve({ data: [] });
+        return Promise.resolve({ data: invoices });
       }
       if (url.includes('/work-orders/config/types')) {
         return Promise.resolve({
@@ -410,6 +411,71 @@ describe('WorkOrderDetailPage', () => {
       // Typed ghost is bootstrap-only — once derived chips appear, the
       // ghost retires (in-drawer +New buttons take over for create flows).
       expect(screen.queryByText(/\+ Invoice/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Bal chip color signal (Phase 7 §5.2)', () => {
+    const summaryWithBalance = {
+      invoiced: '500.00',
+      paid: '0.00',
+      balance: '500.00',
+      currency: 'USD',
+    };
+    const sentInvoice = {
+      id: 'inv-sent',
+      invoiceNumber: 'INV-A',
+      status: 'SENT',
+      totalAmount: '500.00',
+      amountPaid: '0.00',
+      balanceDue: '500.00',
+      invoiceDate: '2026-05-01T00:00:00Z',
+      dueDate: '2026-05-31T00:00:00Z',
+      lineItems: [],
+      payments: [],
+    };
+    const overdueInvoice = { ...sentInvoice, id: 'inv-overdue', status: 'OVERDUE' };
+
+    it('renders Bal in amber when invoiced > 0 and paid = 0 with no overdue', async () => {
+      mockApiResponses(mockWorkOrder, summaryWithBalance, [sentInvoice]);
+      renderPage();
+      const bal = await screen.findByRole('button', {
+        name: /balance/i,
+      });
+      expect(bal.className).toMatch(/bg-amber-50/);
+      expect(bal.className).not.toMatch(/bg-rose-50/);
+    });
+
+    it('renders Bal in rose when ANY invoice on the WO is OVERDUE', async () => {
+      mockApiResponses(mockWorkOrder, summaryWithBalance, [
+        sentInvoice,
+        overdueInvoice,
+      ]);
+      renderPage();
+      const bal = await screen.findByRole('button', {
+        name: /balance/i,
+      });
+      expect(bal.className).toMatch(/bg-rose-50/);
+      // Rose takes priority over amber — once an invoice is late, that's
+      // the headline state.
+      expect(bal.className).not.toMatch(/bg-amber-50/);
+    });
+
+    it('renders Bal in zinc when balance is non-zero, paid > 0, and nothing overdue (partial-pay in progress)', async () => {
+      mockApiResponses(
+        mockWorkOrder,
+        {
+          invoiced: '500.00',
+          paid: '200.00',
+          balance: '300.00',
+          currency: 'USD',
+        },
+        [sentInvoice],
+      );
+      renderPage();
+      const bal = await screen.findByRole('button', {
+        name: /balance/i,
+      });
+      expect(bal.className).toMatch(/bg-zinc-100/);
     });
   });
 

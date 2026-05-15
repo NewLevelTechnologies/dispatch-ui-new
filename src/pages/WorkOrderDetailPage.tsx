@@ -6,6 +6,7 @@ import {
   dispatchesApi,
   equipmentApi,
   financialSummaryApi,
+  invoicesApi,
   workOrderApi,
   workOrderTypesApi,
   divisionsApi,
@@ -448,6 +449,17 @@ export default function WorkOrderDetailPage() {
     enabled: !!id,
   });
 
+  // §5.2 Bal color signal — rose when ANY invoice on the WO is OVERDUE.
+  // The drawer's Invoices tab already keys on ['workOrderInvoices', id]
+  // so subscribing here just reads its cache when the drawer has been
+  // opened, or fetches when it hasn't. Cheap; one round-trip on first
+  // page load.
+  const { data: invoicesForOverdue = [] } = useQuery({
+    queryKey: ['workOrderInvoices', id],
+    queryFn: () => invoicesApi.getByWorkOrder(id!),
+    enabled: !!id,
+  });
+
   const { data: workOrderTypes } = useQuery({
     queryKey: ['work-order-types'],
     queryFn: () => workOrderTypesApi.getAll(),
@@ -760,11 +772,26 @@ export default function WorkOrderDetailPage() {
 
             const showNteSlot = hasNte || !frozen;
             const showTypedGhosts = !frozen && !hasDerivedActivity;
-            // §5.2 Bal palette — rose-on-OVERDUE waits on ask #2.
-            const balIsAmber = invoicedAmt > 0 && paidAmt === 0;
-            const balClasses = balIsAmber
-              ? 'bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300'
-              : 'bg-zinc-100 text-zinc-700 dark:bg-white/5 dark:text-zinc-300';
+            // §5.2 Bal palette:
+            //   rose  → any invoice on the WO is OVERDUE (highest signal)
+            //   amber → invoiced > 0 and paid = 0 (outstanding, not late yet)
+            //   zinc  → balance is 0 OR partial-pay with nothing overdue
+            // Rose takes priority over amber — once an invoice is late,
+            // that's the headline state regardless of partial payments.
+            const hasOverdueInvoice = invoicesForOverdue.some(
+              (inv) => inv.status === 'OVERDUE',
+            );
+            const balPalette = hasOverdueInvoice
+              ? 'rose'
+              : invoicedAmt > 0 && paidAmt === 0
+                ? 'amber'
+                : 'zinc';
+            const balClasses =
+              balPalette === 'rose'
+                ? 'bg-rose-50 text-rose-900 dark:bg-rose-500/10 dark:text-rose-300'
+                : balPalette === 'amber'
+                  ? 'bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300'
+                  : 'bg-zinc-100 text-zinc-700 dark:bg-white/5 dark:text-zinc-300';
             // Shared chip-button affordance: hover ring + pointer cursor.
             // Catalyst Button is too heavy for inline chips; a plain
             // <button> with the chip surface styling keeps the visual
@@ -885,9 +912,11 @@ export default function WorkOrderDetailPage() {
                       title={currencyFormatter.format(balanceAmt)}
                       aria-label={t('workOrders.detail.money.balance')}
                       className={`${chipButtonClass} ${balClasses} ${
-                        balIsAmber
-                          ? 'hover:bg-amber-100 dark:hover:bg-amber-500/20'
-                          : 'hover:bg-zinc-200 dark:hover:bg-white/10'
+                        balPalette === 'rose'
+                          ? 'hover:bg-rose-100 dark:hover:bg-rose-500/20'
+                          : balPalette === 'amber'
+                            ? 'hover:bg-amber-100 dark:hover:bg-amber-500/20'
+                            : 'hover:bg-zinc-200 dark:hover:bg-white/10'
                       }`}
                     >
                       <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
