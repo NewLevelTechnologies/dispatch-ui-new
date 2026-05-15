@@ -128,13 +128,13 @@ export default function InvoiceDialog({
         // the service recipient regardless; only the invoice's
         // customerId changes.
         customerId: billingCustomer!.id,
-        // Backend's CreateInvoiceRequest types these as `Instant`, not
-        // `LocalDate` — date-only strings like "2026-05-15" fail to parse.
-        // Convert to midnight UTC ISO format. The input's calendar date is
-        // what semantically matters; UTC midnight keeps that consistent
-        // across timezones.
-        invoiceDate: `${invoiceDate}T00:00:00Z`,
-        dueDate: `${dueDate}T00:00:00Z`,
+        // Business dates are LocalDate (yyyy-MM-dd) on the wire — only
+        // audit fields (createdAt/updatedAt) are Instant. Pass the date
+        // input value through raw. Earlier this dialog appended T00:00:00Z
+        // because the contract was misread; corrected per backend's wire
+        // -types reference (refactor: business dates use LocalDate).
+        invoiceDate,
+        dueDate,
         // Lump-sum: a single custom line item, no partId. Backend stores
         // it as-is per ask #6's contract confirmation.
         taxRate: 0,
