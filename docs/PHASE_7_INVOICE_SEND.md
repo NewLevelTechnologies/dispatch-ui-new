@@ -157,11 +157,33 @@ Quote variant: same shape, `quote` instead of `invoice`.
 - Per-IP and per-token bucketed independently — both, not OR'd
 - 429 with `Retry-After` header on either trip
 
-### 4.5 New notification type to seed
+### 4.5 Template variables — extend, don't replace
 
-`invoice_sent` is not currently in `notification_types`. Add it in the same migration pattern as `008-seed-notification-types.yaml` etc. `quote_sent` already exists; reuse.
+`invoice_created` and `quote_sent` notification types already exist in `notification_types` (seeded in `008-seed-notification-types.yaml`) and already have tenant-editable System Default email templates rendered by the existing template editor UI (`Settings → Notification Templates`). The current `Invoice Created` System Default body uses `{{customer_name}}`, `{{invoice_number}}`, `{{amount}}`, `{{due_date}}`, `{{company_name}}`.
 
-Both types need a default template seeded — see §6 for the email body spec the frontend is delivering.
+What this slice adds:
+
+1. **New `{{share_url}}` variable** in `templateData` when financial-service publishes the event. Resolved from the share-link row created in step 4 of §4.3:
+
+```
+share_url = "https://app.dispatch.example/p/invoice/{token}"
+```
+
+(Domain comes from a configured `PUBLIC_APP_BASE_URL` — see open question #5.)
+
+2. **Update the System Default body** for both `invoice_created` and `quote_sent` to render a CTA button using `{{share_url}}`. Suggested addition to the existing plain-text body:
+
+```
+View your invoice: {{share_url}}
+```
+
+…and an equivalent `<a class="cta-button" href="{{share_url}}">View Invoice</a>` in the HTML body.
+
+3. **Expose `share_url` in the template editor's "Available Variables"** panel for these two types so tenants who customize their template know the variable exists.
+
+**Graceful degradation:** existing tenant overrides that don't reference `{{share_url}}` will continue to render fine — they just won't include the link. The email is still informative; the customer can call the tenant if they want to view the invoice. Tenants pull `{{share_url}}` into their override when they want it; no migration needed.
+
+**Naming consideration on `invoice_created`:** the existing type_key + display name implies an auto-on-create trigger that doesn't exist today. The send endpoint is the only thing publishing it. If backend wants semantic clarity, rename to `invoice_sent` in the same migration that adds the new variable — zero risk since nothing publishes the old name. If renamed, update the tenant-facing display name in the template editor too.
 
 ### 4.6 Reissue / Extend endpoints (CSR-facing)
 
@@ -185,14 +207,14 @@ Both require standard JWT auth + tenant scoping. CSR-only.
 
 ## 5. Backend ask — notification-service
 
-### 5.1 Email body template
+### 5.1 Rendering, no changes needed
 
-Notification-service consumes the existing `NotificationRequestedEvent` and renders the template via `TemplateRenderService` (Mustache). The frontend team (this repo) ships the template HTML — see §6.
+Notification-service consumes `NotificationRequestedEvent`, resolves recipients via the existing `RecipientResolverService`, renders the template via `TemplateRenderService` (Mustache), and sends via the existing `EmailService` (SES `sendEmail` — HTML + plain text, no attachments). **All of this pipeline works as-is.** No changes to `EmailService`, no MIME, no attachment plumbing.
 
-What notification-service needs to do:
-1. Seed default templates for `invoice_sent` and `quote_sent` from the HTML/text the frontend team provides (§6).
-2. Verify that `templateData.shareUrl` is rendered into the CTA button's `href`.
-3. Confirm SES `sendEmail` path works as-is for HTML emails with no attachments. No changes to `EmailService` needed.
+The only thing notification-service needs to do for this slice:
+1. Confirm `templateData.share_url` (from financial-service's published event per §4.3) flows through the Mustache renderer into the rendered subject/body the same way other variables do today.
+
+Template **content** changes happen in the financial-service migration that updates the System Default bodies — see §4.5. Tenant-customized template bodies live in the existing `notification_templates` table and are edited through the existing template editor UI (`Settings → Notification Templates`); no work here for v1.
 
 ### 5.2 Log scrubbing
 
@@ -226,20 +248,11 @@ Backend doesn't block on these. We ship them on our side and coordinate template
 - Body: "Please contact [tenant support email] to request a new link."
 - No request-new-link button in v1 — that's v2.
 
-### 6.3 Email body template
+### 6.3 Email body template — NOT a frontend deliverable
 
-Frontend ships the HTML + plain-text Mustache template content. Backend seeds it into the template store.
+Tenant-editable email templates already exist in the system (`Settings → Notification Templates` UI, `notification_templates` table). Frontend does **not** ship template HTML. The System Default body changes are part of the financial-service migration (see §4.5).
 
-Required fields rendered:
-- Tenant logo (header)
-- Greeting addressing the customer name
-- Amount due (large, prominent)
-- Due date
-- Invoice number (small, mono)
-- Clear CTA button: "View Invoice" → `{{shareUrl}}`
-- Footer: tenant display name + support email
-
-This is the "earn the click" surface — without amount + due date + branded sender, the email reads like phishing. Spec the layout in our work; backend just renders the data through whatever HTML we hand them.
+If during this work we discover the existing template editor needs improvements to support `{{share_url}}` (e.g., the "Available Variables" panel doesn't list it, or there's no preview rendering for the new variable), those land as small follow-up branches on this repo — but the email body content itself is tenant configuration, not a frontend deliverable.
 
 ### 6.4 In-app affordances
 
@@ -355,6 +368,8 @@ Content-Security-Policy: default-src 'self'; ...   # full policy TBD with FE —
 2. **Reissue email behavior:** does Reissue automatically re-send the email to `lastSentToEmail` with the new link, or does it just generate a new token that CSR has to manually send? My lean: **just generates the token; CSR clicks Send separately.** Clean separation between "rotate access" and "deliver to customer."
 3. **What email gets used when a customer is BILLING_ONLY with no service location?** Should be `customer.email` directly — these customers exist specifically as billing entities, the email is the primary contact channel. Confirm `customerApi` returns a usable email for `BILLING_ONLY` records.
 4. **`view_count` semantics — what counts as a view?** Includes bot prefetches from corporate scanners. Document this as "request count, not human view count" in the response field's description so callers don't trust it as engagement signal.
+5. **`PUBLIC_APP_BASE_URL` config source:** financial-service needs the dispatch-ui base URL to compose `share_url` (e.g., `https://dev.dispatch.newleveltech.net`). Currently no shared env var for this exists across services. Either (a) add `PUBLIC_APP_BASE_URL` to financial-service config and let infra inject the right value per environment, or (b) financial-service publishes just the token + path (`/p/invoice/{token}`) in `templateData` and notification-service composes the full URL using its own configured base. My lean: (a) — keep notification-service generic to whatever URL it gets handed.
+6. **`invoice_created` rename to `invoice_sent`:** backend's call. Nothing publishes the old name today so renaming is zero-risk; the tenant-facing display name in the template editor needs updating in lockstep if so.
 
 ---
 
