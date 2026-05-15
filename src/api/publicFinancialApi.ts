@@ -57,8 +57,21 @@ const tokenHeaders = (token: string) => ({
   headers: { 'X-Share-Token': token },
 });
 
+const PREVIEW_TOKEN_PREFIX = 'preview-';
+
 export const publicFinancialApi = {
   getInvoiceByToken: async (token: string): Promise<PublicInvoiceResponse> => {
+    // Dev-only short-circuit so the page can be previewed in the browser
+    // before the backend `/public/*` endpoints ship. `import.meta.env.DEV`
+    // is replaced with a literal `false` at production build time, so this
+    // branch and the entire dev mocks module get dead-code-eliminated.
+    if (import.meta.env.DEV && token.startsWith(PREVIEW_TOKEN_PREFIX)) {
+      const { previewInvoice } = await import('../dev/publicFinancialMocks');
+      const mock = previewInvoice(token);
+      if (mock) return mock;
+      // Unknown preview variant → fall through to the real API call, which
+      // 404s and surfaces the cliff page. Lets us preview the cliff too.
+    }
     const response = await publicApiClient.get<PublicInvoiceResponse>(
       '/public/invoices',
       tokenHeaders(token),
@@ -67,6 +80,11 @@ export const publicFinancialApi = {
   },
 
   getQuoteByToken: async (token: string): Promise<PublicQuoteResponse> => {
+    if (import.meta.env.DEV && token.startsWith(PREVIEW_TOKEN_PREFIX)) {
+      const { previewQuote } = await import('../dev/publicFinancialMocks');
+      const mock = previewQuote(token);
+      if (mock) return mock;
+    }
     const response = await publicApiClient.get<PublicQuoteResponse>(
       '/public/quotes',
       tokenHeaders(token),
