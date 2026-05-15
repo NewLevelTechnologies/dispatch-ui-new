@@ -964,14 +964,48 @@ vi.mock('react-i18next', () => {
     'workOrders.financialDrawer.invoicesTab.statuses.void': 'Void',
     'workOrders.financialDrawer.invoicesTab.voidConfirm':
       'Void invoice {{number}} for {{amount}}? This cannot be undone.',
-    'workOrders.financialDrawer.stubBlockers.payments':
-      'Waiting on backend asks #3 (WO-scoped payment list) and #4 (payment void endpoint).',
+    'workOrders.financialDrawer.invoicesTab.addPayment': 'Payment',
+    'workOrders.financialDrawer.invoicesTab.noPayments':
+      'No payments recorded against this invoice.',
+    'workOrders.financialDrawer.invoicesTab.paymentColumns.amount': 'Amount',
+    'workOrders.financialDrawer.invoicesTab.paymentColumns.date': 'Date',
+    'workOrders.financialDrawer.invoicesTab.paymentColumns.method': 'Method',
+    'workOrders.financialDrawer.invoicesTab.paymentColumns.paymentNumber': 'Payment #',
+    'workOrders.financialDrawer.invoicesTab.paymentColumns.reference': 'Reference',
+    'workOrders.financialDrawer.invoicesTab.paymentsHeading': 'Payments',
+    'workOrders.financialDrawer.invoicesTab.recordPayment': 'Record Payment',
+    'workOrders.financialDrawer.paymentDialog.amount': 'Amount',
+    'workOrders.financialDrawer.paymentDialog.balanceLabel': 'Bal {{amount}}',
+    'workOrders.financialDrawer.paymentDialog.contextStrip':
+      'Work Order #{{number}} · {{customer}}',
+    'workOrders.financialDrawer.paymentDialog.errorCreate':
+      'Failed to record payment.',
+    'workOrders.financialDrawer.paymentDialog.invalidAmount':
+      'Amount must be a positive number.',
+    'workOrders.financialDrawer.paymentDialog.invoice': 'Invoice',
+    'workOrders.financialDrawer.paymentDialog.method': 'Method',
+    'workOrders.financialDrawer.paymentDialog.methods.ACH': 'ACH',
+    'workOrders.financialDrawer.paymentDialog.methods.CASH': 'Cash',
+    'workOrders.financialDrawer.paymentDialog.methods.CHECK': 'Check',
+    'workOrders.financialDrawer.paymentDialog.methods.CREDIT_CARD': 'Credit card',
+    'workOrders.financialDrawer.paymentDialog.methods.DEBIT_CARD': 'Debit card',
+    'workOrders.financialDrawer.paymentDialog.methods.OTHER': 'Other',
+    'workOrders.financialDrawer.paymentDialog.methods.WIRE_TRANSFER': 'Wire transfer',
+    'workOrders.financialDrawer.paymentDialog.noInvoiceSelected':
+      'Select an invoice to apply the payment to.',
+    'workOrders.financialDrawer.paymentDialog.noOpenInvoices':
+      'No outstanding invoices on this work order.',
+    'workOrders.financialDrawer.paymentDialog.paymentDate': 'Payment date',
+    'workOrders.financialDrawer.paymentDialog.referenceNumber': 'Reference #',
+    'workOrders.financialDrawer.paymentDialog.referencePlaceholder':
+      'Check number, transaction id, etc.',
+    'workOrders.financialDrawer.paymentDialog.submit': 'Record Payment',
+    'workOrders.financialDrawer.paymentDialog.title': 'Record Payment',
     'workOrders.financialDrawer.stubBlockers.purchaseOrders':
       'Deferred to phase 7c — no backend entity yet.',
     'workOrders.financialDrawer.stubBlockers.quotes':
       'Quotes ship in phase 7b — waiting on backend asks #7–#10.',
     'workOrders.financialDrawer.tabs.invoices': 'Invoices',
-    'workOrders.financialDrawer.tabs.payments': 'Payments',
     'workOrders.financialDrawer.tabs.purchaseOrders': 'POs',
     'workOrders.financialDrawer.tabs.quotes': 'Quotes',
     'workOrders.financialDrawer.title': 'Financials · WO #{{number}}',

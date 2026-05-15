@@ -1200,6 +1200,7 @@
           "markPaid": "Mark paid",
           "void": "Void"
         },
+        "addPayment": "Payment",
         "changeStatus": "Change status (currently {{current}})",
         "collapseRow": "Hide line items",
         "columns": {
@@ -1223,7 +1224,17 @@
         "lineItemsHeading": "Line items",
         "loading": "Loading invoices…",
         "noLineItems": "No line items.",
+        "noPayments": "No payments recorded against this invoice.",
         "notesHeading": "Notes",
+        "paymentColumns": {
+          "amount": "Amount",
+          "date": "Date",
+          "method": "Method",
+          "paymentNumber": "Payment #",
+          "reference": "Reference"
+        },
+        "paymentsHeading": "Payments",
+        "recordPayment": "Record Payment",
         "statuses": {
           "cancelled": "Cancelled",
           "draft": "Draft",
@@ -1234,14 +1245,37 @@
         },
         "voidConfirm": "Void invoice {{number}} for {{amount}}? This cannot be undone."
       },
+      "paymentDialog": {
+        "amount": "Amount",
+        "balanceLabel": "Bal {{amount}}",
+        "contextStrip": "Work Order #{{number}} · {{customer}}",
+        "errorCreate": "Failed to record payment.",
+        "invalidAmount": "Amount must be a positive number.",
+        "invoice": "Invoice",
+        "method": "Method",
+        "methods": {
+          "ACH": "ACH",
+          "CASH": "Cash",
+          "CHECK": "Check",
+          "CREDIT_CARD": "Credit card",
+          "DEBIT_CARD": "Debit card",
+          "OTHER": "Other",
+          "WIRE_TRANSFER": "Wire transfer"
+        },
+        "noInvoiceSelected": "Select an invoice to apply the payment to.",
+        "noOpenInvoices": "No outstanding invoices on this work order.",
+        "paymentDate": "Payment date",
+        "referenceNumber": "Reference #",
+        "referencePlaceholder": "Check number, transaction id, etc.",
+        "submit": "Record Payment",
+        "title": "Record Payment"
+      },
       "stubBlockers": {
-        "payments": "Waiting on backend asks #3 (WO-scoped payment list) and #4 (payment void endpoint).",
         "purchaseOrders": "Deferred to phase 7c — no backend entity yet.",
         "quotes": "Quotes ship in phase 7b — waiting on backend asks #7–#10."
       },
       "tabs": {
         "invoices": "Invoices",
-        "payments": "Payments",
         "purchaseOrders": "POs",
         "quotes": "Quotes"
       },

@@ -172,6 +172,8 @@ export {
   type CreateQuoteLineItemRequest,
   type UpdateQuoteStatusRequest,
   type Payment,
+  type NestedInvoicePayment,
+  type PaymentStatus,
   type CreatePaymentRequest,
   type WorkOrderFinancialSummary,
 } from './financialApi';

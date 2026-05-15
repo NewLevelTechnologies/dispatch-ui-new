@@ -22,6 +22,42 @@ export interface InvoiceLineItem {
   lineTotal: number;
 }
 
+/**
+ * Status of a payment record. `RECEIVED` is the default for newly created
+ * payments; `VOID` is set by the (pending) void endpoint and excluded from
+ * the parent invoice's `amountPaid` server-side. Voided rows still appear
+ * in nested `payments` arrays for audit visibility — render them muted.
+ */
+export type PaymentStatus = 'RECEIVED' | 'VOID';
+
+/**
+ * A payment row as it appears nested under an invoice in the response of
+ * `GET /financial/work-orders/{id}/invoices`. CRITICAL semantic: `amount`
+ * is the slice of the payment applied to *this* invoice, not the payment's
+ * gross amount. A single check covering N invoices appears once in each
+ * invoice's `payments[]` with its respective slice. `sum(invoice.payments
+ * [].amount) === invoice.amountPaid` is a server-side guarantee.
+ *
+ * To get the full payment amount, call `paymentsApi.getById(id)` directly.
+ * Not needed for the per-invoice view — the slice is the meaningful number.
+ *
+ * No `invoiceId` / `customerId` / `workOrderId` on the nested shape — those
+ * are redundant with the parent invoice. The standalone `Payment` interface
+ * still carries them for the `getById` / `getByInvoice` endpoints.
+ */
+export interface NestedInvoicePayment {
+  id: string;
+  paymentNumber: string;
+  paymentDate: string;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  status: PaymentStatus;
+  referenceNumber?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Invoice {
   id: string;
   customerId: string;
@@ -38,6 +74,11 @@ export interface Invoice {
   balanceDue: number;
   notes?: string;
   lineItems: InvoiceLineItem[];
+  /**
+   * Server-sorted by `paymentDate DESC, createdAt DESC`. Always an array;
+   * `[]` when none. Includes VOID rows for audit.
+   */
+  payments: NestedInvoicePayment[];
   createdAt: string;
   updatedAt: string;
 }

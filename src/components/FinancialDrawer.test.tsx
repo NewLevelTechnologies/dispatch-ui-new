@@ -21,6 +21,7 @@ describe('FinancialDrawer', () => {
     onClose: vi.fn(),
     workOrderId: 'wo-1',
     workOrderNumber: 'WO-00010',
+    customerName: 'Tenant 2 Inc.',
   };
 
   it('renders the title with the WO number', () => {
@@ -28,14 +29,16 @@ describe('FinancialDrawer', () => {
     expect(screen.getByText('Financials · WO #WO-00010')).toBeInTheDocument();
   });
 
-  it('renders all four tab labels in WO-lifecycle (chronological) order', () => {
+  it('renders three tab labels in WO-lifecycle (chronological) order — no Payments tab', () => {
     renderWithProviders(<FinancialDrawer {...defaults} />);
     const tabs = screen.getAllByRole('tab');
-    expect(tabs).toHaveLength(4);
+    // §3.3 fold removed the Payments tab — payments now nest under each
+    // invoice's row expansion in the Invoices tab.
+    expect(tabs).toHaveLength(3);
     expect(tabs[0]).toHaveTextContent('Quotes');
     expect(tabs[1]).toHaveTextContent('POs');
     expect(tabs[2]).toHaveTextContent('Invoices');
-    expect(tabs[3]).toHaveTextContent('Payments');
+    expect(screen.queryByRole('tab', { name: 'Payments' })).not.toBeInTheDocument();
   });
 
   it('selects the Invoices tab by default (live billable surface in 7a)', () => {
@@ -45,9 +48,9 @@ describe('FinancialDrawer', () => {
   });
 
   it('honors the `initialTab` prop on mount', () => {
-    renderWithProviders(<FinancialDrawer {...defaults} initialTab="payments" />);
-    const paymentsTab = screen.getByRole('tab', { name: 'Payments' });
-    expect(paymentsTab).toHaveAttribute('aria-selected', 'true');
+    renderWithProviders(<FinancialDrawer {...defaults} initialTab="quotes" />);
+    const quotesTab = screen.getByRole('tab', { name: 'Quotes' });
+    expect(quotesTab).toHaveAttribute('aria-selected', 'true');
   });
 
   it('lets the user switch tabs inside the drawer (uncontrolled)', async () => {
@@ -70,9 +73,6 @@ describe('FinancialDrawer', () => {
   it('renders the "Coming soon" stub on the still-stubbed tabs with matching blocker copy', async () => {
     const user = userEvent.setup();
     renderWithProviders(<FinancialDrawer {...defaults} />);
-    // Switch to Payments tab — still stubbed (waits on asks #3, #4)
-    await user.click(screen.getByRole('tab', { name: 'Payments' }));
-    expect(screen.getByText(/backend asks #3/i)).toBeInTheDocument();
     // Quotes tab — 7b
     await user.click(screen.getByRole('tab', { name: 'Quotes' }));
     expect(screen.getByText(/phase 7b/i)).toBeInTheDocument();
