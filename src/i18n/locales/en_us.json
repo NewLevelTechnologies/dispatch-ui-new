@@ -655,6 +655,70 @@
       "reference": "Reference"
     }
   },
+  "public": {
+    "common": {
+      "logoAlt": "{{name}} logo",
+      "contactPhone": " at {{phone}}"
+    },
+    "cliff": {
+      "headline": "This link is no longer available",
+      "invalid": "The link you followed has expired, been replaced, or is no longer valid.",
+      "error": "We couldn't load this right now. Please try the link again, or contact the company that sent it to you.",
+      "contact": "Please contact the company that sent this to you for an updated link."
+    },
+    "invoice": {
+      "loading": "Loading invoice…",
+      "label": "Invoice",
+      "amountDue": "Amount due",
+      "amountPaid": "Amount paid",
+      "dueOn": "Due {{date}}",
+      "billedTo": "Billed to",
+      "invoiceDate": "Invoice date",
+      "items": "Items",
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "taxWithRate": "Tax ({{rate}}%)",
+      "total": "Total",
+      "paid": "Paid",
+      "balanceDue": "Balance due",
+      "notes": "Notes",
+      "paymentsReceived": "Payments received",
+      "voidedHeadline": "This invoice has been voided",
+      "voidedSubline": "Please contact {{tenant}} for the current invoice.",
+      "questions": "Questions about this invoice?",
+      "contactCta": "Contact {{tenant}}",
+      "status": {
+        "draft": "Draft",
+        "outstanding": "Outstanding",
+        "paid": "Paid",
+        "pastDue": "Past due",
+        "cancelled": "Cancelled"
+      }
+    },
+    "quote": {
+      "loading": "Loading quote…",
+      "label": "Quote",
+      "total": "Total",
+      "validThrough": "Valid through {{date}}",
+      "expiredOn": "Expired {{date}}",
+      "quotedTo": "Quoted to",
+      "quoteDate": "Quote date",
+      "items": "Items",
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "taxWithRate": "Tax ({{rate}}%)",
+      "notes": "Notes",
+      "questions": "Questions about this quote?",
+      "contactCta": "Contact {{tenant}}",
+      "status": {
+        "draft": "Draft",
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "declined": "Declined",
+        "expired": "Expired"
+      }
+    }
+  },
   "capabilities": {
     "clearGroup": "Clear group",
     "collapseAll": "Collapse All",

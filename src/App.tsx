@@ -43,6 +43,8 @@ import EquipmentTypesPanel from './pages/settings/equipment/EquipmentTypesPanel'
 import EquipmentCategoriesPanel from './pages/settings/equipment/EquipmentCategoriesPanel';
 import FilterSizesPanel from './pages/settings/equipment/FilterSizesPanel';
 import AccountSettingsPage from './pages/AccountSettingsPage';
+import PublicInvoicePage from './pages/PublicInvoicePage';
+import PublicQuotePage from './pages/PublicQuotePage';
 
 // ProtectedRoute component - defined outside of App to avoid recreation on every render
 const ProtectedRoute = ({ element, isAuthenticated }: { element: React.ReactElement; isAuthenticated: boolean }) => {
@@ -94,6 +96,12 @@ function App() {
   return (
     <GlossaryProvider glossary={tenantSettings?.glossary}>
       <Routes>
+      {/* Customer-facing share-link pages — outside ProtectedRoute (no auth
+          required, the share token IS the auth) and intentionally ignore
+          the GlossaryProvider context (these are unauthenticated viewers
+          who don't share the tenant's glossary). */}
+      <Route path="/p/invoice/:token" element={<PublicInvoicePage />} />
+      <Route path="/p/quote/:token" element={<PublicQuotePage />} />
       <Route
         path="/login"
         element={
