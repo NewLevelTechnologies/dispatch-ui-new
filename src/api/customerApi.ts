@@ -91,6 +91,7 @@ export interface CustomerListDto {
   name: string;
   email: string;
   phone?: string | null;
+  type: CustomerType;
   billingAddress: {
     streetAddress: string;
     city: string;
@@ -121,6 +122,7 @@ export interface CustomerListResponse {
 export interface CustomerSearchResult {
   id: string;
   name: string;
+  type: CustomerType;
   displayMode: CustomerDisplayMode;
 }
 
@@ -192,7 +194,8 @@ export interface ServiceLocationDetailDto {
   version: number;
 }
 
-export type CustomerDisplayMode = 'SIMPLE' | 'STANDARD';
+export type CustomerType = 'STANDARD' | 'BILLING_ONLY';
+export type CustomerDisplayMode = 'SIMPLE' | 'STANDARD' | 'BILLING_ONLY';
 export type CustomerStatus = 'ACTIVE' | 'INACTIVE';
 
 export interface Customer {
@@ -200,6 +203,7 @@ export interface Customer {
   name: string;
   email: string;
   phone?: string | null;
+  type: CustomerType;
   billingAddress: Address;
   additionalContacts: AdditionalContact[];
   serviceLocations: ServiceLocation[];
@@ -237,6 +241,7 @@ export interface CreateCustomerRequest {
   name: string;
   email: string;
   phone?: string | null;
+  type?: CustomerType;
   billingAddress: {
     streetAddress: string;
     streetAddressLine2?: string | null;
@@ -258,6 +263,7 @@ export interface UpdateCustomerRequest {
   name: string;
   email: string;
   phone?: string | null;
+  type?: CustomerType;
   paymentTermsDays: number;
   requiresPurchaseOrder: boolean;
   contractPricingTier?: string | null;

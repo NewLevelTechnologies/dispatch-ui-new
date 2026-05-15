@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
-import { customerApi, dispatchRegionApi, type Customer, type CreateCustomerRequest, type UpdateCustomerRequest } from '../api';
+import { customerApi, dispatchRegionApi, type Customer, type CreateCustomerRequest, type CustomerType, type UpdateCustomerRequest } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
@@ -22,6 +22,7 @@ interface CustomerFormDialogProps {
 }
 
 interface CreateFormData {
+  type: CustomerType;
   dispatchRegionId: string;
   name: string;
   email: string;
@@ -55,6 +56,7 @@ interface CreateFormData {
 }
 
 interface EditFormData {
+  type: CustomerType;
   name: string;
   email: string;
   phone: string;
@@ -99,6 +101,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   const defaultRegionId = activeRegions?.length === 1 ? activeRegions[0].id : '';
 
   const [createFormData, setCreateFormData] = useState<CreateFormData>({
+    type: 'STANDARD',
     dispatchRegionId: '',
     name: '',
     email: '',
@@ -132,6 +135,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   });
 
   const [editFormData, setEditFormData] = useState<EditFormData>({
+    type: 'STANDARD',
     name: '',
     email: '',
     phone: '',
@@ -165,8 +169,9 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
     setShowBusinessTerms(false);
 
     if (customer) {
-       
+
       setEditFormData({
+        type: customer.type,
         name: customer.name,
         email: customer.email,
         phone: customer.phone || '',
@@ -187,6 +192,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       });
     } else {
       setCreateFormData({
+        type: 'STANDARD',
         dispatchRegionId: defaultRegionId,
         name: '',
         email: '',
@@ -260,35 +266,54 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const request: CreateCustomerRequest = {
-      name: createFormData.billingAddressSameAsService
-        ? createFormData.locationName
-        : createFormData.name,
-      email: createFormData.email,
-      phone: createFormData.phone || null,
-      billingAddress: createFormData.billingAddressSameAsService
-        ? createFormData.serviceAddress
-        : createFormData.billingAddress,
-      serviceLocations: [
-        {
-          dispatchRegionId: createFormData.dispatchRegionId,
-          locationName: createFormData.locationName,
-          address: createFormData.serviceAddress,
-          siteContactName: createFormData.siteContactName || null,
-          siteContactPhone: createFormData.siteContactPhone || null,
-          siteContactEmail: createFormData.siteContactEmail || null,
-          accessInstructions: createFormData.accessInstructions || null,
+    const isBillingOnly = createFormData.type === 'BILLING_ONLY';
+
+    const request: CreateCustomerRequest = isBillingOnly
+      ? {
+          name: createFormData.name,
+          email: createFormData.email,
+          phone: createFormData.phone || null,
+          type: 'BILLING_ONLY',
+          billingAddress: createFormData.billingAddress,
+          serviceLocations: [],
+          billingAddressSameAsService: false,
+          paymentTermsDays: createFormData.paymentTermsDays,
+          requiresPurchaseOrder: createFormData.requiresPurchaseOrder,
+          contractPricingTier: createFormData.contractPricingTier || null,
+          taxExempt: createFormData.taxExempt,
+          taxExemptCertificate: createFormData.taxExemptCertificate || null,
           notes: createFormData.notes || null,
-        },
-      ],
-      billingAddressSameAsService: createFormData.billingAddressSameAsService,
-      paymentTermsDays: createFormData.paymentTermsDays,
-      requiresPurchaseOrder: createFormData.requiresPurchaseOrder,
-      contractPricingTier: createFormData.contractPricingTier || null,
-      taxExempt: createFormData.taxExempt,
-      taxExemptCertificate: createFormData.taxExemptCertificate || null,
-      notes: createFormData.notes || null,
-    };
+        }
+      : {
+          name: createFormData.billingAddressSameAsService
+            ? createFormData.locationName
+            : createFormData.name,
+          email: createFormData.email,
+          phone: createFormData.phone || null,
+          type: 'STANDARD',
+          billingAddress: createFormData.billingAddressSameAsService
+            ? createFormData.serviceAddress
+            : createFormData.billingAddress,
+          serviceLocations: [
+            {
+              dispatchRegionId: createFormData.dispatchRegionId,
+              locationName: createFormData.locationName,
+              address: createFormData.serviceAddress,
+              siteContactName: createFormData.siteContactName || null,
+              siteContactPhone: createFormData.siteContactPhone || null,
+              siteContactEmail: createFormData.siteContactEmail || null,
+              accessInstructions: createFormData.accessInstructions || null,
+              notes: createFormData.notes || null,
+            },
+          ],
+          billingAddressSameAsService: createFormData.billingAddressSameAsService,
+          paymentTermsDays: createFormData.paymentTermsDays,
+          requiresPurchaseOrder: createFormData.requiresPurchaseOrder,
+          contractPricingTier: createFormData.contractPricingTier || null,
+          taxExempt: createFormData.taxExempt,
+          taxExemptCertificate: createFormData.taxExemptCertificate || null,
+          notes: createFormData.notes || null,
+        };
 
     createMutation.mutate(request);
   };
@@ -300,6 +325,9 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       name: editFormData.name,
       email: editFormData.email,
       phone: editFormData.phone || null,
+      // Only send `type` when it has actually changed — keeps the request a no-op
+      // for the common edit path and avoids round-tripping the field unnecessarily.
+      ...(customer && editFormData.type !== customer.type ? { type: editFormData.type } : {}),
       paymentTermsDays: editFormData.paymentTermsDays,
       requiresPurchaseOrder: editFormData.requiresPurchaseOrder,
       contractPricingTier: editFormData.contractPricingTier || null,
@@ -340,6 +368,152 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       <DialogBody>
         {!isEdit ? (
           <form onSubmit={handleCreateSubmit} id="customer-form" className="space-y-4">
+            {/* TYPE RADIO — toggles between Service customer and Bill-only customer */}
+            <RadioGroup
+              value={createFormData.type}
+              onChange={(value) =>
+                setCreateFormData((prev) => ({ ...prev, type: value as CustomerType }))
+              }
+              className="flex gap-6"
+            >
+              <RadioField>
+                <Radio value="STANDARD" />
+                <Label>{t('customers.form.customerTypeStandard')}</Label>
+              </RadioField>
+              <RadioField>
+                <Radio value="BILLING_ONLY" />
+                <Label>{t('customers.form.customerTypeBillingOnly')}</Label>
+              </RadioField>
+            </RadioGroup>
+
+            {createFormData.type === 'BILLING_ONLY' ? (
+            <div>
+              <Subheading className="text-base font-semibold">{t('customers.form.billingOnlyHeading')}</Subheading>
+              <p className="mb-2 mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{t('customers.form.billingOnlyHint')}</p>
+              <div className="space-y-2">
+                {/* Row 1: Name, Email, Phone */}
+                <div className="grid grid-cols-12 gap-2">
+                  <Field className="col-span-5">
+                    <Label className="text-xs">{t('common.form.name')} *</Label>
+                    <Input
+                      name="billingOnlyName"
+                      value={createFormData.name}
+                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder="e.g., Acme Warranty Co"
+                      required
+                    />
+                  </Field>
+                  <Field className="col-span-3">
+                    <Label className="text-xs">{t('common.form.email')} *</Label>
+                    <Input
+                      type="email"
+                      name="email"
+                      value={createFormData.email}
+                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, email: e.target.value }))}
+                      required
+                    />
+                  </Field>
+                  <Field className="col-span-4">
+                    <Label className="text-xs">{t('common.form.phone')}</Label>
+                    <PatternFormat
+                      format="(###) ###-####"
+                      mask="_"
+                      customInput={Input}
+                      name="phone"
+                      value={createFormData.phone}
+                      onValueChange={(values) => setCreateFormData((prev) => ({ ...prev, phone: values.value }))}
+                    />
+                  </Field>
+                </div>
+
+                {/* Row 2: Street + Apt */}
+                <div className="grid grid-cols-4 gap-2">
+                  <Field className="col-span-3">
+                    <Label className="text-xs">{t('common.form.streetAddress')} *</Label>
+                    <Input
+                      name="billingStreetAddress"
+                      value={createFormData.billingAddress.streetAddress}
+                      onChange={(e) =>
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          billingAddress: { ...prev.billingAddress, streetAddress: e.target.value },
+                        }))
+                      }
+                      required
+                    />
+                  </Field>
+                  <Field className="col-span-1">
+                    <Label className="text-xs">{t('common.form.addressLine2')}</Label>
+                    <Input
+                      name="billingStreetAddressLine2"
+                      value={createFormData.billingAddress.streetAddressLine2}
+                      onChange={(e) =>
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          billingAddress: { ...prev.billingAddress, streetAddressLine2: e.target.value },
+                        }))
+                      }
+                      placeholder="Apt"
+                    />
+                  </Field>
+                </div>
+
+                {/* Row 3: City/State/Zip */}
+                <div className="grid grid-cols-12 gap-2">
+                  <Field className="col-span-6">
+                    <Label className="text-xs">{t('common.form.city')} *</Label>
+                    <Input
+                      name="billingCity"
+                      value={createFormData.billingAddress.city}
+                      onChange={(e) =>
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          billingAddress: { ...prev.billingAddress, city: e.target.value },
+                        }))
+                      }
+                      required
+                    />
+                  </Field>
+                  <Field className="col-span-2">
+                    <Label className="text-xs">{t('common.form.state')} *</Label>
+                    <Select
+                      name="billingState"
+                      value={createFormData.billingAddress.state}
+                      onChange={(e) =>
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          billingAddress: { ...prev.billingAddress, state: e.target.value },
+                        }))
+                      }
+                      required
+                    >
+                      <option value="">{t('common.form.select')}</option>
+                      {US_STATES.map((state) => (
+                        <option key={state} value={state}>
+                          {state}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field className="col-span-4">
+                    <Label className="text-xs">{t('common.form.zipCode')} *</Label>
+                    <Input
+                      name="billingZipCode"
+                      value={createFormData.billingAddress.zipCode}
+                      onChange={(e) =>
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          billingAddress: { ...prev.billingAddress, zipCode: e.target.value },
+                        }))
+                      }
+                      required
+                    />
+                  </Field>
+                </div>
+              </div>
+            </div>
+            ) : (
+            <>
             {/* PRIMARY SECTION: Where do you need service? */}
             <div>
               <Subheading className="mb-3 text-base font-semibold">{t('customers.form.serviceLocationPrompt')}</Subheading>
@@ -604,8 +778,13 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
               </div>
             )}
 
+            </>
+            )}
+
             {/* OPTIONAL SECTIONS - Collapsible */}
             <div className="space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+              {createFormData.type === 'STANDARD' && (
+              <>
               {/* Site Contact - Collapsible */}
               <div>
                 <button
@@ -675,8 +854,10 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   </div>
                 )}
               </div>
+              </>
+              )}
 
-              {/* Business Terms - Collapsible */}
+              {/* Business Terms - Collapsible (both customer types) */}
               <div>
                 <button
                   type="button"
@@ -802,6 +983,38 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                 />
               </Field>
             </div>
+
+            {/* CUSTOMER TYPE — conversion gated by backend (409 when STANDARD has active locations) */}
+            {(() => {
+              const activeLocations = customer?.serviceLocations.filter((l) => l.status === 'ACTIVE').length ?? 0;
+              const convertToBillingOnlyBlocked =
+                customer?.type === 'STANDARD' && activeLocations > 0;
+              return (
+                <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                  <RadioGroup
+                    value={editFormData.type}
+                    onChange={(value) =>
+                      setEditFormData((prev) => ({ ...prev, type: value as CustomerType }))
+                    }
+                    className="flex gap-6"
+                  >
+                    <RadioField>
+                      <Radio value="STANDARD" />
+                      <Label>{t('customers.form.customerTypeStandard')}</Label>
+                    </RadioField>
+                    <RadioField>
+                      <Radio value="BILLING_ONLY" disabled={convertToBillingOnlyBlocked} />
+                      <Label>{t('customers.form.customerTypeBillingOnly')}</Label>
+                    </RadioField>
+                  </RadioGroup>
+                  {convertToBillingOnlyBlocked && (
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      {t('customers.form.billingOnlyConversionBlocked')}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* BILLING ADDRESS - Always Visible */}
             <div className="space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">

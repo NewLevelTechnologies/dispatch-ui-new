@@ -153,6 +153,8 @@
       "balance": "Balance",
       "backToCustomers": "Back to Customers",
       "billingAddressLabel": "Billing Address",
+      "billingOnlyBadge": "Bill-only",
+      "billingOnlyDescription": "Invoiced only. No service address.",
       "businessTerms": "Business Terms",
       "businessTermsOptional": "Business Terms (optional)",
       "contractTier": "Contract Tier",
@@ -177,6 +179,7 @@
       "viewDetails": "View Details →"
     },
     "displayMode": {
+      "billingOnly": "Bill-only",
       "simple": "Simple",
       "standard": "Standard"
     },
@@ -189,8 +192,13 @@
       "billingAddressHelp": "Check this if invoices should be sent to the service address",
       "billingAddressSection": "Billing Address",
       "billingInvoiceRecipient": "Invoice Recipient",
+      "billingOnlyConversionBlocked": "Delete this customer's service location(s) before converting to Bill-only.",
+      "billingOnlyHeading": "Bill-only customer — Billing address",
+      "billingOnlyHint": "Invoiced only — no service address. Use for warranty companies, property managers, and other third-party payers.",
       "businessDetails": "Business Details",
       "companyName": "Company/Name *",
+      "customerTypeBillingOnly": "Bill-only customer",
+      "customerTypeStandard": "Service customer",
       "locationNameHelp": "Optional - useful for businesses with multiple locations",
       "newWorkOrder": "New Work Order",
       "paymentTermsHelp": "0 = Due on receipt",

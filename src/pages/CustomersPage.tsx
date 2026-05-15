@@ -2,7 +2,7 @@ import { useEffect, useState, useDeferredValue } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon, HomeIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, MagnifyingGlassIcon, HomeIcon, BuildingOfficeIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 import { customerApi, type Customer } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
@@ -254,6 +254,8 @@ export default function CustomersPage() {
                     <TableCell>
                       {customer.displayMode === 'SIMPLE' ? (
                         <HomeIcon className="h-4 w-4 text-zinc-400" title="Homeowner" />
+                      ) : customer.displayMode === 'BILLING_ONLY' ? (
+                        <CreditCardIcon className="h-4 w-4 text-zinc-400" title={t('customers.detail.billingOnlyBadge')} />
                       ) : (
                         <BuildingOfficeIcon className="h-4 w-4 text-zinc-400" title="Business" />
                       )}
