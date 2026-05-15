@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import FinancialInvoicesTab from './FinancialInvoicesTab';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { Button } from './catalyst/button';
 import { SlideOver } from './catalyst/slideover';
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from './catalyst/tabs';
@@ -24,8 +25,14 @@ interface Props {
   workOrderId: string;
   workOrderNumber: string;
   /**
-   * Customer name for the locked-context strip in the Payment dialog
-   * (§4.1) — read-only contextual header, not a field.
+   * Customer id required by the create-invoice POST body (§4.2). Lives on
+   * the parent because the WO already has it; threading it down keeps the
+   * tab components from re-fetching customer state.
+   */
+  customerId: string;
+  /**
+   * Customer name for the locked-context strip in the Payment / Invoice
+   * dialogs (§4.1) — read-only contextual header, not a field.
    */
   customerName: string;
   /**
@@ -39,6 +46,13 @@ interface Props {
    * remounts the TabGroup with that tab as the default.
    */
   initialTab?: FinancialTab;
+  /**
+   * Monotonic signal: each increment triggers the Invoices tab to auto-open
+   * its create dialog. Used by the chip-row `[+ Invoice]` ghost so a single
+   * click both opens the drawer at the Invoices tab AND opens the create
+   * dialog.
+   */
+  openInvoiceCreateSignal?: number;
 }
 
 /**
@@ -60,16 +74,25 @@ export default function FinancialDrawer({
   onClose,
   workOrderId,
   workOrderNumber,
+  customerId,
   customerName,
   initialTab = 'invoices',
+  openInvoiceCreateSignal,
 }: Props) {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const invoicesLabel = getName('invoice', true);
+  const quotesLabel = getName('quote', true);
+  const workOrderLabel = getName('work_order');
 
   return (
-    <SlideOver open={open} onClose={onClose} className="!max-w-[800px]">
+    <SlideOver open={open} onClose={onClose} className="!max-w-[960px]">
       <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
         <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">
-          {t('workOrders.financialDrawer.title', { number: workOrderNumber })}
+          {t('workOrders.financialDrawer.title', {
+            workOrder: workOrderLabel,
+            number: workOrderNumber,
+          })}
         </h2>
         <Button plain onClick={onClose} aria-label={t('common.close')}>
           <XMarkIcon className="size-5" />
@@ -85,21 +108,21 @@ export default function FinancialDrawer({
           className="flex flex-1 flex-col overflow-hidden"
         >
           <TabList className="!gap-4 px-4">
-            <Tab>{t('workOrders.financialDrawer.tabs.quotes')}</Tab>
+            <Tab>{quotesLabel}</Tab>
             <Tab>{t('workOrders.financialDrawer.tabs.purchaseOrders')}</Tab>
-            <Tab>{t('workOrders.financialDrawer.tabs.invoices')}</Tab>
+            <Tab>{invoicesLabel}</Tab>
           </TabList>
 
           <TabPanels className="!mt-0 flex-1 overflow-y-auto p-4">
             <TabPanel>
               <ComingSoon
-                tab="quotes"
+                tabLabel={quotesLabel}
                 blockers={t('workOrders.financialDrawer.stubBlockers.quotes')}
               />
             </TabPanel>
             <TabPanel>
               <ComingSoon
-                tab="purchaseOrders"
+                tabLabel={t('workOrders.financialDrawer.tabs.purchaseOrders')}
                 blockers={t('workOrders.financialDrawer.stubBlockers.purchaseOrders')}
               />
             </TabPanel>
@@ -107,7 +130,9 @@ export default function FinancialDrawer({
               <FinancialInvoicesTab
                 workOrderId={workOrderId}
                 workOrderNumber={workOrderNumber}
+                customerId={customerId}
                 customerName={customerName}
+                openInvoiceCreateSignal={openInvoiceCreateSignal}
               />
             </TabPanel>
           </TabPanels>
@@ -118,7 +143,7 @@ export default function FinancialDrawer({
 }
 
 interface ComingSoonProps {
-  tab: FinancialTab;
+  tabLabel: string;
   blockers: string;
 }
 
@@ -128,12 +153,12 @@ interface ComingSoonProps {
  * -recipes]]. The blockers line names the specific backend ask each tab
  * waits on, so a CSR who navigates here understands the timeline.
  */
-function ComingSoon({ tab, blockers }: ComingSoonProps) {
+function ComingSoon({ tabLabel, blockers }: ComingSoonProps) {
   const { t } = useTranslation();
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 py-12 text-center">
       <Text className="!text-base !font-medium !text-zinc-700 dark:!text-zinc-300">
-        {t(`workOrders.financialDrawer.tabs.${tab}`)} — {t('workOrders.financialDrawer.comingSoon')}
+        {tabLabel} — {t('workOrders.financialDrawer.comingSoon')}
       </Text>
       <Text className="!text-sm !text-zinc-500">{blockers}</Text>
     </div>

@@ -7,6 +7,7 @@ import {
   type Invoice,
   type PaymentMethod as PaymentMethodType,
 } from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { Button } from './catalyst/button';
 import {
   Dialog,
@@ -91,6 +92,11 @@ export default function PaymentDialog({
   lockedInvoice,
 }: Props) {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const paymentLabel = getName('payment');
+  const invoiceLabel = getName('invoice');
+  const invoicesLabel = getName('invoice', true);
+  const workOrderLabel = getName('work_order');
   const queryClient = useQueryClient();
 
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('');
@@ -140,7 +146,12 @@ export default function PaymentDialog({
           ? (e as { response?: { data?: { message?: string } } }).response?.data
               ?.message
           : undefined;
-      setError(msg ?? t('workOrders.financialDrawer.paymentDialog.errorCreate'));
+      setError(
+        msg ??
+          t('workOrders.financialDrawer.paymentDialog.errorCreate', {
+            entity: paymentLabel,
+          }),
+      );
     },
   });
 
@@ -150,7 +161,12 @@ export default function PaymentDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeInvoice) {
-      setError(t('workOrders.financialDrawer.paymentDialog.noInvoiceSelected'));
+      setError(
+        t('workOrders.financialDrawer.paymentDialog.noInvoiceSelected', {
+          entity: invoiceLabel,
+          payment: paymentLabel,
+        }),
+      );
       return;
     }
     const numeric = parseFloat(amount.replace(/[$,\s]/g, ''));
@@ -159,12 +175,23 @@ export default function PaymentDialog({
       return;
     }
     createMutation.mutate({
-      invoiceId: activeInvoice.id,
-      paymentDate,
+      // Bill-to customer comes from the invoice being paid — invoices can
+      // be billed to a third party (warranty co, insurance) so the WO's
+      // primary customer isn't always the right source. The future
+      // dedicated payment-apply UI will source this the same way.
+      customerId: activeInvoice.customerId,
       amount: numeric,
+      // LocalDate (YYYY-MM-DD) per backend contract — not Instant.
+      paymentDate,
       paymentMethod: method,
       referenceNumber: referenceNumber.trim() || undefined,
       notes: notes.trim() || undefined,
+      // Single application — full amount applied to the chosen invoice.
+      // Backend supports N applications for split payments; the dialog
+      // only constructs one for v1.
+      applications: [
+        { invoiceId: activeInvoice.id, amountApplied: numeric },
+      ],
     });
   };
 
@@ -174,13 +201,16 @@ export default function PaymentDialog({
   return (
     <Dialog open={open} onClose={onClose} size="md">
       <DialogTitle>
-        {t('workOrders.financialDrawer.paymentDialog.title')}
+        {t('workOrders.financialDrawer.paymentDialog.title', {
+          entity: paymentLabel,
+        })}
       </DialogTitle>
       <DialogBody>
         {/* Locked context strip (§4.1 layout principle). Read-only context
             for the CSR, not a field. */}
-        <div className="mb-4 rounded-md bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:bg-white/5 dark:text-zinc-300">
+        <div className="mb-3 rounded-md bg-zinc-50 px-2.5 py-1.5 text-sm text-zinc-700 dark:bg-white/5 dark:text-zinc-300">
           {t('workOrders.financialDrawer.paymentDialog.contextStrip', {
+            workOrder: workOrderLabel,
             number: workOrderNumber,
             customer: customerName,
           })}
@@ -188,18 +218,25 @@ export default function PaymentDialog({
 
         {!hasOpenInvoices ? (
           <Text className="!text-sm !text-zinc-500">
-            {t('workOrders.financialDrawer.paymentDialog.noOpenInvoices')}
+            {t('workOrders.financialDrawer.paymentDialog.noOpenInvoices', {
+              entities: invoicesLabel,
+              workOrder: workOrderLabel,
+            })}
           </Text>
         ) : (
           <form onSubmit={handleSubmit}>
             <Fieldset>
-              <FieldGroup>
+              {/* Tighter vertical rhythm than Catalyst's default space-y-8
+                  — CSR forms favor density (memory: feedback_form_density). */}
+              <FieldGroup className="!space-y-3">
                 {/* Invoice slot — picker when no lockedInvoice; read-only
                     line when locked. Same dialog, two entry-point modes. */}
                 {lockedInvoice ? (
                   <Field>
                     <Label>
-                      {t('workOrders.financialDrawer.paymentDialog.invoice')}
+                      {t('workOrders.financialDrawer.paymentDialog.invoice', {
+                        entity: invoiceLabel,
+                      })}
                     </Label>
                     <div className="font-mono text-sm text-zinc-700 dark:text-zinc-300">
                       {lockedInvoice.invoiceNumber} ·{' '}
@@ -211,7 +248,9 @@ export default function PaymentDialog({
                 ) : (
                   <Field>
                     <Label>
-                      {t('workOrders.financialDrawer.paymentDialog.invoice')}
+                      {t('workOrders.financialDrawer.paymentDialog.invoice', {
+                        entity: invoiceLabel,
+                      })}
                     </Label>
                     <Select
                       name="invoice"
@@ -234,10 +273,12 @@ export default function PaymentDialog({
                   </Field>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <Field>
                     <Label>
-                      {t('workOrders.financialDrawer.paymentDialog.paymentDate')}
+                      {t('workOrders.financialDrawer.paymentDialog.paymentDate', {
+                        entity: paymentLabel,
+                      })}
                     </Label>
                     <Input
                       name="paymentDate"
@@ -299,7 +340,7 @@ export default function PaymentDialog({
                   <Label>{t('common.form.notes')}</Label>
                   <Textarea
                     name="notes"
-                    rows={2}
+                    rows={1}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                   />
@@ -326,7 +367,9 @@ export default function PaymentDialog({
         >
           {submitting
             ? t('common.saving')
-            : t('workOrders.financialDrawer.paymentDialog.submit')}
+            : t('workOrders.financialDrawer.paymentDialog.submit', {
+                entity: paymentLabel,
+              })}
         </Button>
       </DialogActions>
     </Dialog>

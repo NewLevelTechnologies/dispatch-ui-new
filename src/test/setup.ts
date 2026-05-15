@@ -930,32 +930,43 @@ vi.mock('react-i18next', () => {
     'workOrders.detail.print': 'Print',
     'workOrders.detail.setNte': 'Set NTE',
     'workOrders.financialDrawer.comingSoon': 'Coming soon',
-    'workOrders.financialDrawer.ghosts.invoice': 'Invoice',
     'workOrders.financialDrawer.invoicesTab.actions.markPaid': 'Mark paid',
     'workOrders.financialDrawer.invoicesTab.actions.void': 'Void',
+    'workOrders.financialDrawer.invoicesTab.actions.voidPayment': 'Void {{entity, lowercase}}',
+    'workOrders.financialDrawer.invoicesTab.addPayment': '{{entity}}',
     'workOrders.financialDrawer.invoicesTab.changeStatus':
       'Change status (currently {{current}})',
     'workOrders.financialDrawer.invoicesTab.collapseRow': 'Hide line items',
     'workOrders.financialDrawer.invoicesTab.columns.balance': 'Balance',
     'workOrders.financialDrawer.invoicesTab.columns.date': 'Date',
     'workOrders.financialDrawer.invoicesTab.columns.due': 'Due',
-    'workOrders.financialDrawer.invoicesTab.columns.invoiceNumber': 'Invoice #',
+    'workOrders.financialDrawer.invoicesTab.columns.invoiceNumber': '{{entity}} #',
     'workOrders.financialDrawer.invoicesTab.columns.paid': 'Paid',
     'workOrders.financialDrawer.invoicesTab.columns.status': 'Status',
     'workOrders.financialDrawer.invoicesTab.columns.total': 'Total',
     'workOrders.financialDrawer.invoicesTab.empty':
-      'No invoices on this work order yet.',
+      'No {{entities, lowercase}} on this {{workOrder, lowercase}} yet.',
     'workOrders.financialDrawer.invoicesTab.errorLoading':
-      'Failed to load invoices.',
+      'Failed to load {{entities, lowercase}}.',
     'workOrders.financialDrawer.invoicesTab.expandRow': 'Show line items',
     'workOrders.financialDrawer.invoicesTab.lineColumns.description': 'Description',
     'workOrders.financialDrawer.invoicesTab.lineColumns.lineTotal': 'Total',
     'workOrders.financialDrawer.invoicesTab.lineColumns.quantity': 'Qty',
     'workOrders.financialDrawer.invoicesTab.lineColumns.unitPrice': 'Unit price',
     'workOrders.financialDrawer.invoicesTab.lineItemsHeading': 'Line items',
-    'workOrders.financialDrawer.invoicesTab.loading': 'Loading invoices…',
+    'workOrders.financialDrawer.invoicesTab.loading': 'Loading {{entities, lowercase}}…',
+    'workOrders.financialDrawer.invoicesTab.newInvoice': 'New {{entity}}',
     'workOrders.financialDrawer.invoicesTab.noLineItems': 'No line items.',
+    'workOrders.financialDrawer.invoicesTab.noPayments':
+      'No {{entities, lowercase}} recorded against this {{parent, lowercase}}.',
     'workOrders.financialDrawer.invoicesTab.notesHeading': 'Notes',
+    'workOrders.financialDrawer.invoicesTab.paymentColumns.amount': 'Amount',
+    'workOrders.financialDrawer.invoicesTab.paymentColumns.date': 'Date',
+    'workOrders.financialDrawer.invoicesTab.paymentColumns.method': 'Method',
+    'workOrders.financialDrawer.invoicesTab.paymentColumns.paymentNumber': '{{entity}} #',
+    'workOrders.financialDrawer.invoicesTab.paymentColumns.reference': 'Reference',
+    'workOrders.financialDrawer.invoicesTab.paymentsHeading': '{{entities}}',
+    'workOrders.financialDrawer.invoicesTab.recordPayment': 'Record {{entity}}',
     'workOrders.financialDrawer.invoicesTab.statuses.cancelled': 'Cancelled',
     'workOrders.financialDrawer.invoicesTab.statuses.draft': 'Draft',
     'workOrders.financialDrawer.invoicesTab.statuses.overdue': 'Overdue',
@@ -963,29 +974,45 @@ vi.mock('react-i18next', () => {
     'workOrders.financialDrawer.invoicesTab.statuses.sent': 'Sent',
     'workOrders.financialDrawer.invoicesTab.statuses.void': 'Void',
     'workOrders.financialDrawer.invoicesTab.voidConfirm':
-      'Void invoice {{number}} for {{amount}}? This cannot be undone.',
+      'Void {{entity, lowercase}} {{number}} for {{amount}}? This cannot be undone.',
     'workOrders.financialDrawer.invoicesTab.voidPaymentConfirm':
-      'Void payment {{number}} ({{amount}} applied to this invoice)? This reverses the full payment from every invoice it applies to. Cannot be undone.',
-    'workOrders.financialDrawer.invoicesTab.actions.voidPayment': 'Void payment',
-    'workOrders.financialDrawer.invoicesTab.addPayment': 'Payment',
-    'workOrders.financialDrawer.invoicesTab.noPayments':
-      'No payments recorded against this invoice.',
-    'workOrders.financialDrawer.invoicesTab.paymentColumns.amount': 'Amount',
-    'workOrders.financialDrawer.invoicesTab.paymentColumns.date': 'Date',
-    'workOrders.financialDrawer.invoicesTab.paymentColumns.method': 'Method',
-    'workOrders.financialDrawer.invoicesTab.paymentColumns.paymentNumber': 'Payment #',
-    'workOrders.financialDrawer.invoicesTab.paymentColumns.reference': 'Reference',
-    'workOrders.financialDrawer.invoicesTab.paymentsHeading': 'Payments',
-    'workOrders.financialDrawer.invoicesTab.recordPayment': 'Record Payment',
+      'Void {{entity, lowercase}} {{number}} ({{amount}} applied to this {{parent, lowercase}})? This reverses the full {{entity, lowercase}} from every {{parent, lowercase}} it applies to. Cannot be undone.',
+    'workOrders.financialDrawer.invoiceDialog.amount': 'Amount',
+    'workOrders.financialDrawer.invoiceDialog.billTo': 'Bill to',
+    'workOrders.financialDrawer.invoiceDialog.contextStrip':
+      '{{workOrder}} #{{number}} · {{customer}}',
+    'workOrders.financialDrawer.invoiceDialog.customerRequired':
+      'A bill-to {{entity, lowercase}} is required.',
+    'workOrders.financialDrawer.invoiceDialog.datesRequired':
+      'Both dates are required.',
+    'common.customerPicker.noResults': 'No {{entities, lowercase}} match "{{query}}".',
+    'common.customerPicker.placeholder': 'Search {{entities, lowercase}}…',
+    'common.customerPicker.searching': 'Searching…',
+    'common.customerPicker.typeToSearch':
+      'Type at least 2 characters to search…',
+    'workOrders.financialDrawer.invoiceDialog.description': 'Description',
+    'workOrders.financialDrawer.invoiceDialog.descriptionPlaceholder':
+      'What is this {{entity, lowercase}} for?',
+    'workOrders.financialDrawer.invoiceDialog.descriptionRequired':
+      'Description is required.',
+    'workOrders.financialDrawer.invoiceDialog.dueDate': 'Due date',
+    'workOrders.financialDrawer.invoiceDialog.errorCreate':
+      'Failed to create {{entity, lowercase}}.',
+    'workOrders.financialDrawer.invoiceDialog.invalidAmount':
+      'Amount must be a positive number.',
+    'workOrders.financialDrawer.invoiceDialog.invoiceDate': '{{entity}} date',
+    'workOrders.financialDrawer.invoiceDialog.saveAndSend': 'Save & Send',
+    'workOrders.financialDrawer.invoiceDialog.saveAsDraft': 'Save as Draft',
+    'workOrders.financialDrawer.invoiceDialog.title': 'New {{entity}}',
     'workOrders.financialDrawer.paymentDialog.amount': 'Amount',
     'workOrders.financialDrawer.paymentDialog.balanceLabel': 'Bal {{amount}}',
     'workOrders.financialDrawer.paymentDialog.contextStrip':
-      'Work Order #{{number}} · {{customer}}',
+      '{{workOrder}} #{{number}} · {{customer}}',
     'workOrders.financialDrawer.paymentDialog.errorCreate':
-      'Failed to record payment.',
+      'Failed to record {{entity, lowercase}}.',
     'workOrders.financialDrawer.paymentDialog.invalidAmount':
       'Amount must be a positive number.',
-    'workOrders.financialDrawer.paymentDialog.invoice': 'Invoice',
+    'workOrders.financialDrawer.paymentDialog.invoice': '{{entity}}',
     'workOrders.financialDrawer.paymentDialog.method': 'Method',
     'workOrders.financialDrawer.paymentDialog.methods.ACH': 'ACH',
     'workOrders.financialDrawer.paymentDialog.methods.CASH': 'Cash',
@@ -995,23 +1022,21 @@ vi.mock('react-i18next', () => {
     'workOrders.financialDrawer.paymentDialog.methods.OTHER': 'Other',
     'workOrders.financialDrawer.paymentDialog.methods.WIRE_TRANSFER': 'Wire transfer',
     'workOrders.financialDrawer.paymentDialog.noInvoiceSelected':
-      'Select an invoice to apply the payment to.',
+      'Select an {{entity, lowercase}} to apply the {{payment, lowercase}} to.',
     'workOrders.financialDrawer.paymentDialog.noOpenInvoices':
-      'No outstanding invoices on this work order.',
-    'workOrders.financialDrawer.paymentDialog.paymentDate': 'Payment date',
+      'No outstanding {{entities, lowercase}} on this {{workOrder, lowercase}}.',
+    'workOrders.financialDrawer.paymentDialog.paymentDate': '{{entity}} date',
     'workOrders.financialDrawer.paymentDialog.referenceNumber': 'Reference #',
     'workOrders.financialDrawer.paymentDialog.referencePlaceholder':
       'Check number, transaction id, etc.',
-    'workOrders.financialDrawer.paymentDialog.submit': 'Record Payment',
-    'workOrders.financialDrawer.paymentDialog.title': 'Record Payment',
+    'workOrders.financialDrawer.paymentDialog.submit': 'Record {{entity}}',
+    'workOrders.financialDrawer.paymentDialog.title': 'Record {{entity}}',
     'workOrders.financialDrawer.stubBlockers.purchaseOrders':
       'Deferred to phase 7c — no backend entity yet.',
     'workOrders.financialDrawer.stubBlockers.quotes':
       'Quotes ship in phase 7b — waiting on backend asks #7–#10.',
-    'workOrders.financialDrawer.tabs.invoices': 'Invoices',
     'workOrders.financialDrawer.tabs.purchaseOrders': 'POs',
-    'workOrders.financialDrawer.tabs.quotes': 'Quotes',
-    'workOrders.financialDrawer.title': 'Financials · WO #{{number}}',
+    'workOrders.financialDrawer.title': 'Financials · {{workOrder}} #{{number}}',
     'workOrders.workItems.changeStatus': 'Change status (currently {{current}})',
     'workOrders.workItems.backToEntity': 'Back to {{entity}}',
     'workOrders.workItems.collapseRow': 'Hide details',
@@ -1086,10 +1111,19 @@ vi.mock('react-i18next', () => {
         if (params) {
           Object.keys(params).forEach((param) => {
             const value = String(params[param]);
-            // Handle {{param, lowercase}} format
-            translation = translation.replace(`{{${param}, lowercase}}`, value.toLowerCase());
+            // Escape regex metacharacters in the param name.
+            const escaped = param.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // Handle {{param, lowercase}} format — global so repeated
+            // placeholders in one template all get substituted.
+            translation = translation.replace(
+              new RegExp(`{{${escaped}, lowercase}}`, 'g'),
+              value.toLowerCase(),
+            );
             // Handle {{param}} format
-            translation = translation.replace(`{{${param}}}`, value);
+            translation = translation.replace(
+              new RegExp(`{{${escaped}}}`, 'g'),
+              value,
+            );
           });
         }
         return translation;

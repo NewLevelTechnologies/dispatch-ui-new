@@ -21,12 +21,16 @@ describe('FinancialDrawer', () => {
     onClose: vi.fn(),
     workOrderId: 'wo-1',
     workOrderNumber: 'WO-00010',
+    customerId: 'cust-1',
     customerName: 'Tenant 2 Inc.',
   };
 
   it('renders the title with the WO number', () => {
     renderWithProviders(<FinancialDrawer {...defaults} />);
-    expect(screen.getByText('Financials · WO #WO-00010')).toBeInTheDocument();
+    // Title uses the work_order glossary singular ("Work Order" by default).
+    expect(
+      screen.getByText('Financials · Work Order #WO-00010'),
+    ).toBeInTheDocument();
   });
 
   it('renders three tab labels in WO-lifecycle (chronological) order — no Payments tab', () => {

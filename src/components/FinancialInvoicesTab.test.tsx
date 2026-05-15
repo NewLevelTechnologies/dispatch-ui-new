@@ -46,6 +46,7 @@ const renderTab = () =>
     <FinancialInvoicesTab
       workOrderId="wo-1"
       workOrderNumber="WO-00010"
+      customerId="cust-1"
       customerName="Tenant 2 Inc."
     />,
   );
@@ -55,11 +56,14 @@ describe('FinancialInvoicesTab', () => {
     vi.clearAllMocks();
   });
 
-  it('shows the empty state when the WO has no invoices', async () => {
+  it('shows the empty state with a + New Invoice button when the WO has no invoices', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
     renderTab();
     expect(
       await screen.findByText(/No invoices on this work order yet/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /new invoice/i }),
     ).toBeInTheDocument();
   });
 
@@ -263,6 +267,7 @@ describe('FinancialInvoicesTab', () => {
 
       // Confirmation copy is honest about the cascade.
       expect(confirmSpy).toHaveBeenCalledWith(
+        // Glossary substitutes entity/parent → "payment" / "invoice".
         expect.stringMatching(/reverses the full payment from every invoice/i),
       );
       await waitFor(() => {
@@ -313,6 +318,111 @@ describe('FinancialInvoicesTab', () => {
       // is the only observable side-effect (covered by the integration
       // chain — refetch happens regardless of 200 vs 204).
       confirmSpy.mockRestore();
+    });
+  });
+
+  describe('New Invoice flow (Phase 7 §4.2)', () => {
+    it('opens the lump-sum dialog from the tab-level + New Invoice button', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [makeInvoice()] });
+      renderTab();
+      const cta = await screen.findByRole('button', { name: /new invoice/i });
+      await user.click(cta);
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      // Locked context strip surfaces the WO + customer.
+      expect(screen.getByText(/Work Order #WO-00010/)).toBeInTheDocument();
+      expect(screen.getByText(/Tenant 2 Inc\./)).toBeInTheDocument();
+    });
+
+    it('posts a single lump-sum line item on Save as Draft', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [makeInvoice()] });
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: { id: 'inv-new', status: 'DRAFT' },
+      });
+      renderTab();
+      await user.click(await screen.findByRole('button', { name: /new invoice/i }));
+
+      await user.type(
+        screen.getByRole('textbox', { name: /description/i }),
+        'Service call',
+      );
+      await user.type(screen.getByRole('textbox', { name: /amount/i }), '350');
+      await user.click(screen.getByRole('button', { name: /save as draft/i }));
+
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/financial/invoices',
+          expect.objectContaining({
+            workOrderId: 'wo-1',
+            customerId: 'cust-1',
+            taxRate: 0,
+            lineItems: [
+              expect.objectContaining({
+                description: 'Service call',
+                quantity: 1,
+                unitPrice: 350,
+              }),
+            ],
+          }),
+        );
+      });
+      // Save as Draft does NOT chain updateStatus.
+      expect(apiClient.patch).not.toHaveBeenCalled();
+    });
+
+    it('chains updateStatus(SENT) on Save & Send', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [makeInvoice()] });
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: { id: 'inv-new', status: 'DRAFT' },
+      });
+      vi.mocked(apiClient.patch).mockResolvedValue({
+        data: { id: 'inv-new', status: 'SENT' },
+      });
+      renderTab();
+      await user.click(await screen.findByRole('button', { name: /new invoice/i }));
+      await user.type(
+        screen.getByRole('textbox', { name: /description/i }),
+        'Service call',
+      );
+      await user.type(screen.getByRole('textbox', { name: /amount/i }), '350');
+      await user.click(screen.getByRole('button', { name: /save & send/i }));
+
+      await waitFor(() => {
+        expect(apiClient.patch).toHaveBeenCalledWith(
+          '/financial/invoices/inv-new/status',
+          { status: 'SENT' },
+        );
+      });
+    });
+
+    it('validates description and amount before submitting', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [makeInvoice()] });
+      renderTab();
+      await user.click(await screen.findByRole('button', { name: /new invoice/i }));
+      // Empty description.
+      await user.click(screen.getByRole('button', { name: /save as draft/i }));
+      expect(
+        await screen.findByText(/Description is required/i),
+      ).toBeInTheDocument();
+      expect(apiClient.post).not.toHaveBeenCalled();
+    });
+
+    it('auto-opens when openInvoiceCreateSignal is non-zero', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+      renderWithProviders(
+        <FinancialInvoicesTab
+          workOrderId="wo-1"
+          workOrderNumber="WO-00010"
+          customerId="cust-1"
+          customerName="Tenant 2 Inc."
+          openInvoiceCreateSignal={1}
+        />,
+      );
+      // Dialog auto-opens via the signal — no button click needed.
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
     });
   });
 
@@ -376,9 +486,13 @@ describe('FinancialInvoicesTab', () => {
         expect(apiClient.post).toHaveBeenCalledWith(
           '/financial/payments',
           expect.objectContaining({
-            invoiceId: 'inv-1',
+            // Bill-to customer pulled from the invoice (fixture: cust-1).
+            customerId: 'cust-1',
             amount: 1000,
             paymentMethod: 'CHECK',
+            applications: [
+              { invoiceId: 'inv-1', amountApplied: 1000 },
+            ],
           }),
         );
       });

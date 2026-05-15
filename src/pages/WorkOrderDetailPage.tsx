@@ -184,11 +184,25 @@ export default function WorkOrderDetailPage() {
   const [financialDrawerOpen, setFinancialDrawerOpen] = useState(false);
   const [financialDrawerInitialTab, setFinancialDrawerInitialTab] =
     useState<FinancialTab>('invoices');
+  // Monotonic counter: each increment signals the Invoices tab to
+  // auto-open its create dialog. Used by the chip-row `[+ Invoice]`
+  // ghost so a single click both opens the drawer AND opens the create
+  // dialog (one CSR-visible action, one click).
+  const [invoiceCreateSignal, setInvoiceCreateSignal] = useState(0);
 
-  // Open the financial drawer at the matching tab. Used by the chip-row
-  // click handlers (§3.2 routing) and the typed-ghost cluster (§5.3).
+  // Open the financial drawer at the matching tab. Used by derived chips
+  // ($ invoiced, $ paid, Bal) — explicitly resets the create-invoice
+  // signal so a stale value from a previous ghost click can't trigger
+  // the create dialog to reopen on this navigation.
   const openFinancialDrawer = (tab: FinancialTab) => {
     setFinancialDrawerInitialTab(tab);
+    setInvoiceCreateSignal(0);
+    setFinancialDrawerOpen(true);
+  };
+
+  const openFinancialDrawerForInvoiceCreate = () => {
+    setFinancialDrawerInitialTab('invoices');
+    setInvoiceCreateSignal((n) => n + 1);
     setFinancialDrawerOpen(true);
   };
   const [workItemDialogOpen, setWorkItemDialogOpen] = useState(false);
@@ -826,7 +840,7 @@ export default function WorkOrderDetailPage() {
                       type="button"
                       onClick={() => openFinancialDrawer('invoices')}
                       title={currencyFormatter.format(invoicedAmt)}
-                      aria-label={t('workOrders.financialDrawer.tabs.invoices')}
+                      aria-label={getName('invoice', true)}
                       className={`${chipButtonClass} bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10`}
                     >
                       <span className="font-medium tabular-nums">
@@ -890,13 +904,15 @@ export default function WorkOrderDetailPage() {
                   // Typed ghost cluster (§5.3) — bootstrap entry to the
                   // drawer when summary is zero. 7a ships only +Invoice;
                   // [+ Quote] joins in 7b once the Quotes tab is real.
+                  // Click lands on Invoices tab AND auto-opens the create
+                  // dialog (one CSR action, one click) per §3.2 routing.
                   <button
                     type="button"
-                    onClick={() => openFinancialDrawer('invoices')}
-                    aria-label={t('workOrders.financialDrawer.tabs.invoices')}
+                    onClick={openFinancialDrawerForInvoiceCreate}
+                    aria-label={getName('invoice', true)}
                     className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-300 px-1.5 py-0.5 text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
                   >
-                    + {t('workOrders.financialDrawer.ghosts.invoice')}
+                    + {getName('invoice')}
                   </button>
                 )}
               </div>
@@ -1138,8 +1154,15 @@ export default function WorkOrderDetailPage() {
         onClose={() => setFinancialDrawerOpen(false)}
         workOrderId={workOrder.id}
         workOrderNumber={woDisplayNumber}
+        // Prefer the enriched `customer.id` over the root `customerId`.
+        // The detail endpoint reliably populates the nested object; the
+        // root field is typed as required but has been observed missing
+        // in production responses for some WOs. Fall back either way so
+        // we never silently submit `customerId: undefined`.
+        customerId={customer?.id ?? workOrder.customerId ?? ''}
         customerName={customer?.name ?? ''}
         initialTab={financialDrawerInitialTab}
+        openInvoiceCreateSignal={invoiceCreateSignal}
       />
 
       {/* Dispatch detail drawer — row body click opens this with the

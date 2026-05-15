@@ -85,15 +85,32 @@ export default function PaymentsPage() {
       return;
     }
 
+    const selectedInvoice = Array.isArray(invoices)
+      ? invoices.find((inv) => inv.id === formData.invoiceId)
+      : undefined;
+    if (!selectedInvoice) {
+      alert('Invoice not found');
+      return;
+    }
+
     try {
       setSubmitting(true);
       const request: CreatePaymentRequest = {
-        invoiceId: formData.invoiceId,
-        paymentDate: new Date(formData.paymentDate).toISOString(),
+        // Bill-to customer sourced from the invoice (may differ from the
+        // WO's customer when billing is routed to a third party).
+        customerId: selectedInvoice.customerId,
+        // Backend wants LocalDate (YYYY-MM-DD) for paymentDate, not Instant.
+        paymentDate: formData.paymentDate,
         amount,
         paymentMethod: formData.paymentMethod,
         referenceNumber: formData.referenceNumber || undefined,
         notes: formData.notes || undefined,
+        // Single-application case: the whole amount lands on the selected
+        // invoice. Split-payment UI is not built; if needed it'd construct
+        // multiple entries here.
+        applications: [
+          { invoiceId: formData.invoiceId, amountApplied: amount },
+        ],
       };
       await createMutation.mutateAsync(request);
     } catch (error: unknown) {
