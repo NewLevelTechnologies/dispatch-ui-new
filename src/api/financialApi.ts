@@ -256,13 +256,39 @@ export interface Payment {
   updatedAt: string;
 }
 
-export interface CreatePaymentRequest {
+/**
+ * One application of a Payment to a single Invoice. Carries the slice that
+ * lands on that invoice — same semantic as the nested `payments[].amount`
+ * returned on the invoice list (ask #2). Supports split payments (one
+ * check across N invoices) without a separate API call shape.
+ *
+ * For v1 the dialog only constructs single-element arrays — `amountApplied`
+ * equals the dialog's Amount field, applied to one chosen invoice. Split-
+ * payment UI is out of scope until a real CSR workflow earns it.
+ */
+export interface CreatePaymentApplication {
   invoiceId: string;
-  paymentDate: string;
+  amountApplied: number;
+}
+
+export interface CreatePaymentRequest {
+  /**
+   * Bill-to customer for this payment. For a payment against a single
+   * invoice, source from `invoice.customerId` (which may differ from the
+   * WO's primary customer per the third-party billing model — warranty
+   * cos, insurance, etc.). When a future split-across-customers UI lands,
+   * this stays per-payment (one payment, one paying party).
+   */
+  customerId: string;
+  /** Total payment amount (gross). For single-invoice cases equals the sole `applications[0].amountApplied`. */
   amount: number;
+  /** Calendar date (LocalDate "YYYY-MM-DD"), not Instant — different from invoice/dueDate. */
+  paymentDate: string;
   paymentMethod: PaymentMethod;
   referenceNumber?: string;
   notes?: string;
+  /** Required. Each entry applies a slice of the payment to one invoice. */
+  applications: CreatePaymentApplication[];
 }
 
 export const paymentsApi = {

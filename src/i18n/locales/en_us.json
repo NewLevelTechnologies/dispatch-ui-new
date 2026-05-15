@@ -7,6 +7,12 @@
     "signInPrompt": "Sign in to your account"
   },
   "common": {
+    "customerPicker": {
+      "noResults": "No {{entities, lowercase}} match \"{{query}}\".",
+      "placeholder": "Search {{entities, lowercase}}…",
+      "searching": "Searching…",
+      "typeToSearch": "Type at least 2 characters to search…"
+    },
     "actions": {
       "add": "Add {{entity}}",
       "addFirst": "Add your first {{entity, lowercase}}",
@@ -1192,29 +1198,26 @@
     },
     "financialDrawer": {
       "comingSoon": "Coming soon",
-      "ghosts": {
-        "invoice": "Invoice"
-      },
       "invoicesTab": {
         "actions": {
           "markPaid": "Mark paid",
           "void": "Void",
-          "voidPayment": "Void payment"
+          "voidPayment": "Void {{entity, lowercase}}"
         },
-        "addPayment": "Payment",
+        "addPayment": "{{entity}}",
         "changeStatus": "Change status (currently {{current}})",
         "collapseRow": "Hide line items",
         "columns": {
           "balance": "Balance",
           "date": "Date",
           "due": "Due",
-          "invoiceNumber": "Invoice #",
+          "invoiceNumber": "{{entity}} #",
           "paid": "Paid",
           "status": "Status",
           "total": "Total"
         },
-        "empty": "No invoices on this work order yet.",
-        "errorLoading": "Failed to load invoices.",
+        "empty": "No {{entities, lowercase}} on this {{workOrder, lowercase}} yet.",
+        "errorLoading": "Failed to load {{entities, lowercase}}.",
         "expandRow": "Show line items",
         "lineColumns": {
           "description": "Description",
@@ -1223,19 +1226,20 @@
           "unitPrice": "Unit price"
         },
         "lineItemsHeading": "Line items",
-        "loading": "Loading invoices…",
+        "loading": "Loading {{entities, lowercase}}…",
+        "newInvoice": "New {{entity}}",
         "noLineItems": "No line items.",
-        "noPayments": "No payments recorded against this invoice.",
+        "noPayments": "No {{entities, lowercase}} recorded against this {{parent, lowercase}}.",
         "notesHeading": "Notes",
         "paymentColumns": {
           "amount": "Amount",
           "date": "Date",
           "method": "Method",
-          "paymentNumber": "Payment #",
+          "paymentNumber": "{{entity}} #",
           "reference": "Reference"
         },
-        "paymentsHeading": "Payments",
-        "recordPayment": "Record Payment",
+        "paymentsHeading": "{{entities}}",
+        "recordPayment": "Record {{entity}}",
         "statuses": {
           "cancelled": "Cancelled",
           "draft": "Draft",
@@ -1244,16 +1248,33 @@
           "sent": "Sent",
           "void": "Void"
         },
-        "voidConfirm": "Void invoice {{number}} for {{amount}}? This cannot be undone.",
-        "voidPaymentConfirm": "Void payment {{number}} ({{amount}} applied to this invoice)? This reverses the full payment from every invoice it applies to. Cannot be undone."
+        "voidConfirm": "Void {{entity, lowercase}} {{number}} for {{amount}}? This cannot be undone.",
+        "voidPaymentConfirm": "Void {{entity, lowercase}} {{number}} ({{amount}} applied to this {{parent, lowercase}})? This reverses the full {{entity, lowercase}} from every {{parent, lowercase}} it applies to. Cannot be undone."
+      },
+      "invoiceDialog": {
+        "amount": "Amount",
+        "billTo": "Bill to",
+        "contextStrip": "{{workOrder}} #{{number}} · {{customer}}",
+        "customerRequired": "A bill-to {{entity, lowercase}} is required.",
+        "datesRequired": "Both dates are required.",
+        "description": "Description",
+        "descriptionPlaceholder": "What is this {{entity, lowercase}} for?",
+        "descriptionRequired": "Description is required.",
+        "dueDate": "Due date",
+        "errorCreate": "Failed to create {{entity, lowercase}}.",
+        "invalidAmount": "Amount must be a positive number.",
+        "invoiceDate": "{{entity}} date",
+        "saveAndSend": "Save & Send",
+        "saveAsDraft": "Save as Draft",
+        "title": "New {{entity}}"
       },
       "paymentDialog": {
         "amount": "Amount",
         "balanceLabel": "Bal {{amount}}",
-        "contextStrip": "Work Order #{{number}} · {{customer}}",
-        "errorCreate": "Failed to record payment.",
+        "contextStrip": "{{workOrder}} #{{number}} · {{customer}}",
+        "errorCreate": "Failed to record {{entity, lowercase}}.",
         "invalidAmount": "Amount must be a positive number.",
-        "invoice": "Invoice",
+        "invoice": "{{entity}}",
         "method": "Method",
         "methods": {
           "ACH": "ACH",
@@ -1264,24 +1285,22 @@
           "OTHER": "Other",
           "WIRE_TRANSFER": "Wire transfer"
         },
-        "noInvoiceSelected": "Select an invoice to apply the payment to.",
-        "noOpenInvoices": "No outstanding invoices on this work order.",
-        "paymentDate": "Payment date",
+        "noInvoiceSelected": "Select an {{entity, lowercase}} to apply the {{payment, lowercase}} to.",
+        "noOpenInvoices": "No outstanding {{entities, lowercase}} on this {{workOrder, lowercase}}.",
+        "paymentDate": "{{entity}} date",
         "referenceNumber": "Reference #",
         "referencePlaceholder": "Check number, transaction id, etc.",
-        "submit": "Record Payment",
-        "title": "Record Payment"
+        "submit": "Record {{entity}}",
+        "title": "Record {{entity}}"
       },
       "stubBlockers": {
         "purchaseOrders": "Deferred to phase 7c — no backend entity yet.",
         "quotes": "Quotes ship in phase 7b — waiting on backend asks #7–#10."
       },
       "tabs": {
-        "invoices": "Invoices",
-        "purchaseOrders": "POs",
-        "quotes": "Quotes"
+        "purchaseOrders": "POs"
       },
-      "title": "Financials · WO #{{number}}"
+      "title": "Financials · {{workOrder}} #{{number}}"
     },
     "dispatches": {
       "assign": "Assign",

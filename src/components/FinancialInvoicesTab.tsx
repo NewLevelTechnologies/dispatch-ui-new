@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -16,6 +16,8 @@ import {
   type NestedInvoicePayment,
   type PaymentMethod as PaymentMethodType,
 } from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
+import InvoiceDialog from './InvoiceDialog';
 import PaymentDialog from './PaymentDialog';
 import { Badge } from './catalyst/badge';
 import { Button } from './catalyst/button';
@@ -39,7 +41,16 @@ import { Text } from './catalyst/text';
 interface Props {
   workOrderId: string;
   workOrderNumber: string;
+  customerId: string;
   customerName: string;
+  /**
+   * Increments each time the parent chip-row's `[+ Invoice]` ghost is
+   * clicked. Treated as a one-shot signal — the tab auto-opens the
+   * create dialog whenever the value changes and is non-zero. Avoids
+   * boolean prop drift (parent doesn't need a clear-after-consumed
+   * callback); a counter is monotonic so each click is observable.
+   */
+  openInvoiceCreateSignal?: number;
 }
 
 // §3.3 status pill palette. OVERDUE is server-derived (date-based per §7
@@ -109,9 +120,16 @@ const amt = (v: number | string | null | undefined): number => Number(v ?? 0) ||
 export default function FinancialInvoicesTab({
   workOrderId,
   workOrderNumber,
+  customerId,
   customerName,
+  openInvoiceCreateSignal,
 }: Props) {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const invoiceLabel = getName('invoice');
+  const invoicesLabel = getName('invoice', true);
+  const paymentLabel = getName('payment');
+  const workOrderLabel = getName('work_order');
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -121,6 +139,18 @@ export default function FinancialInvoicesTab({
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [lockedInvoiceForPayment, setLockedInvoiceForPayment] =
     useState<Invoice | null>(null);
+
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+
+  // Auto-open the create dialog when the parent chip-row ghost signals
+  // a click. Monotonic counter avoids a boolean-clear race.
+  useEffect(() => {
+    if (openInvoiceCreateSignal && openInvoiceCreateSignal > 0) {
+      /* eslint-disable react-hooks/set-state-in-effect -- parent signal pattern */
+      setInvoiceDialogOpen(true);
+      /* eslint-enable react-hooks/set-state-in-effect */
+    }
+  }, [openInvoiceCreateSignal]);
 
   const {
     data: invoices = [],
@@ -172,6 +202,7 @@ export default function FinancialInvoicesTab({
     if (
       window.confirm(
         t('workOrders.financialDrawer.invoicesTab.voidConfirm', {
+          entity: invoiceLabel,
           number: invoice.invoiceNumber,
           amount: currencyFormatter.format(amt(invoice.totalAmount)),
         }),
@@ -190,6 +221,8 @@ export default function FinancialInvoicesTab({
     if (
       window.confirm(
         t('workOrders.financialDrawer.invoicesTab.voidPaymentConfirm', {
+          entity: paymentLabel,
+          parent: invoiceLabel,
           number: payment.paymentNumber,
           amount: currencyFormatter.format(amt(payment.amount)),
         }),
@@ -219,7 +252,9 @@ export default function FinancialInvoicesTab({
     return (
       <div className="py-8 text-center">
         <Text className="!text-sm !text-zinc-500">
-          {t('workOrders.financialDrawer.invoicesTab.loading')}
+          {t('workOrders.financialDrawer.invoicesTab.loading', {
+            entities: invoicesLabel,
+          })}
         </Text>
       </div>
     );
@@ -229,7 +264,9 @@ export default function FinancialInvoicesTab({
     return (
       <div className="py-8 text-center">
         <Text className="!text-sm !text-rose-600 dark:!text-rose-400">
-          {t('workOrders.financialDrawer.invoicesTab.errorLoading')}
+          {t('workOrders.financialDrawer.invoicesTab.errorLoading', {
+            entities: invoicesLabel,
+          })}
         </Text>
       </div>
     );
@@ -237,18 +274,40 @@ export default function FinancialInvoicesTab({
 
   if (invoices.length === 0) {
     return (
-      <div className="py-12 text-center">
-        <Text className="!text-sm !text-zinc-500">
-          {t('workOrders.financialDrawer.invoicesTab.empty')}
-        </Text>
-      </div>
+      <>
+        <div className="py-12 text-center">
+          <Text className="!text-sm !text-zinc-500">
+            {t('workOrders.financialDrawer.invoicesTab.empty', {
+              entities: invoicesLabel,
+              workOrder: workOrderLabel,
+            })}
+          </Text>
+          <div className="mt-4 flex justify-center">
+            <Button color="dark/zinc" onClick={() => setInvoiceDialogOpen(true)}>
+              <PlusIcon className="size-4" />
+              {t('workOrders.financialDrawer.invoicesTab.newInvoice', {
+                entity: invoiceLabel,
+              })}
+            </Button>
+          </div>
+        </div>
+        <InvoiceDialog
+          open={invoiceDialogOpen}
+          onClose={() => setInvoiceDialogOpen(false)}
+          workOrderId={workOrderId}
+          workOrderNumber={workOrderNumber}
+          defaultCustomer={{ id: customerId, name: customerName }}
+        />
+      </>
     );
   }
 
   return (
     <div>
-      {/* Tab header CTA row (§3.3). + New Invoice ships in step 8;
-          + Record Payment ships now alongside the payments fold. */}
+      {/* Tab header CTA row (§3.3): + New Invoice + Record Payment, both
+          right-aligned. Each covers a distinct CSR scenario — create an
+          invoice (parent-less, always) and record a payment with the
+          picker (when the CSR has money but no specific invoice in mind). */}
       <div className="mb-3 flex justify-end gap-2">
         <Button
           outline
@@ -261,7 +320,15 @@ export default function FinancialInvoicesTab({
           }
         >
           <PlusIcon className="size-4" />
-          {t('workOrders.financialDrawer.invoicesTab.recordPayment')}
+          {t('workOrders.financialDrawer.invoicesTab.recordPayment', {
+            entity: paymentLabel,
+          })}
+        </Button>
+        <Button color="dark/zinc" onClick={() => setInvoiceDialogOpen(true)}>
+          <PlusIcon className="size-4" />
+          {t('workOrders.financialDrawer.invoicesTab.newInvoice', {
+            entity: invoiceLabel,
+          })}
         </Button>
       </div>
 
@@ -270,7 +337,9 @@ export default function FinancialInvoicesTab({
           <TableRow>
             <TableHeader className="w-8" />
             <TableHeader>
-              {t('workOrders.financialDrawer.invoicesTab.columns.invoiceNumber')}
+              {t('workOrders.financialDrawer.invoicesTab.columns.invoiceNumber', {
+                entity: invoiceLabel,
+              })}
             </TableHeader>
             <TableHeader>
               {t('workOrders.financialDrawer.invoicesTab.columns.date')}
@@ -457,6 +526,14 @@ export default function FinancialInvoicesTab({
         openInvoices={openInvoicesWithBalance}
         lockedInvoice={lockedInvoiceForPayment ?? undefined}
       />
+
+      <InvoiceDialog
+        open={invoiceDialogOpen}
+        onClose={() => setInvoiceDialogOpen(false)}
+        workOrderId={workOrderId}
+        workOrderNumber={workOrderNumber}
+        defaultCustomer={{ id: customerId, name: customerName }}
+      />
     </div>
   );
 }
@@ -498,16 +575,16 @@ function InvoiceExpansion({
           <table className="w-full text-sm">
             <thead className="text-xs text-zinc-500 dark:text-zinc-400">
               <tr className="text-left">
-                <th className="pb-1 font-medium">
+                <th className="px-2 pb-1 font-medium">
                   {t('workOrders.financialDrawer.invoicesTab.lineColumns.description')}
                 </th>
-                <th className="pb-1 text-right font-medium">
+                <th className="px-2 pb-1 text-right font-medium">
                   {t('workOrders.financialDrawer.invoicesTab.lineColumns.quantity')}
                 </th>
-                <th className="pb-1 text-right font-medium">
+                <th className="px-2 pb-1 text-right font-medium">
                   {t('workOrders.financialDrawer.invoicesTab.lineColumns.unitPrice')}
                 </th>
-                <th className="pb-1 text-right font-medium">
+                <th className="px-2 pb-1 text-right font-medium">
                   {t('workOrders.financialDrawer.invoicesTab.lineColumns.lineTotal')}
                 </th>
               </tr>
@@ -518,14 +595,14 @@ function InvoiceExpansion({
                   key={li.id}
                   className="border-t border-zinc-200 dark:border-white/10"
                 >
-                  <td className="py-1">{li.description}</td>
-                  <td className="py-1 text-right tabular-nums">
+                  <td className="px-2 py-1">{li.description}</td>
+                  <td className="px-2 py-1 text-right tabular-nums">
                     {amt(li.quantity)}
                   </td>
-                  <td className="py-1 text-right tabular-nums">
+                  <td className="px-2 py-1 text-right tabular-nums">
                     {currencyFormatter.format(amt(li.unitPrice))}
                   </td>
-                  <td className="py-1 text-right font-medium tabular-nums">
+                  <td className="px-2 py-1 text-right font-medium tabular-nums">
                     {currencyFormatter.format(amt(li.lineTotal))}
                   </td>
                 </tr>
@@ -592,12 +669,18 @@ function PaymentsSubsection({
   onVoidPayment,
 }: PaymentsSubsectionProps) {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const paymentLabel = getName('payment');
+  const paymentsLabel = getName('payment', true);
+  const invoiceLabel = getName('invoice');
 
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
         <div className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          {t('workOrders.financialDrawer.invoicesTab.paymentsHeading')}
+          {t('workOrders.financialDrawer.invoicesTab.paymentsHeading', {
+            entities: paymentsLabel,
+          })}
         </div>
         {canAddPayment && (
           <button
@@ -606,31 +689,38 @@ function PaymentsSubsection({
             className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-300 px-2 py-0.5 text-xs text-zinc-600 hover:border-zinc-400 hover:text-zinc-800 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
           >
             <PlusIcon className="size-3" />
-            {t('workOrders.financialDrawer.invoicesTab.addPayment')}
+            {t('workOrders.financialDrawer.invoicesTab.addPayment', {
+              entity: paymentLabel,
+            })}
           </button>
         )}
       </div>
       {payments.length === 0 ? (
         <Text className="!text-sm !text-zinc-500">
-          {t('workOrders.financialDrawer.invoicesTab.noPayments')}
+          {t('workOrders.financialDrawer.invoicesTab.noPayments', {
+            entities: paymentsLabel,
+            parent: invoiceLabel,
+          })}
         </Text>
       ) : (
         <table className="w-full text-sm">
           <thead className="text-xs text-zinc-500 dark:text-zinc-400">
             <tr className="text-left">
-              <th className="pb-1 font-medium">
-                {t('workOrders.financialDrawer.invoicesTab.paymentColumns.paymentNumber')}
+              <th className="px-2 pb-1 font-medium">
+                {t('workOrders.financialDrawer.invoicesTab.paymentColumns.paymentNumber', {
+                  entity: paymentLabel,
+                })}
               </th>
-              <th className="pb-1 font-medium">
+              <th className="px-2 pb-1 font-medium">
                 {t('workOrders.financialDrawer.invoicesTab.paymentColumns.date')}
               </th>
-              <th className="pb-1 font-medium">
+              <th className="px-2 pb-1 font-medium">
                 {t('workOrders.financialDrawer.invoicesTab.paymentColumns.method')}
               </th>
-              <th className="pb-1 text-right font-medium">
+              <th className="px-2 pb-1 text-right font-medium">
                 {t('workOrders.financialDrawer.invoicesTab.paymentColumns.amount')}
               </th>
-              <th className="pb-1 font-medium">
+              <th className="px-2 pb-1 font-medium">
                 {t('workOrders.financialDrawer.invoicesTab.paymentColumns.reference')}
               </th>
               <th className="w-8 pb-1" />
@@ -649,17 +739,17 @@ function PaymentsSubsection({
                     isVoided ? 'opacity-50' : ''
                   }`}
                 >
-                  <td className="py-1 font-mono">{p.paymentNumber}</td>
-                  <td className="py-1">{formatDate(p.paymentDate)}</td>
-                  <td className="py-1">
+                  <td className="px-2 py-1 font-mono">{p.paymentNumber}</td>
+                  <td className="px-2 py-1">{formatDate(p.paymentDate)}</td>
+                  <td className="px-2 py-1">
                     {t(
                       `workOrders.financialDrawer.paymentDialog.methods.${PAYMENT_METHOD_LABEL_KEYS[p.paymentMethod]}`,
                     )}
                   </td>
-                  <td className="py-1 text-right font-medium tabular-nums">
+                  <td className="px-2 py-1 text-right font-medium tabular-nums">
                     {currencyFormatter.format(amt(p.amount))}
                   </td>
-                  <td className="py-1 text-zinc-500 dark:text-zinc-400">
+                  <td className="px-2 py-1 text-zinc-500 dark:text-zinc-400">
                     {p.referenceNumber ?? '—'}
                   </td>
                   <td className="py-1">
@@ -676,6 +766,7 @@ function PaymentsSubsection({
                             <DropdownLabel>
                               {t(
                                 'workOrders.financialDrawer.invoicesTab.actions.voidPayment',
+                                { entity: paymentLabel },
                               )}
                             </DropdownLabel>
                           </DropdownItem>

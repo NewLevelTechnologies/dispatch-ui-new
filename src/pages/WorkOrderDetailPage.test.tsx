@@ -67,6 +67,9 @@ describe('WorkOrderDetailPage', () => {
       if (url.match(/\/financial\/work-orders\/[^/]+\/summary$/)) {
         return Promise.resolve({ data: summary });
       }
+      if (url.match(/\/financial\/work-orders\/[^/]+\/invoices$/)) {
+        return Promise.resolve({ data: [] });
+      }
       if (url.includes('/work-orders/config/types')) {
         return Promise.resolve({
           data: [{ id: 'type-1', name: 'HVAC Service', code: 'HVAC', isActive: true, sortOrder: 0 }],
@@ -447,15 +450,19 @@ describe('WorkOrderDetailPage', () => {
       expect(screen.getByText('paid')).toBeInTheDocument();
     });
 
-    it('opens the drawer on the Invoices tab when the [+ Invoice] ghost is clicked', async () => {
+    it('opens the drawer on the Invoices tab AND auto-opens the create dialog when the [+ Invoice] ghost is clicked', async () => {
       const user = userEvent.setup();
       mockApiResponses(); // fresh active WO — typed ghost is the entry point
       renderPage();
       const ghost = await screen.findByText(/\+ Invoice/i);
       await user.click(ghost);
-      expect(await screen.findByText(/Financials · WO/i)).toBeInTheDocument();
-      const invoicesTab = screen.getByRole('tab', { name: 'Invoices' });
-      expect(invoicesTab).toHaveAttribute('aria-selected', 'true');
+      // Drawer opens at Invoices tab AND the New Invoice dialog auto-opens
+      // — one CSR action, one click (§3.2 routing). The inner dialog
+      // (aria-modal) hides the rest of the DOM from accessibility queries
+      // once visible; presence of the New Invoice dialog itself implies
+      // we landed on the Invoices tab (only that tab mounts the dialog).
+      const dialog = await screen.findByRole('dialog', { name: /new invoice/i });
+      expect(dialog.textContent).toMatch(/WO-00010/);
     });
   });
 
