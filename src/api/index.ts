@@ -34,6 +34,7 @@ export {
   type AdditionalContact,
   type CustomerDisplayMode,
   type CustomerStatus,
+  type CustomerType,
   type CreateCustomerRequest,
   type CreateServiceLocationRequest,
   type UpdateCustomerRequest,

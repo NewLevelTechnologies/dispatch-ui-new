@@ -331,6 +331,7 @@ export default function CustomerDetailPage() {
   }
 
   const isSimple = customer.displayMode === 'SIMPLE';
+  const isBillingOnly = customer.displayMode === 'BILLING_ONLY';
   const primaryLocation = customer.serviceLocations[0];
 
   // Determine if we should show additional contacts section
@@ -339,17 +340,22 @@ export default function CustomerDetailPage() {
       // For SIMPLE mode: show if contacts exist OR customer has primary contact info
       return customer.additionalContacts.length > 0 || customer.email || customer.phone;
     }
-    // For STANDARD mode: always show
+    // For STANDARD / BILLING_ONLY: always show
     return true;
   };
 
-  // Tab configuration
-  const tabs = [    { id: 'overview', label: t('customers.tabs.overview'), count: undefined },
+  // Tab configuration — BILLING_ONLY customers have no service work, so drop
+  // Work Orders + Equipment (the data would always be empty by definition).
+  const allTabs = [
+    { id: 'overview', label: t('customers.tabs.overview'), count: undefined },
     { id: 'work-orders', label: getName('work_order', true), count: workOrdersData?.totalElements ?? 0 },
     { id: 'financial', label: t('customers.tabs.financial'), count: undefined },
     { id: 'equipment', label: getName('equipment'), count: equipmentPage?.totalElements ?? 0 },
     { id: 'activity', label: t('customers.tabs.activity'), count: undefined },
   ];
+  const tabs = isBillingOnly
+    ? allTabs.filter((tab) => tab.id !== 'work-orders' && tab.id !== 'equipment')
+    : allTabs;
 
   return (
     <AppLayout>
@@ -530,6 +536,9 @@ export default function CustomerDetailPage() {
                   {customer.name}
                 </Heading>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {isBillingOnly && (
+                    <Badge color="zinc">{t('customers.detail.billingOnlyBadge')}</Badge>
+                  )}
                   {customer.paymentTermsDays > 0 && (
                     <Badge color="amber">{t('customers.detail.netTerms', { days: customer.paymentTermsDays })}</Badge>
                   )}
@@ -586,24 +595,41 @@ export default function CustomerDetailPage() {
               )}
             </div>
 
-            {/* Quick Stats Bar - Responsive Grid */}
-            <div className="mt-4 grid grid-cols-2 gap-px rounded-lg border border-zinc-200 bg-zinc-200 overflow-hidden dark:border-zinc-700 dark:bg-zinc-700 lg:grid-cols-4">
-              <div className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
-                <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{getName('service_location', true)}</Text>
-                <Strong className="mt-1 block text-2xl">{customer.serviceLocations.length}</Strong>
-              </div>
-              <div className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
-                <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('common.actions.open', { entities: getName('work_order', true) })}</Text>
-                <Strong className="mt-1 block text-2xl">0</Strong>
-              </div>
+            {/* Quick Stats Bar - Responsive Grid (service-location + last-service tiles are
+                meaningless for BILLING_ONLY, so we drop them and keep the financial tiles) */}
+            <div className={`mt-4 grid grid-cols-2 gap-px rounded-lg border border-zinc-200 bg-zinc-200 overflow-hidden dark:border-zinc-700 dark:bg-zinc-700 ${isBillingOnly ? '' : 'lg:grid-cols-4'}`}>
+              {!isBillingOnly && (
+                <div className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
+                  <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{getName('service_location', true)}</Text>
+                  <Strong className="mt-1 block text-2xl">{customer.serviceLocations.length}</Strong>
+                </div>
+              )}
+              {!isBillingOnly && (
+                <div className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
+                  <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('common.actions.open', { entities: getName('work_order', true) })}</Text>
+                  <Strong className="mt-1 block text-2xl">0</Strong>
+                </div>
+              )}
               <div className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
                 <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('customers.detail.balance')}</Text>
                 <Strong className="mt-1 block text-2xl">$0.00</Strong>
               </div>
-              <div className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
-                <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('customers.detail.lastService')}</Text>
-                <Strong className="mt-1 block text-base">{t('customers.detail.never')}</Strong>
-              </div>
+              {!isBillingOnly && (
+                <div className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
+                  <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('customers.detail.lastService')}</Text>
+                  <Strong className="mt-1 block text-base">{t('customers.detail.never')}</Strong>
+                </div>
+              )}
+              {isBillingOnly && (
+                <div className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
+                  <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('customers.detail.paymentTerms')}</Text>
+                  <Strong className="mt-1 block text-base">
+                    {customer.paymentTermsDays > 0
+                      ? t('customers.detail.netTerms', { days: customer.paymentTermsDays })
+                      : '—'}
+                  </Strong>
+                </div>
+              )}
             </div>
 
             {/* Tabs */}
@@ -619,9 +645,11 @@ export default function CustomerDetailPage() {
             <div className="mt-4">
               {activeTab === 'overview' && (
                 <>
-                  {/* Two-column layout: Locations (left) + Contacts/Notes (right) */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left column - Service Locations (2/3 width) */}
+                  {/* Two-column layout for STANDARD (locations + contacts/notes);
+                      BILLING_ONLY skips the locations column entirely. */}
+                  <div className={`grid grid-cols-1 gap-6 ${isBillingOnly ? '' : 'lg:grid-cols-3'}`}>
+              {!isBillingOnly && (
+              /* Left column - Service Locations (2/3 width) */
               <div className="lg:col-span-2">
                 <div className="flex flex-col gap-2 mb-2 sm:flex-row sm:items-center sm:justify-between">
                   <Subheading>{t('common.entitiesCount', { entities: getName('service_location', true), count: customer.serviceLocations.length })}</Subheading>
@@ -705,8 +733,10 @@ export default function CustomerDetailPage() {
                 </Table>
               </div>
               </div>
+              )}
 
-              {/* Right column - Contacts & Notes (1/3 width) */}
+              {/* Right column - Contacts & Notes (1/3 width for STANDARD,
+                  full width for BILLING_ONLY since the locations column is hidden) */}
               <div className="space-y-4">
                 {/* Additional Contacts */}
                 {shouldShowAdditionalContacts() && (

@@ -16,6 +16,7 @@ describe('CustomerFormDialog', () => {
     name: 'John Doe',
     email: 'john@example.com',
     phone: '5551234567',
+    type: 'STANDARD',
     billingAddress: {
       streetAddress: '123 Main St',
       streetAddressLine2: null,

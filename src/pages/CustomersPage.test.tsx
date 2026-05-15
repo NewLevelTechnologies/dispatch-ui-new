@@ -26,6 +26,7 @@ const mockCustomersListResponse: CustomerListResponse = {
       requiresPurchaseOrder: false,
       contractPricingTier: null,
       status: 'ACTIVE',
+      type: 'STANDARD',
       displayMode: 'SIMPLE',
     },
     {
@@ -44,6 +45,7 @@ const mockCustomersListResponse: CustomerListResponse = {
       requiresPurchaseOrder: true,
       contractPricingTier: 'Premium',
       status: 'ACTIVE',
+      type: 'STANDARD',
       displayMode: 'STANDARD',
     },
   ],
@@ -76,6 +78,7 @@ const mockFullCustomers: Customer[] = [
     name: 'John Doe',
     email: 'john@example.com',
     phone: '5551234567',
+    type: 'STANDARD',
     billingAddress: {
       streetAddress: '123 Main St',
       streetAddressLine2: null,

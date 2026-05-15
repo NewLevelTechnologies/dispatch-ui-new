@@ -146,13 +146,18 @@ export default function CustomerPicker({
                     role="option"
                     aria-selected={isSelected}
                     onClick={() => handleSelect(c)}
-                    className={`cursor-pointer px-3 py-1.5 text-sm hover:bg-zinc-100 dark:hover:bg-white/5 ${
+                    className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:hover:bg-white/5 ${
                       isSelected
                         ? 'bg-zinc-50 dark:bg-white/5'
                         : ''
                     }`}
                   >
-                    {c.name}
+                    <span className="truncate">{c.name}</span>
+                    {c.type === 'BILLING_ONLY' && (
+                      <span className="flex-shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                        {t('customers.detail.billingOnlyBadge')}
+                      </span>
+                    )}
                   </li>
                 );
               })}
