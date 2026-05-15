@@ -104,10 +104,11 @@ export default function QuoteDialog({
       const request: CreateQuoteRequest = {
         workOrderId,
         customerId: billingCustomer!.id,
-        // Backend's CreateQuoteRequest types these as `Instant`, like
-        // invoice dates — date-only inputs need T00:00:00Z appended.
-        quoteDate: `${quoteDate}T00:00:00Z`,
-        expirationDate: `${expirationDate}T00:00:00Z`,
+        // Quote dates are LocalDate (yyyy-MM-dd), not Instant — different
+        // from the invoice dialog, which DOES need T00:00:00Z. Pass the
+        // date-input value through raw.
+        quoteDate,
+        expirationDate,
         taxRate: 0,
         notes: notes.trim() || undefined,
         lineItems: [
