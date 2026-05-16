@@ -426,6 +426,15 @@ export default function WorkOrdersPage() {
       <div>
         <PageHead
           title={getName('work_order', true)}
+          sub={
+            totalElements > 0
+              ? t('common.pagination.showing', {
+                  start: showingStart,
+                  end: showingEnd,
+                  total: totalElements.toLocaleString(),
+                })
+              : null
+          }
           actions={
             <Button color="accent" onClick={handleAdd}>
               {t('common.actions.create', { entity: getName('work_order') })}
@@ -543,11 +552,6 @@ export default function WorkOrdersPage() {
                 <Label className="text-sm">{t('workOrders.actions.showArchived')}</Label>
               </CheckboxField>
 
-              {pageData && (
-                <div className="ml-auto pb-2 text-[11.5px] text-fg-muted tnum">
-                  {totalElements} {totalElements === 1 ? getName('work_order').toLowerCase() : getName('work_order', true).toLowerCase()}
-                </div>
-              )}
             </div>
 
             {/* Custom date range inputs */}

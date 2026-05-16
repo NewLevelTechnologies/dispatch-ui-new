@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -88,6 +89,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ...(canViewUsers ? [{ name: t('entities.users'), href: '/users', icon: ShieldCheckIcon }] : []),
     ...(canViewSettings ? [{ name: t('entities.settings'), href: '/settings', icon: Cog6ToothIcon }] : []),
   ];
+
+  // Breadcrumbs: walk the nav groups to find which one the current route belongs
+  // to, then surface "Section / Page" in the topbar. mainNavigation and
+  // adminNavigation have no section heading, so those routes show just the page.
+  const navGroups: { section?: string; items: { name: string; href: string }[] }[] = [
+    { items: mainNavigation },
+    { section: t('entities.inventory'), items: equipmentNavigation },
+    { section: t('entities.financial'), items: financialNavigation },
+    { section: t('entities.scheduling'), items: schedulingNavigation },
+    { items: adminNavigation },
+  ];
+  const activeGroup = navGroups.find((g) => g.items.some((i) => isCurrent(i.href)));
+  const activeItem = activeGroup?.items.find((i) => isCurrent(i.href));
+  const breadcrumbs: string[] = [];
+  if (activeGroup?.section) breadcrumbs.push(activeGroup.section);
+  if (activeItem) breadcrumbs.push(activeItem.name);
 
   return (
     <SidebarLayout
@@ -276,6 +293,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }
       navbar={
         <Navbar>
+          {breadcrumbs.length > 0 && (
+            <div className="flex items-center gap-1.5 text-[12.5px] text-fg-muted">
+              {breadcrumbs.map((c, i) => (
+                <Fragment key={i}>
+                  <span className={i === breadcrumbs.length - 1 ? 'font-semibold text-fg-strong' : ''}>
+                    {c}
+                  </span>
+                  {i < breadcrumbs.length - 1 && <span className="text-fg-dim opacity-60">/</span>}
+                </Fragment>
+              ))}
+            </div>
+          )}
           <div className="mx-auto flex h-[30px] w-full max-w-[420px] items-center gap-2 rounded-md border border-border bg-bg-sunken px-2.5 text-[12.5px] text-fg-muted">
             <span className="text-fg-dim">{t('common.search')}</span>
             <span aria-hidden className="ml-auto rounded border border-border bg-bg px-1.5 py-px font-mono text-[10px]">{'⌘K'}</span>
