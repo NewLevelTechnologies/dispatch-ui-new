@@ -81,7 +81,7 @@ export function SidebarLayout({
         {/* Canvas — cards float on bg-bg-sunken. text-[13px] baseline matches
             the design system's calibration; explicit Tailwind text utilities
             on descendants still override per-element. */}
-        <div className="grow px-5 py-5 text-[14px] leading-[1.45]">
+        <div className="grow px-5 py-5 text-[13px] leading-[1.45]">
           <div className="mx-auto max-w-screen-2xl">{children}</div>
         </div>
       </main>

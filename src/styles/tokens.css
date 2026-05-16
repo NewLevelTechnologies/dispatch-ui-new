@@ -19,8 +19,8 @@
 
 :root {
   /* Type ─────────────────────────────────────────────────────────── */
-  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Radii ────────────────────────────────────────────────────────── */
   --r-xs: 4px;
@@ -127,8 +127,8 @@ body {
   font-family: var(--font-sans);
   background: var(--bg-sunken);
   color: var(--fg);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 400;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'cv11', 'ss01';
