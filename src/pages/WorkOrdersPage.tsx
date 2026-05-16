@@ -1,8 +1,9 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import clsx from 'clsx';
+import { EllipsisVerticalIcon, MagnifyingGlassIcon, CheckIcon } from '@heroicons/react/24/outline';
 import {
   workOrderApi,
   workOrderTypesApi,
@@ -21,14 +22,12 @@ import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Input, InputGroup } from '../components/catalyst/input';
-import { Select } from '../components/catalyst/select';
 import { Checkbox, CheckboxField } from '../components/catalyst/checkbox';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
 import { ViewTabs } from '../components/ui/Tabs';
-import { FilterChip } from '../components/ui/FilterChip';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
@@ -158,6 +157,78 @@ function formatDate(dateString?: string | null) {
 
 function isCancelled(wo: WorkOrderSummary): boolean {
   return wo.lifecycleState === 'CANCELLED';
+}
+
+// ─── FilterChipDropdown ──────────────────────────────────────────────────────
+// Chip body opens a popover; clear × is a sibling button. Two adjacent buttons
+// inside one bordered wrapper — keeps the clear click from bubbling into the
+// MenuButton's open handler (Headless MenuButton owns its onClick).
+function FilterChipDropdown({
+  label,
+  value,
+  ariaLabel,
+  onClear,
+  children,
+}: {
+  label: string;
+  value?: string | null;
+  ariaLabel: string;
+  onClear?: () => void;
+  children: ReactNode;
+}) {
+  const isSet = value != null && value !== '';
+  return (
+    <Dropdown>
+      <span
+        className={clsx(
+          'inline-flex h-8 items-center overflow-hidden rounded-md border bg-bg-elev text-[12px]',
+          isSet ? 'border-accent-500/35 bg-accent-500/5' : 'border-border'
+        )}
+      >
+        <DropdownButton
+          as="button"
+          aria-label={ariaLabel}
+          className="flex h-full items-center gap-1.5 px-2.5 font-medium text-fg outline-none focus:outline-none"
+        >
+          <span className="text-fg-muted">{label}</span>
+          {isSet ? (
+            <span className="font-semibold text-fg-strong">{value}</span>
+          ) : (
+            <span className="text-fg-dim">+</span>
+          )}
+        </DropdownButton>
+        {isSet && onClear && (
+          <button
+            type="button"
+            aria-label={`${ariaLabel} — clear`}
+            onClick={onClear}
+            className="flex h-full items-center border-l border-accent-500/20 px-1.5 text-fg-dim hover:bg-bg-hover hover:text-fg-strong"
+          >
+            ×
+          </button>
+        )}
+      </span>
+      {children}
+    </Dropdown>
+  );
+}
+
+// One option row in a FilterChipDropdown menu. Renders a check on the active value.
+function ChipOption({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <DropdownItem onClick={onClick}>
+      {active ? <CheckIcon data-slot="icon" /> : <span data-slot="icon" />}
+      <DropdownLabel>{children}</DropdownLabel>
+    </DropdownItem>
+  );
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -459,89 +530,136 @@ export default function WorkOrdersPage() {
               </InputGroup>
 
               {activeTypes.length > 0 && (
-                <div className="w-44">
-                  <Select
-                    aria-label={t('workOrders.form.type')}
-                    value={typeId}
-                    onChange={(e) => updateParams({ type: e.target.value || null, page: null })}
-                    className={dense.select}
-                  >
-                    <option value="">{t('workOrders.filters.anyType')}</option>
+                <FilterChipDropdown
+                  label={t('workOrders.form.type')}
+                  ariaLabel={t('workOrders.form.type')}
+                  value={typeId ? lookupName(typeId, activeTypes) : null}
+                  onClear={() => updateParams({ type: null, page: null })}
+                >
+                  <DropdownMenu>
+                    <ChipOption active={!typeId} onClick={() => updateParams({ type: null, page: null })}>
+                      {t('workOrders.filters.anyType')}
+                    </ChipOption>
+                    <DropdownDivider />
                     {activeTypes.map((tx) => (
-                      <option key={tx.id} value={tx.id}>{tx.name}</option>
+                      <ChipOption
+                        key={tx.id}
+                        active={typeId === tx.id}
+                        onClick={() => updateParams({ type: tx.id, page: null })}
+                      >
+                        {tx.name}
+                      </ChipOption>
                     ))}
-                  </Select>
-                </div>
+                  </DropdownMenu>
+                </FilterChipDropdown>
               )}
 
               {activeDivisions.length > 0 && (
-                <div className="w-44">
-                  <Select
-                    aria-label={getName('division')}
-                    value={divisionId}
-                    onChange={(e) => updateParams({ division: e.target.value || null, page: null })}
-                    className={dense.select}
-                  >
-                    <option value="">{t('workOrders.filters.any', { entity: getName('division') })}</option>
+                <FilterChipDropdown
+                  label={getName('division')}
+                  ariaLabel={getName('division')}
+                  value={divisionId ? lookupName(divisionId, activeDivisions) : null}
+                  onClear={() => updateParams({ division: null, page: null })}
+                >
+                  <DropdownMenu>
+                    <ChipOption active={!divisionId} onClick={() => updateParams({ division: null, page: null })}>
+                      {t('workOrders.filters.any', { entity: getName('division') })}
+                    </ChipOption>
+                    <DropdownDivider />
                     {activeDivisions.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
+                      <ChipOption
+                        key={d.id}
+                        active={divisionId === d.id}
+                        onClick={() => updateParams({ division: d.id, page: null })}
+                      >
+                        {d.name}
+                      </ChipOption>
                     ))}
-                  </Select>
-                </div>
+                  </DropdownMenu>
+                </FilterChipDropdown>
               )}
 
               {activeRegions.length > 0 && (
-                <div className="w-44">
-                  <Select
-                    aria-label={t('workOrders.filters.region')}
-                    value={regionId}
-                    onChange={(e) => updateParams({ region: e.target.value || null, page: null })}
-                    className={dense.select}
-                  >
-                    <option value="">{t('workOrders.filters.anyRegion')}</option>
+                <FilterChipDropdown
+                  label={t('workOrders.filters.region')}
+                  ariaLabel={t('workOrders.filters.region')}
+                  value={regionId ? lookupName(regionId, activeRegions) : null}
+                  onClear={() => updateParams({ region: null, page: null })}
+                >
+                  <DropdownMenu>
+                    <ChipOption active={!regionId} onClick={() => updateParams({ region: null, page: null })}>
+                      {t('workOrders.filters.anyRegion')}
+                    </ChipOption>
+                    <DropdownDivider />
                     {activeRegions.map((r) => (
-                      <option key={r.id} value={r.id}>{r.name}</option>
+                      <ChipOption
+                        key={r.id}
+                        active={regionId === r.id}
+                        onClick={() => updateParams({ region: r.id, page: null })}
+                      >
+                        {r.name}
+                      </ChipOption>
                     ))}
-                  </Select>
-                </div>
+                  </DropdownMenu>
+                </FilterChipDropdown>
               )}
 
               {activeItemStatuses.length > 0 && (
-                <div className="w-44">
-                  <Select
-                    aria-label={t('workOrders.filters.itemStatus')}
-                    value={itemStatusId}
-                    onChange={(e) => updateParams({ itemStatus: e.target.value || null, page: null })}
-                    className={dense.select}
-                  >
-                    <option value="">{t('workOrders.filters.anyItemStatus')}</option>
+                <FilterChipDropdown
+                  label={t('workOrders.filters.itemStatus')}
+                  ariaLabel={t('workOrders.filters.itemStatus')}
+                  value={itemStatusId ? lookupName(itemStatusId, activeItemStatuses) : null}
+                  onClear={() => updateParams({ itemStatus: null, page: null })}
+                >
+                  <DropdownMenu>
+                    <ChipOption active={!itemStatusId} onClick={() => updateParams({ itemStatus: null, page: null })}>
+                      {t('workOrders.filters.anyItemStatus')}
+                    </ChipOption>
+                    <DropdownDivider />
                     {activeItemStatuses.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                      <ChipOption
+                        key={s.id}
+                        active={itemStatusId === s.id}
+                        onClick={() => updateParams({ itemStatus: s.id, page: null })}
+                      >
+                        {s.name}
+                      </ChipOption>
                     ))}
-                  </Select>
-                </div>
+                  </DropdownMenu>
+                </FilterChipDropdown>
               )}
 
-              <div className="w-40">
-                <Select
-                  aria-label={t('workOrders.filters.scheduled')}
-                  value={datePreset}
-                  onChange={(e) => {
-                    const next = e.target.value as DatePreset;
-                    const updates: Record<string, string | null> = { date: next || null, page: null };
-                    if (next !== 'custom') {
-                      updates.from = null;
-                      updates.to = null;
-                    }
-                    updateParams(updates);
-                  }}
-                  className={dense.select}
-                >
+              <FilterChipDropdown
+                label={t('workOrders.filters.scheduled')}
+                ariaLabel={t('workOrders.filters.scheduled')}
+                value={
+                  datePreset === ''
+                    ? null
+                    : datePreset === 'custom'
+                      ? `${customFrom || '…'} – ${customTo || '…'}`
+                      : t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '')
+                }
+                onClear={() => updateParams({ date: null, from: null, to: null, page: null })}
+              >
+                <DropdownMenu>
                   {DATE_PRESETS.map((p) => (
-                    <option key={p.id || 'any'} value={p.id}>{t(p.labelKey)}</option>
+                    <ChipOption
+                      key={p.id || 'any'}
+                      active={datePreset === p.id}
+                      onClick={() => {
+                        const updates: Record<string, string | null> = { date: p.id || null, page: null };
+                        if (p.id !== 'custom') {
+                          updates.from = null;
+                          updates.to = null;
+                        }
+                        updateParams(updates);
+                      }}
+                    >
+                      {t(p.labelKey)}
+                    </ChipOption>
                   ))}
-                </Select>
-              </div>
+                </DropdownMenu>
+              </FilterChipDropdown>
 
               <CheckboxField className="ml-2 flex-none">
                 <Checkbox
@@ -552,9 +670,18 @@ export default function WorkOrdersPage() {
                 <Label className="text-sm">{t('workOrders.actions.showArchived')}</Label>
               </CheckboxField>
 
+              {activeChips.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="ml-1 text-[11.5px] font-medium text-fg-muted underline-offset-2 hover:underline hover:text-fg-strong"
+                >
+                  {t('workOrders.filters.clearAll')}
+                </button>
+              )}
             </div>
 
-            {/* Custom date range inputs */}
+            {/* Custom date range inputs — surface only when the date chip is in custom mode */}
             {datePreset === 'custom' && (
               <div className="mt-2 flex flex-wrap items-end gap-2">
                 <Field className="w-44">
@@ -575,27 +702,6 @@ export default function WorkOrdersPage() {
                     className={dense.input}
                   />
                 </Field>
-              </div>
-            )}
-
-            {/* Active filter chips */}
-            {activeChips.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                {activeChips.map((chip) => (
-                  <FilterChip
-                    key={chip.key}
-                    label={chip.label}
-                    value={chip.value}
-                    onClear={chip.onClear}
-                  />
-                ))}
-                <button
-                  type="button"
-                  onClick={clearAllFilters}
-                  className="ml-1 text-[11.5px] font-medium text-fg-muted underline-offset-2 hover:underline hover:text-fg-strong"
-                >
-                  {t('workOrders.filters.clearAll')}
-                </button>
               </div>
             )}
           </CardBody>
