@@ -835,11 +835,18 @@ export default function WorkOrdersPage() {
                               {workOrder.serviceLocation?.locationName || workOrder.customer?.name || '-'}
                             </CellTop>
                             <CellSub>
-                              {[
-                                titleCaseAddress(workOrder.serviceLocation?.address.streetAddress),
-                                titleCaseAddress(workOrder.serviceLocation?.address.city),
-                                workOrder.serviceLocation?.address.state,
-                              ].filter(Boolean).join(', ')}
+                              {(() => {
+                                const a = workOrder.serviceLocation?.address;
+                                if (!a) return '';
+                                // US convention: "Street, City, ST ZIP" — single
+                                // space between state and ZIP, not a comma.
+                                const stateZip = [a.state, a.zipCode].filter(Boolean).join(' ');
+                                return [
+                                  titleCaseAddress(a.streetAddress),
+                                  titleCaseAddress(a.city),
+                                  stateZip,
+                                ].filter(Boolean).join(', ');
+                              })()}
                             </CellSub>
                           </CellStack>
                         </td>
