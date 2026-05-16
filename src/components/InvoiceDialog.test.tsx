@@ -145,7 +145,10 @@ describe('InvoiceDialog', () => {
       );
     });
     await waitFor(() => {
-      expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/i-99/send');
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/financial/invoices/i-99/send',
+        undefined,
+      );
     });
     expect(apiClient.patch).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();

@@ -195,21 +195,45 @@ export const invoicesApi = {
   },
 
   /**
-   * Send (or resend) the invoice to its bill-to customer (§4.3). Backend
-   * issues / reuses a share-link token, publishes a `NotificationRequested
-   * Event` with the rendered `{{share_url}}`, and stamps `lastSentAt` /
-   * `lastSentToEmails` on the row. DRAFT invoices auto-flip to SENT in the
-   * same transaction — callers don't need a chained status update.
+   * Send (or resend) the invoice (§4.3). Backend issues / reuses a share-
+   * link token, publishes a `NotificationRequestedEvent` with the rendered
+   * `{{share_url}}`, and stamps `lastSentAt` / `lastSentToEmails` on the
+   * row. DRAFT invoices auto-flip to SENT in the same transaction —
+   * callers don't need a chained status update.
    *
-   * Error codes worth branching on (uniform `{ code, message }` shape):
-   *   - `NO_RECIPIENT` (422)         → "Add an email to the bill-to customer first"
+   * Recipient resolution:
+   *   - When `recipientEmails` is omitted (or empty), backend resolves via
+   *     `RecipientResolverService` against the customer's notification
+   *     preferences for the `invoice_sent` event. That's the default path
+   *     and the one the row's plain `Send` action hits.
+   *   - When `recipientEmails` is provided, backend skips the resolver and
+   *     uses the array verbatim. That's the path the (forthcoming) "Send
+   *     to other…" override dialog will use.
+   *
+   * IMPORTANT: never send `recipientEmails: []` — backend would interpret
+   * an empty array as "explicit override with zero recipients" and 422.
+   * The guard below collapses empty / undefined to "no body at all" so the
+   * resolver runs. Backend also coerces empty → null defensively, but the
+   * FE shouldn't rely on that.
+   *
+   * Error codes (uniform `{ code, message }` shape):
+   *   - `NO_RECIPIENT` (422)         → resolver returned nothing / override list empty
    *   - `NOT_SENDABLE_STATUS` (400)  → terminal status (VOID / CANCELLED)
-   *   - `TOO_MANY_RECIPIENTS` (400)  → > 10 in override list (n/a for v1 UI)
+   *   - `TOO_MANY_RECIPIENTS` (400)  → > 10 in override list
+   *   - `INVALID_REQUEST` (400)      → malformed email in override list
    *   - `RATE_LIMIT_EXCEEDED` (429)  → backoff hint in message
    */
-  send: async (id: string): Promise<SendResponse> => {
+  send: async (
+    id: string,
+    recipientEmails?: string[],
+  ): Promise<SendResponse> => {
+    const body =
+      recipientEmails && recipientEmails.length > 0
+        ? { recipientEmails }
+        : undefined;
     const response = await apiClient.post<SendResponse>(
       `/financial/invoices/${id}/send`,
+      body,
     );
     return response.data;
   },
@@ -359,9 +383,17 @@ export const quotesApi = {
   },
 
   /** See `invoicesApi.send` — same contract, quote-scoped. */
-  send: async (id: string): Promise<SendResponse> => {
+  send: async (
+    id: string,
+    recipientEmails?: string[],
+  ): Promise<SendResponse> => {
+    const body =
+      recipientEmails && recipientEmails.length > 0
+        ? { recipientEmails }
+        : undefined;
     const response = await apiClient.post<SendResponse>(
       `/financial/quotes/${id}/send`,
+      body,
     );
     return response.data;
   },
