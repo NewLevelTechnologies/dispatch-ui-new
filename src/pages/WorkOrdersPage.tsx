@@ -537,10 +537,11 @@ export default function WorkOrdersPage() {
           }
         />
 
-        {/* Filter bar */}
-        <Card className="mb-3">
-          <CardBody>
-            <div className="flex flex-wrap items-end gap-2">
+        {/* Filter bar — loose on the canvas, not wrapped in a Card. Cards
+            are reserved for content surfaces (the table below); the filter
+            row is an action affordance. */}
+        <div className="mb-3">
+          <div className="flex flex-wrap items-end gap-2">
               <InputGroup className="min-w-[260px] flex-1">
                 <MagnifyingGlassIcon data-slot="icon" />
                 <Input
@@ -728,8 +729,7 @@ export default function WorkOrdersPage() {
                 </Field>
               </div>
             )}
-          </CardBody>
-        </Card>
+        </div>
 
         {/* Lifecycle / progress tabs */}
         <ViewTabs
@@ -863,7 +863,7 @@ export default function WorkOrdersPage() {
                           )}
                         </td>
                         <td>
-                          <Pill tone={PRIORITY_TONES[workOrder.priority ?? 'NORMAL']}>
+                          <Pill tone={PRIORITY_TONES[workOrder.priority ?? 'NORMAL']} dot>
                             {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[workOrder.priority ?? 'NORMAL']}`)}
                           </Pill>
                         </td>
