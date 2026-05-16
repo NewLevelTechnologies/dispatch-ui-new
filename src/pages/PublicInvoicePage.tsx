@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import {
   publicFinancialApi,
-  InvoiceStatus,
   type PublicInvoiceResponse,
+  type PublicInvoiceStatus,
+  type PublicPaymentMethod,
 } from '../api';
 import TenantBrandingHeader from '../components/TenantBrandingHeader';
 import CliffPage from '../components/CliffPage';
@@ -46,29 +47,52 @@ const formatDate = (iso: string | null | undefined): string => {
   });
 };
 
-type InvoiceBadgeProps = {
-  status: PublicInvoiceResponse['invoice']['status'];
+/**
+ * Format a BigDecimal quantity string for display. Trim trailing zeros so
+ * "1.00" reads as "1" and "1.50" as "1.5"; preserves meaningful precision
+ * like "1.75". Customer-facing — they shouldn't see padding noise.
+ */
+const formatQuantity = (value: string | number): string => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  return Number.isInteger(n) ? String(n) : String(n);
 };
+
+type InvoiceBadgeProps = { status: PublicInvoiceStatus };
 
 const InvoiceStatusBadge = ({ status }: InvoiceBadgeProps) => {
   const { t } = useTranslation();
   switch (status) {
-    case InvoiceStatus.PAID:
+    case 'PAID':
       return <Badge color="lime">{t('public.invoice.status.paid')}</Badge>;
-    case InvoiceStatus.OVERDUE:
+    case 'PARTIALLY_PAID':
+      return (
+        <Badge color="amber">{t('public.invoice.status.partiallyPaid')}</Badge>
+      );
+    case 'OVERDUE':
       return <Badge color="rose">{t('public.invoice.status.pastDue')}</Badge>;
-    case InvoiceStatus.CANCELLED:
+    case 'CANCELLED':
       return <Badge color="zinc">{t('public.invoice.status.cancelled')}</Badge>;
-    case InvoiceStatus.SENT:
+    case 'SENT':
       return <Badge color="sky">{t('public.invoice.status.outstanding')}</Badge>;
-    case InvoiceStatus.DRAFT:
+    case 'DRAFT':
       return <Badge color="zinc">{t('public.invoice.status.draft')}</Badge>;
-    case InvoiceStatus.VOID:
+    case 'VOID':
       // Voided invoices show the loud full-width banner instead of a pill.
       return null;
     default:
       return null;
   }
+};
+
+type PaymentMethodProps = { method: PublicPaymentMethod };
+
+const PaymentMethodLabel = ({ method }: PaymentMethodProps) => {
+  const { t } = useTranslation();
+  // i18n keys mirror the enum exactly so adding a new method on the
+  // backend surfaces as a missing-key warning instead of silently falling
+  // through to the raw `OTHER` literal.
+  return <>{t(`public.invoice.paymentMethod.${method}`)}</>;
 };
 
 export default function PublicInvoicePage() {
@@ -108,9 +132,13 @@ export default function PublicInvoicePage() {
   }
 
   const { invoice, tenant, customer } = data;
-  const isVoid = invoice.status === InvoiceStatus.VOID;
-  const isPaid = invoice.status === InvoiceStatus.PAID;
-  const isPastDue = invoice.status === InvoiceStatus.OVERDUE;
+  const isVoid = invoice.status === 'VOID';
+  const isPaid = invoice.status === 'PAID';
+  const isPastDue = invoice.status === 'OVERDUE';
+
+  // "Contact <tenant>" / void subline both want a sender name. When the
+  // tenant hasn't configured branding, fall through to a neutral phrase.
+  const senderName = tenant.displayName ?? t('public.common.theSender');
 
   return (
     <div className="min-h-screen bg-zinc-50 print:bg-white">
@@ -120,7 +148,7 @@ export default function PublicInvoicePage() {
             {t('public.invoice.voidedHeadline')}
           </p>
           <p className="mt-0.5 text-sm text-rose-100 print:text-rose-700">
-            {t('public.invoice.voidedSubline', { tenant: tenant.displayName })}
+            {t('public.invoice.voidedSubline', { tenant: senderName })}
           </p>
         </div>
       )}
@@ -202,15 +230,15 @@ export default function PublicInvoicePage() {
             {t('public.invoice.items')}
           </h2>
           <ul className="divide-y divide-zinc-100">
-            {invoice.lineItems.map((item) => (
+            {invoice.lineItems.map((item, idx) => (
               <li
-                key={item.id}
+                key={idx}
                 className="flex flex-col gap-1 px-6 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-zinc-900">{item.description}</p>
                   <p className="mt-0.5 text-xs text-zinc-500">
-                    {item.quantity} × {formatMoney(item.unitPrice)}
+                    {formatQuantity(item.quantity)} × {formatMoney(item.unitPrice)}
                   </p>
                 </div>
                 <div className="text-sm font-medium text-zinc-900 sm:text-right">
@@ -231,7 +259,7 @@ export default function PublicInvoicePage() {
             {Number(invoice.taxAmount) > 0 && (
               <div className="flex justify-between">
                 <dt className="text-zinc-600">
-                  {invoice.taxRate
+                  {Number(invoice.taxRate) > 0
                     ? t('public.invoice.taxWithRate', { rate: invoice.taxRate })
                     : t('public.invoice.tax')}
                 </dt>
@@ -281,35 +309,46 @@ export default function PublicInvoicePage() {
           </section>
         )}
 
-        {/* Payment history — shown only when payments exist. Voided payment
-            rows are muted but present (audit transparency, same rule as the
-            in-app drawer's expansion). */}
+        {/* Payment history — shown only when payments exist. Voided rows
+            stay visible (audit transparency) but get both a muted/struck
+            row AND an explicit "Voided" pill — strikethrough alone is
+            unreliable for color-blind viewers and on print. */}
         {invoice.payments.length > 0 && (
           <section className="mt-4 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm print:shadow-none">
             <h2 className="border-b border-zinc-100 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
               {t('public.invoice.paymentsReceived')}
             </h2>
             <ul className="divide-y divide-zinc-100">
-              {invoice.payments.map((payment) => {
+              {invoice.payments.map((payment, idx) => {
                 const isVoidedPayment = payment.status === 'VOID';
                 return (
                   <li
-                    key={payment.id}
-                    className={`flex flex-col gap-1 px-6 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6 ${
-                      isVoidedPayment ? 'text-zinc-400 line-through' : ''
-                    }`}
+                    key={idx}
+                    className="flex flex-col gap-1 px-6 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
                   >
-                    <div className="min-w-0 flex-1">
+                    <div
+                      className={`min-w-0 flex-1 ${
+                        isVoidedPayment ? 'text-zinc-400 line-through' : ''
+                      }`}
+                    >
                       <p className="text-sm">{formatDate(payment.paymentDate)}</p>
                       <p className="mt-0.5 text-xs text-zinc-500">
-                        {payment.paymentMethod.replace(/_/g, ' ').toLowerCase()}
-                        {payment.referenceNumber
-                          ? ` · ${payment.referenceNumber}`
-                          : ''}
+                        <PaymentMethodLabel method={payment.method} />
                       </p>
                     </div>
-                    <div className="text-sm sm:text-right">
-                      {formatMoney(payment.amount)}
+                    <div className="flex items-center gap-2 sm:justify-end">
+                      <div
+                        className={`text-sm sm:text-right ${
+                          isVoidedPayment ? 'text-zinc-400 line-through' : ''
+                        }`}
+                      >
+                        {formatMoney(payment.amount)}
+                      </div>
+                      {isVoidedPayment && (
+                        <Badge color="zinc">
+                          {t('public.invoice.paymentVoided')}
+                        </Badge>
+                      )}
                     </div>
                   </li>
                 );
@@ -319,28 +358,31 @@ export default function PublicInvoicePage() {
         )}
 
         {/* Footer — questions / contact. Same info as the header so customers
-            don't have to scroll back up to find the phone number. */}
-        <footer className="mt-8 text-center text-sm text-zinc-500 print:mt-4">
-          <p>{t('public.invoice.questions')}</p>
-          <p className="mt-1 text-zinc-700">
-            {t('public.invoice.contactCta', { tenant: tenant.displayName })}
-            {tenant.supportPhone
-              ? t('public.common.contactPhone', { phone: tenant.supportPhone })
-              : ''}
-            {tenant.supportEmail ? (
-              <>
-                {' · '}
-                <a
-                  href={`mailto:${tenant.supportEmail}`}
-                  rel="noopener noreferrer"
-                  className="text-sky-700 underline"
-                >
-                  {tenant.supportEmail}
-                </a>
-              </>
-            ) : null}
-          </p>
-        </footer>
+            don't have to scroll back up to find the phone number. Hide the
+            whole block when the tenant has no contact info at all. */}
+        {(tenant.supportPhone || tenant.supportEmail) && (
+          <footer className="mt-8 text-center text-sm text-zinc-500 print:mt-4">
+            <p>{t('public.invoice.questions')}</p>
+            <p className="mt-1 text-zinc-700">
+              {t('public.invoice.contactCta', { tenant: senderName })}
+              {tenant.supportPhone
+                ? t('public.common.contactPhone', { phone: tenant.supportPhone })
+                : ''}
+              {tenant.supportEmail ? (
+                <>
+                  {' · '}
+                  <a
+                    href={`mailto:${tenant.supportEmail}`}
+                    rel="noopener noreferrer"
+                    className="text-sky-700 underline"
+                  >
+                    {tenant.supportEmail}
+                  </a>
+                </>
+              ) : null}
+            </p>
+          </footer>
+        )}
       </div>
     </div>
   );

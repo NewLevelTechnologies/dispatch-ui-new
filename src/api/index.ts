@@ -189,6 +189,14 @@ export {
   type PublicCustomerSummary,
   type PublicInvoiceResponse,
   type PublicQuoteResponse,
+  type PublicInvoiceData,
+  type PublicQuoteData,
+  type PublicLineItem,
+  type PublicPayment,
+  type PublicInvoiceStatus,
+  type PublicQuoteStatus,
+  type PublicPaymentMethod,
+  type PublicPaymentStatus,
 } from './publicFinancialApi';
 
 // Scheduling APIs

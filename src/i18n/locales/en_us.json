@@ -659,7 +659,8 @@
   "public": {
     "common": {
       "logoAlt": "{{name}} logo",
-      "contactPhone": " at {{phone}}"
+      "contactPhone": " at {{phone}}",
+      "theSender": "the sender"
     },
     "cliff": {
       "headline": "This link is no longer available",
@@ -684,6 +685,16 @@
       "balanceDue": "Balance due",
       "notes": "Notes",
       "paymentsReceived": "Payments received",
+      "paymentVoided": "Voided",
+      "paymentMethod": {
+        "CASH": "Cash",
+        "CHECK": "Check",
+        "CREDIT_CARD": "Credit card",
+        "DEBIT_CARD": "Debit card",
+        "ACH": "ACH transfer",
+        "WIRE_TRANSFER": "Wire transfer",
+        "OTHER": "Other"
+      },
       "voidedHeadline": "This invoice has been voided",
       "voidedSubline": "Please contact {{tenant}} for the current invoice.",
       "questions": "Questions about this invoice?",
@@ -691,6 +702,7 @@
       "status": {
         "draft": "Draft",
         "outstanding": "Outstanding",
+        "partiallyPaid": "Partially paid",
         "paid": "Paid",
         "pastDue": "Past due",
         "cancelled": "Cancelled"
@@ -716,6 +728,7 @@
         "pending": "Pending",
         "accepted": "Accepted",
         "declined": "Declined",
+        "cancelled": "Cancelled",
         "expired": "Expired"
       }
     }

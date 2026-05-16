@@ -16,34 +16,31 @@ function buildResponse(
 ): PublicInvoiceResponse {
   return {
     invoice: {
-      id: 'inv-1',
-      customerId: 'cust-1',
       invoiceNumber: 'INV-0042',
       status: 'SENT',
-      invoiceDate: '2026-05-10T00:00:00Z',
-      dueDate: '2026-06-09T00:00:00Z',
-      subtotal: 500,
-      taxRate: 0,
-      taxAmount: 0,
-      totalAmount: 500,
-      amountPaid: 0,
-      balanceDue: 500,
+      invoiceDate: '2026-05-10',
+      dueDate: '2026-06-09',
+      subtotal: '500.00',
+      taxRate: '0.00',
+      taxAmount: '0.00',
+      totalAmount: '500.00',
+      amountPaid: '0.00',
+      balanceDue: '500.00',
+      notes: null,
       lineItems: [
         {
-          id: 'li-1',
           description: 'HVAC tune-up',
-          quantity: 1,
-          unitPrice: 500,
-          lineTotal: 500,
+          quantity: '1.00',
+          unitPrice: '500.00',
+          lineTotal: '500.00',
         },
       ],
       payments: [],
-      createdAt: '2026-05-10T00:00:00Z',
-      updatedAt: '2026-05-10T00:00:00Z',
       ...overrides,
     },
     tenant: {
       displayName: 'Acme HVAC',
+      companySlogan: null,
       logoUrl: null,
       streetAddress: '123 Main',
       city: 'Springfield',
@@ -127,5 +124,76 @@ describe('PublicInvoicePage', () => {
     renderAt('tok-1');
     await screen.findByRole('heading', { level: 1, name: /Acme HVAC/ });
     expect(screen.queryByRole('img', { name: /acme hvac logo/i })).toBeNull();
+  });
+
+  it('renders cleanly when the tenant has no branding at all', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({
+      data: buildResponse(
+        {},
+        {
+          displayName: null,
+          companySlogan: null,
+          logoUrl: null,
+          streetAddress: null,
+          city: null,
+          state: null,
+          zipCode: null,
+          supportEmail: null,
+          supportPhone: null,
+        },
+      ),
+    });
+    renderAt('tok-1');
+    // Document body still renders.
+    expect(await screen.findByText(/INV-0042/)).toBeInTheDocument();
+    // No empty sender heading.
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+    // No contact footer.
+    expect(screen.queryByText(/questions about this invoice/i)).toBeNull();
+  });
+
+  it('shows a "Partially paid" badge and a paid line in the totals when partially paid', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({
+      data: buildResponse({
+        status: 'PARTIALLY_PAID',
+        amountPaid: '200.00',
+        balanceDue: '300.00',
+        payments: [
+          {
+            paymentDate: '2026-05-20',
+            amount: '200.00',
+            method: 'CREDIT_CARD',
+            status: 'RECEIVED',
+          },
+        ],
+      }),
+    });
+    renderAt('tok-1');
+    expect(
+      await screen.findByText(/partially paid/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/credit card/i)).toBeInTheDocument();
+    // "Paid −$200.00" row in totals.
+    expect(screen.getByText(/−\$200\.00/)).toBeInTheDocument();
+  });
+
+  it('shows a Voided pill next to voided payment rows', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({
+      data: buildResponse({
+        amountPaid: '0.00',
+        balanceDue: '500.00',
+        payments: [
+          {
+            paymentDate: '2026-05-05',
+            amount: '500.00',
+            method: 'CASH',
+            status: 'VOID',
+          },
+        ],
+      }),
+    });
+    renderAt('tok-1');
+    expect(await screen.findByText(/voided/i)).toBeInTheDocument();
+    expect(screen.getByText(/cash/i)).toBeInTheDocument();
   });
 });

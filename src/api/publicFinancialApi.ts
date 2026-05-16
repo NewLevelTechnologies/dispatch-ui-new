@@ -10,37 +10,121 @@
 // The URL path that the customer actually clicks (`/p/invoice/:token`)
 // is an SPA route — the token is read from `useParams()` and forwarded
 // to this API call as a header.
+//
+// Public types are intentionally narrower than the internal `Invoice` /
+// `Quote` shapes. The wire response carries only the fields a customer
+// is allowed to see: no internal ids on line items, no payment numbers
+// or audit timestamps, no `customerId` / `workOrderId` foreign keys,
+// no `lastSentAt` / `lastSentToEmails` mail-routing metadata. Defining
+// these locally means any future leakage requires a deliberate type
+// change here, not an accidental inclusion of an internal field.
+//
+// BigDecimal money fields are serialized as strings to preserve
+// precision across the wire. The display layer calls `Number(...)` /
+// `formatMoney(...)` at render time; never sum these as strings.
 
 import publicApiClient from './publicClient';
-import type { Invoice, Quote } from './financialApi';
+
+export type PublicInvoiceStatus =
+  | 'DRAFT'
+  | 'SENT'
+  | 'PARTIALLY_PAID'
+  | 'PAID'
+  | 'OVERDUE'
+  | 'VOID'
+  | 'CANCELLED';
+
+export type PublicQuoteStatus =
+  | 'DRAFT'
+  | 'SENT'
+  | 'ACCEPTED'
+  | 'REJECTED'
+  | 'EXPIRED'
+  | 'CANCELLED';
+
+export type PublicPaymentMethod =
+  | 'CASH'
+  | 'CHECK'
+  | 'CREDIT_CARD'
+  | 'DEBIT_CARD'
+  | 'ACH'
+  | 'WIRE_TRANSFER'
+  | 'OTHER';
 
 /**
- * Minimal tenant branding fields the public page needs to render a
- * sender block. Sourced from `tenant_settings`; all address fields
- * are nullable because the column itself is nullable — render the
- * address conditionally on the page.
+ * `RECEIVED` rows count toward `amountPaid`; `VOID` rows do not, but are
+ * still included in the array for audit transparency. Render voided rows
+ * muted so the customer sees the history without confusion about totals.
+ */
+export type PublicPaymentStatus = 'RECEIVED' | 'VOID';
+
+export interface PublicLineItem {
+  description: string;
+  quantity: string;
+  unitPrice: string;
+  lineTotal: string;
+}
+
+export interface PublicPayment {
+  paymentDate: string;
+  amount: string;
+  method: PublicPaymentMethod;
+  status: PublicPaymentStatus;
+}
+
+export interface PublicInvoiceData {
+  invoiceNumber: string;
+  status: PublicInvoiceStatus;
+  invoiceDate: string;
+  dueDate: string;
+  subtotal: string;
+  taxRate: string;
+  taxAmount: string;
+  totalAmount: string;
+  amountPaid: string;
+  balanceDue: string;
+  notes: string | null;
+  lineItems: PublicLineItem[];
+  /** Server-sorted newest-first by paymentDate; may be empty. */
+  payments: PublicPayment[];
+}
+
+export interface PublicQuoteData {
+  quoteNumber: string;
+  status: PublicQuoteStatus;
+  quoteDate: string;
+  expirationDate: string;
+  subtotal: string;
+  taxRate: string;
+  taxAmount: string;
+  totalAmount: string;
+  notes: string | null;
+  lineItems: PublicLineItem[];
+}
+
+/**
+ * Tenant branding fields the public page needs to render a sender block.
+ * Every field is nullable: tenants that haven't configured branding still
+ * get a working public page — the header collapses to just the document
+ * body when nothing is set.
  */
 export interface PublicTenantBranding {
-  displayName: string;
-  /**
-   * Optional tagline shown under `displayName` in the page header (e.g.
-   * "Heating & cooling since 1987"). Sourced from `tenant_settings`;
-   * nullable so we render nothing when the tenant hasn't set one.
-   */
-  companySlogan?: string | null;
-  logoUrl?: string | null;
-  streetAddress?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zipCode?: string | null;
-  supportEmail?: string | null;
-  supportPhone?: string | null;
+  displayName: string | null;
+  companySlogan: string | null;
+  supportEmail: string | null;
+  supportPhone: string | null;
+  logoUrl: string | null;
+  streetAddress: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
 }
 
 /**
  * Bill-to / quote-recipient customer fields exposed publicly. Intentionally
  * narrow — the public page shows "Billed to: {name}" and nothing else
- * about the customer record. No email / phone / address leakage.
+ * about the customer record. No email / phone / address leakage. `id` is
+ * present on the wire but must NOT be rendered to the page.
  */
 export interface PublicCustomerSummary {
   id: string;
@@ -48,13 +132,13 @@ export interface PublicCustomerSummary {
 }
 
 export interface PublicInvoiceResponse {
-  invoice: Invoice;
+  invoice: PublicInvoiceData;
   tenant: PublicTenantBranding;
   customer: PublicCustomerSummary;
 }
 
 export interface PublicQuoteResponse {
-  quote: Quote;
+  quote: PublicQuoteData;
   tenant: PublicTenantBranding;
   customer: PublicCustomerSummary;
 }
@@ -68,9 +152,9 @@ const PREVIEW_TOKEN_PREFIX = 'preview-';
 export const publicFinancialApi = {
   getInvoiceByToken: async (token: string): Promise<PublicInvoiceResponse> => {
     // Dev-only short-circuit so the page can be previewed in the browser
-    // before the backend `/public/*` endpoints ship. `import.meta.env.DEV`
-    // is replaced with a literal `false` at production build time, so this
-    // branch and the entire dev mocks module get dead-code-eliminated.
+    // without a real backend token. `import.meta.env.DEV` is replaced with
+    // a literal `false` at production build time, so this branch and the
+    // entire dev mocks module get dead-code-eliminated.
     if (import.meta.env.DEV && token.startsWith(PREVIEW_TOKEN_PREFIX)) {
       const { previewInvoice } = await import('../dev/publicFinancialMocks');
       const mock = previewInvoice(token);
