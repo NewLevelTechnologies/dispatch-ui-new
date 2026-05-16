@@ -181,8 +181,10 @@ function FilterChipDropdown({
     <Dropdown>
       <span
         className={clsx(
-          'inline-flex h-8 items-center overflow-hidden rounded-md border bg-bg-elev text-[12px]',
-          isSet ? 'border-accent-500/35 bg-accent-500/5' : 'border-border'
+          'inline-flex h-8 items-center overflow-hidden rounded-md border bg-bg-elev text-[12px] transition-colors',
+          isSet
+            ? 'border-accent-500/35 bg-accent-500/5 hover:bg-[color-mix(in_oklch,var(--accent-500)_12%,var(--bg-elev))]'
+            : 'border-border hover:bg-bg-hover'
         )}
       >
         <DropdownButton
@@ -816,7 +818,7 @@ export default function WorkOrdersPage() {
                             <CellTop>
                               <RouterLink
                                 to={`/work-orders/${workOrder.id}`}
-                                className="id-mono strong hover:text-accent-500 hover:underline"
+                                className="id-mono text-fg-muted hover:text-accent-500 hover:underline"
                               >
                                 {workOrder.workOrderNumber || `#${workOrder.id.substring(0, 8)}`}
                               </RouterLink>
@@ -843,7 +845,7 @@ export default function WorkOrdersPage() {
                             totalCount={workOrder.workItemCount}
                           />
                         </td>
-                        <td className="muted">
+                        <td>
                           {activeTypes.find((tp) => tp.id === workOrder.workOrderTypeId)?.name ?? '—'}
                         </td>
                         <td>
@@ -867,7 +869,7 @@ export default function WorkOrdersPage() {
                             {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[workOrder.priority ?? 'NORMAL']}`)}
                           </Pill>
                         </td>
-                        <td className="muted">
+                        <td>
                           {formatDate(workOrder.scheduledDate)}
                         </td>
                         <td>
