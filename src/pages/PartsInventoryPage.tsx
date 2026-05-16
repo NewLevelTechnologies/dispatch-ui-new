@@ -3,10 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
-import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
+import { PageHead } from '../components/ui/PageHead';
+import { Card, CardBody } from '../components/ui/Card';
+import { Pill } from '../components/ui/Pill';
+import {
+  DenseTable, DenseTHead, DenseRow,
+} from '../components/ui/DenseTable';
+import { dense } from '../components/ui/dense';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, FieldGroup, Fieldset, Label } from '../components/catalyst/fieldset';
@@ -144,112 +148,127 @@ export default function PartsInventoryPage() {
     });
   };
 
+  const partCount = safePartsInventory.length;
+  const subtitle = partCount > 0
+    ? (filteredParts.length === partCount
+        ? `${partCount.toLocaleString()} ${partCount === 1 ? t('equipment.entities.part').toLowerCase() : t('equipment.entities.parts').toLowerCase()}`
+        : `${filteredParts.length} of ${partCount}`)
+    : null;
+
   return (
     <AppLayout>
-      <div className="flex items-center justify-between gap-4">
-        <Heading>{t('equipment.entities.parts')}</Heading>
-        <Button onClick={handleAdd}>
-          {t('common.actions.add', { entity: t('equipment.entities.part') })}
-        </Button>
-      </div>
+      <div>
+        <PageHead
+          title={t('equipment.entities.parts')}
+          sub={subtitle}
+          actions={
+            <Button color="accent" onClick={handleAdd}>
+              {t('common.actions.add', { entity: t('equipment.entities.part') })}
+            </Button>
+          }
+        />
 
-      {/* Quick Search Bar */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </InputGroup>
-        {safePartsInventory.length > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredParts.length === safePartsInventory.length
-              ? `${safePartsInventory.length} ${safePartsInventory.length === 1 ? t('equipment.entities.part').toLowerCase() : t('equipment.entities.parts').toLowerCase()}`
-              : `${filteredParts.length} of ${safePartsInventory.length}`}
-          </div>
+        <div className="mb-3 flex flex-wrap items-end gap-2">
+          <InputGroup className="min-w-[260px] flex-1">
+            <MagnifyingGlassIcon data-slot="icon" />
+            <Input
+              type="text"
+              placeholder={t('common.search')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={dense.input}
+            />
+          </InputGroup>
+        </div>
+
+        {error && (
+          <Card className="border-danger-500/40 bg-danger-100/40">
+            <CardBody>
+              <p className="text-[12.5px] text-danger-500">
+                {t('common.actions.errorLoading', { entities: t('equipment.entities.parts') })}: {(error as Error).message}
+              </p>
+            </CardBody>
+          </Card>
+        )}
+
+        {isLoading ? (
+          <Card>
+            <CardBody>
+              <p className="text-center text-[12.5px] text-fg-muted">
+                {t('common.actions.loading', { entities: t('equipment.entities.parts') })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : safePartsInventory.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-[12.5px] text-fg-muted">
+                {t('common.actions.notFound', { entities: t('equipment.entities.parts') })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : filteredParts.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-[12.5px] text-fg-muted">
+                {t('common.actions.noMatchSearch', { entities: t('equipment.entities.parts') })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : (
+          <Card>
+            <CardBody flush>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{t('equipment.table.partNumber')}</th>
+                    <th>{t('equipment.table.partName')}</th>
+                    <th>{t('equipment.table.warehouse')}</th>
+                    <th className="right">{t('equipment.table.quantity')}</th>
+                    <th className="right">{t('equipment.table.reorderPoint')}</th>
+                    <th className="right">{t('equipment.table.unitCost')}</th>
+                    <th></th>
+                  </tr>
+                </DenseTHead>
+                <tbody>
+                  {filteredParts.map((item) => (
+                    <DenseRow key={item.id}>
+                      <td><span className="id-mono text-fg-muted">{item.partNumber}</span></td>
+                      <td className="strong">{item.partName}</td>
+                      <td>{item.warehouseName || item.warehouseId}</td>
+                      <td className="right num">
+                        <span className={item.needsReorder ? 'font-semibold text-danger-500' : 'strong'}>
+                          {item.quantityOnHand}
+                        </span>
+                        {item.needsReorder && (
+                          <Pill tone="danger" dot className="ml-2">{t('equipment.lowStock')}</Pill>
+                        )}
+                      </td>
+                      <td className="right num">{item.reorderPoint}</td>
+                      <td className="right num strong">{formatCurrency(item.unitCost)}</td>
+                      <td>
+                        <Dropdown>
+                          <DropdownButton plain aria-label={t('common.moreOptions')}>
+                            <EllipsisVerticalIcon className="size-5" />
+                          </DropdownButton>
+                          <DropdownMenu anchor="bottom end">
+                            <DropdownItem onClick={() => handleEdit(item)}>
+                              <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                            </DropdownItem>
+                            <DropdownItem onClick={() => handleDelete(item)}>
+                              <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                            </DropdownItem>
+                          </DropdownMenu>
+                        </Dropdown>
+                      </td>
+                    </DenseRow>
+                  ))}
+                </tbody>
+              </DenseTable>
+            </CardBody>
+          </Card>
         )}
       </div>
-
-      {error && (
-        <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-          <p className="text-sm text-red-800 dark:text-red-400">
-            {t('common.actions.errorLoading', { entities: t('equipment.entities.parts') })}: {(error as Error).message}
-          </p>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.loading', { entities: t('equipment.entities.parts') })}
-          </p>
-        </div>
-      ) : safePartsInventory.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.notFound', { entities: t('equipment.entities.parts') })}
-          </p>
-        </div>
-      ) : filteredParts.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.noMatchSearch', { entities: t('equipment.entities.parts') })}
-          </p>
-        </div>
-      ) : (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('equipment.table.partNumber')}</TableHeader>
-                <TableHeader>{t('equipment.table.partName')}</TableHeader>
-                <TableHeader>{t('equipment.table.warehouse')}</TableHeader>
-                <TableHeader>{t('equipment.table.quantity')}</TableHeader>
-                <TableHeader>{t('equipment.table.reorderPoint')}</TableHeader>
-                <TableHeader>{t('equipment.table.unitCost')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredParts.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.partNumber}</TableCell>
-                  <TableCell>{item.partName}</TableCell>
-                  <TableCell>{item.warehouseName || item.warehouseId}</TableCell>
-                  <TableCell>
-                    {item.quantityOnHand}
-                    {item.needsReorder && (
-                      <Badge color="rose" className="ml-2">{t('equipment.lowStock')}</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>{item.reorderPoint}</TableCell>
-                  <TableCell>{formatCurrency(item.unitCost)}</TableCell>
-                  <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                      <Dropdown>
-                        <DropdownButton plain aria-label={t('common.moreOptions')}>
-                          <EllipsisVerticalIcon className="size-5" />
-                        </DropdownButton>
-                        <DropdownMenu anchor="bottom end">
-                          <DropdownItem onClick={() => handleEdit(item)}>
-                            <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handleDelete(item)}>
-                            <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
 
       {/* Dialog */}
       <Dialog open={isDialogOpen} onClose={setIsDialogOpen}>

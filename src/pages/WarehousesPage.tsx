@@ -4,10 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
-import { Heading } from '../components/catalyst/heading';
+import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { Button } from '../components/catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
+import { PageHead } from '../components/ui/PageHead';
+import { Card, CardBody } from '../components/ui/Card';
+import { Pill } from '../components/ui/Pill';
+import {
+  DenseTable, DenseTHead, DenseRow,
+} from '../components/ui/DenseTable';
+import { dense } from '../components/ui/dense';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, FieldGroup, Fieldset, Label } from '../components/catalyst/fieldset';
@@ -134,114 +139,123 @@ export default function WarehousesPage() {
   };
 
   const getStatusBadge = (status: WarehouseStatus) => {
-    const colors: Record<WarehouseStatus, 'lime' | 'zinc'> = {
-      ACTIVE: 'lime',
-      INACTIVE: 'zinc',
-    };
-    return <Badge color={colors[status]}>{status}</Badge>;
+    return <Pill tone={status === 'ACTIVE' ? 'success' : 'neutral'} dot>{status}</Pill>;
   };
+
+  const warehouseCount = safeWarehouses.length;
+  const subtitle = warehouseCount > 0
+    ? (filteredWarehouses.length === warehouseCount
+        ? `${warehouseCount.toLocaleString()} ${warehouseCount === 1 ? t('equipment.entities.warehouse').toLowerCase() : t('equipment.entities.warehouses').toLowerCase()}`
+        : `${filteredWarehouses.length} of ${warehouseCount}`)
+    : null;
 
   return (
     <AppLayout>
-      <div className="flex items-center justify-between gap-4">
-        <Heading>{t('equipment.entities.warehouses')}</Heading>
-        <Button onClick={handleAdd}>
-          {t('common.actions.add', { entity: t('equipment.entities.warehouse') })}
-        </Button>
-      </div>
+      <div>
+        <PageHead
+          title={t('equipment.entities.warehouses')}
+          sub={subtitle}
+          actions={
+            <Button color="accent" onClick={handleAdd}>
+              {t('common.actions.add', { entity: t('equipment.entities.warehouse') })}
+            </Button>
+          }
+        />
 
-      {/* Quick Search Bar */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </InputGroup>
-        {safeWarehouses.length > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredWarehouses.length === safeWarehouses.length
-              ? `${safeWarehouses.length} ${safeWarehouses.length === 1 ? t('equipment.entities.warehouse').toLowerCase() : t('equipment.entities.warehouses').toLowerCase()}`
-              : `${filteredWarehouses.length} of ${safeWarehouses.length}`}
-          </div>
+        <div className="mb-3 flex flex-wrap items-end gap-2">
+          <InputGroup className="min-w-[260px] flex-1">
+            <MagnifyingGlassIcon data-slot="icon" />
+            <Input
+              type="text"
+              placeholder={t('common.search')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={dense.input}
+            />
+          </InputGroup>
+        </div>
+
+        {error && (
+          <Card className="border-danger-500/40 bg-danger-100/40">
+            <CardBody>
+              <p className="text-[12.5px] text-danger-500">
+                {t('common.actions.errorLoading', { entities: t('equipment.entities.warehouses') })}: {(error as Error).message}
+              </p>
+            </CardBody>
+          </Card>
+        )}
+
+        {isLoading ? (
+          <Card>
+            <CardBody>
+              <p className="text-center text-[12.5px] text-fg-muted">
+                {t('common.actions.loading', { entities: t('equipment.entities.warehouses') })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : safeWarehouses.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-[12.5px] text-fg-muted">
+                {t('common.actions.notFound', { entities: t('equipment.entities.warehouses') })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : filteredWarehouses.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-[12.5px] text-fg-muted">
+                {t('common.actions.noMatchSearch', { entities: t('equipment.entities.warehouses') })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : (
+          <Card>
+            <CardBody flush>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{t('common.form.name')}</th>
+                    <th>{t('equipment.table.location')}</th>
+                    <th>{t('equipment.table.manager')}</th>
+                    <th>{t('common.form.phone')}</th>
+                    <th>{t('common.form.status')}</th>
+                    <th></th>
+                  </tr>
+                </DenseTHead>
+                <tbody>
+                  {filteredWarehouses.map((item) => (
+                    <DenseRow key={item.id}>
+                      <td className="strong">{item.name}</td>
+                      <td>
+                        {item.city && item.state ? `${titleCaseAddress(item.city)}, ${item.state}` : '-'}
+                      </td>
+                      <td>{item.managerName || '-'}</td>
+                      <td>{item.phone || '-'}</td>
+                      <td>{getStatusBadge(item.status)}</td>
+                      <td>
+                        <Dropdown>
+                          <DropdownButton plain aria-label={t('common.moreOptions')}>
+                            <EllipsisVerticalIcon className="size-5" />
+                          </DropdownButton>
+                          <DropdownMenu anchor="bottom end">
+                            <DropdownItem onClick={() => handleEdit(item)}>
+                              <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                            </DropdownItem>
+                            <DropdownItem onClick={() => handleDelete(item)}>
+                              <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                            </DropdownItem>
+                          </DropdownMenu>
+                        </Dropdown>
+                      </td>
+                    </DenseRow>
+                  ))}
+                </tbody>
+              </DenseTable>
+            </CardBody>
+          </Card>
         )}
       </div>
-
-      {error && (
-        <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-            <p className="text-sm text-red-800 dark:text-red-400">
-              {t('common.actions.errorLoading', { entities: t('equipment.entities.warehouses') })}: {(error as Error).message}
-            </p>
-          </div>
-        )}
-
-      {isLoading ? (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.loading', { entities: t('equipment.entities.warehouses') })}
-          </p>
-        </div>
-      ) : safeWarehouses.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.notFound', { entities: t('equipment.entities.warehouses') })}
-          </p>
-        </div>
-      ) : filteredWarehouses.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.noMatchSearch', { entities: t('equipment.entities.warehouses') })}
-          </p>
-        </div>
-      ) : (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('common.form.name')}</TableHeader>
-                <TableHeader>{t('equipment.table.location')}</TableHeader>
-                <TableHeader>{t('equipment.table.manager')}</TableHeader>
-                <TableHeader>{t('common.form.phone')}</TableHeader>
-                <TableHeader>{t('common.form.status')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredWarehouses.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell>
-                    {item.city && item.state ? `${item.city}, ${item.state}` : '-'}
-                  </TableCell>
-                  <TableCell>{item.managerName || '-'}</TableCell>
-                  <TableCell>{item.phone || '-'}</TableCell>
-                  <TableCell>{getStatusBadge(item.status)}</TableCell>
-                  <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                      <Dropdown>
-                        <DropdownButton plain aria-label={t('common.moreOptions')}>
-                          <EllipsisVerticalIcon className="size-5" />
-                        </DropdownButton>
-                        <DropdownMenu anchor="bottom end">
-                          <DropdownItem onClick={() => handleEdit(item)}>
-                            <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handleDelete(item)}>
-                            <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
 
       {/* Dialog */}
       <Dialog open={isDialogOpen} onClose={setIsDialogOpen}>

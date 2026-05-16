@@ -9,10 +9,16 @@ import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import { formatPhone } from '../utils/formatPhone';
-import { Heading } from '../components/catalyst/heading';
+import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { Button } from '../components/catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
+import { PageHead } from '../components/ui/PageHead';
+import { Card, CardBody } from '../components/ui/Card';
+import { Pill } from '../components/ui/Pill';
+import { ViewTabs } from '../components/ui/Tabs';
+import {
+  DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
+} from '../components/ui/DenseTable';
+import { dense } from '../components/ui/dense';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Input, InputGroup } from '../components/catalyst/input';
 import { Select } from '../components/catalyst/select';
@@ -172,254 +178,270 @@ export default function ServiceLocationsPage() {
     setSelectedCustomerId(null);
   };
 
+  const PAGE_SIZE = 50;
+  const showingStart = totalLocations === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const showingEnd = Math.min(page * PAGE_SIZE, totalLocations);
+
+  const statusViewTabs = [
+    { id: 'all', label: t('serviceLocations.filter.allStatuses') },
+    { id: 'ACTIVE', label: t('serviceLocations.status.active') },
+    { id: 'INACTIVE', label: t('serviceLocations.status.inactive') },
+    { id: 'CLOSED', label: t('serviceLocations.status.closed') },
+  ];
+
+  const subtitle = totalLocations > 0
+    ? `${totalLocations.toLocaleString()} ${totalLocations === 1 ? getName('service_location').toLowerCase() : getName('service_location', true).toLowerCase()}${
+        totalLocations > PAGE_SIZE
+          ? ' · ' + t('common.pagination.showing', { start: showingStart, end: showingEnd, total: totalLocations.toLocaleString() })
+          : ''
+      }`
+    : null;
+
   return (
     <AppLayout>
-      <div className="flex items-center justify-between gap-4">
-        <Heading>{getName('service_location', true)}</Heading>
-        {canAddServiceLocations && (
-          <Button onClick={handleAdd}>{t('common.actions.add', { entity: getName('service_location') })}</Button>
-        )}
-      </div>
+      <div>
+        <PageHead
+          title={getName('service_location', true)}
+          sub={subtitle}
+          actions={
+            canAddServiceLocations ? (
+              <Button color="accent" onClick={handleAdd}>
+                {t('common.actions.add', { entity: getName('service_location') })}
+              </Button>
+            ) : null
+          }
+        />
 
-      {/* Search and Filters */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              updateFilters({ search: e.target.value }, { replace: true });
-            }}
-          />
-        </InputGroup>
-        {activeRegions.length > 0 && (
-          <div className="w-44">
-            <Select
-              aria-label={t('serviceLocations.filter.region')}
-              value={regionId}
-              onChange={(e) => updateFilters({ region: e.target.value })}
-            >
-              <option value="">{t('serviceLocations.filter.allRegions')}</option>
-              {activeRegions.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </Select>
-          </div>
-        )}
-        <div className="flex items-center gap-2">
-          <Button
-            plain
-            onClick={() => updateFilters({ status: 'all' })}
-            className={statusFilter === 'all' ? 'font-semibold text-zinc-950 dark:text-white' : ''}
-          >
-            {t('serviceLocations.filter.allStatuses')}
-          </Button>
-          <Button
-            plain
-            onClick={() => updateFilters({ status: 'ACTIVE' })}
-            className={statusFilter === 'ACTIVE' ? 'font-semibold text-zinc-950 dark:text-white' : ''}
-          >
-            {t('serviceLocations.status.active')}
-          </Button>
-          <Button
-            plain
-            onClick={() => updateFilters({ status: 'INACTIVE'  })}
-            className={statusFilter === 'INACTIVE' ? 'font-semibold text-zinc-950 dark:text-white' : ''}
-          >
-            {t('serviceLocations.status.inactive')}
-          </Button>
-          <Button
-            plain
-            onClick={() => updateFilters({ status: 'CLOSED' })}
-            className={statusFilter === 'CLOSED' ? 'font-semibold text-zinc-950 dark:text-white' : ''}
-          >
-            {t('serviceLocations.status.closed')}
-          </Button>
-        </div>
-        {totalLocations > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {totalLocations} {totalLocations === 1 ? getName('service_location').toLowerCase() : getName('service_location', true).toLowerCase()}
-          </div>
-        )}
-      </div>
-
-      {isLoading && (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: getName('service_location', true) })}</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-          <p className="text-sm text-red-800 dark:text-red-400">
-            {t('common.actions.errorLoading', { entities: getName('service_location', true) })}: {(error as Error).message}
-          </p>
-        </div>
-      )}
-
-      {totalLocations === 0 && !isLoading && (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {deferredSearch || statusFilter !== 'all'
-              ? t('common.actions.noMatchSearch', { entities: getName('service_location', true) })
-              : t('common.actions.notFound', { entities: getName('service_location', true) })}
-          </p>
-          {canAddServiceLocations && !deferredSearch && statusFilter === 'all' && (
-            <Button className="mt-2" onClick={handleAdd}>
-              {t('common.actions.addFirst', { entity: getName('service_location') })}
-            </Button>
+        {/* Search + region filter */}
+        <div className="mb-3 flex flex-wrap items-end gap-2">
+          <InputGroup className="min-w-[260px] flex-1">
+            <MagnifyingGlassIcon data-slot="icon" />
+            <Input
+              type="text"
+              placeholder={t('common.search')}
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                updateFilters({ search: e.target.value }, { replace: true });
+              }}
+              className={dense.input}
+            />
+          </InputGroup>
+          {activeRegions.length > 0 && (
+            <div className="w-44">
+              <Select
+                aria-label={t('serviceLocations.filter.region')}
+                value={regionId}
+                onChange={(e) => updateFilters({ region: e.target.value })}
+                className={dense.select}
+              >
+                <option value="">{t('serviceLocations.filter.allRegions')}</option>
+                {activeRegions.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </Select>
+            </div>
           )}
         </div>
-      )}
 
-      {locations.length > 0 && (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('common.form.name')}</TableHeader>
-                <TableHeader>{t('serviceLocations.table.address')}</TableHeader>
-                <TableHeader>{t('serviceLocations.table.contact')}</TableHeader>
-                <TableHeader>{t('serviceLocations.table.lastService')}</TableHeader>
-                <TableHeader>{t('common.form.status')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {locations.map((location) => {
-                return (
-                  <TableRow key={location.id} href={`/service-locations/${location.id}`} className="cursor-pointer">
-                    <TableCell className="font-medium">
-                      {location.locationName || <span className="text-zinc-400">{t('serviceLocations.detail.unnamedLocation')}</span>}
-                    </TableCell>
-                    <TableCell className="text-zinc-500">
-                      <div className="text-xs">
-                        {location.address.streetAddress}
-                        {location.address.streetAddressLine2 && ` ${location.address.streetAddressLine2}`}
-                      </div>
-                      <div className="text-xs text-zinc-400">
-                        {location.address.city}, {location.address.state} {location.address.zipCode}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-zinc-500">
-                      {location.siteContactName || location.siteContactPhone ? (
-                        <>
-                          {location.siteContactName && (
-                            <div className="text-xs">{location.siteContactName}</div>
-                          )}
-                          {location.siteContactPhone && (
-                            <div className="text-xs">
-                              <a
-                                href={`tel:${location.siteContactPhone}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="relative z-10 hover:underline"
-                              >
-                                {formatPhone(location.siteContactPhone)}
-                              </a>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-xs text-zinc-400">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-zinc-500">
-                      <span className="text-xs text-zinc-400">{t('serviceLocations.table.neverServiced')}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        color={
-                          location.status === 'ACTIVE'
-                            ? 'lime'
-                            : location.status === 'INACTIVE'
-                            ? 'amber'
-                            : 'zinc'
-                        }
-                        className="text-xs"
+        <ViewTabs
+          className="mb-3"
+          value={statusFilter}
+          onChange={(id) => updateFilters({ status: id })}
+          tabs={statusViewTabs}
+        />
+
+        {isLoading && (
+          <Card>
+            <CardBody>
+              <p className="text-center text-[12.5px] text-fg-muted">
+                {t('common.actions.loading', { entities: getName('service_location', true) })}
+              </p>
+            </CardBody>
+          </Card>
+        )}
+
+        {error && (
+          <Card className="border-danger-500/40 bg-danger-100/40">
+            <CardBody>
+              <p className="text-[12.5px] text-danger-500">
+                {t('common.actions.errorLoading', { entities: getName('service_location', true) })}: {(error as Error).message}
+              </p>
+            </CardBody>
+          </Card>
+        )}
+
+        {totalLocations === 0 && !isLoading && (
+          <Card>
+            <CardBody>
+              <p className="text-[12.5px] text-fg-muted">
+                {deferredSearch || statusFilter !== 'all'
+                  ? t('common.actions.noMatchSearch', { entities: getName('service_location', true) })
+                  : t('common.actions.notFound', { entities: getName('service_location', true) })}
+              </p>
+              {canAddServiceLocations && !deferredSearch && statusFilter === 'all' && (
+                <Button color="accent" className="mt-2" onClick={handleAdd}>
+                  {t('common.actions.addFirst', { entity: getName('service_location') })}
+                </Button>
+              )}
+            </CardBody>
+          </Card>
+        )}
+
+        {locations.length > 0 && (
+          <Card>
+            <CardBody flush>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{t('common.form.name')}</th>
+                    <th>{t('serviceLocations.table.address')}</th>
+                    <th>{t('serviceLocations.table.contact')}</th>
+                    <th>{t('serviceLocations.table.lastService')}</th>
+                    <th>{t('common.form.status')}</th>
+                    <th></th>
+                  </tr>
+                </DenseTHead>
+                <tbody>
+                  {locations.map((location) => {
+                    const street = [location.address.streetAddress, location.address.streetAddressLine2]
+                      .filter(Boolean).join(' ');
+                    const stateZip = [location.address.state, location.address.zipCode].filter(Boolean).join(' ');
+                    return (
+                      <DenseRow
+                        key={location.id}
+                        className="cursor-pointer"
+                        onClick={() => navigate(`/service-locations/${location.id}`)}
                       >
-                        {t(`serviceLocations.status.${location.status.toLowerCase()}`)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {(canEditServiceLocations || canCloseServiceLocations) && (
-                        <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                          <Dropdown>
-                            <DropdownButton plain aria-label={t('common.moreOptions')}>
-                              <EllipsisVerticalIcon className="size-5" />
-                            </DropdownButton>
-                            <DropdownMenu anchor="bottom end">
-                              <DropdownItem onClick={() => navigate(`/service-locations/${location.id}`)}>
-                                <DropdownLabel>{t('common.view')}</DropdownLabel>
-                              </DropdownItem>
-                              {canEditServiceLocations && (
-                                <DropdownItem onClick={() => handleEdit(location.id, location.customerId)}>
-                                  <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                        <td className="strong">
+                          {location.locationName || (
+                            <span className="muted italic">{t('serviceLocations.detail.unnamedLocation')}</span>
+                          )}
+                        </td>
+                        <td>
+                          <CellStack>
+                            <CellTop>{titleCaseAddress(street)}</CellTop>
+                            <CellSub>
+                              {[titleCaseAddress(location.address.city), stateZip].filter(Boolean).join(', ')}
+                            </CellSub>
+                          </CellStack>
+                        </td>
+                        <td>
+                          {location.siteContactName || location.siteContactPhone ? (
+                            <CellStack>
+                              {location.siteContactName && <CellTop>{location.siteContactName}</CellTop>}
+                              {location.siteContactPhone && (
+                                <CellSub>
+                                  <a
+                                    href={`tel:${location.siteContactPhone}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="hover:underline"
+                                  >
+                                    {formatPhone(location.siteContactPhone)}
+                                  </a>
+                                </CellSub>
+                              )}
+                            </CellStack>
+                          ) : (
+                            <span className="muted">-</span>
+                          )}
+                        </td>
+                        <td className="muted">{t('serviceLocations.table.neverServiced')}</td>
+                        <td>
+                          <Pill
+                            tone={
+                              location.status === 'ACTIVE'
+                                ? 'success'
+                                : location.status === 'INACTIVE'
+                                ? 'warning'
+                                : 'neutral'
+                            }
+                            dot
+                          >
+                            {t(`serviceLocations.status.${location.status.toLowerCase()}`)}
+                          </Pill>
+                        </td>
+                        <td>
+                          {(canEditServiceLocations || canCloseServiceLocations) && (
+                            <Dropdown>
+                              <DropdownButton plain aria-label={t('common.moreOptions')}>
+                                <EllipsisVerticalIcon className="size-5" />
+                              </DropdownButton>
+                              <DropdownMenu anchor="bottom end">
+                                <DropdownItem onClick={() => navigate(`/service-locations/${location.id}`)}>
+                                  <DropdownLabel>{t('common.view')}</DropdownLabel>
                                 </DropdownItem>
-                              )}
-                              {canCloseServiceLocations && (
-                                <>
-                                  {location.status !== 'CLOSED' && (
-                                    <DropdownItem onClick={() => handleClose(location.id, location.locationName || '', location.address.streetAddress)}>
-                                      <DropdownLabel>{t('serviceLocations.actions.close')}</DropdownLabel>
-                                    </DropdownItem>
-                                  )}
-                                  <DropdownItem onClick={() => handleDelete(location.id, location.locationName || '', location.address.streetAddress)}>
-                                    <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                {canEditServiceLocations && (
+                                  <DropdownItem onClick={() => handleEdit(location.id, location.customerId)}>
+                                    <DropdownLabel>{t('common.edit')}</DropdownLabel>
                                   </DropdownItem>
-                                </>
-                              )}
-                            </DropdownMenu>
-                          </Dropdown>
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+                                )}
+                                {canCloseServiceLocations && (
+                                  <>
+                                    {location.status !== 'CLOSED' && (
+                                      <DropdownItem onClick={() => handleClose(location.id, location.locationName || '', location.address.streetAddress)}>
+                                        <DropdownLabel>{t('serviceLocations.actions.close')}</DropdownLabel>
+                                      </DropdownItem>
+                                    )}
+                                    <DropdownItem onClick={() => handleDelete(location.id, location.locationName || '', location.address.streetAddress)}>
+                                      <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                    </DropdownItem>
+                                  </>
+                                )}
+                              </DropdownMenu>
+                            </Dropdown>
+                          )}
+                        </td>
+                      </DenseRow>
+                    );
+                  })}
+                </tbody>
+              </DenseTable>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Pagination className="mt-4">
-          <PaginationPrevious href={page > 1 ? pageHref(page - 1) : null} />
-          <PaginationList>
-            {(() => {
-              const pages: (number | 'gap')[] = [];
-              if (totalPages <= 7) {
-                for (let i = 1; i <= totalPages; i++) pages.push(i);
-              } else {
-                pages.push(1);
-                if (page > 3) pages.push('gap');
-                const start = Math.max(2, page - 1);
-                const end = Math.min(totalPages - 1, page + 1);
-                for (let i = start; i <= end; i++) pages.push(i);
-                if (page < totalPages - 2) pages.push('gap');
-                pages.push(totalPages);
-              }
-              return pages.map((p, idx) =>
-                p === 'gap' ? (
-                  <PaginationGap key={`gap-${idx}`} />
-                ) : (
-                  <PaginationPage
-                    key={p}
-                    href={pageHref(p)}
-                    current={p === page}
-                  >
-                    {p}
-                  </PaginationPage>
-                )
-              );
-            })()}
-          </PaginationList>
-          <PaginationNext href={page < totalPages ? pageHref(page + 1) : null} />
-        </Pagination>
-      )}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-3 py-2 text-[11.5px] text-fg-muted">
+                  <span>
+                    {t('common.pagination.showing', {
+                      start: showingStart,
+                      end: showingEnd,
+                      total: totalLocations.toLocaleString(),
+                    })}
+                  </span>
+                  <Pagination className="m-0">
+                    <PaginationPrevious href={page > 1 ? pageHref(page - 1) : null} />
+                    <PaginationList>
+                      {(() => {
+                        const pages: (number | 'gap')[] = [];
+                        if (totalPages <= 7) {
+                          for (let i = 1; i <= totalPages; i++) pages.push(i);
+                        } else {
+                          pages.push(1);
+                          if (page > 3) pages.push('gap');
+                          const start = Math.max(2, page - 1);
+                          const end = Math.min(totalPages - 1, page + 1);
+                          for (let i = start; i <= end; i++) pages.push(i);
+                          if (page < totalPages - 2) pages.push('gap');
+                          pages.push(totalPages);
+                        }
+                        return pages.map((p, idx) =>
+                          p === 'gap' ? (
+                            <PaginationGap key={`gap-${idx}`} />
+                          ) : (
+                            <PaginationPage key={p} href={pageHref(p)} current={p === page}>
+                              {String(p)}
+                            </PaginationPage>
+                          )
+                        );
+                      })()}
+                    </PaginationList>
+                    <PaginationNext href={page < totalPages ? pageHref(page + 1) : null} />
+                  </Pagination>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        )}
+      </div>
 
       <ServiceLocationFormDialog
         isOpen={isDialogOpen}
