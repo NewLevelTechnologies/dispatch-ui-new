@@ -248,6 +248,45 @@ describe('ActivityStream', () => {
     expect(screen.getByText(/Invoice 11079 issued for \$9,800/)).toBeInTheDocument();
   });
 
+  it('renders dispatch events using the backend assignedUserName field', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: page([
+        event({
+          id: 'e-assigned',
+          kind: 'DISPATCH_ASSIGNED',
+          category: 'DISPATCH',
+          data: { dispatchId: 'd-1', assignedUserName: 'Rich Garcia' },
+        }),
+        event({
+          id: 'e-arrived',
+          kind: 'DISPATCH_ARRIVED',
+          category: 'DISPATCH',
+          data: { dispatchId: 'd-1', assignedUserName: 'Rich Garcia' },
+        }),
+        event({
+          id: 'e-checked-out',
+          kind: 'DISPATCH_CHECKED_OUT',
+          category: 'DISPATCH',
+          data: { dispatchId: 'd-1', assignedUserName: 'Rich Garcia' },
+        }),
+        event({
+          id: 'e-cancelled',
+          kind: 'DISPATCH_CANCELLED',
+          category: 'DISPATCH',
+          data: { dispatchId: 'd-1', assignedUserName: 'Rich Garcia' },
+        }),
+      ]),
+    });
+    renderWithProviders(<ActivityStream workOrderId="wo-1" />);
+    await waitFor(() => {
+      expect(screen.getByText('Dispatch assigned to Rich Garcia')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Rich Garcia arrived')).toBeInTheDocument();
+    expect(screen.getByText('Rich Garcia checked out')).toBeInTheDocument();
+    expect(screen.getByText('Dispatch cancelled')).toBeInTheDocument();
+    expect(screen.queryByText(/unrecognized activity/i)).not.toBeInTheDocument();
+  });
+
   it('falls back to the unknown-activity label when the backend sends incomplete data', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
       data: page([

@@ -1229,8 +1229,11 @@ vi.mock('react-i18next', () => {
     'workOrders.activity.filter.notes': 'Notes',
     'workOrders.activity.filter.status': 'Status',
     'workOrders.activity.heading': 'Activity',
-    'workOrders.activity.kind.dispatchAssigned': '{{entity}} assigned to {{techName}}',
+    'workOrders.activity.kind.dispatchArrived': '{{assignedUserName}} arrived',
+    'workOrders.activity.kind.dispatchAssigned': '{{entity}} assigned to {{assignedUserName}}',
     'workOrders.activity.kind.dispatchCancelled': '{{entity}} cancelled',
+    'workOrders.activity.kind.dispatchCheckedOut': '{{assignedUserName}} checked out',
+    'workOrders.activity.kind.dispatchDeparted': '{{assignedUserName}} departed',
     'workOrders.activity.kind.invoiceIssued':
       '{{entity}} {{invoiceNumber}} issued for {{amount}}',
     'workOrders.activity.kind.invoicePaid': '{{entity}} {{invoiceNumber}} paid',
