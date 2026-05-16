@@ -33,6 +33,7 @@
       "notFound": "No {{entities, lowercase}} found",
       "open": "Open {{entities}}",
       "removeFilter": "Remove {{name}} filter",
+      "rowsPerPage": "Rows per page",
       "title": "Actions"
     },
     "active": "Active",
