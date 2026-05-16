@@ -305,7 +305,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               ))}
             </div>
           )}
-          <div className="mx-auto flex h-[30px] w-full max-w-[420px] items-center gap-2 rounded-md border border-border bg-bg-sunken px-2.5 text-[12.5px] text-fg-muted">
+          <div className="mx-auto flex h-[30px] w-full max-w-[380px] items-center gap-2 rounded-md border border-border bg-bg-sunken px-2.5 text-[12.5px] text-fg-muted">
             <span className="text-fg-dim">{t('common.search')}</span>
             <span aria-hidden className="ml-auto rounded border border-border bg-bg px-1.5 py-px font-mono text-[10px]">{'⌘K'}</span>
           </div>

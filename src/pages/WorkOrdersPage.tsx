@@ -502,21 +502,34 @@ export default function WorkOrdersPage() {
   const showingStart = totalElements === 0 ? 0 : (pageNumber - 1) * PAGE_SIZE + 1;
   const showingEnd = Math.min(pageNumber * PAGE_SIZE, totalElements);
 
+  // Subtitle — uses the one count we actually have (active tab's total).
+  // The handoff's "3 open · 1 urgent · 2 scheduled today" pattern wants
+  // per-tab counts, which are gated on a backend counts-summary endpoint.
+  const activeTabLabel = t(tab.labelKey).toLowerCase();
+  const subtitleParts: string[] = [];
+  if (totalElements > 0) {
+    subtitleParts.push(
+      `${totalElements.toLocaleString()} ${activeTabLabel} ${getName('work_order', true).toLowerCase()}`
+    );
+    if (totalElements > PAGE_SIZE) {
+      subtitleParts.push(
+        t('common.pagination.showing', {
+          start: showingStart,
+          end: showingEnd,
+          total: totalElements.toLocaleString(),
+        })
+      );
+    }
+  }
+  const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : null;
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <AppLayout>
       <div>
         <PageHead
           title={getName('work_order', true)}
-          sub={
-            totalElements > 0
-              ? t('common.pagination.showing', {
-                  start: showingStart,
-                  end: showingEnd,
-                  total: totalElements.toLocaleString(),
-                })
-              : null
-          }
+          sub={subtitle}
           actions={
             <Button color="accent" onClick={handleAdd}>
               {t('common.actions.create', { entity: getName('work_order') })}
@@ -889,47 +902,55 @@ export default function WorkOrdersPage() {
                 </tbody>
               </DenseTable>
 
+              {/* Footer row inside the Card. Catalyst Pagination hrefs preserve
+                  filter params and SPA-navigate via RouterLink, so middle-click
+                  / Cmd-click opens a new tab with the right URL. */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-3 py-2 text-[11.5px] text-fg-muted">
+                  <span>
+                    {t('common.pagination.showing', {
+                      start: showingStart,
+                      end: showingEnd,
+                      total: totalElements.toLocaleString(),
+                    })}
+                  </span>
+                  <Pagination className="m-0">
+                    <PaginationPrevious href={pageNumber > 1 ? pageHref(pageNumber - 1) : null} />
+                    <PaginationList>
+                      {(() => {
+                        const pages: (number | 'gap')[] = [];
+                        if (totalPages <= 7) {
+                          for (let i = 1; i <= totalPages; i++) pages.push(i);
+                        } else {
+                          pages.push(1);
+                          if (pageNumber > 3) pages.push('gap');
+                          const start = Math.max(2, pageNumber - 1);
+                          const end = Math.min(totalPages - 1, pageNumber + 1);
+                          for (let i = start; i <= end; i++) pages.push(i);
+                          if (pageNumber < totalPages - 2) pages.push('gap');
+                          pages.push(totalPages);
+                        }
+                        return pages.map((p, idx) =>
+                          p === 'gap' ? (
+                            <PaginationGap key={`gap-${idx}`} />
+                          ) : (
+                            <PaginationPage
+                              key={p}
+                              href={pageHref(p)}
+                              current={p === pageNumber}
+                            >
+                              {String(p)}
+                            </PaginationPage>
+                          )
+                        );
+                      })()}
+                    </PaginationList>
+                    <PaginationNext href={pageNumber < totalPages ? pageHref(pageNumber + 1) : null} />
+                  </Pagination>
+                </div>
+              )}
             </CardBody>
           </Card>
-        )}
-
-        {/* Pagination — Catalyst hrefs preserve filter params and SPA-navigate
-            via RouterLink, so middle-click / Cmd-click opens a new tab with
-            the right URL. "Showing X-Y of Z" lives in PageHead.sub above. */}
-        {totalPages > 1 && (
-          <Pagination className="mt-4">
-            <PaginationPrevious href={pageNumber > 1 ? pageHref(pageNumber - 1) : null} />
-            <PaginationList>
-              {(() => {
-                const pages: (number | 'gap')[] = [];
-                if (totalPages <= 7) {
-                  for (let i = 1; i <= totalPages; i++) pages.push(i);
-                } else {
-                  pages.push(1);
-                  if (pageNumber > 3) pages.push('gap');
-                  const start = Math.max(2, pageNumber - 1);
-                  const end = Math.min(totalPages - 1, pageNumber + 1);
-                  for (let i = start; i <= end; i++) pages.push(i);
-                  if (pageNumber < totalPages - 2) pages.push('gap');
-                  pages.push(totalPages);
-                }
-                return pages.map((p, idx) =>
-                  p === 'gap' ? (
-                    <PaginationGap key={`gap-${idx}`} />
-                  ) : (
-                    <PaginationPage
-                      key={p}
-                      href={pageHref(p)}
-                      current={p === pageNumber}
-                    >
-                      {String(p)}
-                    </PaginationPage>
-                  )
-                );
-              })()}
-            </PaginationList>
-            <PaginationNext href={pageNumber < totalPages ? pageHref(pageNumber + 1) : null} />
-          </Pagination>
         )}
 
         <WorkOrderFormDialog
