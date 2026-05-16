@@ -295,7 +295,10 @@ describe('FinancialInvoicesTab', () => {
       await user.click(overflow);
       await user.click(await screen.findByRole('menuitem', { name: /^resend$/i }));
       await waitFor(() => {
-        expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-1/send');
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/financial/invoices/inv-1/send',
+          undefined,
+        );
       });
       // Success banner shows up with role=status.
       const banner = await screen.findByRole('status');
@@ -663,7 +666,10 @@ describe('FinancialInvoicesTab', () => {
       await user.click(screen.getByRole('button', { name: /save & send/i }));
 
       await waitFor(() => {
-        expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-new/send');
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/financial/invoices/inv-new/send',
+          undefined,
+        );
       });
       expect(apiClient.patch).not.toHaveBeenCalled();
     });
