@@ -158,8 +158,8 @@
 .dense-table .right { text-align: right; }
 /* Two-line cell (top + sub) */
 .dense-table .cell-stack { display: flex; flex-direction: column; gap: 1px; }
-.dense-table .cell-stack .top { color: var(--fg-strong); font-weight: 500; }
-.dense-table .cell-stack .bot { color: var(--fg-muted); font-size: 10.5px; }
+.dense-table .cell-stack .top { color: var(--fg-strong); font-weight: 600; font-size: 13px; }
+.dense-table .cell-stack .bot { color: var(--fg-muted); font-size: 12px; font-weight: 400; }
 
 /* ── Buttons ────────────────────────────────────────────────────── */
 .btn {

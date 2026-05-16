@@ -17,6 +17,7 @@ import {
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import WorkItemsCell from '../components/WorkItemsCell';
+import { titleCaseAddress } from '../utils/titleCaseAddress';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';
 import { Button } from '../components/catalyst/button';
@@ -834,8 +835,11 @@ export default function WorkOrdersPage() {
                               {workOrder.serviceLocation?.locationName || workOrder.customer?.name || '-'}
                             </CellTop>
                             <CellSub>
-                              {workOrder.serviceLocation?.address.streetAddress || ''}{' '}
-                              {workOrder.serviceLocation?.address.city || ''}, {workOrder.serviceLocation?.address.state || ''}
+                              {[
+                                titleCaseAddress(workOrder.serviceLocation?.address.streetAddress),
+                                titleCaseAddress(workOrder.serviceLocation?.address.city),
+                                workOrder.serviceLocation?.address.state,
+                              ].filter(Boolean).join(', ')}
                             </CellSub>
                           </CellStack>
                         </td>
