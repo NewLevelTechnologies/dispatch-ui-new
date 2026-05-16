@@ -180,6 +180,9 @@ vi.mock('react-i18next', () => {
     'contacts.table.contact': 'Contact',
     'common.signOut': 'Sign out',
     'common.theme': 'Theme',
+    'common.themeAccent': 'Accent',
+    'common.themeAccentCool': 'Cool',
+    'common.themeAccentWarm': 'Warm',
     'common.update': 'Update',
     'customers.description': 'Manage your customer database',
     'customers.displayMode.simple': 'Simple',
@@ -1307,14 +1310,17 @@ vi.mock('react-i18next', () => {
   };
 });
 
-// Mock ThemeContext
-vi.mock('../contexts/ThemeContext', () => ({
+// Mock ThemeProvider
+vi.mock('../components/ThemeProvider', () => ({
   useTheme: vi.fn(() => ({
-    theme: 'light',
-    setTheme: vi.fn(),
-    resolvedTheme: 'light',
+    mode: 'light',
+    accent: 'warm',
+    setMode: vi.fn(),
+    setAccent: vi.fn(),
   })),
   ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+  ThemeToggle: () => null,
+  themeBootstrapScript: '',
 }));
 
 // Mock GlossaryContext

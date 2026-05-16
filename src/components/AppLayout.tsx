@@ -12,7 +12,7 @@ import {
   Cog6ToothIcon,
   SunIcon,
   MoonIcon,
-  ComputerDesktopIcon,
+  SwatchIcon,
   DocumentTextIcon,
   DocumentChartBarIcon,
   CreditCardIcon,
@@ -28,7 +28,7 @@ import { SidebarLayout } from './catalyst/sidebar-layout';
 import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from './catalyst/navbar';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
 import { Avatar } from './catalyst/avatar';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from './ThemeProvider';
 import { useHasAnyCapability } from '../hooks/useCurrentUser';
 
 const ENV_BADGE: Record<string, { label: string; className: string }> = {
@@ -56,7 +56,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { t } = useTranslation();
   const { getName } = useGlossary();
-  const { theme, setTheme } = useTheme();
+  const { mode, accent, setMode, setAccent } = useTheme();
 
   // Permission checks for navigation visibility
   const canViewUsers = useHasAnyCapability('VIEW_USERS');
@@ -234,9 +234,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <div className="text-sm font-medium text-zinc-900 dark:text-white mb-2">{t('common.theme')}</div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setTheme('light')}
+                      onClick={() => setMode('light')}
                       className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
-                        theme === 'light'
+                        mode === 'light'
                           ? 'bg-indigo-600 text-white'
                           : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
                       }`}
@@ -245,9 +245,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       <SunIcon className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => setTheme('dark')}
+                      onClick={() => setMode('dark')}
                       className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
-                        theme === 'dark'
+                        mode === 'dark'
                           ? 'bg-indigo-600 text-white'
                           : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
                       }`}
@@ -255,16 +255,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     >
                       <MoonIcon className="h-4 w-4" />
                     </button>
+                  </div>
+                  <div className="mt-3 mb-2 text-sm font-medium text-zinc-900 dark:text-white">{t('common.themeAccent')}</div>
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => setTheme('system')}
+                      onClick={() => setAccent('warm')}
                       className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
-                        theme === 'system'
+                        accent === 'warm'
                           ? 'bg-indigo-600 text-white'
                           : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
                       }`}
-                      aria-label="System theme"
+                      aria-label="Warm accent"
                     >
-                      <ComputerDesktopIcon className="h-4 w-4" />
+                      <SwatchIcon className="h-4 w-4" /> {t('common.themeAccentWarm')}
+                    </button>
+                    <button
+                      onClick={() => setAccent('cool')}
+                      className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                        accent === 'cool'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+                      }`}
+                      aria-label="Cool accent"
+                    >
+                      <SwatchIcon className="h-4 w-4" /> {t('common.themeAccentCool')}
                     </button>
                   </div>
                 </div>

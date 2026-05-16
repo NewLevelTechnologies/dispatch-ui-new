@@ -1,0 +1,372 @@
+/* ───────────────────────────────────────────────────────────────────
+   Component classes — drop alongside tokens.css.
+
+   These are the dense, opinionated component primitives that Catalyst
+   doesn't ship: tighter table padding, status pills with dots, KPI
+   cards, dense form controls, etc. Import AFTER tokens.css and AFTER
+   Tailwind's base:
+
+       @import './tokens.css';
+       @tailwind base;
+       @tailwind components;
+       @tailwind utilities;
+       @import './components.css';
+
+   Or load it as a plain stylesheet — class names are unique-prefix-free
+   on purpose so Tailwind utilities can compose with them.
+   ─────────────────────────────────────────────────────────────────── */
+
+/* ── Cards ──────────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  gap: 10px;
+}
+.card-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg-strong);
+  letter-spacing: -0.005em;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.card-sub { font-size: 11.5px; color: var(--fg-muted); }
+.card-body { padding: 14px; }
+.card-body.flush { padding: 0; }
+
+/* ── KPI cards with colored left rule ───────────────────────────── */
+.kpi {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 12px 14px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.kpi::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--bar, var(--accent-500));
+}
+.kpi-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.kpi-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--fg-strong);
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  margin: 4px 0 2px;
+}
+.kpi-delta { font-size: 11px; font-weight: 600; }
+.kpi-delta.up   { color: var(--success-500); }
+.kpi-delta.down { color: var(--danger-500); }
+.kpi-meta { font-size: 11px; color: var(--fg-dim); }
+
+/* ── Pills / status badges ──────────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  color: var(--fg-strong);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill.info     { background: color-mix(in oklch, var(--info-500) 12%, var(--bg-elev)); color: var(--info-500); }
+.pill.success  { background: color-mix(in oklch, var(--success-500) 12%, var(--bg-elev)); color: var(--success-500); }
+.pill.warning  { background: color-mix(in oklch, var(--warning-500) 14%, var(--bg-elev)); color: oklch(50% 0.16 78); }
+.theme-dark .pill.warning { color: var(--warning-500); }
+.pill.danger   { background: color-mix(in oklch, var(--danger-500) 12%, var(--bg-elev)); color: var(--danger-500); }
+.pill.accent   { background: color-mix(in oklch, var(--accent-500) 14%, var(--bg-elev)); color: var(--accent-700); }
+.theme-dark .pill.accent { color: var(--accent-300); }
+.pill.violet   { background: color-mix(in oklch, var(--violet-500) 12%, var(--bg-elev)); color: var(--violet-500); }
+.pill.neutral  { background: var(--bg-active); color: var(--fg-muted); }
+
+/* Square tag — for monospace codes in table cells */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg-active);
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* ── Dense table — much tighter than Catalyst default ───────────── */
+.dense-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+.dense-table thead th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+  padding: 9px 12px;
+  background: var(--bg-elev-2);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+}
+.dense-table tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--fg);
+  vertical-align: middle;
+}
+.dense-table tbody tr:hover td { background: var(--bg-hover); }
+.dense-table tbody tr.urgent td { background: color-mix(in oklch, var(--danger-500) 5%, var(--bg-elev)); }
+.dense-table .num { font-variant-numeric: tabular-nums; letter-spacing: -0.005em; }
+.dense-table .strong { color: var(--fg-strong); font-weight: 600; }
+.dense-table .muted { color: var(--fg-muted); font-size: 11px; }
+.dense-table .right { text-align: right; }
+/* Two-line cell (top + sub) */
+.dense-table .cell-stack { display: flex; flex-direction: column; gap: 1px; }
+.dense-table .cell-stack .top { color: var(--fg-strong); font-weight: 500; }
+.dense-table .cell-stack .bot { color: var(--fg-dim); font-size: 10.5px; }
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+.btn {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--r-md);
+  font-size: 12.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--fg-strong);
+  white-space: nowrap;
+}
+.btn:hover { background: var(--bg-hover); }
+.btn.primary {
+  background: linear-gradient(180deg, var(--accent-500), var(--accent-600));
+  border-color: var(--accent-700);
+  color: white;
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.18);
+}
+.btn.primary:hover { background: linear-gradient(180deg, var(--accent-400), var(--accent-500)); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--fg-muted); }
+.btn.ghost:hover { background: var(--bg-hover); color: var(--fg-strong); }
+.btn.sm { height: 26px; padding: 0 9px; font-size: 11.5px; gap: 4px; }
+
+/* ── Helpers ────────────────────────────────────────────────────── */
+.label-tiny {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
+.bar {
+  height: 5px;
+  background: var(--bg-active);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.bar-fill { height: 100%; background: var(--accent-500); border-radius: 999px; }
+.bar-fill.success { background: var(--success-500); }
+.bar-fill.danger  { background: var(--danger-500); }
+.bar-fill.warning { background: var(--warning-500); }
+
+/* ── Avatar ─────────────────────────────────────────────────────── */
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-weight: 600;
+  font-size: 10.5px;
+  flex-shrink: 0;
+  background: var(--av-bg, oklch(60% 0.12 200));
+  border: 1px solid color-mix(in oklch, var(--av-bg, oklch(60% 0.12 200)) 70%, black);
+}
+.avatar.sm { width: 22px; height: 22px; font-size: 9.5px; }
+.avatar.lg { width: 36px; height: 36px; font-size: 13px; }
+.avatar.xl { width: 52px; height: 52px; font-size: 18px; }
+
+/* ── Tabs (underlined section tabs on detail pages) ─────────────── */
+.tab-row {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.tab {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  margin-bottom: -1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tab:hover { color: var(--fg-strong); }
+.tab.active { color: var(--accent-700); border-bottom-color: var(--accent-500); }
+.theme-dark .tab.active { color: var(--accent-300); }
+
+/* ── Saved-view tabs (used on list pages) ───────────────────────── */
+.view-tab {
+  all: unset;
+  cursor: pointer;
+  padding: 8px 14px 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.view-tab:hover { color: var(--fg-strong); }
+.view-tab.active {
+  color: var(--fg-strong);
+  border-bottom-color: var(--accent-500);
+}
+.view-tab-count {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  background: transparent;
+  color: var(--fg-dim);
+}
+.view-tab.active .view-tab-count {
+  background: var(--bg-active);
+  color: var(--fg-strong);
+}
+
+/* ── Filter chip (filter bar above lists) ───────────────────────── */
+.filter-chip {
+  all: unset;
+  cursor: pointer;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg);
+}
+.filter-chip.set {
+  border-color: color-mix(in oklch, var(--accent-500) 35%, var(--border));
+  background: color-mix(in oklch, var(--accent-500) 6%, var(--bg-elev));
+}
+.filter-chip .label { color: var(--fg-muted); }
+.filter-chip .value { color: var(--fg-strong); font-weight: 600; }
+.filter-chip .x { color: var(--fg-dim); }
+
+/* ── Key-value list (detail panels) ─────────────────────────────── */
+.kv {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 4px 14px;
+  font-size: 12px;
+}
+.kv .k { color: var(--fg-muted); }
+.kv .v { color: var(--fg-strong); font-weight: 500; }
+
+/* ── Timeline (activity feed) ───────────────────────────────────── */
+.timeline { position: relative; padding-left: 22px; }
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px; top: 4px; bottom: 4px;
+  width: 1.5px;
+  background: var(--border);
+}
+.timeline-item { position: relative; padding-bottom: 12px; }
+.timeline-item:last-child { padding-bottom: 0; }
+.timeline-dot {
+  position: absolute;
+  left: -22px;
+  top: 3px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--bg-elev);
+  border: 2px solid var(--accent-500);
+}
+.timeline-dot.info    { border-color: var(--info-500); }
+.timeline-dot.success { border-color: var(--success-500); }
+.timeline-dot.warning { border-color: var(--warning-500); }
+.timeline-dot.danger  { border-color: var(--danger-500); }
+.timeline-dot.muted   { border-color: var(--fg-dim); }
+.timeline-time { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-muted); }
+.timeline-text { font-size: 12px; color: var(--fg); margin-top: 1px; }
+.timeline-text strong { color: var(--fg-strong); font-weight: 600; }
+
+/* ── List footer (pagination) ───────────────────────────────────── */
+.list-footer {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-elev-2);
+  font-size: 11.5px;
+  color: var(--fg-muted);
+}
+.list-footer strong { color: var(--fg); }
+.list-footer .page-num {
+  min-width: 26px;
+  padding: 0 8px;
+}
+.list-footer select {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--fg);
+  font-size: 11.5px;
+}

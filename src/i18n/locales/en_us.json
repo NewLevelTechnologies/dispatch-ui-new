@@ -120,6 +120,9 @@
     "showAll": "Show All",
     "signOut": "Sign out",
     "theme": "Theme",
+    "themeAccent": "Accent",
+    "themeAccentCool": "Cool",
+    "themeAccentWarm": "Warm",
     "update": "Update",
     "updateStatus": "Update {{entity, lowercase}} status"
   },
