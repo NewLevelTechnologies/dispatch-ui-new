@@ -29,25 +29,29 @@ export const dense = {
     'text-[10px]! font-semibold! uppercase! tracking-[0.06em]! ' +
     'text-fg-muted! mb-1!',
 
-  /** Text-style inputs — 32px tall, 12.5px text. */
+  /** Text-style inputs — 32px tall, 12.5px text.
+   *  Catalyst's <Input> wraps a span around the real <input>; the className
+   *  lands on the span, so we need child-selectors to reach the input. The
+   *  `before:` overrides target the wrapper's white-bg pseudo-element so its
+   *  radius matches the inner input. We deliberately don't touch horizontal
+   *  padding — InputGroup uses [&_input]:pl-8 for the icon overlap and we
+   *  don't want to clobber that. */
   input:
-    'h-8! text-[12.5px]! px-2.5! rounded-md! ' +
-    'bg-bg-elev! border-border! text-fg-strong! ' +
-    'placeholder:text-fg-dim! ' +
-    'focus:border-accent-500! focus:ring-2! focus:ring-accent-500/15!',
+    '[&_input]:h-8! [&_input]:py-0! [&_input]:text-[12.5px]! [&_input]:rounded-md! ' +
+    '[&_input]:border-border! ' +
+    'before:rounded-md!',
 
-  /** Select dropdowns — same height/text as input. */
+  /** Select dropdowns — same height/text as input. Same wrapper trick. */
   select:
-    'h-8! text-[12.5px]! px-2.5! pr-8! rounded-md! ' +
-    'bg-bg-elev! border-border! text-fg-strong! ' +
-    'focus:border-accent-500! focus:ring-2! focus:ring-accent-500/15!',
+    '[&_select]:h-8! [&_select]:py-0! [&_select]:text-[12.5px]! [&_select]:rounded-md! ' +
+    '[&_select]:border-border! ' +
+    'before:rounded-md!',
 
   /** Textareas — same character as input, multi-line. */
   textarea:
-    'text-[12.5px]! px-2.5! py-2! rounded-md! leading-[1.5]! ' +
-    'bg-bg-elev! border-border! text-fg-strong! ' +
-    'placeholder:text-fg-dim! ' +
-    'focus:border-accent-500! focus:ring-2! focus:ring-accent-500/15!',
+    '[&_textarea]:text-[12.5px]! [&_textarea]:py-2! [&_textarea]:rounded-md! [&_textarea]:leading-[1.5]! ' +
+    '[&_textarea]:border-border! ' +
+    'before:rounded-md!',
 
   /** Smaller switch — pair with smaller label text. */
   switch: 'h-[18px]! w-[30px]!',
