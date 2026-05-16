@@ -102,6 +102,17 @@ const formatDate = (iso: string | null | undefined): string => {
   });
 };
 
+// Compact variant for the "Last sent <date>" row hint — see the matching
+// helper in FinancialInvoicesTab.tsx for rationale.
+const formatDateCompact = (iso: string | null | undefined): string => {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+};
+
 const amt = (v: number | string | null | undefined): number => Number(v ?? 0) || 0;
 
 /**
@@ -434,16 +445,25 @@ export default function FinancialQuotesTab({
                   </TableCell>
                   <TableCell className="font-mono">
                     <div>{quote.quoteNumber}</div>
-                    {quote.lastSentAt && (
-                      <div className="font-sans text-xs italic font-normal text-zinc-500 dark:text-zinc-400">
-                        {t('workOrders.financialDrawer.quotesTab.lastSentTo', {
-                          date: formatDate(quote.lastSentAt),
-                          email:
-                            quote.lastSentToEmails?.split(',')[0]?.trim() ??
-                            '—',
-                        })}
-                      </div>
-                    )}
+                    {quote.lastSentAt && (() => {
+                      const fullEmail =
+                        quote.lastSentToEmails?.split(',')[0]?.trim() ?? '—';
+                      const lastSentText = t(
+                        'workOrders.financialDrawer.quotesTab.lastSentTo',
+                        {
+                          date: formatDateCompact(quote.lastSentAt),
+                          email: fullEmail,
+                        },
+                      );
+                      return (
+                        <div
+                          className="max-w-[14rem] truncate font-sans text-xs italic font-normal text-zinc-500 dark:text-zinc-400"
+                          title={lastSentText}
+                        >
+                          {lastSentText}
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>{formatDate(quote.quoteDate)}</TableCell>
                   <TableCell>{formatDate(quote.expirationDate)}</TableCell>

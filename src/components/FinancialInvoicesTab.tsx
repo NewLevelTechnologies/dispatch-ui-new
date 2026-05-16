@@ -113,6 +113,19 @@ const formatDate = (iso: string | null | undefined): string => {
   });
 };
 
+// Compact variant used only in the per-row "Last sent <date> to <email>"
+// metadata. The invoice date sitting in the next column already carries
+// the year; repeating it in the sub-line just makes the cell wide enough
+// to push the table past the 960px drawer width. Drop the year.
+const formatDateCompact = (iso: string | null | undefined): string => {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+};
+
 // Backend serializes BigDecimal as strings (see ask #2 contract). The
 // Invoice type still types money fields as `number` for now (pre-existing
 // definition); runtime values are strings. `Number()` coerces either form
@@ -592,16 +605,28 @@ export default function FinancialInvoicesTab({
                   </TableCell>
                   <TableCell className="font-mono">
                     <div>{invoice.invoiceNumber}</div>
-                    {invoice.lastSentAt && (
-                      <div className="font-sans text-xs italic font-normal text-zinc-500 dark:text-zinc-400">
-                        {t('workOrders.financialDrawer.invoicesTab.lastSentTo', {
-                          date: formatDate(invoice.lastSentAt),
-                          email:
-                            invoice.lastSentToEmails?.split(',')[0]?.trim() ??
-                            '—',
-                        })}
-                      </div>
-                    )}
+                    {invoice.lastSentAt && (() => {
+                      // Truncate + max-width so the long email tail (e.g.
+                      // pwilcox@newleveltech.net) doesn't widen the column
+                      // past the 960px drawer. Full text on hover via `title`.
+                      const fullEmail =
+                        invoice.lastSentToEmails?.split(',')[0]?.trim() ?? '—';
+                      const lastSentText = t(
+                        'workOrders.financialDrawer.invoicesTab.lastSentTo',
+                        {
+                          date: formatDateCompact(invoice.lastSentAt),
+                          email: fullEmail,
+                        },
+                      );
+                      return (
+                        <div
+                          className="max-w-[14rem] truncate font-sans text-xs italic font-normal text-zinc-500 dark:text-zinc-400"
+                          title={lastSentText}
+                        >
+                          {lastSentText}
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>{formatDate(invoice.invoiceDate)}</TableCell>
                   <TableCell>{formatDate(invoice.dueDate)}</TableCell>
