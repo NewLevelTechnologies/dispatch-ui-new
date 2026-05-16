@@ -9,13 +9,18 @@ import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import CustomerFormDialog from '../components/CustomerFormDialog';
 import { formatPhone } from '../utils/formatPhone';
-import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Input, InputGroup } from '../components/catalyst/input';
 import { Pagination, PaginationGap, PaginationList, PaginationNext, PaginationPage, PaginationPrevious } from '../components/catalyst/pagination';
+import { PageHead } from '../components/ui/PageHead';
+import { Card, CardBody } from '../components/ui/Card';
+import { Pill } from '../components/ui/Pill';
+import { ViewTabs } from '../components/ui/Tabs';
+import {
+  DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
+} from '../components/ui/DenseTable';
+import { dense } from '../components/ui/dense';
 
 export default function CustomersPage() {
   const navigate = useNavigate();
@@ -102,6 +107,23 @@ export default function CustomersPage() {
   const customers = data?.content || [];
   const totalCustomers = data?.totalElements || 0;
   const totalPages = data?.totalPages || 0;
+  const PAGE_SIZE = 50;
+  const showingStart = totalCustomers === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const showingEnd = Math.min(page * PAGE_SIZE, totalCustomers);
+
+  const statusViewTabs = [
+    { id: 'all', label: t('customers.filter.allStatuses') },
+    { id: 'ACTIVE', label: t('common.active') },
+    { id: 'INACTIVE', label: t('common.inactive') },
+  ];
+
+  const customerSubtitle = totalCustomers > 0
+    ? `${totalCustomers.toLocaleString()} ${totalCustomers === 1 ? getName('customer').toLowerCase() : getName('customer', true).toLowerCase()}${
+        totalCustomers > PAGE_SIZE
+          ? ' · ' + t('common.pagination.showing', { start: showingStart, end: showingEnd, total: totalCustomers.toLocaleString() })
+          : ''
+      }`
+    : null;
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => customerApi.delete(id),
@@ -139,267 +161,256 @@ export default function CustomersPage() {
 
   return (
     <AppLayout>
-      <div className="flex items-center justify-between gap-4">
-        <Heading>{getName('customer', true)}</Heading>
-        {canAddCustomers && (
-          <Button onClick={handleAdd}>{t('common.actions.add', { entity: getName('customer') })}</Button>
+      <div>
+        <PageHead
+          title={getName('customer', true)}
+          sub={customerSubtitle}
+          actions={
+            canAddCustomers ? (
+              <Button color="accent" onClick={handleAdd}>
+                {t('common.actions.add', { entity: getName('customer') })}
+              </Button>
+            ) : null
+          }
+        />
+
+        {/* Search row — loose on canvas */}
+        <div className="mb-3 flex flex-wrap items-end gap-2">
+          <InputGroup className="min-w-[260px] flex-1">
+            <MagnifyingGlassIcon data-slot="icon" />
+            <Input
+              type="text"
+              placeholder={t('common.search')}
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                updateFilters({ search: e.target.value }, { replace: true });
+              }}
+              className={dense.input}
+            />
+          </InputGroup>
+        </div>
+
+        {/* Status tabs */}
+        <ViewTabs
+          className="mb-3"
+          value={statusFilter}
+          onChange={(id) => updateFilters({ status: id })}
+          tabs={statusViewTabs}
+        />
+
+        {isLoading && (
+          <Card>
+            <CardBody>
+              <p className="text-center text-[12.5px] text-fg-muted">
+                {t('common.actions.loading', { entities: getName('customer', true) })}
+              </p>
+            </CardBody>
+          </Card>
         )}
-      </div>
 
-      {/* Search and Filters */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              updateFilters({ search: e.target.value }, { replace: true });
-            }}
-          />
-        </InputGroup>
-        <div className="flex items-center gap-2">
-          <Button
-            plain
-            onClick={() => updateFilters({ status: 'all' })}
-            className={statusFilter === 'all' ? 'font-semibold text-zinc-950 dark:text-white' : ''}
-          >
-            {t('customers.filter.allStatuses')}
-          </Button>
-          <Button
-            plain
-            onClick={() => updateFilters({ status: 'ACTIVE' })}
-            className={statusFilter === 'ACTIVE' ? 'font-semibold text-zinc-950 dark:text-white' : ''}
-          >
-            {t('common.active')}
-          </Button>
-          <Button
-            plain
-            onClick={() => updateFilters({ status: 'INACTIVE' })}
-            className={statusFilter === 'INACTIVE' ? 'font-semibold text-zinc-950 dark:text-white' : ''}
-          >
-            {t('common.inactive')}
-          </Button>
-        </div>
-        {totalCustomers > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {totalCustomers} {totalCustomers === 1 ? getName('customer').toLowerCase() : getName('customer', true).toLowerCase()}
-          </div>
+        {error && (
+          <Card className="border-danger-500/40 bg-danger-100/40">
+            <CardBody>
+              <p className="text-[12.5px] text-danger-500">
+                {t('common.actions.errorLoading', { entities: getName('customer', true) })}: {(error as Error).message}
+              </p>
+            </CardBody>
+          </Card>
         )}
-      </div>
 
-      {isLoading && (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: getName('customer', true) })}</p>
-        </div>
-      )}
+        {totalCustomers === 0 && !isLoading && (
+          <Card>
+            <CardBody>
+              <p className="text-[12.5px] text-fg-muted">
+                {deferredSearch || statusFilter !== 'all'
+                  ? t('common.actions.noMatchSearch', { entities: getName('customer', true) })
+                  : t('common.actions.notFound', { entities: getName('customer', true) })}
+              </p>
+              {canAddCustomers && !deferredSearch && statusFilter === 'all' && (
+                <Button color="accent" className="mt-2" onClick={handleAdd}>
+                  {t('common.actions.addFirst', { entity: getName('customer') })}
+                </Button>
+              )}
+            </CardBody>
+          </Card>
+        )}
 
-      {error && (
-        <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-          <p className="text-sm text-red-800 dark:text-red-400">
-            {t('common.actions.errorLoading', { entities: getName('customer', true) })}: {(error as Error).message}
-          </p>
-        </div>
-      )}
+        {customers.length > 0 && (
+          <Card>
+            <CardBody flush>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{t('customers.table.type')}</th>
+                    <th>{t('common.form.name')}</th>
+                    <th>{t('common.form.phone')}</th>
+                    <th>{t('common.form.email')}</th>
+                    <th>{t('customers.table.billingAddress')}</th>
+                    <th>{t('customers.table.locations')}</th>
+                    <th>{t('customers.table.terms')}</th>
+                    <th>{t('common.form.status')}</th>
+                    <th></th>
+                  </tr>
+                </DenseTHead>
+                <tbody>
+                  {customers.map((customer) => {
+                    const terms: string[] = [];
+                    if (customer.paymentTermsDays > 0) terms.push(`Net-${customer.paymentTermsDays}`);
+                    if (customer.requiresPurchaseOrder) terms.push('PO');
+                    if (customer.contractPricingTier) terms.push(customer.contractPricingTier);
 
-      {totalCustomers === 0 && !isLoading && (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {deferredSearch || statusFilter !== 'all'
-              ? t('common.actions.noMatchSearch', { entities: getName('customer', true) })
-              : t('common.actions.notFound', { entities: getName('customer', true) })}
-          </p>
-          {canAddCustomers && !deferredSearch && statusFilter === 'all' && (
-            <Button className="mt-2" onClick={handleAdd}>
-              {t('common.actions.addFirst', { entity: getName('customer') })}
-            </Button>
-          )}
-        </div>
-      )}
-
-      {customers.length > 0 && (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('customers.table.type')}</TableHeader>
-                <TableHeader>{t('common.form.name')}</TableHeader>
-                <TableHeader>{t('common.form.phone')}</TableHeader>
-                <TableHeader>{t('common.form.email')}</TableHeader>
-                <TableHeader>{t('customers.table.billingAddress')}</TableHeader>
-                <TableHeader>{t('customers.table.locations')}</TableHeader>
-                <TableHeader>{t('customers.table.terms')}</TableHeader>
-                <TableHeader>{t('common.form.status')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {customers.map((customer) => {
-                // Build payment terms badges
-                const terms = [];
-                if (customer.paymentTermsDays > 0) {
-                  terms.push(`Net-${customer.paymentTermsDays}`);
-                }
-                if (customer.requiresPurchaseOrder) {
-                  terms.push('PO');
-                }
-                if (customer.contractPricingTier) {
-                  terms.push(customer.contractPricingTier);
-                }
-
-                return (
-                  <TableRow key={customer.id} href={`/customers/${customer.id}`} className="cursor-pointer">
-                    <TableCell>
-                      {customer.displayMode === 'SIMPLE' ? (
-                        <HomeIcon className="h-4 w-4 text-zinc-400" title="Homeowner" />
-                      ) : customer.displayMode === 'BILLING_ONLY' ? (
-                        <CreditCardIcon className="h-4 w-4 text-zinc-400" title={t('customers.detail.billingOnlyBadge')} />
-                      ) : (
-                        <BuildingOfficeIcon className="h-4 w-4 text-zinc-400" title="Business" />
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium">{customer.name}</TableCell>
-                    <TableCell className="text-zinc-500">
-                      {customer.phone ? (
-                        <a
-                          href={`tel:${customer.phone}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="relative z-10 hover:underline"
-                        >
-                          {formatPhone(customer.phone)}
-                        </a>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                    <TableCell className="text-zinc-500">
-                      <a
-                        href={`mailto:${customer.email}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="relative z-10 hover:underline"
+                    return (
+                      <DenseRow
+                        key={customer.id}
+                        className="cursor-pointer"
+                        onClick={() => navigate(`/customers/${customer.id}`)}
                       >
-                        {customer.email}
-                      </a>
-                    </TableCell>
-                    <TableCell className="text-zinc-500">
-                      <div className="text-xs">
-                        {customer.billingAddress.streetAddress}
-                      </div>
-                      <div className="text-xs text-zinc-400">
-                        {customer.billingAddress.city}, {customer.billingAddress.state} {customer.billingAddress.zipCode}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-zinc-500">
-                      {customer.serviceLocationCount > 0 ? (
-                        <div className="text-xs">
-                          {t('customers.table.locationsCount', { count: customer.serviceLocationCount })}
-                        </div>
-                      ) : (
-                        <div className="text-xs text-zinc-400">{t('customers.table.none')}</div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {terms.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {terms.map((term, idx) => (
-                            <Badge key={idx} color="zinc" className="text-xs">
-                              {term}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-zinc-400">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge color={customer.status === 'ACTIVE' ? 'lime' : 'zinc'} className="text-xs">
-                        {customer.status === 'ACTIVE' ? t('common.active') : t('common.inactive')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {(canEditCustomers || canArchiveCustomers) && (
-                        <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                          <Dropdown>
-                            <DropdownButton plain aria-label={t('common.moreOptions')}>
-                              <EllipsisVerticalIcon className="size-5" />
-                            </DropdownButton>
-                            <DropdownMenu anchor="bottom end">
-                              <DropdownItem onClick={() => navigate(`/customers/${customer.id}`)}>
-                                <DropdownLabel>{t('common.view')}</DropdownLabel>
-                              </DropdownItem>
-                              {canEditCustomers && (
-                                <DropdownItem
-                                  onClick={async () => {
-                                    // Fetch full customer details for editing
-                                    const fullCustomer = await customerApi.getById(customer.id);
-                                    handleEdit(fullCustomer);
-                                  }}
-                                >
-                                  <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                        <td>
+                          {customer.displayMode === 'SIMPLE' ? (
+                            <HomeIcon className="h-4 w-4 text-fg-muted" />
+                          ) : customer.displayMode === 'BILLING_ONLY' ? (
+                            <CreditCardIcon className="h-4 w-4 text-fg-muted" />
+                          ) : (
+                            <BuildingOfficeIcon className="h-4 w-4 text-fg-muted" />
+                          )}
+                        </td>
+                        <td className="strong">{customer.name}</td>
+                        <td>
+                          {customer.phone ? (
+                            <a
+                              href={`tel:${customer.phone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="hover:underline"
+                            >
+                              {formatPhone(customer.phone)}
+                            </a>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
+                        <td>
+                          <a
+                            href={`mailto:${customer.email}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="hover:underline"
+                          >
+                            {customer.email}
+                          </a>
+                        </td>
+                        <td>
+                          <CellStack>
+                            <CellTop>{customer.billingAddress.streetAddress}</CellTop>
+                            <CellSub>
+                              {customer.billingAddress.city}, {customer.billingAddress.state} {customer.billingAddress.zipCode}
+                            </CellSub>
+                          </CellStack>
+                        </td>
+                        <td>
+                          {customer.serviceLocationCount > 0
+                            ? t('customers.table.locationsCount', { count: customer.serviceLocationCount })
+                            : <span className="muted">{t('customers.table.none')}</span>}
+                        </td>
+                        <td>
+                          {terms.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {terms.map((term, idx) => (
+                                <Pill key={idx} tone="neutral">{term}</Pill>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="muted">-</span>
+                          )}
+                        </td>
+                        <td>
+                          <Pill tone={customer.status === 'ACTIVE' ? 'success' : 'neutral'} dot>
+                            {customer.status === 'ACTIVE' ? t('common.active') : t('common.inactive')}
+                          </Pill>
+                        </td>
+                        <td>
+                          {(canEditCustomers || canArchiveCustomers) && (
+                            <Dropdown>
+                              <DropdownButton plain aria-label={t('common.moreOptions')}>
+                                <EllipsisVerticalIcon className="size-5" />
+                              </DropdownButton>
+                              <DropdownMenu anchor="bottom end">
+                                <DropdownItem onClick={() => navigate(`/customers/${customer.id}`)}>
+                                  <DropdownLabel>{t('common.view')}</DropdownLabel>
                                 </DropdownItem>
-                              )}
-                              {canArchiveCustomers && (
-                                <DropdownItem
-                                  onClick={async () => {
-                                    // Fetch full customer details for confirmation
-                                    const fullCustomer = await customerApi.getById(customer.id);
-                                    handleDelete(fullCustomer);
-                                  }}
-                                >
-                                  <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                                </DropdownItem>
-                              )}
-                            </DropdownMenu>
-                          </Dropdown>
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+                                {canEditCustomers && (
+                                  <DropdownItem
+                                    onClick={async () => {
+                                      const fullCustomer = await customerApi.getById(customer.id);
+                                      handleEdit(fullCustomer);
+                                    }}
+                                  >
+                                    <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                                  </DropdownItem>
+                                )}
+                                {canArchiveCustomers && (
+                                  <DropdownItem
+                                    onClick={async () => {
+                                      const fullCustomer = await customerApi.getById(customer.id);
+                                      handleDelete(fullCustomer);
+                                    }}
+                                  >
+                                    <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                  </DropdownItem>
+                                )}
+                              </DropdownMenu>
+                            </Dropdown>
+                          )}
+                        </td>
+                      </DenseRow>
+                    );
+                  })}
+                </tbody>
+              </DenseTable>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Pagination className="mt-4">
-          <PaginationPrevious href={page > 1 ? pageHref(page - 1) : null} />
-          <PaginationList>
-            {(() => {
-              const pages: (number | 'gap')[] = [];
-              if (totalPages <= 7) {
-                for (let i = 1; i <= totalPages; i++) pages.push(i);
-              } else {
-                pages.push(1);
-                if (page > 3) pages.push('gap');
-                const start = Math.max(2, page - 1);
-                const end = Math.min(totalPages - 1, page + 1);
-                for (let i = start; i <= end; i++) pages.push(i);
-                if (page < totalPages - 2) pages.push('gap');
-                pages.push(totalPages);
-              }
-              return pages.map((p, idx) =>
-                p === 'gap' ? (
-                  <PaginationGap key={`gap-${idx}`} />
-                ) : (
-                  <PaginationPage
-                    key={p}
-                    href={pageHref(p)}
-                    current={p === page}
-                  >
-                    {p}
-                  </PaginationPage>
-                )
-              );
-            })()}
-          </PaginationList>
-          <PaginationNext href={page < totalPages ? pageHref(page + 1) : null} />
-        </Pagination>
-      )}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-3 py-2 text-[11.5px] text-fg-muted">
+                  <span>
+                    {t('common.pagination.showing', {
+                      start: showingStart,
+                      end: showingEnd,
+                      total: totalCustomers.toLocaleString(),
+                    })}
+                  </span>
+                  <Pagination className="m-0">
+                    <PaginationPrevious href={page > 1 ? pageHref(page - 1) : null} />
+                    <PaginationList>
+                      {(() => {
+                        const pages: (number | 'gap')[] = [];
+                        if (totalPages <= 7) {
+                          for (let i = 1; i <= totalPages; i++) pages.push(i);
+                        } else {
+                          pages.push(1);
+                          if (page > 3) pages.push('gap');
+                          const start = Math.max(2, page - 1);
+                          const end = Math.min(totalPages - 1, page + 1);
+                          for (let i = start; i <= end; i++) pages.push(i);
+                          if (page < totalPages - 2) pages.push('gap');
+                          pages.push(totalPages);
+                        }
+                        return pages.map((p, idx) =>
+                          p === 'gap' ? (
+                            <PaginationGap key={`gap-${idx}`} />
+                          ) : (
+                            <PaginationPage key={p} href={pageHref(p)} current={p === page}>
+                              {String(p)}
+                            </PaginationPage>
+                          )
+                        );
+                      })()}
+                    </PaginationList>
+                    <PaginationNext href={page < totalPages ? pageHref(page + 1) : null} />
+                  </Pagination>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        )}
+      </div>
 
       <CustomerFormDialog
         isOpen={isDialogOpen}

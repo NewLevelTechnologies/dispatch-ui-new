@@ -2,7 +2,8 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import AppLayout from '../../components/AppLayout';
-import { Heading } from '../../components/catalyst/heading';
+import { PageHead } from '../../components/ui/PageHead';
+import { Card, CardBody } from '../../components/ui/Card';
 
 interface NavItem {
   label: string;
@@ -61,44 +62,48 @@ export default function SettingsLayout() {
 
   return (
     <AppLayout>
-      <div className="pb-2">
-        <Heading>{t('entities.settings')}</Heading>
-      </div>
-      <div className="flex gap-8 pb-8">
-        <aside className="w-56 shrink-0">
-          <nav className="space-y-6">
-            {sections.map((section) => (
-              <div key={section.label}>
-                <div className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  {section.label}
-                </div>
-                <ul className="space-y-0.5">
-                  {section.items.map((item) => (
-                    <li key={item.to}>
-                      <NavLink
-                        to={item.to}
-                        className={({ isActive }) =>
-                          [
-                            'block rounded-md px-3 py-1.5 text-sm transition-colors',
-                            isActive
-                              ? 'bg-zinc-100 text-zinc-900 font-medium dark:bg-zinc-800 dark:text-white'
-                              : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-white',
-                          ].join(' ')
-                        }
-                      >
-                        {item.label}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </nav>
-        </aside>
+      <div>
+        <PageHead title={t('entities.settings')} />
 
-        <main className="min-w-0 flex-1">
-          <Outlet />
-        </main>
+        <div className="flex gap-5">
+          {/* Settings nav rail in its own Card */}
+          <Card className="w-56 shrink-0 self-start">
+            <CardBody>
+              <nav className="space-y-4">
+                {sections.map((section) => (
+                  <div key={section.label}>
+                    <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+                      {section.label}
+                    </div>
+                    <ul className="space-y-0.5">
+                      {section.items.map((item) => (
+                        <li key={item.to}>
+                          <NavLink
+                            to={item.to}
+                            className={({ isActive }) =>
+                              [
+                                'block rounded-md px-2 py-1.5 text-[12.5px] transition-colors',
+                                isActive
+                                  ? 'bg-accent-500/10 font-semibold text-accent-700 dark:text-accent-300'
+                                  : 'text-fg hover:bg-bg-hover hover:text-fg-strong',
+                              ].join(' ')
+                            }
+                          >
+                            {item.label}
+                          </NavLink>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </nav>
+            </CardBody>
+          </Card>
+
+          <main className="min-w-0 flex-1">
+            <Outlet />
+          </main>
+        </div>
       </div>
     </AppLayout>
   );

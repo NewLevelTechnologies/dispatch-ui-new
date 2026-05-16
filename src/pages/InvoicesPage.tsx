@@ -4,15 +4,19 @@ import { useTranslation } from 'react-i18next';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
-import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Input, InputGroup } from '../components/catalyst/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
+import { PageHead } from '../components/ui/PageHead';
+import { Card, CardBody } from '../components/ui/Card';
+import { Pill } from '../components/ui/Pill';
+import {
+  DenseTable, DenseTHead, DenseRow,
+} from '../components/ui/DenseTable';
+import { dense } from '../components/ui/dense';
 import { InvoiceStatus, invoicesApi } from '../api/financialApi';
 import type { Invoice, CreateInvoiceRequest, CreateInvoiceLineItemRequest } from '../api/financialApi';
 import { customerApi } from '../api/customerApi';
@@ -181,15 +185,15 @@ export default function InvoicesPage() {
   };
 
   const getStatusBadge = (status: InvoiceStatus) => {
-    const colors: Record<InvoiceStatus, 'lime' | 'sky' | 'amber' | 'rose' | 'zinc'> = {
-      [InvoiceStatus.DRAFT]: 'zinc',
-      [InvoiceStatus.SENT]: 'sky',
-      [InvoiceStatus.PAID]: 'lime',
-      [InvoiceStatus.OVERDUE]: 'rose',
-      [InvoiceStatus.CANCELLED]: 'zinc',
-      [InvoiceStatus.VOID]: 'zinc',
+    const tones: Record<InvoiceStatus, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
+      [InvoiceStatus.DRAFT]: 'neutral',
+      [InvoiceStatus.SENT]: 'info',
+      [InvoiceStatus.PAID]: 'success',
+      [InvoiceStatus.OVERDUE]: 'danger',
+      [InvoiceStatus.CANCELLED]: 'neutral',
+      [InvoiceStatus.VOID]: 'neutral',
     };
-    return <Badge color={colors[status]}>{t(`invoices.status.${status.toLowerCase()}`)}</Badge>;
+    return <Pill tone={tones[status]} dot>{t(`invoices.status.${status.toLowerCase()}`)}</Pill>;
   };
 
   const getCustomerName = (customerId: string) => {
@@ -211,91 +215,110 @@ export default function InvoicesPage() {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  const invoiceCount = Array.isArray(invoices) ? invoices.length : 0;
+  const invoiceSubtitle = invoiceCount > 0
+    ? (filteredInvoices.length === invoiceCount
+        ? `${invoiceCount.toLocaleString()} ${invoiceCount === 1 ? getName('invoice').toLowerCase() : getName('invoice', true).toLowerCase()}`
+        : `${filteredInvoices.length} of ${invoiceCount}`)
+    : t('invoices.description');
+
   return (
     <AppLayout>
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <Heading>{getName('invoice', true)}</Heading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{t('invoices.description')}</p>
-        </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          {t('common.actions.create', { entity: getName('invoice') })}
-        </Button>
-      </div>
+      <div>
+        <PageHead
+          title={getName('invoice', true)}
+          sub={invoiceSubtitle}
+          actions={
+            <Button color="accent" onClick={() => setIsCreateOpen(true)}>
+              {t('common.actions.create', { entity: getName('invoice') })}
+            </Button>
+          }
+        />
 
-      {/* Quick Search Bar */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </InputGroup>
-        {invoices && invoices.length > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredInvoices.length === invoices.length
-              ? `${invoices.length} ${invoices.length === 1 ? getName('invoice').toLowerCase() : getName('invoice', true).toLowerCase()}`
-              : `${filteredInvoices.length} of ${invoices.length}`}
-          </div>
+        {/* Search row */}
+        <div className="mb-3 flex flex-wrap items-end gap-2">
+          <InputGroup className="min-w-[260px] flex-1">
+            <MagnifyingGlassIcon data-slot="icon" />
+            <Input
+              type="text"
+              placeholder={t('common.search')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={dense.input}
+            />
+          </InputGroup>
+        </div>
+
+        {invoicesLoading ? (
+          <Card>
+            <CardBody>
+              <p className="text-center text-[12.5px] text-fg-muted">
+                {t('common.actions.loading', { entities: getName('invoice', true) })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : filteredInvoices.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-[12.5px] text-fg-muted">
+                {searchTerm ? t('common.actions.noMatchSearch', { entities: getName('invoice', true) }) : t('common.actions.notFound', { entities: getName('invoice', true) })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : (
+          <Card>
+            <CardBody flush>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{t('invoices.table.invoiceNumber')}</th>
+                    <th>{t('invoices.table.customer')}</th>
+                    <th>{t('invoices.table.invoiceDate')}</th>
+                    <th>{t('invoices.table.dueDate')}</th>
+                    <th className="right">{t('invoices.table.totalAmount')}</th>
+                    <th className="right">{t('invoices.table.balanceDue')}</th>
+                    <th>{t('invoices.table.status')}</th>
+                    <th></th>
+                  </tr>
+                </DenseTHead>
+                <tbody>
+                  {filteredInvoices.map((invoice) => (
+                    <DenseRow key={invoice.id}>
+                      <td>
+                        <span className="id-mono text-fg-muted">{invoice.invoiceNumber}</span>
+                      </td>
+                      <td className="strong">{getCustomerName(invoice.customerId)}</td>
+                      <td>{formatDate(invoice.invoiceDate)}</td>
+                      <td>{formatDate(invoice.dueDate)}</td>
+                      <td className="right num strong">{formatCurrency(invoice.totalAmount)}</td>
+                      <td className="right num">
+                        {invoice.balanceDue > 0 ? (
+                          <span className="font-semibold text-warning-500">{formatCurrency(invoice.balanceDue)}</span>
+                        ) : (
+                          formatCurrency(invoice.balanceDue)
+                        )}
+                      </td>
+                      <td>{getStatusBadge(invoice.status)}</td>
+                      <td>
+                        <Button
+                          plain
+                          onClick={() => {
+                            setSelectedInvoice(invoice);
+                            setNewStatus(invoice.status);
+                            setIsStatusOpen(true);
+                          }}
+                        >
+                          {t('common.edit')}
+                        </Button>
+                      </td>
+                    </DenseRow>
+                  ))}
+                </tbody>
+              </DenseTable>
+            </CardBody>
+          </Card>
         )}
       </div>
-
-      {invoicesLoading ? (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: getName('invoice', true) })}</p>
-        </div>
-      ) : filteredInvoices.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {searchTerm ? t('common.actions.noMatchSearch', { entities: getName('invoice', true) }) : t('common.actions.notFound', { entities: getName('invoice', true) })}
-          </p>
-        </div>
-      ) : (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-          <TableHead>
-            <TableRow>
-              <TableHeader>{t('invoices.table.invoiceNumber')}</TableHeader>
-              <TableHeader>{t('invoices.table.customer')}</TableHeader>
-              <TableHeader>{t('invoices.table.invoiceDate')}</TableHeader>
-              <TableHeader>{t('invoices.table.dueDate')}</TableHeader>
-              <TableHeader>{t('invoices.table.totalAmount')}</TableHeader>
-              <TableHeader>{t('invoices.table.balanceDue')}</TableHeader>
-              <TableHeader>{t('invoices.table.status')}</TableHeader>
-              <TableHeader></TableHeader>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredInvoices.map((invoice) => (
-              <TableRow key={invoice.id}>
-                <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
-                <TableCell>{getCustomerName(invoice.customerId)}</TableCell>
-                <TableCell>{formatDate(invoice.invoiceDate)}</TableCell>
-                <TableCell>{formatDate(invoice.dueDate)}</TableCell>
-                <TableCell>{formatCurrency(invoice.totalAmount)}</TableCell>
-                <TableCell>{formatCurrency(invoice.balanceDue)}</TableCell>
-                <TableCell>{getStatusBadge(invoice.status)}</TableCell>
-                <TableCell>
-                  <Button
-                    plain
-                    onClick={() => {
-                      setSelectedInvoice(invoice);
-                      setNewStatus(invoice.status);
-                      setIsStatusOpen(true);
-                    }}
-                  >
-                    {t('common.edit')}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        </div>
-      )}
 
       {/* Create Invoice Dialog */}
       <Dialog open={isCreateOpen} onClose={setIsCreateOpen}>
