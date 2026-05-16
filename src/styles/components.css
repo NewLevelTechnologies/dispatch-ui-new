@@ -134,7 +134,7 @@
 .dense-table thead th {
   text-align: left;
   font-weight: 600;
-  font-size: 10.5px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--fg-muted);

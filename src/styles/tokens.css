@@ -127,7 +127,8 @@ body {
   font-family: var(--font-sans);
   background: var(--bg-sunken);
   color: var(--fg);
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'cv11', 'ss01';
