@@ -21,6 +21,7 @@ import {
 import { useGlossary } from '../contexts/GlossaryContext';
 import InvoiceDialog from './InvoiceDialog';
 import PaymentDialog from './PaymentDialog';
+import VoidFinancialDocDialog from './VoidFinancialDocDialog';
 import { Badge } from './catalyst/badge';
 import { Button } from './catalyst/button';
 import {
@@ -151,6 +152,12 @@ export default function FinancialInvoicesTab({
     useState<Invoice | null>(null);
 
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+
+  // Invoice currently in the void dialog (replaces the prior window.confirm
+  // flow per §6.4). `null` means dialog closed. Holding the full Invoice
+  // not just the id so the dialog can render the number / amount without
+  // re-fetching from the cached query.
+  const [voidTarget, setVoidTarget] = useState<Invoice | null>(null);
 
   // Auto-open the create dialog when the parent chip-row ghost signals
   // a click. Monotonic counter avoids a boolean-clear race.
@@ -328,17 +335,58 @@ export default function FinancialInvoicesTab({
   };
 
   const handleVoid = (invoice: Invoice) => {
-    if (
-      window.confirm(
-        t('workOrders.financialDrawer.invoicesTab.voidConfirm', {
-          entity: invoiceLabel,
-          number: invoice.invoiceNumber,
-          amount: currencyFormatter.format(amt(invoice.totalAmount)),
-        }),
-      )
-    ) {
-      updateStatus.mutate({ id: invoice.id, status: InvoiceStatus.VOID });
+    setActionBanner(null);
+    setVoidTarget(invoice);
+  };
+
+  // Sequential per backend's documented flow: PATCH status → VOID first,
+  // then POST /share-link/revoke if the checkbox was checked. The revoke
+  // endpoint is idempotent (204 either way), so we retry once on transient
+  // failure before surfacing a non-blocking banner that nudges the CSR to
+  // retry from the Reissue action.
+  const handleVoidConfirm = async ({
+    revokeShareLink,
+  }: {
+    revokeShareLink: boolean;
+  }) => {
+    if (!voidTarget) return;
+    const invoice = voidTarget;
+    try {
+      await invoicesApi.updateStatus(invoice.id, { status: InvoiceStatus.VOID });
+    } catch (error) {
+      setActionBanner({
+        kind: 'error',
+        message:
+          getApiErrorMessage(error) ??
+          t('workOrders.financialDrawer.invoicesTab.sendError', {
+            entity: invoiceLabel,
+          }),
+      });
+      setVoidTarget(null);
+      return;
     }
+    queryClient.invalidateQueries({ queryKey: ['workOrderInvoices', workOrderId] });
+    queryClient.invalidateQueries({ queryKey: ['financialSummary', workOrderId] });
+
+    if (revokeShareLink) {
+      try {
+        await invoicesApi.revokeShareLink(invoice.id);
+      } catch {
+        // One idempotent retry per backend guidance — the endpoint returns
+        // 204 whether or not a link existed, so re-issuing is safe.
+        try {
+          await invoicesApi.revokeShareLink(invoice.id);
+        } catch {
+          setActionBanner({
+            kind: 'error',
+            message: t(
+              'workOrders.financialDrawer.voidDialog.revokeRetryError',
+            ),
+          });
+        }
+      }
+    }
+    setVoidTarget(null);
   };
 
   const handleVoidPayment = (payment: NestedInvoicePayment) => {
@@ -718,6 +766,20 @@ export default function FinancialInvoicesTab({
         workOrderNumber={workOrderNumber}
         defaultCustomer={{ id: customerId, name: customerName }}
       />
+
+      {voidTarget && (
+        <VoidFinancialDocDialog
+          open={!!voidTarget}
+          kind="invoice"
+          entityLabel={invoiceLabel}
+          documentNumber={voidTarget.invoiceNumber}
+          amountDisplay={currencyFormatter.format(amt(voidTarget.totalAmount))}
+          hasActiveShareLink={!!voidTarget.lastSentAt}
+          onConfirm={handleVoidConfirm}
+          onClose={() => setVoidTarget(null)}
+          busy={updateStatus.isPending}
+        />
+      )}
     </div>
   );
 }

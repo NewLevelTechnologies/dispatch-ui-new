@@ -141,9 +141,8 @@ describe('FinancialInvoicesTab', () => {
     });
   });
 
-  it('voids an invoice via the ⋯ menu with confirmation', async () => {
+  it('voids an invoice via the ⋯ menu with a Catalyst confirmation dialog', async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(apiClient.get).mockResolvedValue({ data: [makeInvoice()] });
     vi.mocked(apiClient.patch).mockResolvedValue({
       data: makeInvoice({ status: 'VOID' }),
@@ -155,14 +154,278 @@ describe('FinancialInvoicesTab', () => {
       .at(-1)!;
     await user.click(overflow);
     await user.click(await screen.findByRole('menuitem', { name: /void/i }));
-    expect(confirmSpy).toHaveBeenCalled();
+    // Dialog opens. Click the confirm button — destructive Catalyst Button
+    // with the rose color. Use the role+name query.
+    const confirmButton = await screen.findByRole('button', {
+      name: /^void invoice$/i,
+    });
+    await user.click(confirmButton);
     await waitFor(() => {
       expect(apiClient.patch).toHaveBeenCalledWith(
         '/financial/invoices/inv-1/status',
         { status: 'VOID' },
       );
     });
-    confirmSpy.mockRestore();
+    // No revoke call when the checkbox is left at its default OFF.
+    expect(apiClient.post).not.toHaveBeenCalledWith(
+      '/financial/invoices/inv-1/share-link/revoke',
+    );
+  });
+
+  it('voids and revokes the share link when the checkbox is checked', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: [
+        makeInvoice({
+          status: 'SENT',
+          // lastSentAt non-null surfaces the "Revoke" checkbox per §6.4.
+          // Cast through `unknown` because the test fixture's `makeInvoice`
+          // type is intentionally tight and doesn't include the optional
+          // share-link-derived fields.
+          ...({
+            lastSentAt: '2026-05-15T10:00:00Z',
+            lastSentToEmails: 'jane@example.com',
+          } as unknown as Record<string, never>),
+        }),
+      ],
+    });
+    vi.mocked(apiClient.patch).mockResolvedValue({
+      data: makeInvoice({ status: 'VOID' }),
+    });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: undefined });
+    renderTab();
+    await screen.findByText('INV-0042');
+    const overflow = screen
+      .getAllByRole('button', { name: /more options/i })
+      .at(-1)!;
+    await user.click(overflow);
+    await user.click(await screen.findByRole('menuitem', { name: /void/i }));
+    const checkbox = await screen.findByRole('checkbox', {
+      name: /revoke the share link/i,
+    });
+    await user.click(checkbox);
+    await user.click(
+      await screen.findByRole('button', { name: /^void invoice$/i }),
+    );
+    await waitFor(() => {
+      expect(apiClient.patch).toHaveBeenCalledWith(
+        '/financial/invoices/inv-1/status',
+        { status: 'VOID' },
+      );
+    });
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/financial/invoices/inv-1/share-link/revoke',
+      );
+    });
+  });
+
+  it('hides the revoke checkbox when the invoice has never been sent', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: [makeInvoice({ status: 'DRAFT' })],
+    });
+    renderTab();
+    await screen.findByText('INV-0042');
+    const overflow = screen
+      .getAllByRole('button', { name: /more options/i })
+      .at(-1)!;
+    await user.click(overflow);
+    await user.click(await screen.findByRole('menuitem', { name: /void/i }));
+    await screen.findByRole('button', { name: /^void invoice$/i });
+    expect(
+      screen.queryByRole('checkbox', { name: /revoke the share link/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  describe('Send / Reissue / Extend (Phase 7 §6.4)', () => {
+    const sentInvoice = () =>
+      makeInvoice({
+        status: 'SENT',
+        ...({
+          lastSentAt: '2026-05-15T10:00:00Z',
+          lastSentToEmails: 'jane@example.com',
+        } as unknown as Record<string, never>),
+      });
+
+    it('renders the lastSent metadata under the invoice number', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [sentInvoice()] });
+      renderTab();
+      await screen.findByText('INV-0042');
+      expect(screen.getByText(/last sent/i)).toBeInTheDocument();
+      expect(screen.getByText(/jane@example\.com/)).toBeInTheDocument();
+    });
+
+    it('shows Send for never-sent rows and Resend once lastSentAt is set', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [sentInvoice()] });
+      renderTab();
+      await screen.findByText('INV-0042');
+      const overflow = screen
+        .getAllByRole('button', { name: /more options/i })
+        .at(-1)!;
+      await user.click(overflow);
+      expect(
+        await screen.findByRole('menuitem', { name: /^resend$/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('menuitem', { name: /reissue link/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('menuitem', { name: /extend link expiry/i }),
+      ).toBeInTheDocument();
+    });
+
+    it('POSTs to /send when Resend is clicked, surfacing a success banner', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [sentInvoice()] });
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: {
+          notificationId: 'n-1',
+          queuedAt: '2026-05-15T10:00:00Z',
+          shareUrl: 'https://app.example/p/invoice/abc',
+          lastSentToEmails: 'jane@example.com',
+        },
+      });
+      renderTab();
+      await screen.findByText('INV-0042');
+      const overflow = screen
+        .getAllByRole('button', { name: /more options/i })
+        .at(-1)!;
+      await user.click(overflow);
+      await user.click(await screen.findByRole('menuitem', { name: /^resend$/i }));
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-1/send');
+      });
+      // Success banner shows up with role=status.
+      const banner = await screen.findByRole('status');
+      expect(banner).toHaveTextContent(/INV-0042/);
+    });
+
+    it('surfaces NO_RECIPIENT error as friendly copy', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [makeInvoice({ status: 'DRAFT' })] });
+      vi.mocked(apiClient.post).mockRejectedValue(
+        Object.assign(new Error('Request failed with status 422'), {
+          response: {
+            data: { code: 'NO_RECIPIENT', message: 'No email on file' },
+          },
+        }),
+      );
+      renderTab();
+      await screen.findByText('INV-0042');
+      const overflow = screen
+        .getAllByRole('button', { name: /more options/i })
+        .at(-1)!;
+      await user.click(overflow);
+      await user.click(await screen.findByRole('menuitem', { name: /^send$/i }));
+      expect(
+        await screen.findByText(/add an email to the bill-to customer first/i),
+      ).toBeInTheDocument();
+    });
+
+    it('POSTs to /share-link/reissue with confirmation', async () => {
+      const user = userEvent.setup();
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [sentInvoice()] });
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: { shareUrl: 'https://app.example/p/invoice/new' },
+      });
+      renderTab();
+      await screen.findByText('INV-0042');
+      const overflow = screen
+        .getAllByRole('button', { name: /more options/i })
+        .at(-1)!;
+      await user.click(overflow);
+      await user.click(
+        await screen.findByRole('menuitem', { name: /reissue link/i }),
+      );
+      expect(confirmSpy).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/financial/invoices/inv-1/share-link/reissue',
+        );
+      });
+      confirmSpy.mockRestore();
+    });
+
+    it('POSTs to /share-link/extend with confirmation', async () => {
+      const user = userEvent.setup();
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [sentInvoice()] });
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: { expiresAt: '2027-05-15T10:00:00Z' },
+      });
+      renderTab();
+      await screen.findByText('INV-0042');
+      const overflow = screen
+        .getAllByRole('button', { name: /more options/i })
+        .at(-1)!;
+      await user.click(overflow);
+      await user.click(
+        await screen.findByRole('menuitem', { name: /extend link expiry/i }),
+      );
+      expect(confirmSpy).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/financial/invoices/inv-1/share-link/extend',
+        );
+      });
+      confirmSpy.mockRestore();
+    });
+
+    it('skips reissue when the confirmation dialog is dismissed', async () => {
+      const user = userEvent.setup();
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [sentInvoice()] });
+      renderTab();
+      await screen.findByText('INV-0042');
+      const overflow = screen
+        .getAllByRole('button', { name: /more options/i })
+        .at(-1)!;
+      await user.click(overflow);
+      await user.click(
+        await screen.findByRole('menuitem', { name: /reissue link/i }),
+      );
+      expect(apiClient.post).not.toHaveBeenCalled();
+      confirmSpy.mockRestore();
+    });
+
+    it('retries revoke once on transient failure during void-and-revoke', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [sentInvoice()] });
+      vi.mocked(apiClient.patch).mockResolvedValue({
+        data: makeInvoice({ status: 'VOID' }),
+      });
+      // First revoke fails, second succeeds (the implementation's
+      // single idempotent retry per backend's documented recovery).
+      const post = vi.mocked(apiClient.post);
+      post
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValueOnce({ data: undefined });
+      renderTab();
+      await screen.findByText('INV-0042');
+      const overflow = screen
+        .getAllByRole('button', { name: /more options/i })
+        .at(-1)!;
+      await user.click(overflow);
+      await user.click(await screen.findByRole('menuitem', { name: /void/i }));
+      const checkbox = await screen.findByRole('checkbox', {
+        name: /revoke the share link/i,
+      });
+      await user.click(checkbox);
+      await user.click(
+        await screen.findByRole('button', { name: /^void invoice$/i }),
+      );
+      await waitFor(() => {
+        expect(post).toHaveBeenCalledTimes(2);
+      });
+      // Both calls targeted the revoke endpoint — the first failed,
+      // the second succeeded. No error banner surfaces.
+      expect(
+        screen.queryByText(/couldn't revoke the share link/i),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it('hides the status pill dropdown and ⋯ menu for terminal statuses', async () => {

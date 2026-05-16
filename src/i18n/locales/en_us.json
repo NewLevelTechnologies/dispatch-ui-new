@@ -1419,6 +1419,17 @@
         "saveAsDraft": "Save as Draft",
         "title": "New {{entity}}"
       },
+      "voidDialog": {
+        "body": {
+          "invoice": "Void {{entity, lowercase}} {{number}} for {{amount}}? This cannot be undone.",
+          "quote": "Void {{entity, lowercase}} {{number}} for {{amount}}? This cannot be undone."
+        },
+        "confirm": "Void {{entity, lowercase}}",
+        "revokeDescription": "The customer who received this link will see a 404 if they revisit it.",
+        "revokeLabel": "Revoke the share link so the original recipient can no longer view this.",
+        "revokeRetryError": "Voided, but couldn't revoke the share link — try again from the row's Reissue action.",
+        "title": "Void {{entity}}"
+      },
       "paymentDialog": {
         "amount": "Amount",
         "balanceLabel": "Bal {{amount}}",

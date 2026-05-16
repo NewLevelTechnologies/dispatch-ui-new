@@ -159,4 +159,147 @@ describe('FinancialQuotesTab', () => {
     );
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
+
+  describe('Send / Reissue / Extend (Phase 7 §6.4)', () => {
+    it('triggers POST /send when Send is clicked from the ⋯ menu', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [makeQuote()] });
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: {
+          notificationId: 'n-1',
+          queuedAt: '2026-05-15T10:00:00Z',
+          shareUrl: 'https://app.example/p/quote/abc',
+          lastSentToEmails: 'jane@example.com',
+        },
+      });
+      renderTab();
+      await screen.findByText('QUO-0001');
+      const overflow = screen
+        .getAllByRole('button', { name: /more options/i })
+        .at(-1)!;
+      await user.click(overflow);
+      await user.click(await screen.findByRole('menuitem', { name: /^send$/i }));
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/send');
+      });
+    });
+
+    it('flips Send → Resend and surfaces Reissue + Extend when lastSentAt is set', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({
+        data: [
+          makeQuote({
+            lastSentAt: '2026-05-15T10:00:00Z',
+            lastSentToEmails: 'jane@example.com',
+          }),
+        ],
+      });
+      renderTab();
+      await screen.findByText('QUO-0001');
+      const overflow = screen
+        .getAllByRole('button', { name: /more options/i })
+        .at(-1)!;
+      await user.click(overflow);
+      expect(
+        await screen.findByRole('menuitem', { name: /^resend$/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('menuitem', { name: /reissue link/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('menuitem', { name: /extend link expiry/i }),
+      ).toBeInTheDocument();
+    });
+
+    it('renders "Last sent" metadata under the quote number when sent', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({
+        data: [
+          makeQuote({
+            lastSentAt: '2026-05-15T10:00:00Z',
+            lastSentToEmails: 'jane@example.com',
+          }),
+        ],
+      });
+      renderTab();
+      await screen.findByText('QUO-0001');
+      expect(screen.getByText(/last sent/i)).toBeInTheDocument();
+      expect(screen.getByText(/jane@example\.com/)).toBeInTheDocument();
+    });
+
+    it('surfaces NO_RECIPIENT error with friendly add-an-email copy', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [makeQuote()] });
+      vi.mocked(apiClient.post).mockRejectedValue(
+        Object.assign(new Error('Request failed with status 422'), {
+          response: {
+            data: { code: 'NO_RECIPIENT', message: 'No email on file' },
+          },
+        }),
+      );
+      renderTab();
+      await screen.findByText('QUO-0001');
+      const overflow = screen
+        .getAllByRole('button', { name: /more options/i })
+        .at(-1)!;
+      await user.click(overflow);
+      await user.click(await screen.findByRole('menuitem', { name: /^send$/i }));
+      expect(
+        await screen.findByText(/add an email to the bill-to customer first/i),
+      ).toBeInTheDocument();
+    });
+
+    it('POSTs to /share-link/reissue with confirmation', async () => {
+      const user = userEvent.setup();
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      vi.mocked(apiClient.get).mockResolvedValue({
+        data: [makeQuote({ lastSentAt: '2026-05-15T10:00:00Z' })],
+      });
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: { shareUrl: 'https://app.example/p/quote/new' },
+      });
+      renderTab();
+      await screen.findByText('QUO-0001');
+      const overflow = screen
+        .getAllByRole('button', { name: /more options/i })
+        .at(-1)!;
+      await user.click(overflow);
+      await user.click(
+        await screen.findByRole('menuitem', { name: /reissue link/i }),
+      );
+      expect(confirmSpy).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/financial/quotes/q-1/share-link/reissue',
+        );
+      });
+      confirmSpy.mockRestore();
+    });
+
+    it('POSTs to /share-link/extend with confirmation', async () => {
+      const user = userEvent.setup();
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      vi.mocked(apiClient.get).mockResolvedValue({
+        data: [makeQuote({ lastSentAt: '2026-05-15T10:00:00Z' })],
+      });
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: { expiresAt: '2027-05-15T10:00:00Z' },
+      });
+      renderTab();
+      await screen.findByText('QUO-0001');
+      const overflow = screen
+        .getAllByRole('button', { name: /more options/i })
+        .at(-1)!;
+      await user.click(overflow);
+      await user.click(
+        await screen.findByRole('menuitem', { name: /extend link expiry/i }),
+      );
+      expect(confirmSpy).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/financial/quotes/q-1/share-link/extend',
+        );
+      });
+      confirmSpy.mockRestore();
+    });
+  });
 });

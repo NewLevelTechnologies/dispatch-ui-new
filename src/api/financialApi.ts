@@ -238,6 +238,20 @@ export const invoicesApi = {
     );
     return response.data;
   },
+
+  /**
+   * Revoke the active share-link without issuing a replacement. The
+   * customer's previously-issued link returns 410 SHARE_LINK_REVOKED on
+   * next visit. Used by §6.4's void-and-revoke flow as a second
+   * sequential call after the status PATCH.
+   *
+   * Idempotent by design (204 No Content whether or not there was an
+   * active link). Safe to retry on transient network failure — that's
+   * the documented recovery if the post-void revoke step fails.
+   */
+  revokeShareLink: async (id: string): Promise<void> => {
+    await apiClient.post(`/financial/invoices/${id}/share-link/revoke`);
+  },
 };
 
 // ========== QUOTES ==========
@@ -366,6 +380,11 @@ export const quotesApi = {
       `/financial/quotes/${id}/share-link/extend`,
     );
     return response.data;
+  },
+
+  /** See `invoicesApi.revokeShareLink` — same contract, quote-scoped. */
+  revokeShareLink: async (id: string): Promise<void> => {
+    await apiClient.post(`/financial/quotes/${id}/share-link/revoke`);
   },
 };
 

@@ -16,6 +16,8 @@ export default defineConfig({
         'node_modules/',
         'src/test/',
         'dist/**',
+        // Untracked design-handoff dump (not checked into the repo)
+        'handoff/**',
         '**/*.config.{ts,js}',
         '**/main.tsx',
         '**/vite-env.d.ts',
@@ -57,6 +59,8 @@ export default defineConfig({
         'src/api/glossaryApi.ts',
         'src/api/dispatchRegionApi.ts',
         'src/api/workOrderConfigApi.ts',
+        // Dev-only mock fixtures (DCE'd in production builds)
+        'src/dev/**',
         // Exclude temporary/debug files
         '**/check-menu-sizes.js',
         'coverage/**',

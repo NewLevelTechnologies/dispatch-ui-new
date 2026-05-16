@@ -1146,6 +1146,18 @@ vi.mock('react-i18next', () => {
     'workOrders.financialDrawer.quoteDialog.saveAndSend': 'Save & Send',
     'workOrders.financialDrawer.quoteDialog.saveAsDraft': 'Save as Draft',
     'workOrders.financialDrawer.quoteDialog.title': 'New {{entity}}',
+    'workOrders.financialDrawer.voidDialog.body.invoice':
+      'Void {{entity, lowercase}} {{number}} for {{amount}}? This cannot be undone.',
+    'workOrders.financialDrawer.voidDialog.body.quote':
+      'Void {{entity, lowercase}} {{number}} for {{amount}}? This cannot be undone.',
+    'workOrders.financialDrawer.voidDialog.confirm': 'Void {{entity, lowercase}}',
+    'workOrders.financialDrawer.voidDialog.revokeDescription':
+      'The customer who received this link will see a 404 if they revisit it.',
+    'workOrders.financialDrawer.voidDialog.revokeLabel':
+      'Revoke the share link so the original recipient can no longer view this.',
+    'workOrders.financialDrawer.voidDialog.revokeRetryError':
+      "Voided, but couldn't revoke the share link — try again from the row's Reissue action.",
+    'workOrders.financialDrawer.voidDialog.title': 'Void {{entity}}',
     'workOrders.financialDrawer.paymentDialog.amount': 'Amount',
     'workOrders.financialDrawer.paymentDialog.balanceLabel': 'Bal {{amount}}',
     'workOrders.financialDrawer.paymentDialog.contextStrip':
