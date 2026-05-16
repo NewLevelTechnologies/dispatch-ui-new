@@ -24,6 +24,7 @@ import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel,
 import { Input, InputGroup } from '../components/catalyst/input';
 import { Checkbox, CheckboxField } from '../components/catalyst/checkbox';
 import { Field, Label } from '../components/catalyst/fieldset';
+import { Pagination, PaginationGap, PaginationList, PaginationNext, PaginationPage, PaginationPrevious } from '../components/catalyst/pagination';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
@@ -31,7 +32,6 @@ import { ViewTabs } from '../components/ui/Tabs';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
-import { ListFooter } from '../components/ui/ListFooter';
 import { dense } from '../components/ui/dense';
 
 // ─── Filter constants ────────────────────────────────────────────────────────
@@ -485,6 +485,17 @@ export default function WorkOrdersPage() {
     setSearchInput('');
   };
 
+  // ── Build pagination hrefs that preserve current filter state ─────────────
+  // Catalyst Pagination's hrefs render through RouterLink for SPA navigation
+  // and support middle-click / Cmd-click "open in new tab".
+  const pageHref = (target: number): string => {
+    const next = new URLSearchParams(searchParams);
+    if (target <= 1) next.delete('page');
+    else next.set('page', String(target));
+    const qs = next.toString();
+    return qs ? `?${qs}` : '?';
+  };
+
   // ── Tab options for ViewTabs (no per-tab counts available yet) ─────────────
   const viewTabs = LIFECYCLE_TABS.map((f) => ({ id: f.id, label: t(f.labelKey) }));
 
@@ -741,7 +752,7 @@ export default function WorkOrdersPage() {
               <p className="text-[12.5px] text-fg-muted">
                 {t('common.actions.notFound', { entities: getName('work_order', true) })}
               </p>
-              <Button className="mt-2" onClick={handleAdd}>
+              <Button color="accent" className="mt-2" onClick={handleAdd}>
                 {t('common.actions.createFirst', { entity: getName('work_order') })}
               </Button>
             </CardBody>
@@ -878,33 +889,47 @@ export default function WorkOrdersPage() {
                 </tbody>
               </DenseTable>
 
-              {/* Pagination: onClick mutates URL via updateParams. NOTE: this
-                  drops the previous href-preserving behavior (no middle-click
-                  open-in-new-tab). For prod, ListFooter would need href
-                  support. Acceptable for the design-system experiment. */}
-              {totalElements > 0 && (
-                <ListFooter
-                  page={pageNumber}
-                  totalPages={Math.max(1, totalPages)}
-                  showing={[showingStart, showingEnd]}
-                  total={totalElements}
-                  perPage={PAGE_SIZE}
-                  perPageOptions={[PAGE_SIZE]}
-                  onPageChange={(p) => updateParams({ page: p > 1 ? p : null })}
-                  labels={{
-                    showing: (s, e, tot) => (
-                      <>
-                        {t('common.pagination.showing', { start: s, end: e, total: tot })}
-                      </>
-                    ),
-                    prev: t('common.previous'),
-                    next: t('common.next'),
-                    rowsPerPage: t('common.actions.rowsPerPage'),
-                  }}
-                />
-              )}
             </CardBody>
           </Card>
+        )}
+
+        {/* Pagination — Catalyst hrefs preserve filter params and SPA-navigate
+            via RouterLink, so middle-click / Cmd-click opens a new tab with
+            the right URL. "Showing X-Y of Z" lives in PageHead.sub above. */}
+        {totalPages > 1 && (
+          <Pagination className="mt-4">
+            <PaginationPrevious href={pageNumber > 1 ? pageHref(pageNumber - 1) : null} />
+            <PaginationList>
+              {(() => {
+                const pages: (number | 'gap')[] = [];
+                if (totalPages <= 7) {
+                  for (let i = 1; i <= totalPages; i++) pages.push(i);
+                } else {
+                  pages.push(1);
+                  if (pageNumber > 3) pages.push('gap');
+                  const start = Math.max(2, pageNumber - 1);
+                  const end = Math.min(totalPages - 1, pageNumber + 1);
+                  for (let i = start; i <= end; i++) pages.push(i);
+                  if (pageNumber < totalPages - 2) pages.push('gap');
+                  pages.push(totalPages);
+                }
+                return pages.map((p, idx) =>
+                  p === 'gap' ? (
+                    <PaginationGap key={`gap-${idx}`} />
+                  ) : (
+                    <PaginationPage
+                      key={p}
+                      href={pageHref(p)}
+                      current={p === pageNumber}
+                    >
+                      {String(p)}
+                    </PaginationPage>
+                  )
+                );
+              })()}
+            </PaginationList>
+            <PaginationNext href={pageNumber < totalPages ? pageHref(pageNumber + 1) : null} />
+          </Pagination>
         )}
 
         <WorkOrderFormDialog
