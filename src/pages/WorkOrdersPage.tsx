@@ -427,7 +427,7 @@ export default function WorkOrdersPage() {
         <PageHead
           title={getName('work_order', true)}
           actions={
-            <Button onClick={handleAdd}>
+            <Button color="accent" onClick={handleAdd}>
               {t('common.actions.create', { entity: getName('work_order') })}
             </Button>
           }

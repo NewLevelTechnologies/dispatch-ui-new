@@ -155,6 +155,11 @@ const styles = {
       'text-white [--btn-hover-overlay:var(--color-white)]/10 [--btn-bg:var(--color-rose-500)] [--btn-border:var(--color-rose-600)]/90',
       '[--btn-icon:var(--color-rose-300)] data-active:[--btn-icon:var(--color-rose-200)] data-hover:[--btn-icon:var(--color-rose-200)]',
     ],
+    // Brand button — follows the warm/cool accent token at runtime.
+    accent: [
+      'text-white [--btn-hover-overlay:var(--color-white)]/12 [--btn-bg:var(--color-accent-500)] [--btn-border:var(--color-accent-700)]',
+      '[--btn-icon:var(--color-accent-200)] data-active:[--btn-icon:var(--color-accent-100)] data-hover:[--btn-icon:var(--color-accent-100)]',
+    ],
   },
 }
 
