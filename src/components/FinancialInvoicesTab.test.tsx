@@ -371,14 +371,24 @@ describe('FinancialInvoicesTab', () => {
       expect(apiClient.patch).not.toHaveBeenCalled();
     });
 
-    it('chains updateStatus(SENT) on Save & Send', async () => {
+    it('calls /send (no chained status PATCH) on Save & Send', async () => {
       const user = userEvent.setup();
       vi.mocked(apiClient.get).mockResolvedValue({ data: [makeInvoice()] });
-      vi.mocked(apiClient.post).mockResolvedValue({
-        data: { id: 'inv-new', status: 'DRAFT' },
-      });
-      vi.mocked(apiClient.patch).mockResolvedValue({
-        data: { id: 'inv-new', status: 'SENT' },
+      vi.mocked(apiClient.post).mockImplementation((url: string) => {
+        if (url === '/financial/invoices') {
+          return Promise.resolve({ data: { id: 'inv-new', status: 'DRAFT' } });
+        }
+        if (url === '/financial/invoices/inv-new/send') {
+          return Promise.resolve({
+            data: {
+              notificationId: 'n-1',
+              queuedAt: '2026-05-15T10:00:00Z',
+              shareUrl: 'https://app.example/p/invoice/abc',
+              lastSentToEmails: 'jane@example.com',
+            },
+          });
+        }
+        return Promise.reject(new Error(`Unexpected POST: ${url}`));
       });
       renderTab();
       await user.click(await screen.findByRole('button', { name: /new invoice/i }));
@@ -390,11 +400,9 @@ describe('FinancialInvoicesTab', () => {
       await user.click(screen.getByRole('button', { name: /save & send/i }));
 
       await waitFor(() => {
-        expect(apiClient.patch).toHaveBeenCalledWith(
-          '/financial/invoices/inv-new/status',
-          { status: 'SENT' },
-        );
+        expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-new/send');
       });
+      expect(apiClient.patch).not.toHaveBeenCalled();
     });
 
     it('validates description and amount before submitting', async () => {

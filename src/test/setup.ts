@@ -157,6 +157,7 @@ vi.mock('react-i18next', () => {
     'common.form.invalidEmail': 'Invalid email address',
     'common.form.errorDelete': 'Failed to delete {{entity, lowercase}}',
     'common.form.required': '{{field}} is required',
+    'common.dismiss': 'Dismiss',
     'common.moreOptions': 'More options',
     'common.next': 'Next',
     'common.pagination.next': 'Next',
@@ -984,9 +985,26 @@ vi.mock('react-i18next', () => {
     'workOrders.detail.print': 'Print',
     'workOrders.detail.setNte': 'Set NTE',
     'workOrders.financialDrawer.comingSoon': 'Coming soon',
+    'workOrders.financialDrawer.invoicesTab.actions.extend': 'Extend link expiry',
     'workOrders.financialDrawer.invoicesTab.actions.markPaid': 'Mark paid',
+    'workOrders.financialDrawer.invoicesTab.actions.reissue': 'Reissue link',
+    'workOrders.financialDrawer.invoicesTab.actions.resend': 'Resend',
+    'workOrders.financialDrawer.invoicesTab.actions.send': 'Send',
     'workOrders.financialDrawer.invoicesTab.actions.void': 'Void',
     'workOrders.financialDrawer.invoicesTab.actions.voidPayment': 'Void {{entity, lowercase}}',
+    'workOrders.financialDrawer.invoicesTab.extendConfirm':
+      'Extend the customer-facing link for {{entity, lowercase}} {{number}} by another year? The existing link keeps working.',
+    'workOrders.financialDrawer.invoicesTab.extendSuccess': 'Link expiry extended.',
+    'workOrders.financialDrawer.invoicesTab.lastSentTo': 'Last sent {{date}} to {{email}}',
+    'workOrders.financialDrawer.invoicesTab.reissueConfirm':
+      'Reissue the customer-facing link for {{entity, lowercase}} {{number}}? The previous link will stop working — the customer will need a new email to view this {{entity, lowercase}}.',
+    'workOrders.financialDrawer.invoicesTab.reissueSuccess':
+      'Link reissued. The previous link no longer works.',
+    'workOrders.financialDrawer.invoicesTab.sendError':
+      'Failed to send {{entity, lowercase}}.',
+    'workOrders.financialDrawer.invoicesTab.sendErrorNoRecipient':
+      'Add an email to the bill-to {{customer, lowercase}} first.',
+    'workOrders.financialDrawer.invoicesTab.sendSuccess': '{{entity}} sent.',
     'workOrders.financialDrawer.invoicesTab.addPayment': '{{entity}}',
     'workOrders.financialDrawer.invoicesTab.changeStatus':
       'Change status (currently {{current}})',
@@ -1052,14 +1070,33 @@ vi.mock('react-i18next', () => {
     'workOrders.financialDrawer.invoiceDialog.dueDate': 'Due date',
     'workOrders.financialDrawer.invoiceDialog.errorCreate':
       'Failed to create {{entity, lowercase}}.',
+    'workOrders.financialDrawer.invoiceDialog.errorNoRecipient':
+      'Add an email to the bill-to customer first, then try Send again. The {{entity, lowercase}} was created as a draft.',
     'workOrders.financialDrawer.invoiceDialog.invalidAmount':
       'Amount must be a positive number.',
     'workOrders.financialDrawer.invoiceDialog.invoiceDate': '{{entity}} date',
     'workOrders.financialDrawer.invoiceDialog.saveAndSend': 'Save & Send',
     'workOrders.financialDrawer.invoiceDialog.saveAsDraft': 'Save as Draft',
     'workOrders.financialDrawer.invoiceDialog.title': 'New {{entity}}',
+    'workOrders.financialDrawer.quotesTab.actions.extend': 'Extend link expiry',
     'workOrders.financialDrawer.quotesTab.actions.markAccepted': 'Mark accepted',
     'workOrders.financialDrawer.quotesTab.actions.markDeclined': 'Mark declined',
+    'workOrders.financialDrawer.quotesTab.actions.reissue': 'Reissue link',
+    'workOrders.financialDrawer.quotesTab.actions.resend': 'Resend',
+    'workOrders.financialDrawer.quotesTab.actions.send': 'Send',
+    'workOrders.financialDrawer.quotesTab.extendConfirm':
+      'Extend the customer-facing link for {{entity, lowercase}} {{number}} by another year? The existing link keeps working.',
+    'workOrders.financialDrawer.quotesTab.extendSuccess': 'Link expiry extended.',
+    'workOrders.financialDrawer.quotesTab.lastSentTo': 'Last sent {{date}} to {{email}}',
+    'workOrders.financialDrawer.quotesTab.reissueConfirm':
+      'Reissue the customer-facing link for {{entity, lowercase}} {{number}}? The previous link will stop working — the customer will need a new email to view this {{entity, lowercase}}.',
+    'workOrders.financialDrawer.quotesTab.reissueSuccess':
+      'Link reissued. The previous link no longer works.',
+    'workOrders.financialDrawer.quotesTab.sendError':
+      'Failed to send {{entity, lowercase}}.',
+    'workOrders.financialDrawer.quotesTab.sendErrorNoRecipient':
+      'Add an email to the bill-to {{customer, lowercase}} first.',
+    'workOrders.financialDrawer.quotesTab.sendSuccess': '{{entity}} sent.',
     'workOrders.financialDrawer.quotesTab.changeStatus':
       'Change status (currently {{current}})',
     'workOrders.financialDrawer.quotesTab.collapseRow': 'Hide line items',

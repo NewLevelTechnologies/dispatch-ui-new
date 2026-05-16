@@ -10,6 +10,7 @@ import {
 import TenantBrandingHeader from '../components/TenantBrandingHeader';
 import CliffPage from '../components/CliffPage';
 import { Badge } from '../components/catalyst/badge';
+import { useScopedReferrerPolicy } from '../hooks/useScopedReferrerPolicy';
 
 /**
  * Customer-facing read-only invoice view, rendered when a customer clicks
@@ -73,6 +74,7 @@ const InvoiceStatusBadge = ({ status }: InvoiceBadgeProps) => {
 export default function PublicInvoicePage() {
   const { t } = useTranslation();
   const { token = '' } = useParams<{ token: string }>();
+  useScopedReferrerPolicy();
 
   const { data, isLoading, isError, error } = useQuery<
     PublicInvoiceResponse,

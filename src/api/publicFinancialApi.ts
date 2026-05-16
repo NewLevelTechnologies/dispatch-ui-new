@@ -22,6 +22,12 @@ import type { Invoice, Quote } from './financialApi';
  */
 export interface PublicTenantBranding {
   displayName: string;
+  /**
+   * Optional tagline shown under `displayName` in the page header (e.g.
+   * "Heating & cooling since 1987"). Sourced from `tenant_settings`;
+   * nullable so we render nothing when the tenant hasn't set one.
+   */
+  companySlogan?: string | null;
   logoUrl?: string | null;
   streetAddress?: string | null;
   city?: string | null;

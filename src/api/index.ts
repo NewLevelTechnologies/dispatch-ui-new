@@ -1,6 +1,6 @@
 // Central API exports
 export { default as apiClient } from './client';
-export { getApiErrorMessage } from './errors';
+export { getApiErrorMessage, getApiErrorCode } from './errors';
 
 // Audit API
 export { auditApi, type AuditLog } from './auditApi';
@@ -176,6 +176,9 @@ export {
   type NestedInvoicePayment,
   type PaymentStatus,
   type CreatePaymentRequest,
+  type SendResponse,
+  type ReissueShareLinkResponse,
+  type ExtendShareLinkResponse,
   type WorkOrderFinancialSummary,
 } from './financialApi';
 

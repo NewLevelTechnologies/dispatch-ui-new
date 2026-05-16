@@ -114,13 +114,25 @@ describe('InvoiceDialog', () => {
     expect(body.dueDate).not.toContain('T');
   });
 
-  it('on Save & Send creates the invoice, then patches status to SENT', async () => {
+  it('on Save & Send creates the invoice, then calls /send (no chained status PATCH)', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.post).mockResolvedValue({
-      data: { id: 'i-99', status: 'DRAFT' },
-    });
-    vi.mocked(apiClient.patch).mockResolvedValue({
-      data: { id: 'i-99', status: 'SENT' },
+    vi.mocked(apiClient.post).mockImplementation((url: string) => {
+      if (url === '/financial/invoices') {
+        return Promise.resolve({
+          data: { id: 'i-99', status: 'DRAFT' },
+        });
+      }
+      if (url === '/financial/invoices/i-99/send') {
+        return Promise.resolve({
+          data: {
+            notificationId: 'n-1',
+            queuedAt: '2026-05-15T10:00:00Z',
+            shareUrl: 'https://app.example/p/invoice/abc',
+            lastSentToEmails: 'jane@example.com',
+          },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected POST: ${url}`));
     });
     const { onClose } = renderDialog();
     await user.type(screen.getByLabelText(/description/i), 'Replace condenser');
@@ -133,12 +145,36 @@ describe('InvoiceDialog', () => {
       );
     });
     await waitFor(() => {
-      expect(apiClient.patch).toHaveBeenCalledWith(
-        '/financial/invoices/i-99/status',
-        { status: 'SENT' },
-      );
+      expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/i-99/send');
     });
+    expect(apiClient.patch).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('surfaces friendly copy when /send rejects with NO_RECIPIENT', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.post).mockImplementation((url: string) => {
+      if (url === '/financial/invoices') {
+        return Promise.resolve({ data: { id: 'i-77', status: 'DRAFT' } });
+      }
+      if (url === '/financial/invoices/i-77/send') {
+        return Promise.reject(
+          Object.assign(new Error('Request failed with status 422'), {
+            response: {
+              data: { code: 'NO_RECIPIENT', message: 'No email on file' },
+            },
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected POST: ${url}`));
+    });
+    renderDialog();
+    await user.type(screen.getByLabelText(/description/i), 'Tune up');
+    await user.type(screen.getByLabelText(/^amount$/i), '450');
+    await user.click(screen.getByRole('button', { name: /save & send/i }));
+    expect(
+      await screen.findByText(/add an email to the bill-to customer first/i),
+    ).toBeInTheDocument();
   });
 
   it('passes the optional notes through when filled', async () => {

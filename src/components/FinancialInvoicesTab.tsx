@@ -11,6 +11,8 @@ import {
   invoicesApi,
   InvoiceStatus,
   paymentsApi,
+  getApiErrorCode,
+  getApiErrorMessage,
   type Invoice,
   type InvoiceStatus as InvoiceStatusType,
   type NestedInvoicePayment,
@@ -129,9 +131,17 @@ export default function FinancialInvoicesTab({
   const invoiceLabel = getName('invoice');
   const invoicesLabel = getName('invoice', true);
   const paymentLabel = getName('payment');
+  const customerLabel = getName('customer');
   const workOrderLabel = getName('work_order');
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Banner-style transient feedback for send / reissue / extend actions.
+  // `window.alert` for errors would be jarring; a soft inline strip lets the
+  // CSR keep working in the drawer. Cleared by the next action or by the
+  // dismiss button.
+  const [actionBanner, setActionBanner] = useState<
+    { kind: 'success' | 'error'; message: string } | null
+  >(null);
 
   // PaymentDialog state — both entry points (tab-level + row-level) share
   // a single mounted dialog. `lockedInvoice` set ⇒ row-level entry; absent
@@ -184,6 +194,92 @@ export default function FinancialInvoicesTab({
     },
   });
 
+  // Send (or resend) an invoice. Backend auto-flips DRAFT → SENT in the
+  // same transaction (§4.3 step 7), so we don't chain a status PATCH.
+  // The error branch surfaces NO_RECIPIENT specifically because it's the
+  // only one a CSR can actually fix from the row (the rest are status /
+  // rate-limit issues with no in-context remediation).
+  const sendInvoice = useMutation({
+    mutationFn: (invoice: Invoice) => invoicesApi.send(invoice.id),
+    onSuccess: (_data, invoice) => {
+      queryClient.invalidateQueries({ queryKey: ['workOrderInvoices', workOrderId] });
+      // Send auto-flips DRAFT → SENT, which affects summary rollup buckets.
+      queryClient.invalidateQueries({ queryKey: ['financialSummary', workOrderId] });
+      setActionBanner({
+        kind: 'success',
+        message: t('workOrders.financialDrawer.invoicesTab.sendSuccess', {
+          entity: `${invoiceLabel} ${invoice.invoiceNumber}`,
+        }),
+      });
+    },
+    onError: (error: unknown) => {
+      const code = getApiErrorCode(error);
+      if (code === 'NO_RECIPIENT') {
+        setActionBanner({
+          kind: 'error',
+          message: t(
+            'workOrders.financialDrawer.invoicesTab.sendErrorNoRecipient',
+            { customer: customerLabel },
+          ),
+        });
+        return;
+      }
+      setActionBanner({
+        kind: 'error',
+        message:
+          getApiErrorMessage(error) ??
+          t('workOrders.financialDrawer.invoicesTab.sendError', {
+            entity: invoiceLabel,
+          }),
+      });
+    },
+  });
+
+  const reissueShareLink = useMutation({
+    mutationFn: (invoice: Invoice) => invoicesApi.reissueShareLink(invoice.id),
+    onSuccess: () => {
+      // Reissue doesn't stamp lastSentAt (the new token isn't sent yet),
+      // but the active token id has changed — invalidate so any cached
+      // shareUrl in the list view picks up the new value once the field
+      // is denormalized (not in v1; future-proofing).
+      queryClient.invalidateQueries({ queryKey: ['workOrderInvoices', workOrderId] });
+      setActionBanner({
+        kind: 'success',
+        message: t('workOrders.financialDrawer.invoicesTab.reissueSuccess'),
+      });
+    },
+    onError: (error: unknown) => {
+      setActionBanner({
+        kind: 'error',
+        message:
+          getApiErrorMessage(error) ??
+          t('workOrders.financialDrawer.invoicesTab.sendError', {
+            entity: invoiceLabel,
+          }),
+      });
+    },
+  });
+
+  const extendShareLink = useMutation({
+    mutationFn: (invoice: Invoice) => invoicesApi.extendShareLink(invoice.id),
+    onSuccess: () => {
+      setActionBanner({
+        kind: 'success',
+        message: t('workOrders.financialDrawer.invoicesTab.extendSuccess'),
+      });
+    },
+    onError: (error: unknown) => {
+      setActionBanner({
+        kind: 'error',
+        message:
+          getApiErrorMessage(error) ??
+          t('workOrders.financialDrawer.invoicesTab.sendError', {
+            entity: invoiceLabel,
+          }),
+      });
+    },
+  });
+
   const toggleExpand = (id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -196,6 +292,39 @@ export default function FinancialInvoicesTab({
   const handleStatusChange = (invoice: Invoice, next: InvoiceStatusType) => {
     if (next === invoice.status) return;
     updateStatus.mutate({ id: invoice.id, status: next });
+  };
+
+  const handleSend = (invoice: Invoice) => {
+    setActionBanner(null);
+    sendInvoice.mutate(invoice);
+  };
+
+  const handleReissue = (invoice: Invoice) => {
+    if (
+      window.confirm(
+        t('workOrders.financialDrawer.invoicesTab.reissueConfirm', {
+          entity: invoiceLabel,
+          number: invoice.invoiceNumber,
+        }),
+      )
+    ) {
+      setActionBanner(null);
+      reissueShareLink.mutate(invoice);
+    }
+  };
+
+  const handleExtend = (invoice: Invoice) => {
+    if (
+      window.confirm(
+        t('workOrders.financialDrawer.invoicesTab.extendConfirm', {
+          entity: invoiceLabel,
+          number: invoice.invoiceNumber,
+        }),
+      )
+    ) {
+      setActionBanner(null);
+      extendShareLink.mutate(invoice);
+    }
   };
 
   const handleVoid = (invoice: Invoice) => {
@@ -304,6 +433,26 @@ export default function FinancialInvoicesTab({
 
   return (
     <div>
+      {actionBanner && (
+        <div
+          className={`mb-3 flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm ${
+            actionBanner.kind === 'success'
+              ? 'bg-lime-50 text-lime-800 dark:bg-lime-500/10 dark:text-lime-300'
+              : 'bg-rose-50 text-rose-800 dark:bg-rose-500/10 dark:text-rose-300'
+          }`}
+          role={actionBanner.kind === 'error' ? 'alert' : 'status'}
+        >
+          <span>{actionBanner.message}</span>
+          <button
+            type="button"
+            onClick={() => setActionBanner(null)}
+            className="text-xs underline hover:no-underline"
+            aria-label={t('common.dismiss')}
+          >
+            {t('common.dismiss')}
+          </button>
+        </div>
+      )}
       {/* Tab header CTA row (§3.3): + New Invoice + Record Payment, both
           right-aligned. Each covers a distinct CSR scenario — create an
           invoice (parent-less, always) and record a payment with the
@@ -394,7 +543,17 @@ export default function FinancialInvoicesTab({
                     </button>
                   </TableCell>
                   <TableCell className="font-mono">
-                    {invoice.invoiceNumber}
+                    <div>{invoice.invoiceNumber}</div>
+                    {invoice.lastSentAt && (
+                      <div className="font-sans text-xs italic font-normal text-zinc-500 dark:text-zinc-400">
+                        {t('workOrders.financialDrawer.invoicesTab.lastSentTo', {
+                          date: formatDate(invoice.lastSentAt),
+                          email:
+                            invoice.lastSentToEmails?.split(',')[0]?.trim() ??
+                            '—',
+                        })}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>{formatDate(invoice.invoiceDate)}</TableCell>
                   <TableCell>{formatDate(invoice.dueDate)}</TableCell>
@@ -468,6 +627,31 @@ export default function FinancialInvoicesTab({
                           <EllipsisHorizontalIcon className="size-5" />
                         </DropdownButton>
                         <DropdownMenu anchor="bottom end">
+                          {/* Send / Resend lives at the top of the menu —
+                              it's the most common follow-on action after
+                              creating an invoice. Label flips once the row
+                              has been sent at least once. */}
+                          <DropdownItem onClick={() => handleSend(invoice)}>
+                            <DropdownLabel>
+                              {invoice.lastSentAt
+                                ? t('workOrders.financialDrawer.invoicesTab.actions.resend')
+                                : t('workOrders.financialDrawer.invoicesTab.actions.send')}
+                            </DropdownLabel>
+                          </DropdownItem>
+                          {invoice.lastSentAt && (
+                            <>
+                              <DropdownItem onClick={() => handleReissue(invoice)}>
+                                <DropdownLabel>
+                                  {t('workOrders.financialDrawer.invoicesTab.actions.reissue')}
+                                </DropdownLabel>
+                              </DropdownItem>
+                              <DropdownItem onClick={() => handleExtend(invoice)}>
+                                <DropdownLabel>
+                                  {t('workOrders.financialDrawer.invoicesTab.actions.extend')}
+                                </DropdownLabel>
+                              </DropdownItem>
+                            </>
+                          )}
                           {invoice.status !== InvoiceStatus.PAID && (
                             <DropdownItem
                               onClick={() =>

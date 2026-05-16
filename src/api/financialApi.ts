@@ -79,6 +79,23 @@ export interface Invoice {
    * `[]` when none. Includes VOID rows for audit.
    */
   payments: NestedInvoicePayment[];
+  /**
+   * Timestamp of the most recent successful send (Instant). `null` until
+   * the first `/send` call lands. Backend denormalizes this onto the
+   * invoice row so the list view doesn't have to join `notification_logs`.
+   * Used by the row metadata "Last sent <date>" hint and to flip the
+   * Send menu label to Resend.
+   */
+  lastSentAt?: string | null;
+  /**
+   * Comma-separated string of recipient emails resolved at the last send.
+   * Backend supports 1–10 recipients per call (override the bill-to with
+   * an explicit list); this stays a single string for forward-compat and
+   * to match the existing DTO shape. Display layer uses `split(",")[0]`
+   * for the row hint — "Last sent to alice@…" — the rare multi-recipient
+   * case is acceptable to under-display in v1.
+   */
+  lastSentToEmails?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -101,6 +118,39 @@ export interface CreateInvoiceRequest {
 
 export interface UpdateInvoiceStatusRequest {
   status: InvoiceStatus;
+}
+
+/**
+ * Response from `POST /financial/{invoices,quotes}/{id}/send` (§4.3). The
+ * server has stamped `lastSentAt` + `lastSentToEmails` on the row by the
+ * time this returns — callers should invalidate the WO list query to pick
+ * those up. The `shareUrl` is included primarily for a copy-link affordance
+ * (not yet built).
+ */
+export interface SendResponse {
+  notificationId: string;
+  queuedAt: string;
+  shareUrl: string;
+  lastSentToEmails: string;
+}
+
+/**
+ * Response from `POST .../share-link/reissue` (§4.6). Old emails go dead
+ * once this returns; the new token is in `shareUrl` and is only useful
+ * after a subsequent `/send` call (Reissue does NOT auto-send — that's an
+ * explicit second step per §11 open question #2's resolution).
+ */
+export interface ReissueShareLinkResponse {
+  shareUrl: string;
+}
+
+/**
+ * Response from `POST .../share-link/extend` (§4.6). Bumps `expires_at`
+ * to `now() + 1 year` on the existing active row — old emails keep
+ * working. Returns the new expiry so callers can confirm the bump.
+ */
+export interface ExtendShareLinkResponse {
+  expiresAt: string;
 }
 
 export const invoicesApi = {
@@ -143,6 +193,51 @@ export const invoicesApi = {
     const response = await apiClient.patch<Invoice>(`/financial/invoices/${id}/status`, request);
     return response.data;
   },
+
+  /**
+   * Send (or resend) the invoice to its bill-to customer (§4.3). Backend
+   * issues / reuses a share-link token, publishes a `NotificationRequested
+   * Event` with the rendered `{{share_url}}`, and stamps `lastSentAt` /
+   * `lastSentToEmails` on the row. DRAFT invoices auto-flip to SENT in the
+   * same transaction — callers don't need a chained status update.
+   *
+   * Error codes worth branching on (uniform `{ code, message }` shape):
+   *   - `NO_RECIPIENT` (422)         → "Add an email to the bill-to customer first"
+   *   - `NOT_SENDABLE_STATUS` (400)  → terminal status (VOID / CANCELLED)
+   *   - `TOO_MANY_RECIPIENTS` (400)  → > 10 in override list (n/a for v1 UI)
+   *   - `RATE_LIMIT_EXCEEDED` (429)  → backoff hint in message
+   */
+  send: async (id: string): Promise<SendResponse> => {
+    const response = await apiClient.post<SendResponse>(
+      `/financial/invoices/${id}/send`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Revoke the current active share-link token and create a new one (§4.6).
+   * Old emails go dead. Explicit follow-up `send` required if the CSR wants
+   * the new token delivered to the customer — Reissue and Send are kept as
+   * two separate affordances (locked decision in §3, "Reissue vs. Extend").
+   */
+  reissueShareLink: async (id: string): Promise<ReissueShareLinkResponse> => {
+    const response = await apiClient.post<ReissueShareLinkResponse>(
+      `/financial/invoices/${id}/share-link/reissue`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Bump `expires_at` on the active share-link row by another year from
+   * `now()` (not from current `expires_at`, so a 5-year-out token can't
+   * be produced by stacking clicks). Old emails keep working.
+   */
+  extendShareLink: async (id: string): Promise<ExtendShareLinkResponse> => {
+    const response = await apiClient.post<ExtendShareLinkResponse>(
+      `/financial/invoices/${id}/share-link/extend`,
+    );
+    return response.data;
+  },
 };
 
 // ========== QUOTES ==========
@@ -180,6 +275,10 @@ export interface Quote {
   totalAmount: number;
   notes?: string;
   lineItems: QuoteLineItem[];
+  /** See `Invoice.lastSentAt` — same semantics. */
+  lastSentAt?: string | null;
+  /** See `Invoice.lastSentToEmails` — same semantics. */
+  lastSentToEmails?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -242,6 +341,30 @@ export const quotesApi = {
 
   updateStatus: async (id: string, request: UpdateQuoteStatusRequest): Promise<Quote> => {
     const response = await apiClient.patch<Quote>(`/financial/quotes/${id}/status`, request);
+    return response.data;
+  },
+
+  /** See `invoicesApi.send` — same contract, quote-scoped. */
+  send: async (id: string): Promise<SendResponse> => {
+    const response = await apiClient.post<SendResponse>(
+      `/financial/quotes/${id}/send`,
+    );
+    return response.data;
+  },
+
+  /** See `invoicesApi.reissueShareLink` — same contract, quote-scoped. */
+  reissueShareLink: async (id: string): Promise<ReissueShareLinkResponse> => {
+    const response = await apiClient.post<ReissueShareLinkResponse>(
+      `/financial/quotes/${id}/share-link/reissue`,
+    );
+    return response.data;
+  },
+
+  /** See `invoicesApi.extendShareLink` — same contract, quote-scoped. */
+  extendShareLink: async (id: string): Promise<ExtendShareLinkResponse> => {
+    const response = await apiClient.post<ExtendShareLinkResponse>(
+      `/financial/quotes/${id}/share-link/extend`,
+    );
     return response.data;
   },
 };

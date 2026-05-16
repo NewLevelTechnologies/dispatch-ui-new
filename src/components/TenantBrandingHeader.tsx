@@ -36,6 +36,11 @@ export default function TenantBrandingHeader({ tenant }: Props) {
       <h1 className="text-xl font-semibold text-zinc-900">
         {tenant.displayName}
       </h1>
+      {tenant.companySlogan?.trim() && (
+        <p className="mt-0.5 text-sm italic text-zinc-500">
+          {tenant.companySlogan.trim()}
+        </p>
+      )}
       {hasAddress && (
         <address className="mt-1 not-italic text-sm text-zinc-600">
           {addressLine1 && <div>{addressLine1}</div>}
