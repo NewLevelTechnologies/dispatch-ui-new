@@ -23,33 +23,19 @@ import {
   ArrowPathIcon,
   MapPinIcon,
 } from '@heroicons/react/24/outline';
-import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarItem, SidebarSection } from './catalyst/sidebar';
+import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarHeading, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
-import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from './catalyst/navbar';
+import { Navbar } from './catalyst/navbar';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
 import { Avatar } from './catalyst/avatar';
 import { useTheme } from './ThemeProvider';
 import { useHasAnyCapability } from '../hooks/useCurrentUser';
 
 const ENV_BADGE: Record<string, { label: string; className: string }> = {
-  development: { label: 'DEV', className: 'bg-amber-500/15 text-amber-700 ring-amber-500/30 dark:text-amber-400' },
-  qa: { label: 'QA', className: 'bg-sky-500/15 text-sky-700 ring-sky-500/30 dark:text-sky-400' },
-  staging: { label: 'STG', className: 'bg-violet-500/15 text-violet-700 ring-violet-500/30 dark:text-violet-400' },
+  development: { label: 'DEV', className: 'bg-warning-500/20 text-warning-500 ring-warning-500/30' },
+  qa: { label: 'QA', className: 'bg-info-500/20 text-info-500 ring-info-500/30' },
+  staging: { label: 'STG', className: 'bg-violet-500/20 text-violet-500 ring-violet-500/30' },
 };
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="mt-1 mb-1 px-2 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase dark:text-zinc-400">
-      {children}
-    </h3>
-  );
-}
-
-function navItemClasses(isCurrent: boolean) {
-  return isCurrent
-    ? 'rounded-lg bg-zinc-950/[0.04] dark:bg-white/[0.06]'
-    : '';
-}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuthenticator((context) => [context.user]);
@@ -108,12 +94,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       sidebar={
         <Sidebar>
           <SidebarHeader>
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 shadow-sm">
-                <span className="text-sm font-bold text-white">D</span>
+            <div className="flex items-center gap-2.5">
+              <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-accent-500 to-accent-700 text-[13px] font-bold text-white shadow-sm">
+                {t('app.name').charAt(0)}
               </div>
               <div className="flex min-w-0 flex-1 items-center gap-2">
-                <span className="text-base font-semibold text-zinc-900 dark:text-white">
+                <span className="text-[14px] font-semibold tracking-tight text-white">
                   {t('app.name')}
                 </span>
                 {envBadge && (
@@ -136,9 +122,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     key={item.name}
                     href={item.href}
                     current={current}
-                    className={navItemClasses(current)}
                   >
-                    <item.icon className="h-5 w-5" />
+                    <item.icon data-slot="icon" />
                     <span>{item.name}</span>
                   </SidebarItem>
                 );
@@ -146,7 +131,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarSection>
 
             <SidebarSection>
-              <SectionHeading>{t('entities.inventory')}</SectionHeading>
+              <SidebarHeading>{t('entities.inventory')}</SidebarHeading>
               {equipmentNavigation.map((item) => {
                 const current = isCurrent(item.href);
                 return (
@@ -154,9 +139,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     key={item.name}
                     href={item.href}
                     current={current}
-                    className={navItemClasses(current)}
                   >
-                    <item.icon className="h-5 w-5" />
+                    <item.icon data-slot="icon" />
                     <span>{item.name}</span>
                   </SidebarItem>
                 );
@@ -164,7 +148,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarSection>
 
             <SidebarSection>
-              <SectionHeading>{t('entities.financial')}</SectionHeading>
+              <SidebarHeading>{t('entities.financial')}</SidebarHeading>
               {financialNavigation.map((item) => {
                 const current = isCurrent(item.href);
                 return (
@@ -172,9 +156,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     key={item.name}
                     href={item.href}
                     current={current}
-                    className={navItemClasses(current)}
                   >
-                    <item.icon className="h-5 w-5" />
+                    <item.icon data-slot="icon" />
                     <span>{item.name}</span>
                   </SidebarItem>
                 );
@@ -182,7 +165,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarSection>
 
             <SidebarSection>
-              <SectionHeading>{t('entities.scheduling')}</SectionHeading>
+              <SidebarHeading>{t('entities.scheduling')}</SidebarHeading>
               {schedulingNavigation.map((item) => {
                 const current = isCurrent(item.href);
                 return (
@@ -190,9 +173,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     key={item.name}
                     href={item.href}
                     current={current}
-                    className={navItemClasses(current)}
                   >
-                    <item.icon className="h-5 w-5" />
+                    <item.icon data-slot="icon" />
                     <span>{item.name}</span>
                   </SidebarItem>
                 );
@@ -208,9 +190,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       key={item.name}
                       href={item.href}
                       current={current}
-                      className={navItemClasses(current)}
                     >
-                      <item.icon className="h-5 w-5" />
+                      <item.icon data-slot="icon" />
                       <span>{item.name}</span>
                     </SidebarItem>
                   );
@@ -295,21 +276,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }
       navbar={
         <Navbar>
-          <NavbarSpacer />
-          <NavbarSection>
-            <NavbarItem>
-              <Avatar
-                initials={user?.signInDetails?.loginId?.charAt(0).toUpperCase() || 'U'}
-                className="size-8"
-              />
-            </NavbarItem>
-          </NavbarSection>
+          <div className="mx-auto flex h-[30px] w-full max-w-[420px] items-center gap-2 rounded-md border border-border bg-bg-sunken px-2.5 text-[12.5px] text-fg-muted">
+            <span className="text-fg-dim">{t('common.search')}</span>
+            <span aria-hidden className="ml-auto rounded border border-border bg-bg px-1.5 py-px font-mono text-[10px]">{'⌘K'}</span>
+          </div>
         </Navbar>
       }
     >
-      <div className="p-2">
-        {children}
-      </div>
+      {children}
     </SidebarLayout>
   );
 }
