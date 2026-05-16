@@ -10,6 +10,8 @@ import {
 import {
   quotesApi,
   QuoteStatus,
+  getApiErrorCode,
+  getApiErrorMessage,
   type Quote,
   type QuoteStatus as QuoteStatusType,
 } from '../api';
@@ -120,9 +122,15 @@ export default function FinancialQuotesTab({
   const { getName } = useGlossary();
   const quoteLabel = getName('quote');
   const quotesLabel = getName('quote', true);
+  const customerLabel = getName('customer');
   const workOrderLabel = getName('work_order');
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Same pattern as FinancialInvoicesTab — soft inline banner for send /
+  // reissue / extend feedback. See that file for rationale.
+  const [actionBanner, setActionBanner] = useState<
+    { kind: 'success' | 'error'; message: string } | null
+  >(null);
 
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
 
@@ -157,6 +165,84 @@ export default function FinancialQuotesTab({
     },
   });
 
+  const sendQuote = useMutation({
+    mutationFn: (quote: Quote) => quotesApi.send(quote.id),
+    onSuccess: (_data, quote) => {
+      queryClient.invalidateQueries({ queryKey: ['workOrderQuotes', workOrderId] });
+      // Send auto-flips DRAFT → SENT (mirrors the invoice contract), which
+      // affects the summary rollup bucket.
+      queryClient.invalidateQueries({ queryKey: ['financialSummary', workOrderId] });
+      setActionBanner({
+        kind: 'success',
+        message: t('workOrders.financialDrawer.quotesTab.sendSuccess', {
+          entity: `${quoteLabel} ${quote.quoteNumber}`,
+        }),
+      });
+    },
+    onError: (error: unknown) => {
+      const code = getApiErrorCode(error);
+      if (code === 'NO_RECIPIENT') {
+        setActionBanner({
+          kind: 'error',
+          message: t(
+            'workOrders.financialDrawer.quotesTab.sendErrorNoRecipient',
+            { customer: customerLabel },
+          ),
+        });
+        return;
+      }
+      setActionBanner({
+        kind: 'error',
+        message:
+          getApiErrorMessage(error) ??
+          t('workOrders.financialDrawer.quotesTab.sendError', {
+            entity: quoteLabel,
+          }),
+      });
+    },
+  });
+
+  const reissueShareLink = useMutation({
+    mutationFn: (quote: Quote) => quotesApi.reissueShareLink(quote.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workOrderQuotes', workOrderId] });
+      setActionBanner({
+        kind: 'success',
+        message: t('workOrders.financialDrawer.quotesTab.reissueSuccess'),
+      });
+    },
+    onError: (error: unknown) => {
+      setActionBanner({
+        kind: 'error',
+        message:
+          getApiErrorMessage(error) ??
+          t('workOrders.financialDrawer.quotesTab.sendError', {
+            entity: quoteLabel,
+          }),
+      });
+    },
+  });
+
+  const extendShareLink = useMutation({
+    mutationFn: (quote: Quote) => quotesApi.extendShareLink(quote.id),
+    onSuccess: () => {
+      setActionBanner({
+        kind: 'success',
+        message: t('workOrders.financialDrawer.quotesTab.extendSuccess'),
+      });
+    },
+    onError: (error: unknown) => {
+      setActionBanner({
+        kind: 'error',
+        message:
+          getApiErrorMessage(error) ??
+          t('workOrders.financialDrawer.quotesTab.sendError', {
+            entity: quoteLabel,
+          }),
+      });
+    },
+  });
+
   const toggleExpand = (id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -169,6 +255,39 @@ export default function FinancialQuotesTab({
   const handleStatusChange = (quote: Quote, next: QuoteStatusType) => {
     if (next === quote.status) return;
     updateStatus.mutate({ id: quote.id, status: next });
+  };
+
+  const handleSend = (quote: Quote) => {
+    setActionBanner(null);
+    sendQuote.mutate(quote);
+  };
+
+  const handleReissue = (quote: Quote) => {
+    if (
+      window.confirm(
+        t('workOrders.financialDrawer.quotesTab.reissueConfirm', {
+          entity: quoteLabel,
+          number: quote.quoteNumber,
+        }),
+      )
+    ) {
+      setActionBanner(null);
+      reissueShareLink.mutate(quote);
+    }
+  };
+
+  const handleExtend = (quote: Quote) => {
+    if (
+      window.confirm(
+        t('workOrders.financialDrawer.quotesTab.extendConfirm', {
+          entity: quoteLabel,
+          number: quote.quoteNumber,
+        }),
+      )
+    ) {
+      setActionBanner(null);
+      extendShareLink.mutate(quote);
+    }
   };
 
   if (isLoading) {
@@ -227,6 +346,26 @@ export default function FinancialQuotesTab({
 
   return (
     <div>
+      {actionBanner && (
+        <div
+          className={`mb-3 flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm ${
+            actionBanner.kind === 'success'
+              ? 'bg-lime-50 text-lime-800 dark:bg-lime-500/10 dark:text-lime-300'
+              : 'bg-rose-50 text-rose-800 dark:bg-rose-500/10 dark:text-rose-300'
+          }`}
+          role={actionBanner.kind === 'error' ? 'alert' : 'status'}
+        >
+          <span>{actionBanner.message}</span>
+          <button
+            type="button"
+            onClick={() => setActionBanner(null)}
+            className="text-xs underline hover:no-underline"
+            aria-label={t('common.dismiss')}
+          >
+            {t('common.dismiss')}
+          </button>
+        </div>
+      )}
       <div className="mb-3 flex justify-end gap-2">
         <Button color="dark/zinc" onClick={() => setQuoteDialogOpen(true)}>
           <PlusIcon className="size-4" />
@@ -293,7 +432,19 @@ export default function FinancialQuotesTab({
                       )}
                     </button>
                   </TableCell>
-                  <TableCell className="font-mono">{quote.quoteNumber}</TableCell>
+                  <TableCell className="font-mono">
+                    <div>{quote.quoteNumber}</div>
+                    {quote.lastSentAt && (
+                      <div className="font-sans text-xs italic font-normal text-zinc-500 dark:text-zinc-400">
+                        {t('workOrders.financialDrawer.quotesTab.lastSentTo', {
+                          date: formatDate(quote.lastSentAt),
+                          email:
+                            quote.lastSentToEmails?.split(',')[0]?.trim() ??
+                            '—',
+                        })}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>{formatDate(quote.quoteDate)}</TableCell>
                   <TableCell>{formatDate(quote.expirationDate)}</TableCell>
                   <TableCell>
@@ -351,34 +502,59 @@ export default function FinancialQuotesTab({
                     {currencyFormatter.format(amt(quote.totalAmount))}
                   </TableCell>
                   <TableCell>
-                    {!isTerminal && quote.status === QuoteStatus.SENT && (
+                    {!isTerminal && (
                       <Dropdown>
                         <DropdownButton plain aria-label={t('common.moreOptions')}>
                           <EllipsisHorizontalIcon className="size-5" />
                         </DropdownButton>
                         <DropdownMenu anchor="bottom end">
-                          <DropdownItem
-                            onClick={() =>
-                              handleStatusChange(quote, QuoteStatus.ACCEPTED)
-                            }
-                          >
+                          <DropdownItem onClick={() => handleSend(quote)}>
                             <DropdownLabel>
-                              {t(
-                                'workOrders.financialDrawer.quotesTab.actions.markAccepted',
-                              )}
+                              {quote.lastSentAt
+                                ? t('workOrders.financialDrawer.quotesTab.actions.resend')
+                                : t('workOrders.financialDrawer.quotesTab.actions.send')}
                             </DropdownLabel>
                           </DropdownItem>
-                          <DropdownItem
-                            onClick={() =>
-                              handleStatusChange(quote, QuoteStatus.DECLINED)
-                            }
-                          >
-                            <DropdownLabel>
-                              {t(
-                                'workOrders.financialDrawer.quotesTab.actions.markDeclined',
-                              )}
-                            </DropdownLabel>
-                          </DropdownItem>
+                          {quote.lastSentAt && (
+                            <>
+                              <DropdownItem onClick={() => handleReissue(quote)}>
+                                <DropdownLabel>
+                                  {t('workOrders.financialDrawer.quotesTab.actions.reissue')}
+                                </DropdownLabel>
+                              </DropdownItem>
+                              <DropdownItem onClick={() => handleExtend(quote)}>
+                                <DropdownLabel>
+                                  {t('workOrders.financialDrawer.quotesTab.actions.extend')}
+                                </DropdownLabel>
+                              </DropdownItem>
+                            </>
+                          )}
+                          {quote.status === QuoteStatus.SENT && (
+                            <>
+                              <DropdownItem
+                                onClick={() =>
+                                  handleStatusChange(quote, QuoteStatus.ACCEPTED)
+                                }
+                              >
+                                <DropdownLabel>
+                                  {t(
+                                    'workOrders.financialDrawer.quotesTab.actions.markAccepted',
+                                  )}
+                                </DropdownLabel>
+                              </DropdownItem>
+                              <DropdownItem
+                                onClick={() =>
+                                  handleStatusChange(quote, QuoteStatus.DECLINED)
+                                }
+                              >
+                                <DropdownLabel>
+                                  {t(
+                                    'workOrders.financialDrawer.quotesTab.actions.markDeclined',
+                                  )}
+                                </DropdownLabel>
+                              </DropdownItem>
+                            </>
+                          )}
                         </DropdownMenu>
                       </Dropdown>
                     )}

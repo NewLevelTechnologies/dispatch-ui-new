@@ -73,7 +73,7 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region, next
         if (typeof data === 'string') {
           errorMessage = data;
         } else if (data && typeof data === 'object') {
-          errorMessage = (data as { message?: string }).message || (data as { error?: string }).error;
+          errorMessage = (data as { message?: string }).message;
         }
       }
 
@@ -101,7 +101,7 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region, next
         if (typeof data === 'string') {
           errorMessage = data;
         } else if (data && typeof data === 'object') {
-          errorMessage = (data as { message?: string }).message || (data as { error?: string }).error;
+          errorMessage = (data as { message?: string }).message;
         }
       }
 

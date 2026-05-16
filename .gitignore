@@ -33,6 +33,10 @@ check-menu-sizes.js
 menu-*.png
 menu-*.md
 
+# Local-only design handoff dumps
+handoff/
+*.zip
+
 # Test coverage
 coverage
 

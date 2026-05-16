@@ -3,7 +3,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   invoicesApi,
-  InvoiceStatus,
+  getApiErrorCode,
+  getApiErrorMessage,
   type CreateInvoiceRequest,
   type CustomerSearchResult,
 } from '../api';
@@ -56,7 +57,9 @@ const isoPlusDays = (days: number) => {
  *
  * Two save buttons (§4.2):
  *   - Save as Draft  → POST with status DRAFT
- *   - Save & Send    → POST + chained updateStatus(SENT)
+ *   - Save & Send    → POST, then POST `/send` (server flips DRAFT → SENT
+ *                       atomically per Phase 7 §4.3 step 7; no chained
+ *                       status PATCH needed)
  *
  * Tax handling is intentionally out of scope here — `taxRate: 0` is
  * hardcoded. The standalone Invoices page covers tax-aware creation
@@ -149,9 +152,10 @@ export default function InvoiceDialog({
       };
       const created = await invoicesApi.create(request);
       if (send) {
-        await invoicesApi.updateStatus(created.id, {
-          status: InvoiceStatus.SENT,
-        });
+        // Server flips DRAFT → SENT atomically in the same transaction
+        // that publishes the NotificationRequestedEvent (§4.3 step 7), so
+        // we no longer need a chained `updateStatus(SENT)` call here.
+        await invoicesApi.send(created.id);
       }
       return created;
     },
@@ -160,11 +164,19 @@ export default function InvoiceDialog({
       onClose();
     },
     onError: (e: unknown) => {
-      const msg =
-        e instanceof Error && 'response' in e
-          ? (e as { response?: { data?: { message?: string } } }).response?.data
-              ?.message
-          : undefined;
+      // Branch on the structured error code for the most common send
+      // failure — bill-to customer has no email on file — so the CSR
+      // gets actionable copy instead of the backend's bare message.
+      const code = getApiErrorCode(e);
+      if (code === 'NO_RECIPIENT') {
+        setError(
+          t('workOrders.financialDrawer.invoiceDialog.errorNoRecipient', {
+            entity: invoiceLabel,
+          }),
+        );
+        return;
+      }
+      const msg = getApiErrorMessage(e);
       setError(
         msg ??
           t('workOrders.financialDrawer.invoiceDialog.errorCreate', {

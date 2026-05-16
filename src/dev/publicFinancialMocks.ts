@@ -16,6 +16,7 @@ import type {
 
 const TENANT = {
   displayName: 'Acme HVAC',
+  companySlogan: 'Heating & cooling since 1987',
   logoUrl: null,
   streetAddress: '123 Main Street',
   city: 'Springfield',

@@ -10,6 +10,7 @@ import {
 import TenantBrandingHeader from '../components/TenantBrandingHeader';
 import CliffPage from '../components/CliffPage';
 import { Badge } from '../components/catalyst/badge';
+import { useScopedReferrerPolicy } from '../hooks/useScopedReferrerPolicy';
 
 /**
  * Customer-facing read-only quote view, rendered when a customer clicks
@@ -65,6 +66,7 @@ const QuoteStatusBadge = ({ status }: QuoteBadgeProps) => {
 export default function PublicQuotePage() {
   const { t } = useTranslation();
   const { token = '' } = useParams<{ token: string }>();
+  useScopedReferrerPolicy();
 
   const { data, isLoading, isError, error } = useQuery<
     PublicQuoteResponse,
