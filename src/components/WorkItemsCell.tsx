@@ -78,7 +78,7 @@ export default function WorkItemsCell({ items, totalCount }: Props) {
               `workOrders.progress.${PROGRESS_TRANSLATION_KEYS[wi.statusCategory]}`
             )}
           </Badge>
-          <span className="line-clamp-5 min-w-0 flex-1 whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
+          <span className="line-clamp-5 min-w-0 flex-1 whitespace-pre-wrap font-[450] text-zinc-700 dark:text-zinc-300">
             {wi.description}
           </span>
         </div>
