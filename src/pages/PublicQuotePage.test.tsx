@@ -15,31 +15,28 @@ function buildResponse(
 ): PublicQuoteResponse {
   return {
     quote: {
-      id: 'q-1',
-      customerId: 'cust-1',
       quoteNumber: 'Q-0007',
       status: 'SENT',
-      quoteDate: '2026-05-10T00:00:00Z',
-      expirationDate: '2026-06-09T00:00:00Z',
-      subtotal: 1200,
-      taxRate: 0,
-      taxAmount: 0,
-      totalAmount: 1200,
+      quoteDate: '2026-05-10',
+      expirationDate: '2026-06-09',
+      subtotal: '1200.00',
+      taxRate: '0.00',
+      taxAmount: '0.00',
+      totalAmount: '1200.00',
+      notes: null,
       lineItems: [
         {
-          id: 'li-1',
           description: 'Replace compressor',
-          quantity: 1,
-          unitPrice: 1200,
-          lineTotal: 1200,
+          quantity: '1.00',
+          unitPrice: '1200.00',
+          lineTotal: '1200.00',
         },
       ],
-      createdAt: '2026-05-10T00:00:00Z',
-      updatedAt: '2026-05-10T00:00:00Z',
       ...overrides,
     },
     tenant: {
       displayName: 'Acme HVAC',
+      companySlogan: null,
       logoUrl: null,
       streetAddress: '123 Main',
       city: 'Springfield',
@@ -76,6 +73,22 @@ describe('PublicQuotePage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Q-0007/)).toBeInTheDocument();
     expect(screen.getAllByText(/\$1,200\.00/).length).toBeGreaterThan(0);
+  });
+
+  it('shows a "Declined" badge for REJECTED quotes', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({
+      data: buildResponse({ status: 'REJECTED' }),
+    });
+    renderAt('tok-1');
+    expect(await screen.findByText(/declined/i)).toBeInTheDocument();
+  });
+
+  it('shows a "Cancelled" badge for CANCELLED quotes', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({
+      data: buildResponse({ status: 'CANCELLED' }),
+    });
+    renderAt('tok-1');
+    expect(await screen.findByText(/cancelled/i)).toBeInTheDocument();
   });
 
   it('shows the cliff page when the token endpoint returns 404', async () => {

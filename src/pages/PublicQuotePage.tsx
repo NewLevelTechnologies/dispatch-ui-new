@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import {
   publicFinancialApi,
-  QuoteStatus,
   type PublicQuoteResponse,
+  type PublicQuoteStatus,
 } from '../api';
 import TenantBrandingHeader from '../components/TenantBrandingHeader';
 import CliffPage from '../components/CliffPage';
@@ -18,9 +18,9 @@ import { useScopedReferrerPolicy } from '../hooks/useScopedReferrerPolicy';
  *
  * Mirrors `PublicInvoicePage` structure with a quote-shaped hero (total
  * amount + expiration date instead of balance + due date) and no payments
- * section. DECLINED / EXPIRED render with muted styling; ACCEPTED gets a
- * lime accent. No customer-side accept/decline affordance in v1 (out of
- * scope — quote responses are a phone call today).
+ * section. REJECTED / EXPIRED / CANCELLED render with muted styling;
+ * ACCEPTED gets a lime accent. No customer-side accept/decline affordance
+ * in v1 (out of scope — quote responses are a phone call today).
  */
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
@@ -41,22 +41,30 @@ const formatDate = (iso: string | null | undefined): string => {
   });
 };
 
-type QuoteBadgeProps = {
-  status: PublicQuoteResponse['quote']['status'];
+const formatQuantity = (value: string | number): string => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  return Number.isInteger(n) ? String(n) : String(n);
 };
+
+type QuoteBadgeProps = { status: PublicQuoteStatus };
 
 const QuoteStatusBadge = ({ status }: QuoteBadgeProps) => {
   const { t } = useTranslation();
   switch (status) {
-    case QuoteStatus.ACCEPTED:
+    case 'ACCEPTED':
       return <Badge color="lime">{t('public.quote.status.accepted')}</Badge>;
-    case QuoteStatus.DECLINED:
+    case 'REJECTED':
+      // Customer-facing label stays "Declined" — gentler than "Rejected"
+      // on a document the customer themselves may have declined.
       return <Badge color="zinc">{t('public.quote.status.declined')}</Badge>;
-    case QuoteStatus.EXPIRED:
+    case 'CANCELLED':
+      return <Badge color="zinc">{t('public.quote.status.cancelled')}</Badge>;
+    case 'EXPIRED':
       return <Badge color="amber">{t('public.quote.status.expired')}</Badge>;
-    case QuoteStatus.SENT:
+    case 'SENT':
       return <Badge color="sky">{t('public.quote.status.pending')}</Badge>;
-    case QuoteStatus.DRAFT:
+    case 'DRAFT':
       return <Badge color="zinc">{t('public.quote.status.draft')}</Badge>;
     default:
       return null;
@@ -96,8 +104,9 @@ export default function PublicQuotePage() {
   }
 
   const { quote, tenant, customer } = data;
-  const isAccepted = quote.status === QuoteStatus.ACCEPTED;
-  const isExpired = quote.status === QuoteStatus.EXPIRED;
+  const isAccepted = quote.status === 'ACCEPTED';
+  const isExpired = quote.status === 'EXPIRED';
+  const senderName = tenant.displayName ?? t('public.common.theSender');
 
   return (
     <div className="min-h-screen bg-zinc-50 print:bg-white">
@@ -168,15 +177,15 @@ export default function PublicQuotePage() {
             {t('public.quote.items')}
           </h2>
           <ul className="divide-y divide-zinc-100">
-            {quote.lineItems.map((item) => (
+            {quote.lineItems.map((item, idx) => (
               <li
-                key={item.id}
+                key={idx}
                 className="flex flex-col gap-1 px-6 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-zinc-900">{item.description}</p>
                   <p className="mt-0.5 text-xs text-zinc-500">
-                    {item.quantity} × {formatMoney(item.unitPrice)}
+                    {formatQuantity(item.quantity)} × {formatMoney(item.unitPrice)}
                   </p>
                 </div>
                 <div className="text-sm font-medium text-zinc-900 sm:text-right">
@@ -196,7 +205,7 @@ export default function PublicQuotePage() {
             {Number(quote.taxAmount) > 0 && (
               <div className="flex justify-between">
                 <dt className="text-zinc-600">
-                  {quote.taxRate
+                  {Number(quote.taxRate) > 0
                     ? t('public.quote.taxWithRate', { rate: quote.taxRate })
                     : t('public.quote.tax')}
                 </dt>
@@ -225,27 +234,29 @@ export default function PublicQuotePage() {
           </section>
         )}
 
-        <footer className="mt-8 text-center text-sm text-zinc-500 print:mt-4">
-          <p>{t('public.quote.questions')}</p>
-          <p className="mt-1 text-zinc-700">
-            {t('public.quote.contactCta', { tenant: tenant.displayName })}
-            {tenant.supportPhone
-              ? t('public.common.contactPhone', { phone: tenant.supportPhone })
-              : ''}
-            {tenant.supportEmail ? (
-              <>
-                {' · '}
-                <a
-                  href={`mailto:${tenant.supportEmail}`}
-                  rel="noopener noreferrer"
-                  className="text-sky-700 underline"
-                >
-                  {tenant.supportEmail}
-                </a>
-              </>
-            ) : null}
-          </p>
-        </footer>
+        {(tenant.supportPhone || tenant.supportEmail) && (
+          <footer className="mt-8 text-center text-sm text-zinc-500 print:mt-4">
+            <p>{t('public.quote.questions')}</p>
+            <p className="mt-1 text-zinc-700">
+              {t('public.quote.contactCta', { tenant: senderName })}
+              {tenant.supportPhone
+                ? t('public.common.contactPhone', { phone: tenant.supportPhone })
+                : ''}
+              {tenant.supportEmail ? (
+                <>
+                  {' · '}
+                  <a
+                    href={`mailto:${tenant.supportEmail}`}
+                    rel="noopener noreferrer"
+                    className="text-sky-700 underline"
+                  >
+                    {tenant.supportEmail}
+                  </a>
+                </>
+              ) : null}
+            </p>
+          </footer>
+        )}
       </div>
     </div>
   );
