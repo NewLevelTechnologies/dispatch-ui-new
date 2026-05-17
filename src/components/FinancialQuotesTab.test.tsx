@@ -180,7 +180,10 @@ describe('FinancialQuotesTab', () => {
       await user.click(overflow);
       await user.click(await screen.findByRole('menuitem', { name: /^send$/i }));
       await waitFor(() => {
-        expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/send');
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/financial/quotes/q-1/send',
+          undefined,
+        );
       });
     });
 
