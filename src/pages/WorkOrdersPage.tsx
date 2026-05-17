@@ -3,7 +3,8 @@ import { useSearchParams, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon, CheckIcon } from '@heroicons/react/24/outline';
+import * as Headless from '@headlessui/react';
+import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import {
   workOrderApi,
   workOrderTypesApi,
@@ -22,6 +23,7 @@ import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
+import { ListboxOption } from '../components/catalyst/listbox';
 import IconButton from '../components/IconButton';
 import { Input, InputGroup } from '../components/catalyst/input';
 import { Checkbox, CheckboxField } from '../components/catalyst/checkbox';
@@ -161,26 +163,38 @@ function isCancelled(wo: WorkOrderSummary): boolean {
   return wo.lifecycleState === 'CANCELLED';
 }
 
-// ─── FilterChipDropdown ──────────────────────────────────────────────────────
-// Chip body opens a popover; clear × is a sibling button. Two adjacent buttons
-// inside one bordered wrapper — keeps the clear click from bubbling into the
-// MenuButton's open handler (Headless MenuButton owns its onClick).
-function FilterChipDropdown({
+// ─── FilterChipListbox ───────────────────────────────────────────────────────
+// Chip body opens a Listbox popover; clear × is a sibling button. Two adjacent
+// buttons inside one bordered wrapper — keeps the clear click from bubbling
+// into the ListboxButton's open handler.
+//
+// Listbox (not Menu) is the correct primitive: screen readers announce
+// "<option>, selected" for the currently-applied filter via aria-selected,
+// which a menu can't communicate. Keyboard nav, type-ahead, Esc-to-close,
+// click-outside, and floating positioning all come from Headless UI.
+//
+// The reset row uses <ListboxOption value={null}>. Hosts pass `value={x || null}`
+// so empty-string URL params map cleanly to the null option.
+function FilterChipListbox({
   label,
   value,
+  displayValue,
   ariaLabel,
+  onChange,
   onClear,
   children,
 }: {
   label: string;
-  value?: string | null;
+  value: string | null;
+  displayValue?: string | null;
   ariaLabel: string;
+  onChange: (value: string | null) => void;
   onClear?: () => void;
   children: ReactNode;
 }) {
-  const isSet = value != null && value !== '';
+  const isSet = value != null && displayValue != null && displayValue !== '';
   return (
-    <Dropdown>
+    <Headless.Listbox value={value} onChange={onChange}>
       <span
         className={clsx(
           'inline-flex h-8 items-center overflow-hidden rounded-md border bg-bg-elev text-[12px] transition-colors',
@@ -189,18 +203,17 @@ function FilterChipDropdown({
             : 'border-border hover:bg-bg-hover'
         )}
       >
-        <DropdownButton
-          as="button"
+        <Headless.ListboxButton
           aria-label={ariaLabel}
           className="flex h-full items-center gap-1.5 px-2.5 font-medium text-fg outline-none focus:outline-none"
         >
           <span className="text-fg-muted">{label}</span>
           {isSet ? (
-            <span className="font-semibold text-fg-strong">{value}</span>
+            <span className="font-semibold text-fg-strong">{displayValue}</span>
           ) : (
             <span className="text-fg-dim">+</span>
           )}
-        </DropdownButton>
+        </Headless.ListboxButton>
         {isSet && onClear && (
           <button
             type="button"
@@ -212,27 +225,28 @@ function FilterChipDropdown({
           </button>
         )}
       </span>
-      {children}
-    </Dropdown>
+      <Headless.ListboxOptions
+        transition
+        anchor="bottom start"
+        className={clsx(
+          '[--anchor-gap:--spacing(2)] [--anchor-padding:--spacing(1)] [--anchor-offset:-6px]',
+          'isolate w-max rounded-xl p-1',
+          'outline outline-transparent focus:outline-hidden',
+          'overflow-y-auto',
+          'bg-bg-elev/95 backdrop-blur-xl',
+          'shadow-lg ring-1 ring-border',
+          'transition data-leave:duration-100 data-leave:ease-in data-closed:data-leave:opacity-0'
+        )}
+      >
+        {children}
+      </Headless.ListboxOptions>
+    </Headless.Listbox>
   );
 }
 
-// One option row in a FilterChipDropdown menu. Renders a check on the active value.
-function ChipOption({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <DropdownItem onClick={onClick}>
-      {active ? <CheckIcon data-slot="icon" /> : <span data-slot="icon" />}
-      <DropdownLabel>{children}</DropdownLabel>
-    </DropdownItem>
-  );
+// Visual separator between the reset row and real options. Matches DropdownDivider styling.
+function ChipDivider() {
+  return <hr className="mx-3 my-1 h-px border-0 bg-border-soft" />;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -559,136 +573,110 @@ export default function WorkOrdersPage() {
               </InputGroup>
 
               {activeTypes.length > 0 && (
-                <FilterChipDropdown
+                <FilterChipListbox
                   label={t('workOrders.form.type')}
                   ariaLabel={t('workOrders.form.type')}
-                  value={typeId ? lookupName(typeId, activeTypes) : null}
+                  value={typeId || null}
+                  displayValue={typeId ? lookupName(typeId, activeTypes) : null}
+                  onChange={(id) => updateParams({ type: id, page: null })}
                   onClear={() => updateParams({ type: null, page: null })}
                 >
-                  <DropdownMenu>
-                    <ChipOption active={!typeId} onClick={() => updateParams({ type: null, page: null })}>
-                      {t('workOrders.filters.anyType')}
-                    </ChipOption>
-                    <DropdownDivider />
-                    {activeTypes.map((tx) => (
-                      <ChipOption
-                        key={tx.id}
-                        active={typeId === tx.id}
-                        onClick={() => updateParams({ type: tx.id, page: null })}
-                      >
-                        {tx.name}
-                      </ChipOption>
-                    ))}
-                  </DropdownMenu>
-                </FilterChipDropdown>
+                  <ListboxOption value={null}>{t('workOrders.filters.anyType')}</ListboxOption>
+                  <ChipDivider />
+                  {activeTypes.map((tx) => (
+                    <ListboxOption key={tx.id} value={tx.id}>
+                      {tx.name}
+                    </ListboxOption>
+                  ))}
+                </FilterChipListbox>
               )}
 
               {activeDivisions.length > 0 && (
-                <FilterChipDropdown
+                <FilterChipListbox
                   label={getName('division')}
                   ariaLabel={getName('division')}
-                  value={divisionId ? lookupName(divisionId, activeDivisions) : null}
+                  value={divisionId || null}
+                  displayValue={divisionId ? lookupName(divisionId, activeDivisions) : null}
+                  onChange={(id) => updateParams({ division: id, page: null })}
                   onClear={() => updateParams({ division: null, page: null })}
                 >
-                  <DropdownMenu>
-                    <ChipOption active={!divisionId} onClick={() => updateParams({ division: null, page: null })}>
-                      {t('workOrders.filters.any', { entity: getName('division') })}
-                    </ChipOption>
-                    <DropdownDivider />
-                    {activeDivisions.map((d) => (
-                      <ChipOption
-                        key={d.id}
-                        active={divisionId === d.id}
-                        onClick={() => updateParams({ division: d.id, page: null })}
-                      >
-                        {d.name}
-                      </ChipOption>
-                    ))}
-                  </DropdownMenu>
-                </FilterChipDropdown>
+                  <ListboxOption value={null}>
+                    {t('workOrders.filters.any', { entity: getName('division') })}
+                  </ListboxOption>
+                  <ChipDivider />
+                  {activeDivisions.map((d) => (
+                    <ListboxOption key={d.id} value={d.id}>
+                      {d.name}
+                    </ListboxOption>
+                  ))}
+                </FilterChipListbox>
               )}
 
               {activeRegions.length > 0 && (
-                <FilterChipDropdown
+                <FilterChipListbox
                   label={t('workOrders.filters.region')}
                   ariaLabel={t('workOrders.filters.region')}
-                  value={regionId ? lookupName(regionId, activeRegions) : null}
+                  value={regionId || null}
+                  displayValue={regionId ? lookupName(regionId, activeRegions) : null}
+                  onChange={(id) => updateParams({ region: id, page: null })}
                   onClear={() => updateParams({ region: null, page: null })}
                 >
-                  <DropdownMenu>
-                    <ChipOption active={!regionId} onClick={() => updateParams({ region: null, page: null })}>
-                      {t('workOrders.filters.anyRegion')}
-                    </ChipOption>
-                    <DropdownDivider />
-                    {activeRegions.map((r) => (
-                      <ChipOption
-                        key={r.id}
-                        active={regionId === r.id}
-                        onClick={() => updateParams({ region: r.id, page: null })}
-                      >
-                        {r.name}
-                      </ChipOption>
-                    ))}
-                  </DropdownMenu>
-                </FilterChipDropdown>
+                  <ListboxOption value={null}>{t('workOrders.filters.anyRegion')}</ListboxOption>
+                  <ChipDivider />
+                  {activeRegions.map((r) => (
+                    <ListboxOption key={r.id} value={r.id}>
+                      {r.name}
+                    </ListboxOption>
+                  ))}
+                </FilterChipListbox>
               )}
 
               {activeItemStatuses.length > 0 && (
-                <FilterChipDropdown
+                <FilterChipListbox
                   label={t('workOrders.filters.itemStatus')}
                   ariaLabel={t('workOrders.filters.itemStatus')}
-                  value={itemStatusId ? lookupName(itemStatusId, activeItemStatuses) : null}
+                  value={itemStatusId || null}
+                  displayValue={itemStatusId ? lookupName(itemStatusId, activeItemStatuses) : null}
+                  onChange={(id) => updateParams({ itemStatus: id, page: null })}
                   onClear={() => updateParams({ itemStatus: null, page: null })}
                 >
-                  <DropdownMenu>
-                    <ChipOption active={!itemStatusId} onClick={() => updateParams({ itemStatus: null, page: null })}>
-                      {t('workOrders.filters.anyItemStatus')}
-                    </ChipOption>
-                    <DropdownDivider />
-                    {activeItemStatuses.map((s) => (
-                      <ChipOption
-                        key={s.id}
-                        active={itemStatusId === s.id}
-                        onClick={() => updateParams({ itemStatus: s.id, page: null })}
-                      >
-                        {s.name}
-                      </ChipOption>
-                    ))}
-                  </DropdownMenu>
-                </FilterChipDropdown>
+                  <ListboxOption value={null}>{t('workOrders.filters.anyItemStatus')}</ListboxOption>
+                  <ChipDivider />
+                  {activeItemStatuses.map((s) => (
+                    <ListboxOption key={s.id} value={s.id}>
+                      {s.name}
+                    </ListboxOption>
+                  ))}
+                </FilterChipListbox>
               )}
 
-              <FilterChipDropdown
+              <FilterChipListbox
                 label={t('workOrders.filters.scheduled')}
                 ariaLabel={t('workOrders.filters.scheduled')}
-                value={
+                value={datePreset || null}
+                displayValue={
                   datePreset === ''
                     ? null
                     : datePreset === 'custom'
                       ? `${customFrom || '…'} – ${customTo || '…'}`
                       : t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '')
                 }
+                onChange={(id) => {
+                  const updates: Record<string, string | null> = { date: id, page: null };
+                  if (id !== 'custom') {
+                    updates.from = null;
+                    updates.to = null;
+                  }
+                  updateParams(updates);
+                }}
                 onClear={() => updateParams({ date: null, from: null, to: null, page: null })}
               >
-                <DropdownMenu>
-                  {DATE_PRESETS.map((p) => (
-                    <ChipOption
-                      key={p.id || 'any'}
-                      active={datePreset === p.id}
-                      onClick={() => {
-                        const updates: Record<string, string | null> = { date: p.id || null, page: null };
-                        if (p.id !== 'custom') {
-                          updates.from = null;
-                          updates.to = null;
-                        }
-                        updateParams(updates);
-                      }}
-                    >
-                      {t(p.labelKey)}
-                    </ChipOption>
-                  ))}
-                </DropdownMenu>
-              </FilterChipDropdown>
+                {DATE_PRESETS.map((p) => (
+                  <ListboxOption key={p.id || 'any'} value={p.id || null}>
+                    {t(p.labelKey)}
+                  </ListboxOption>
+                ))}
+              </FilterChipListbox>
 
               <CheckboxField className="ml-2 flex-none">
                 <Checkbox
