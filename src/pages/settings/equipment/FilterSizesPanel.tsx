@@ -11,14 +11,6 @@ import { Heading } from '../../../components/catalyst/heading';
 import { Text } from '../../../components/catalyst/text';
 import { Button } from '../../../components/catalyst/button';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../../components/catalyst/table';
-import {
   Dropdown,
   DropdownButton,
   DropdownItem,
@@ -28,12 +20,12 @@ import { Dialog, DialogActions, DialogBody, DialogTitle } from '../../../compone
 import IconButton from '../../../components/IconButton';
 import { Field, FieldGroup, Fieldset, Label } from '../../../components/catalyst/fieldset';
 import { Input } from '../../../components/catalyst/input';
-import {
-  ChevronUpIcon,
-  ChevronDownIcon,
-  EllipsisVerticalIcon,
-} from '@heroicons/react/16/solid';
+import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { formatFilterSize } from '../../../utils/formatFilterSize';
+import { Card, CardBody } from '../../../components/ui/Card';
+import { DenseTable, DenseTHead, DenseRow } from '../../../components/ui/DenseTable';
+import { SettingsListFooter } from '../../../components/settings/SettingsListFooter';
+import { DragHandle } from '../../../components/settings/DragHandle';
 
 const QUERY_KEY = ['tenant-filter-sizes'] as const;
 
@@ -45,6 +37,8 @@ export default function FilterSizesPanel() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selected, setSelected] = useState<TenantFilterSize | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const { data: items, isLoading, error } = useQuery({
     queryKey: QUERY_KEY,
@@ -93,16 +87,11 @@ export default function FilterSizesPanel() {
   const nextSortOrder =
     sorted.length > 0 ? Math.max(...sorted.map((i) => i.sortOrder)) + 1 : 0;
 
-  const moveUp = (index: number) => {
-    if (index <= 0) return;
+  const performReorder = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= sorted.length || to >= sorted.length) return;
     const reordered = [...sorted];
-    [reordered[index], reordered[index - 1]] = [reordered[index - 1], reordered[index]];
-    reorderMutation.mutate(reordered.map((i) => i.id));
-  };
-  const moveDown = (index: number) => {
-    if (index >= sorted.length - 1) return;
-    const reordered = [...sorted];
-    [reordered[index], reordered[index + 1]] = [reordered[index + 1], reordered[index]];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
     reorderMutation.mutate(reordered.map((i) => i.id));
   };
 
@@ -141,7 +130,7 @@ export default function FilterSizesPanel() {
                 ? t('common.saving')
                 : t('settings.filterSizes.seedCommon')}
             </Button>
-            <Button onClick={handleAdd}>{t('settings.filterSizes.add')}</Button>
+            <Button color="accent" onClick={handleAdd}>{t('settings.filterSizes.add')}</Button>
           </div>
         )}
       </div>
@@ -173,63 +162,85 @@ export default function FilterSizesPanel() {
       )}
 
       {sorted.length > 0 && (
-        <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-          <TableHead>
-            <TableRow>
-              <TableHeader>{t('settings.filterSizes.size')}</TableHeader>
-              <TableHeader className="w-24"></TableHeader>
-              <TableHeader></TableHeader>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {sorted.map((item, index) => (
-              <TableRow key={item.id}>
-                <TableCell>{formatFilterSize(item)}</TableCell>
-                <TableCell>
-                  {canEdit && (
-                    <div className="flex items-center gap-0.5">
-                      <IconButton
-                        onClick={() => moveUp(index)}
-                        disabled={index === 0 || reorderMutation.isPending}
-                        title={t('common.moveUp')}
-                        aria-label={t('common.moveUp')}
-                      >
-                        <ChevronUpIcon className="h-4 w-4" />
-                      </IconButton>
-                      <IconButton
-                        onClick={() => moveDown(index)}
-                        disabled={index === sorted.length - 1 || reorderMutation.isPending}
-                        title={t('common.moveDown')}
-                        aria-label={t('common.moveDown')}
-                      >
-                        <ChevronDownIcon className="h-4 w-4" />
-                      </IconButton>
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="-mx-3 -my-1.5 sm:-mx-2.5 flex items-center justify-end">
-                    {canEdit && (
-                      <Dropdown>
-                        <DropdownButton plain aria-label={t('common.moreOptions')}>
-                          <EllipsisVerticalIcon />
-                        </DropdownButton>
-                        <DropdownMenu anchor="bottom end">
-                          <DropdownItem onClick={() => handleEdit(item)}>
-                            {t('common.edit')}
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handleDelete(item)}>
-                            {t('common.delete')}
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <Card>
+          <CardBody flush>
+            <DenseTable>
+              <DenseTHead>
+                <tr>
+                  <th style={{ width: 32 }}></th>
+                  <th>{t('settings.filterSizes.size')}</th>
+                  <th style={{ width: 40 }}></th>
+                </tr>
+              </DenseTHead>
+              <tbody>
+                {sorted.map((item, index) => {
+                  const isDragging = dragIndex === index;
+                  const isDragOver = dragOverIndex === index && dragIndex !== null && dragIndex !== index;
+                  return (
+                    <DenseRow
+                      key={item.id}
+                      draggable={canEdit}
+                      onDragStart={(e: React.DragEvent) => {
+                        if (!canEdit) return;
+                        setDragIndex(index);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragOver={(e: React.DragEvent) => {
+                        if (dragIndex === null) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        if (dragOverIndex !== index) setDragOverIndex(index);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverIndex === index) setDragOverIndex(null);
+                      }}
+                      onDrop={(e: React.DragEvent) => {
+                        e.preventDefault();
+                        if (dragIndex !== null) performReorder(dragIndex, index);
+                        setDragIndex(null);
+                        setDragOverIndex(null);
+                      }}
+                      onDragEnd={() => {
+                        setDragIndex(null);
+                        setDragOverIndex(null);
+                      }}
+                      className={
+                        [
+                          isDragging && 'opacity-50',
+                          isDragOver && 'outline outline-2 outline-accent-500/40 outline-offset-[-2px]',
+                        ].filter(Boolean).join(' ')
+                      }
+                    >
+                      <td>{canEdit && <DragHandle />}</td>
+                      <td className="strong">{formatFilterSize(item)}</td>
+                      <td className="right">
+                        {canEdit && (
+                          <Dropdown>
+                            <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                              <EllipsisVerticalIcon className="size-4" />
+                            </DropdownButton>
+                            <DropdownMenu anchor="bottom end">
+                              <DropdownItem onClick={() => handleEdit(item)}>
+                                {t('common.edit')}
+                              </DropdownItem>
+                              <DropdownItem onClick={() => handleDelete(item)}>
+                                {t('common.delete')}
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        )}
+                      </td>
+                    </DenseRow>
+                  );
+                })}
+              </tbody>
+            </DenseTable>
+          </CardBody>
+          <SettingsListFooter
+            count={sorted.length}
+            noun={t('settings.filterSizes.nounPlural')}
+          />
+        </Card>
       )}
 
       <FilterSizeFormDialog
