@@ -13,7 +13,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 type Mode = 'light' | 'dark';
-type Accent = 'warm' | 'cool' | 'sage';
+type Accent = 'warm' | 'cool';
 
 type ThemeContextValue = {
   mode: Mode;
@@ -46,10 +46,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement;
     root.classList.remove('theme-light', 'theme-dark');
     root.classList.add(`theme-${mode}`);
-    root.classList.remove('accent-cool', 'accent-sage');
-    if (accent === 'cool') root.classList.add('accent-cool');
-    else if (accent === 'sage') root.classList.add('accent-sage');
-    // warm needs no class — the default --accent-* values live in :root
+    root.classList.toggle('accent-cool', accent === 'cool');
     root.style.colorScheme = mode;
   }, [mode, accent]);
 
@@ -86,7 +83,6 @@ export const themeBootstrapScript = `
     if (!m) m = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     document.documentElement.classList.add('theme-' + m);
     if (a === 'cool') document.documentElement.classList.add('accent-cool');
-    else if (a === 'sage') document.documentElement.classList.add('accent-sage');
     document.documentElement.style.colorScheme = m;
   } catch (e) {}
 })();
@@ -106,11 +102,11 @@ export function ThemeToggle() {
         {mode === 'light' ? '☾ Dark' : '☀ Light'}
       </button>
       <button
-        onClick={() => setAccent(accent === 'warm' ? 'cool' : accent === 'cool' ? 'sage' : 'warm')}
+        onClick={() => setAccent(accent === 'warm' ? 'cool' : 'warm')}
         className="btn sm"
-        aria-label="Cycle accent"
+        aria-label="Toggle accent"
       >
-        {accent === 'warm' ? 'Warm' : accent === 'cool' ? 'Cool' : 'Sage'}
+        {accent === 'warm' ? 'Warm' : 'Cool'}
       </button>
     </div>
   );

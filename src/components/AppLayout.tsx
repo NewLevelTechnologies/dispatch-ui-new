@@ -278,17 +278,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     >
                       <SwatchIcon className="h-4 w-4" /> {t('common.themeAccentCool')}
                     </button>
-                    <button
-                      onClick={() => setAccent('sage')}
-                      className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
-                        accent === 'sage'
-                          ? 'bg-accent-500 text-white'
-                          : 'bg-bg-hover text-fg hover:bg-bg-active'
-                      }`}
-                      aria-label="Sage accent"
-                    >
-                      <SwatchIcon className="h-4 w-4" /> {t('common.themeAccentSage')}
-                    </button>
                   </div>
                 </div>
                 <DropdownItem href="/account/settings">

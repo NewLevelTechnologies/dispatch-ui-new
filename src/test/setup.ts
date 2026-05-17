@@ -182,7 +182,6 @@ vi.mock('react-i18next', () => {
     'common.theme': 'Theme',
     'common.themeAccent': 'Accent',
     'common.themeAccentCool': 'Cool',
-    'common.themeAccentSage': 'Sage',
     'common.themeAccentWarm': 'Warm',
     'common.update': 'Update',
     'customers.description': 'Manage your customer database',
