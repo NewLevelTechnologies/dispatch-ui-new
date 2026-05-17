@@ -13,6 +13,7 @@ import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
+import { Pill } from '../components/ui/Pill';
 import { ViewTabs } from '../components/ui/Tabs';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
@@ -347,17 +348,23 @@ export default function ServiceLocationsPage() {
                         </td>
                         <td className="muted">{t('serviceLocations.table.neverServiced')}</td>
                         <td>
-                          <span
-                            className={
-                              location.status === 'ACTIVE'
-                                ? 'text-success-500 font-medium'
-                                : location.status === 'INACTIVE'
-                                ? 'text-fg-muted'
-                                : 'text-fg-dim'
-                            }
-                          >
-                            {t(`serviceLocations.status.${location.status.toLowerCase()}`)}
-                          </span>
+                          {location.status === 'ACTIVE' ? (
+                            // Pill recedes when 100% of the list is Active
+                            // (.pill.success is already a soft 12% mix on bg-elev).
+                            <Pill tone="success">
+                              {t(`serviceLocations.status.${location.status.toLowerCase()}`)}
+                            </Pill>
+                          ) : (
+                            <span
+                              className={
+                                location.status === 'INACTIVE'
+                                  ? 'text-fg-muted'
+                                  : 'text-fg-dim'
+                              }
+                            >
+                              {t(`serviceLocations.status.${location.status.toLowerCase()}`)}
+                            </span>
+                          )}
                         </td>
                         <td>
                           {(canEditServiceLocations || canCloseServiceLocations) && (
