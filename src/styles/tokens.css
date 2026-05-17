@@ -64,6 +64,21 @@
   --accent-700: oklch(40% 0.10 215);
 }
 
+/* Sage accent — muted green. Apply by adding `accent-sage` class to <html>.
+   Chroma scaled slightly below warm since hue 152 is naturally more luminous;
+   intentionally no semantic-token overrides so success/info/warning/danger
+   stay distinct from brand. */
+.accent-sage {
+  --accent-50:  oklch(96% 0.012 152);
+  --accent-100: oklch(92% 0.025 152);
+  --accent-200: oklch(85% 0.05 152);
+  --accent-300: oklch(76% 0.075 152);
+  --accent-400: oklch(66% 0.10 152);
+  --accent-500: oklch(58% 0.115 152);
+  --accent-600: oklch(50% 0.105 152);
+  --accent-700: oklch(42% 0.095 152);
+}
+
 /* ── Light theme ─────────────────────────────────────────────────── */
 .theme-light {
   --bg:           oklch(98.4% 0.004 80);   /* subtly warm paper */

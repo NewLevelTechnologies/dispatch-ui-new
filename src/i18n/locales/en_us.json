@@ -123,6 +123,7 @@
     "theme": "Theme",
     "themeAccent": "Accent",
     "themeAccentCool": "Cool",
+    "themeAccentSage": "Sage",
     "themeAccentWarm": "Warm",
     "update": "Update",
     "updateStatus": "Update {{entity, lowercase}} status"
