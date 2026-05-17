@@ -64,7 +64,7 @@ export function DropdownItem({
     // Text styles
     'text-left text-base/6 text-fg-strong sm:text-sm/6 forced-colors:text-[CanvasText]',
     // Focus
-    'data-focus:bg-accent-500 data-focus:text-white',
+    'data-focus:bg-blue-500 data-focus:text-white',
     // Disabled state
     'data-disabled:opacity-50',
     // Forced colors mode
