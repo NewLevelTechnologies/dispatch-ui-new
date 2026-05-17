@@ -42,6 +42,7 @@
     "close": "Close",
     "cloning": "Cloning...",
     "create": "Create",
+    "default": "Default",
     "delete": "Delete",
     "deleting": "Deleting...",
     "edit": "Edit",
@@ -804,7 +805,11 @@
       "restoreDefaultsConfirm": "Restore \"{{name}}\" to default capabilities?",
       "restoreDefaultsWarning": "This will reset all capabilities to the system template defaults. Custom changes will be lost."
     },
-    "description": "Manage roles and their capabilities",
+    "breakdown": {
+      "builtIn": "{{count}} built-in",
+      "custom": "{{count}} custom"
+    },
+    "description": "Permission groups assigned to users. Each role grants a specific set of screens and actions. Built-in roles can't be deleted but their permissions can be customized.",
     "form": {
       "descriptionCreate": "Create a new role by defining its name, description, and capabilities.",
       "descriptionEdit": "Update role name, description, and capabilities."
@@ -819,8 +824,11 @@
       "totalCapabilities": "Total Capabilities"
     },
     "table": {
+      "builtIn": "Built-in",
       "capabilities": "Capabilities",
-      "lastUpdated": "Last Updated"
+      "custom": "Custom",
+      "lastUpdated": "Last Updated",
+      "type": "Type"
     },
     "restoreAllSummary": {
       "customRolesPreserved": "{{count}} custom role preserved",
@@ -923,8 +931,11 @@
   "settings": {
     "itemStatuses": {
       "categoryHelper": "How this status behaves in workflows and reports.",
-      "description": "Customize the lifecycle statuses that work items move through.",
+      "description": "Customize the lifecycle statuses that work items move through. Drag rows to reorder — the order shown here defines the default progression in workflows.",
+      "errorDelete": "Failed to delete status",
+      "errorReorder": "Failed to reorder status",
       "isTerminalHelper": "Terminal statuses end the work item; no further transitions are allowed.",
+      "statusSingular": "Status",
       "table": {
         "category": "Category",
         "terminal": "Terminal"
@@ -947,13 +958,17 @@
     },
     "equipmentTypes": {
       "add": "Add Type",
-      "description": "Top-level equipment classifications (e.g. HVAC, Refrigeration, Plumbing). Categories nest within each type.",
+      "description": "Top-level equipment classifications (e.g. HVAC, Refrigeration, Plumbing). Categories nest within each type. Drag to reorder.",
       "empty": "No equipment types yet.",
       "errorDelete": "Failed to delete equipment type",
       "errorLoad": "Failed to load equipment types",
       "errorReorder": "Failed to reorder equipment types",
       "errorSave": "Failed to save equipment type",
       "loading": "Loading equipment types…",
+      "table": {
+        "categories": "Categories",
+        "items": "Items"
+      },
       "title": "Equipment Types",
       "titleAdd": "Add Equipment Type",
       "titleEdit": "Edit Equipment Type"
@@ -1010,6 +1025,35 @@
       "shortNameHint": "appears in nav",
       "title": "Company Profile"
     },
+    "notificationTemplates": {
+      "action": {
+        "customize": "Customize",
+        "edit": "Edit"
+      },
+      "channel": {
+        "email": "Email",
+        "sms": "SMS"
+      },
+      "description": "Customize email and SMS notification templates for your organization. Templates use Mustache syntax (e.g. {{customer_name}}) for variable substitution.",
+      "empty": "No notification templates found.",
+      "errorLoad": "Failed to load notification templates.",
+      "errorLoadDetail": "Failed to load template details",
+      "errorRevert": "Failed to revert template to default",
+      "loading": "Loading templates...",
+      "nounPlural": "templates",
+      "versionShort": "v{{version}}",
+      "status": {
+        "customized": "Customized",
+        "systemDefault": "System Default"
+      },
+      "table": {
+        "channel": "Channel",
+        "status": "Status",
+        "subject": "Subject",
+        "template": "Template",
+        "version": "Version"
+      }
+    },
     "modulesFeatures": {
       "communications": "Communications",
       "description": "Turn product capabilities on or off for your organization. Some modules are still in development.",
@@ -1049,6 +1093,7 @@
     "planned": "Planned",
     "resetDefaults": "Reset to defaults",
     "saveChanges": "Save changes",
+    "searchPlaceholder": "Search settings",
     "sections": {
       "access": "Access",
       "dispatch": "{{dispatch}}",
@@ -1058,6 +1103,11 @@
     },
     "showingCount": "Showing {{count}} {{noun}}",
     "soon": "Soon",
+    "terminology": {
+      "default": "default",
+      "description": "Customize how entity names appear throughout the app and on customer-facing documents. Leave a field blank to use the default shown in the placeholder.",
+      "title": "Terminology"
+    },
     "statusWorkflows": {
       "addRule": "Add Transition",
       "description": "Define which status transitions are allowed. Only enforced when 'Enforce Workflow' is enabled in Workflow Config.",
@@ -1078,12 +1128,24 @@
       "singular": "Type"
     },
     "workflowConfig": {
+      "behavior": "Behavior",
       "boardTypeHelper": "Choose how the dispatch board groups work — by current status or by scheduled time.",
+      "defaultItemStatus": "Default Item Status",
       "defaultStatusHelper": "Starting status applied to newly created work items.",
       "defaultTypeHelper": "Pre-selected on the create work order form.",
+      "defaultWorkOrderType": "Default {{workOrder}} Type",
+      "defaults": "Defaults",
       "description": "Tenant-wide rules that govern how work moves through the system.",
-      "enforceHelper": "When enabled, only transitions defined in Status Workflows are allowed.",
-      "noneOption": "None"
+      "descriptionLong": "Tenant-wide rules that govern how work moves through the system. Changes here affect every work order — new and existing.",
+      "dispatchBoardType": "{{dispatch}} Board Type",
+      "enforce": "Enforce Status Workflow",
+      "enforceHelper": "When enabled, only transitions defined in Status Workflows are allowed. Recommended for teams with strict QA gates.",
+      "errorLoad": "Failed to load workflow config.",
+      "errorSave": "Failed to update workflow config",
+      "lastSaved": "Last saved {{when}}",
+      "noneOption": "None",
+      "scheduleBased": "Schedule-based",
+      "statusBased": "Status-based"
     }
   },
   "tenantSettings": {
@@ -1161,7 +1223,10 @@
       "disableConfirm": "Are you sure you want to disable {{name}}? They will no longer be able to log in.",
       "enableConfirm": "Are you sure you want to enable {{name}}?"
     },
-    "description": "Manage user accounts and permissions",
+    "breakdown": {
+      "disabled": "{{count}} disabled"
+    },
+    "description": "People who can sign in to the app. Assign each user a role — roles determine which screens and actions they can access. Manage role permissions under Access › Roles.",
     "detail": {
       "activityComingSoon": "Activity history coming soon",
       "activityHelper": "Will show login history, actions performed, etc.",
@@ -1215,7 +1280,9 @@
       "auditLog": "Audit Log",
       "disable": "Disable",
       "enable": "Enable",
-      "lastUpdated": "Last Updated"
+      "lastActive": "Last Active",
+      "lastUpdated": "Last Updated",
+      "you": "You"
     }
   },
   "workOrders": {

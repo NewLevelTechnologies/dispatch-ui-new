@@ -2,17 +2,19 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, ShieldCheckIcon, ArrowPathIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, ArrowPathIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { userApi, type Role, type RestoreAllDefaultsResponse } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import RoleFormDialog from '../components/RoleFormDialog';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Input, InputGroup } from '../components/catalyst/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Alert, AlertActions, AlertDescription, AlertTitle } from '../components/catalyst/alert';
+import { Pill } from '../components/ui/Pill';
+import { Card, CardBody } from '../components/ui/Card';
+import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
+import { SettingsListFooter } from '../components/settings/SettingsListFooter';
 
 export default function RolesPage() {
   const navigate = useNavigate();
@@ -34,6 +36,21 @@ export default function RolesPage() {
     queryKey: ['roles'],
     queryFn: () => userApi.getRoles(),
   });
+
+  const { data: users } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => userApi.getAll(),
+  });
+
+  const userCountByRole = useMemo(() => {
+    const map: Record<string, number> = {};
+    (users ?? []).forEach((u) => {
+      (u.roles ?? []).forEach((r) => {
+        map[r.id] = (map[r.id] ?? 0) + 1;
+      });
+    });
+    return map;
+  }, [users]);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => userApi.deleteRole(id),
@@ -123,15 +140,6 @@ export default function RolesPage() {
     setSelectedRole(null);
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
   // Filter roles based on search query
   const filteredRoles = useMemo(() => {
     if (!roles) return [];
@@ -163,8 +171,7 @@ export default function RolesPage() {
               </Button>
             )}
             {canCreateRoles && (
-              <Button onClick={handleAdd}>
-                <ShieldCheckIcon className="size-4" />
+              <Button color="accent" onClick={handleAdd}>
                 {t('common.actions.add', { entity: t('entities.role') })}
               </Button>
             )}
@@ -231,71 +238,90 @@ export default function RolesPage() {
 
       {roles && roles.length > 0 && filteredRoles.length > 0 && (
         <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('common.form.name')}</TableHeader>
-                <TableHeader>{t('common.form.description')}</TableHeader>
-                <TableHeader>{t('roles.table.capabilities')}</TableHeader>
-                <TableHeader>{t('roles.table.lastUpdated')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredRoles.map((role) => (
-                <TableRow
-                  key={role.id}
-                  href={`/settings/access/roles/${role.id}`}
-                  onClick={(e: React.MouseEvent) => {
-                    const target = e.target as HTMLElement;
-                    if (!target.closest('[role="menu"]') && !target.closest('button[aria-label]')) {
-                      navigate(`/settings/access/roles/${role.id}`);
-                    }
-                  }}
-                  className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
-                >
-                  <TableCell className="font-medium">{role.name}</TableCell>
-                  <TableCell className="text-zinc-500">
-                    {role.description || '-'}
-                  </TableCell>
-                  <TableCell>
-                    {role.capabilities && role.capabilities.length > 0 ? (
-                      <Badge color="purple">{role.capabilities.length} {t('capabilities.totalCount')}</Badge>
-                    ) : (
-                      <span className="text-zinc-500">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-zinc-500">
-                    {formatDate(role.updatedAt)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5" onClick={(e) => e.stopPropagation()}>
-                      <Dropdown>
-                        <DropdownButton plain aria-label={t('common.moreOptions')}>
-                          <EllipsisVerticalIcon className="size-5" />
-                        </DropdownButton>
-                        <DropdownMenu anchor="bottom end">
-                          {canEditRoles && !role.isProtected && (
-                            <DropdownItem onClick={() => handleEdit(role)}>
-                              <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                            </DropdownItem>
+          <Card>
+            <CardBody flush>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{t('common.form.name')}</th>
+                    <th>{t('common.form.description')}</th>
+                    <th className="right">{t('entities.users')}</th>
+                    <th>{t('roles.table.type')}</th>
+                    <th style={{ width: 40 }}></th>
+                  </tr>
+                </DenseTHead>
+                <tbody>
+                  {filteredRoles.map((role) => {
+                    const userCount = userCountByRole[role.id] ?? 0;
+                    return (
+                      <DenseRow
+                        key={role.id}
+                        onClick={(e: React.MouseEvent) => {
+                          const target = e.target as HTMLElement;
+                          if (!target.closest('[role="menu"]') && !target.closest('button[aria-label]')) {
+                            navigate(`/settings/access/roles/${role.id}`);
+                          }
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <td className="strong">{role.name}</td>
+                        <td className="muted">{role.description || '—'}</td>
+                        <td className="right num">
+                          <span className={userCount > 0 ? 'strong' : 'text-fg-dim'}>
+                            {userCount}
+                          </span>
+                        </td>
+                        <td>
+                          {role.isProtected ? (
+                            <Pill tone="neutral">{t('roles.table.builtIn')}</Pill>
+                          ) : (
+                            <Pill tone="accent">{t('roles.table.custom')}</Pill>
                           )}
-                          <DropdownItem onClick={() => navigate(`/settings/access/roles/${role.id}`)}>
-                            <DropdownLabel>{t('common.view')}</DropdownLabel>
-                          </DropdownItem>
-                          {canDeleteRoles && !role.isProtected && (
-                            <DropdownItem onClick={() => handleDelete(role)}>
-                              <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                            </DropdownItem>
-                          )}
-                        </DropdownMenu>
-                      </Dropdown>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                        </td>
+                        <td className="right">
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Dropdown>
+                              <DropdownButton plain aria-label={t('common.moreOptions')}>
+                                <EllipsisVerticalIcon className="size-5" />
+                              </DropdownButton>
+                              <DropdownMenu anchor="bottom end">
+                                {canEditRoles && !role.isProtected && (
+                                  <DropdownItem onClick={() => handleEdit(role)}>
+                                    <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                                  </DropdownItem>
+                                )}
+                                <DropdownItem onClick={() => navigate(`/settings/access/roles/${role.id}`)}>
+                                  <DropdownLabel>{t('common.view')}</DropdownLabel>
+                                </DropdownItem>
+                                {canDeleteRoles && !role.isProtected && (
+                                  <DropdownItem onClick={() => handleDelete(role)}>
+                                    <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                  </DropdownItem>
+                                )}
+                              </DropdownMenu>
+                            </Dropdown>
+                          </div>
+                        </td>
+                      </DenseRow>
+                    );
+                  })}
+                </tbody>
+              </DenseTable>
+            </CardBody>
+            <SettingsListFooter
+              count={filteredRoles.length}
+              noun={t('entities.roles').toLowerCase()}
+              extra={(() => {
+                const customCount = filteredRoles.filter((r) => !r.isProtected).length;
+                const builtInCount = filteredRoles.length - customCount;
+                if (customCount === 0 && builtInCount === 0) return null;
+                const parts: string[] = [];
+                if (builtInCount > 0) parts.push(t('roles.breakdown.builtIn', { count: builtInCount }));
+                if (customCount > 0) parts.push(t('roles.breakdown.custom', { count: customCount }));
+                return <span>{parts.join(' · ')}</span>;
+              })()}
+            />
+          </Card>
         </div>
       )}
 

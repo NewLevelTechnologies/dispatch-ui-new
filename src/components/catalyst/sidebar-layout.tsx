@@ -47,8 +47,9 @@ function MobileSidebar({ open, close, children }: React.PropsWithChildren<{ open
 export function SidebarLayout({
   navbar,
   sidebar,
+  flush,
   children,
-}: React.PropsWithChildren<{ navbar: React.ReactNode; sidebar: React.ReactNode }>) {
+}: React.PropsWithChildren<{ navbar: React.ReactNode; sidebar: React.ReactNode; flush?: boolean }>) {
   const [showSidebar, setShowSidebar] = useState(false)
 
   return (
@@ -80,10 +81,18 @@ export function SidebarLayout({
 
         {/* Canvas — cards float on bg-bg-sunken. text-[13px] baseline matches
             the design system's calibration; explicit Tailwind text utilities
-            on descendants still override per-element. */}
-        <div className="grow px-5 py-5 text-[13px] leading-[1.45]">
-          <div className="mx-auto max-w-screen-2xl">{children}</div>
-        </div>
+            on descendants still override per-element.
+
+            `flush` removes the padding + max-width wrapper so a page can
+            render its own full-width layout (e.g. Settings, with a flush
+            left rail). */}
+        {flush ? (
+          <div className="grow text-[13px] leading-[1.45] min-h-0">{children}</div>
+        ) : (
+          <div className="grow px-5 py-5 text-[13px] leading-[1.45]">
+            <div className="mx-auto max-w-screen-2xl">{children}</div>
+          </div>
+        )}
       </main>
     </div>
   )

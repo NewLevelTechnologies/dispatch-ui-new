@@ -4,15 +4,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { userApi, type User } from '../api';
-import { useHasCapability } from '../hooks/useCurrentUser';
+import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
 import UserFormDialog from '../components/UserFormDialog';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Input } from '../components/catalyst/input';
 import { Alert, AlertActions, AlertDescription, AlertTitle } from '../components/catalyst/alert';
+import { Avatar } from '../components/ui/Avatar';
+import { Pill } from '../components/ui/Pill';
+import { Card, CardBody } from '../components/ui/Card';
+import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
+import { SettingsListFooter } from '../components/settings/SettingsListFooter';
 
 export default function UsersPage() {
   const navigate = useNavigate();
@@ -30,6 +33,7 @@ export default function UsersPage() {
   const canInviteUsers = useHasCapability('INVITE_USERS');
   const canEditUsers = useHasCapability('EDIT_USERS');
   const canDeleteUsers = useHasCapability('DELETE_USERS');
+  const { data: currentUser } = useCurrentUser();
 
   const { data: users, isLoading, error } = useQuery({
     queryKey: ['users'],
@@ -156,7 +160,7 @@ export default function UsersPage() {
           </p>
         </div>
         {canInviteUsers && (
-          <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.user') })}</Button>
+          <Button color="accent" onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.user') })}</Button>
         )}
       </div>
 
@@ -249,96 +253,133 @@ export default function UsersPage() {
 
       {filteredUsers && filteredUsers.length > 0 && (
         <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('common.form.name')}</TableHeader>
-                <TableHeader>{t('common.form.email')}</TableHeader>
-                <TableHeader>{t('common.form.role')}</TableHeader>
-                <TableHeader>{t('common.form.status')}</TableHeader>
-                <TableHeader>{t('users.table.lastUpdated')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow
-                  key={user.id}
-                  href={`/settings/access/users/${user.id}`}
-                  onClick={(e: React.MouseEvent) => {
-                    // Only navigate if not clicking dropdown or its children
-                    const target = e.target as HTMLElement;
-                    if (!target.closest('[role="menu"]') && !target.closest('button[aria-label]')) {
-                      navigate(`/settings/access/users/${user.id}`);
-                    }
-                  }}
-                  className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
-                >
-                  <TableCell className="font-medium">
-                    {user.firstName} {user.lastName}
-                  </TableCell>
-                  <TableCell className="text-zinc-500">{user.email}</TableCell>
-                  <TableCell className="text-zinc-500">
-                    {user.roles && user.roles.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {user.roles.map(role => (
-                          <Badge key={role.id} color="sky">{role.name}</Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-zinc-500">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {user.enabled ? (
-                      <Badge color="lime">{t('common.enabled')}</Badge>
-                    ) : (
-                      <Badge color="zinc">{t('common.disabled')}</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-zinc-500">{formatDate(user.updatedAt)}</TableCell>
-                  <TableCell>
-                    {(canEditUsers || canDeleteUsers) && (
-                      <div className="-mx-3 -my-1.5 sm:-mx-2.5" onClick={(e) => e.stopPropagation()}>
-                        <Dropdown>
-                          <DropdownButton plain aria-label={t('common.moreOptions')}>
-                            <EllipsisVerticalIcon className="size-5" />
-                          </DropdownButton>
-                          <DropdownMenu anchor="bottom end">
-                            {canEditUsers && (
-                              <>
-                                <DropdownItem onClick={() => handleEdit(user)}>
-                                  <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                                </DropdownItem>
-                                {user.enabled ? (
-                                  <DropdownItem onClick={() => handleDisable(user)}>
-                                    <DropdownLabel>{t('users.table.disable')}</DropdownLabel>
-                                  </DropdownItem>
-                                ) : (
-                                  <DropdownItem onClick={() => handleEnable(user)}>
-                                    <DropdownLabel>{t('users.table.enable')}</DropdownLabel>
-                                  </DropdownItem>
+          <Card>
+            <CardBody flush>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{t('common.form.name')}</th>
+                    <th>{t('common.form.role')}</th>
+                    <th>{t('users.table.lastActive')}</th>
+                    <th>{t('common.form.status')}</th>
+                    <th style={{ width: 40 }}></th>
+                  </tr>
+                </DenseTHead>
+                <tbody>
+                  {filteredUsers.map((user) => {
+                    const fullName = `${user.firstName} ${user.lastName}`;
+                    const isMe = currentUser?.id === user.id;
+                    const rowOpacity = !user.enabled ? 'opacity-55' : '';
+                    return (
+                      <DenseRow
+                        key={user.id}
+                        onClick={(e: React.MouseEvent) => {
+                          const target = e.target as HTMLElement;
+                          if (!target.closest('[role="menu"]') && !target.closest('button[aria-label]')) {
+                            navigate(`/settings/access/users/${user.id}`);
+                          }
+                        }}
+                        className={`cursor-pointer ${rowOpacity}`}
+                      >
+                        <td>
+                          <div className="flex items-center gap-2.5">
+                            <Avatar name={fullName} size="sm" />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="strong truncate">{fullName}</span>
+                                {isMe && (
+                                  <span className="inline-flex items-center rounded bg-bg-active px-1 py-[1px] text-[9px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
+                                    {t('users.table.you')}
+                                  </span>
                                 )}
-                              </>
-                            )}
-                            {canDeleteUsers && (
-                              <DropdownItem onClick={() => handleDelete(user)}>
-                                <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                              </DropdownItem>
-                            )}
-                          </DropdownMenu>
-                        </Dropdown>
-                      </div>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                              </div>
+                              <div className="muted truncate">{user.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          {user.roles && user.roles.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {user.roles.map((role) => (
+                                <Pill key={role.id} tone="neutral">{role.name}</Pill>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-fg-dim">—</span>
+                          )}
+                        </td>
+                        <td className="muted">{formatDate(user.updatedAt)}</td>
+                        <td>
+                          {user.enabled ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-success-500" />
+                              <span>{t('common.active')}</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-fg-muted">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-fg-dim" />
+                              <span>{t('common.disabled')}</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="right">
+                          {(canEditUsers || canDeleteUsers) && (
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <Dropdown>
+                                <DropdownButton plain aria-label={t('common.moreOptions')}>
+                                  <EllipsisVerticalIcon className="size-5" />
+                                </DropdownButton>
+                                <DropdownMenu anchor="bottom end">
+                                  {canEditUsers && (
+                                    <>
+                                      <DropdownItem onClick={() => handleEdit(user)}>
+                                        <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                                      </DropdownItem>
+                                      {user.enabled ? (
+                                        <DropdownItem onClick={() => handleDisable(user)}>
+                                          <DropdownLabel>{t('users.table.disable')}</DropdownLabel>
+                                        </DropdownItem>
+                                      ) : (
+                                        <DropdownItem onClick={() => handleEnable(user)}>
+                                          <DropdownLabel>{t('users.table.enable')}</DropdownLabel>
+                                        </DropdownItem>
+                                      )}
+                                    </>
+                                  )}
+                                  {canDeleteUsers && (
+                                    <DropdownItem onClick={() => handleDelete(user)}>
+                                      <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                    </DropdownItem>
+                                  )}
+                                </DropdownMenu>
+                              </Dropdown>
+                            </div>
+                          )}
+                        </td>
+                      </DenseRow>
+                    );
+                  })}
+                </tbody>
+              </DenseTable>
+            </CardBody>
+            <SettingsListFooter
+              count={filteredUsers.length}
+              noun={t('entities.users').toLowerCase()}
+              extra={(() => {
+                const disabledCount = filteredUsers.filter((u) => !u.enabled).length;
+                if (disabledCount === 0) return null;
+                return (
+                  <span>
+                    {t('users.breakdown.disabled', { count: disabledCount })}
+                  </span>
+                );
+              })()}
+            />
+          </Card>
 
           {filteredUsers.length === 0 && searchQuery && (
             <div className="mt-4 text-center">
-              <p className="text-zinc-600 dark:text-zinc-400">
+              <p className="text-fg-muted">
                 {t('users.search.noMatch', { query: searchQuery })}
               </p>
             </div>

@@ -145,7 +145,7 @@ describe('UsersPage', () => {
     expect(screen.getByText('Technician')).toBeInTheDocument();
   });
 
-  it('displays enabled/disabled status badges', async () => {
+  it('displays enabled/disabled status indicators', async () => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
       if (url === '/users') {
         return Promise.resolve({ data: mockUsers });
@@ -162,13 +162,12 @@ describe('UsersPage', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    const enabledBadges = screen.getAllByText('Enabled');
-    const disabledBadges = screen.getAllByText('Disabled');
-    expect(enabledBadges.length).toBeGreaterThan(0);
-    expect(disabledBadges.length).toBeGreaterThan(0);
+    // Active rows use the success dot + "Active" text; disabled rows use "Disabled".
+    expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Disabled').length).toBeGreaterThan(0);
   });
 
-  it('displays dash for users with no roles', async () => {
+  it('displays an em-dash for users with no roles', async () => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
       if (url === '/users') {
         return Promise.resolve({ data: [mockUsers[2]] });
@@ -185,7 +184,7 @@ describe('UsersPage', () => {
       expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
     });
 
-    const dashElements = screen.getAllByText('-');
+    const dashElements = screen.getAllByText('—');
     expect(dashElements.length).toBeGreaterThan(0);
   });
 

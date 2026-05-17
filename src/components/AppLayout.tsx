@@ -37,7 +37,7 @@ const ENV_BADGE: Record<string, { label: string; className: string }> = {
   staging: { label: 'STG', className: 'bg-violet-500/20 text-violet-500 ring-violet-500/30' },
 };
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default function AppLayout({ children, flush }: { children: React.ReactNode; flush?: boolean }) {
   const { user, signOut } = useAuthenticator((context) => [context.user]);
   const location = useLocation();
   const { t } = useTranslation();
@@ -105,6 +105,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarLayout
+      flush={flush}
       sidebar={
         <Sidebar>
           <SidebarHeader>
