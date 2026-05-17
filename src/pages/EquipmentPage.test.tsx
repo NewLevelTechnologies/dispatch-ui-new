@@ -367,8 +367,8 @@ describe('EquipmentPage', () => {
 
     await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
 
-    const statusSelect = screen.getByRole('combobox', { name: /^status$/i });
-    await user.selectOptions(statusSelect, 'RETIRED');
+    const retiredTab = screen.getByRole('tab', { name: /^retired$/i });
+    await user.click(retiredTab);
 
     await waitFor(() => {
       expect(mockEquipmentList.mock.calls.some(([args]) => args?.status === 'RETIRED')).toBe(true);
@@ -384,8 +384,8 @@ describe('EquipmentPage', () => {
     await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
     mockEquipmentList.mockClear();
 
-    const statusSelect = screen.getByRole('combobox', { name: /^status$/i });
-    await user.selectOptions(statusSelect, '');
+    const allTab = screen.getByRole('tab', { name: /^all$/i });
+    await user.click(allTab);
 
     await waitFor(() => expect(mockEquipmentList).toHaveBeenCalled());
     const lastCall = mockEquipmentList.mock.calls[mockEquipmentList.mock.calls.length - 1][0];
@@ -405,8 +405,8 @@ describe('EquipmentPage', () => {
     await waitFor(() => expect(screen.getByText('Active Unit')).toBeInTheDocument());
 
     // Switch to "All" so both rows are rendered
-    const statusSelect = screen.getByRole('combobox', { name: /^status$/i });
-    await user.selectOptions(statusSelect, '');
+    const allTab = screen.getByRole('tab', { name: /^all$/i });
+    await user.click(allTab);
 
     // Both badges should appear regardless of the filter — "Active" for row 1, "Retired" for row 2.
     const activeRow = screen.getByText('Active Unit').closest('tr')!;

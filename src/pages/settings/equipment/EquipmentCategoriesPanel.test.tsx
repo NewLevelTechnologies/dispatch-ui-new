@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../../test/utils';
 import EquipmentCategoriesPanel from './EquipmentCategoriesPanel';
 
@@ -89,19 +89,33 @@ describe('EquipmentCategoriesPanel', () => {
     });
   });
 
-  it('reorders categories via the up arrow', async () => {
+  it('reorders categories via drag-and-drop, posting the new id order', async () => {
     mockTypesGetAll.mockResolvedValue(sampleTypes);
     mockGetAll.mockResolvedValue([
       { id: 'c1', tenantId: 't', equipmentTypeId: 't-hvac', name: 'Furnace', sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' },
       { id: 'c2', tenantId: 't', equipmentTypeId: 't-hvac', name: 'Condenser', sortOrder: 1, archivedAt: null, createdAt: '', updatedAt: '' },
     ]);
     mockReorder.mockResolvedValue([]);
-    const user = userEvent.setup();
     renderWithProviders(<EquipmentCategoriesPanel />);
 
     await waitFor(() => expect(screen.getByText('Furnace')).toBeInTheDocument());
-    const upButtons = screen.getAllByRole('button', { name: /move up/i });
-    await user.click(upButtons[1]);
+
+    const furnaceRow = screen.getByText('Furnace').closest('tr')!;
+    const condenserRow = screen.getByText('Condenser').closest('tr')!;
+
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: vi.fn(),
+      getData: vi.fn(),
+      types: [],
+      files: [],
+      items: [],
+    };
+
+    fireEvent.dragStart(condenserRow, { dataTransfer });
+    fireEvent.dragOver(furnaceRow, { dataTransfer });
+    fireEvent.drop(furnaceRow, { dataTransfer });
 
     await waitFor(() => {
       expect(mockReorder).toHaveBeenCalledWith('t-hvac', ['c2', 'c1']);

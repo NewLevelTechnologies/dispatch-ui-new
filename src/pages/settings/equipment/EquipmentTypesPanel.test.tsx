@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../../test/utils';
 import EquipmentTypesPanel from './EquipmentTypesPanel';
 
@@ -76,16 +76,30 @@ describe('EquipmentTypesPanel', () => {
     });
   });
 
-  it('reorders via the up arrow', async () => {
+  it('reorders rows via drag-and-drop, posting the new id order', async () => {
     mockGetAll.mockResolvedValue(sampleTypes);
     mockReorder.mockResolvedValue([sampleTypes[1], sampleTypes[0]]);
-    const user = userEvent.setup();
     renderWithProviders(<EquipmentTypesPanel />);
 
     await waitFor(() => expect(screen.getByText('Refrigeration')).toBeInTheDocument());
-    // Move "Refrigeration" up — it's the second row
-    const upButtons = screen.getAllByRole('button', { name: /move up/i });
-    await user.click(upButtons[1]);
+
+    // Drag the second row (Refrigeration) onto the first row (HVAC).
+    const refRow = screen.getByText('Refrigeration').closest('tr')!;
+    const hvacRow = screen.getByText('HVAC').closest('tr')!;
+
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: vi.fn(),
+      getData: vi.fn(),
+      types: [],
+      files: [],
+      items: [],
+    };
+
+    fireEvent.dragStart(refRow, { dataTransfer });
+    fireEvent.dragOver(hvacRow, { dataTransfer });
+    fireEvent.drop(hvacRow, { dataTransfer });
 
     await waitFor(() => {
       expect(mockReorder).toHaveBeenCalledWith(['t2', 't1']);
@@ -111,19 +125,14 @@ describe('EquipmentTypesPanel', () => {
     confirmSpy.mockRestore();
   });
 
-  it('reorders via the down arrow', async () => {
+  it('renders a drag handle in each row', async () => {
     mockGetAll.mockResolvedValue(sampleTypes);
-    mockReorder.mockResolvedValue([sampleTypes[1], sampleTypes[0]]);
-    const user = userEvent.setup();
     renderWithProviders(<EquipmentTypesPanel />);
 
     await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
-    const downButtons = screen.getAllByRole('button', { name: /move down/i });
-    await user.click(downButtons[0]);
 
-    await waitFor(() => {
-      expect(mockReorder).toHaveBeenCalledWith(['t2', 't1']);
-    });
+    const handles = screen.getAllByRole('img', { name: /drag to reorder/i });
+    expect(handles).toHaveLength(2);
   });
 
   it('opens edit dialog and updates an existing type', async () => {

@@ -45,14 +45,13 @@ describe('NotificationTemplatesPanel', () => {
     expect(screen.getByText(/your invoice is ready/i)).toBeInTheDocument();
   });
 
-  it('shows Customize action for system templates and Edit + Revert for customized', async () => {
+  it('shows a Customize link for system templates and an Edit link for customized', async () => {
     renderWithProviders(<NotificationTemplatesPanel />);
 
     await waitFor(() => expect(screen.getByText('Invoice Created')).toBeInTheDocument());
 
     expect(screen.getByRole('button', { name: /^customize$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /revert to default/i })).toBeInTheDocument();
   });
 
   it('renders empty state when no templates', async () => {
@@ -62,24 +61,6 @@ describe('NotificationTemplatesPanel', () => {
     await waitFor(() => {
       expect(screen.getByText(/no notification templates/i)).toBeInTheDocument();
     });
-  });
-
-  it('reverts a customized template after confirmation', async () => {
-    const user = userEvent.setup();
-    vi.mocked(apiClient.delete).mockResolvedValue({ data: undefined });
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-
-    renderWithProviders(<NotificationTemplatesPanel />);
-
-    await waitFor(() => expect(screen.getByText('Work Order Completed')).toBeInTheDocument());
-
-    await user.click(screen.getByRole('button', { name: /revert to default/i }));
-
-    await waitFor(() => {
-      expect(apiClient.delete).toHaveBeenCalledWith(expect.stringContaining('tpl-2'));
-    });
-
-    confirmSpy.mockRestore();
   });
 
   it('opens the editor when Customize is clicked (calls getById)', async () => {
@@ -137,19 +118,6 @@ describe('NotificationTemplatesPanel', () => {
 
     alertSpy.mockRestore();
     consoleSpy.mockRestore();
-  });
-
-  it('does not revert if user cancels confirmation', async () => {
-    const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-
-    renderWithProviders(<NotificationTemplatesPanel />);
-
-    await waitFor(() => expect(screen.getByText('Work Order Completed')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: /revert to default/i }));
-
-    expect(apiClient.delete).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
   });
 
   it('surfaces API error message on load failure', async () => {

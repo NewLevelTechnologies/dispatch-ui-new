@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within, fireEvent } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../test/utils';
 import DispatchRegionsPanel from './DispatchRegionsPanel';
 import apiClient from '../../api/client';
@@ -54,39 +54,57 @@ describe('DispatchRegionsPanel', () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockRegions });
   });
 
-  it('renders regions with active and inactive badges', async () => {
+  it('renders regions with active dot and inactive Pill', async () => {
     renderWithProviders(<DispatchRegionsPanel />);
 
     await waitFor(() => expect(screen.getByText('Georgia')).toBeInTheDocument());
     expect(screen.getByText('South Carolina')).toBeInTheDocument();
     expect(screen.getByText('Old Florida')).toBeInTheDocument();
+    // Two active rows, one inactive row.
     expect(screen.getAllByText('Active').length).toBe(2);
     expect(screen.getByText('Inactive')).toBeInTheDocument();
   });
 
-  it('does not show reorder arrows on inactive rows', async () => {
+  it('only active rows are draggable (inactive rows have no drag handle)', async () => {
     renderWithProviders(<DispatchRegionsPanel />);
 
     await waitFor(() => expect(screen.getByText('Old Florida')).toBeInTheDocument());
 
     const inactiveRow = screen.getByText('Old Florida').closest('tr')!;
-    expect(within(inactiveRow).queryByRole('button', { name: /move up/i })).not.toBeInTheDocument();
-    expect(within(inactiveRow).queryByRole('button', { name: /move down/i })).not.toBeInTheDocument();
+    expect(within(inactiveRow).queryByRole('img', { name: /drag to reorder/i })).not.toBeInTheDocument();
+    expect(inactiveRow).not.toHaveAttribute('draggable', 'true');
+
+    const activeRow = screen.getByText('Georgia').closest('tr')!;
+    expect(within(activeRow).getByRole('img', { name: /drag to reorder/i })).toBeInTheDocument();
   });
 
-  it('reorders only active regions', async () => {
-    const user = userEvent.setup();
+  it('reorders only active regions via drag-and-drop', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: mockRegions });
 
     renderWithProviders(<DispatchRegionsPanel />);
 
     await waitFor(() => expect(screen.getByText('South Carolina')).toBeInTheDocument());
 
+    // Drag South Carolina (active index 1) onto Georgia (active index 0) → [r-2, r-1].
+    // Inactive r-3 must not be in the payload.
+    const gaRow = screen.getByText('Georgia').closest('tr')!;
     const scRow = screen.getByText('South Carolina').closest('tr')!;
-    await user.click(within(scRow).getByRole('button', { name: /move up/i }));
+
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: vi.fn(),
+      getData: vi.fn(),
+      types: [],
+      files: [],
+      items: [],
+    };
+
+    fireEvent.dragStart(scRow, { dataTransfer });
+    fireEvent.dragOver(gaRow, { dataTransfer });
+    fireEvent.drop(gaRow, { dataTransfer });
 
     await waitFor(() => {
-      // Inactive r-3 must NOT be in the reorder payload
       expect(apiClient.post).toHaveBeenCalledWith(
         '/tenant/dispatch-regions/reorder',
         { orderedIds: ['r-2', 'r-1'] }
@@ -176,16 +194,30 @@ describe('DispatchRegionsPanel', () => {
     confirmSpy.mockRestore();
   });
 
-  it('moves a region down via the down arrow', async () => {
-    const user = userEvent.setup();
+  it('reorder mutation is keyed by active sort position', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: mockRegions });
 
     renderWithProviders(<DispatchRegionsPanel />);
 
     await waitFor(() => expect(screen.getByText('Georgia')).toBeInTheDocument());
 
+    // Drag Georgia onto South Carolina — same net swap, different starting side.
     const gaRow = screen.getByText('Georgia').closest('tr')!;
-    await user.click(within(gaRow).getByRole('button', { name: /move down/i }));
+    const scRow = screen.getByText('South Carolina').closest('tr')!;
+
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: vi.fn(),
+      getData: vi.fn(),
+      types: [],
+      files: [],
+      items: [],
+    };
+
+    fireEvent.dragStart(gaRow, { dataTransfer });
+    fireEvent.dragOver(scRow, { dataTransfer });
+    fireEvent.drop(scRow, { dataTransfer });
 
     await waitFor(() => {
       expect(apiClient.post).toHaveBeenCalledWith(

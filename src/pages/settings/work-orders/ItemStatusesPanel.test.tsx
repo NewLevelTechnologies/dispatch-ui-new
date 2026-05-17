@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within, fireEvent } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../../test/utils';
 import ItemStatusesPanel from './ItemStatusesPanel';
 import apiClient from '../../../api/client';
@@ -108,7 +108,7 @@ describe('ItemStatusesPanel', () => {
 
     await waitFor(() => expect(screen.getByText('New')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /add item status/i }));
+    await user.click(screen.getByRole('button', { name: /^add status$/i }));
 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByLabelText(/category/i)).toBeInTheDocument();
@@ -123,7 +123,7 @@ describe('ItemStatusesPanel', () => {
 
     await waitFor(() => expect(screen.getByText('New')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /add item status/i }));
+    await user.click(screen.getByRole('button', { name: /^add status$/i }));
     const dialog = await screen.findByRole('dialog');
 
     await user.type(within(dialog).getByLabelText(/name/i), 'Pending Parts');
@@ -160,16 +160,32 @@ describe('ItemStatusesPanel', () => {
     expect(within(dialog).getByLabelText(/name/i)).toHaveValue('In Progress');
   });
 
-  it('reorders via the down arrow', async () => {
-    const user = userEvent.setup();
+  it('reorders rows via drag-and-drop, posting the new id order', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: mockStatuses });
 
     renderWithProviders(<ItemStatusesPanel />);
 
     await waitFor(() => expect(screen.getByText('New')).toBeInTheDocument());
 
-    const newRow = screen.getByText('New').closest('tr')!;
-    await user.click(within(newRow).getByRole('button', { name: /move down/i }));
+    // Drag "In Progress" (st-2) onto "New" (st-1) → [st-2, st-1, st-3].
+    // Use the code column (IN_PROGRESS / NEW) to disambiguate — the name "In Progress"
+    // also appears in the category Pill column.
+    const newRow = screen.getByText('NEW').closest('tr')!;
+    const inProgressRow = screen.getByText('IN_PROGRESS').closest('tr')!;
+
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: vi.fn(),
+      getData: vi.fn(),
+      types: [],
+      files: [],
+      items: [],
+    };
+
+    fireEvent.dragStart(inProgressRow, { dataTransfer });
+    fireEvent.dragOver(newRow, { dataTransfer });
+    fireEvent.drop(newRow, { dataTransfer });
 
     await waitFor(() => {
       expect(apiClient.post).toHaveBeenCalledWith(
@@ -185,7 +201,7 @@ describe('ItemStatusesPanel', () => {
     renderWithProviders(<ItemStatusesPanel />);
 
     await waitFor(() => expect(screen.getByText('New')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: /add item status/i }));
+    await user.click(screen.getByRole('button', { name: /^add status$/i }));
 
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByLabelText(/name/i), 'Pending Parts');

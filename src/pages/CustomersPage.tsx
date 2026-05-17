@@ -268,11 +268,14 @@ export default function CustomersPage() {
                       >
                         <td>
                           {customer.displayMode === 'SIMPLE' ? (
-                            <HomeIcon className="h-4 w-4 text-fg-muted" />
+                            <HomeIcon className="h-4 w-4 text-fg-muted" title="Homeowner" />
                           ) : customer.displayMode === 'BILLING_ONLY' ? (
-                            <CreditCardIcon className="h-4 w-4 text-fg-muted" />
+                            <CreditCardIcon
+                              className="h-4 w-4 text-fg-muted"
+                              title={t('customers.detail.billingOnlyBadge')}
+                            />
                           ) : (
-                            <BuildingOfficeIcon className="h-4 w-4 text-fg-muted" />
+                            <BuildingOfficeIcon className="h-4 w-4 text-fg-muted" title="Business" />
                           )}
                         </td>
                         <td className="strong">{customer.name}</td>

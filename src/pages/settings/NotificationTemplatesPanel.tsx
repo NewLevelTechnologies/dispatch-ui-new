@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   notificationTemplateApi,
@@ -18,7 +18,6 @@ import { DenseTable, DenseTHead, DenseRow } from '../../components/ui/DenseTable
 import { SettingsListFooter } from '../../components/settings/SettingsListFooter';
 
 export default function NotificationTemplatesPanel() {
-  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const canView = useHasCapability('VIEW_SETTINGS');
   const canEdit = useHasCapability('EDIT_SETTINGS');
@@ -29,21 +28,6 @@ export default function NotificationTemplatesPanel() {
     queryKey: ['notification-templates'],
     queryFn: () => notificationTemplateApi.getAll(),
     enabled: canView,
-  });
-
-  const revertMutation = useMutation({
-    mutationFn: (id: string) => notificationTemplateApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notification-templates'] });
-      setIsEditorOpen(false);
-      setSelectedTemplate(null);
-    },
-    onError: (error: unknown) => {
-      const errorMessage = error instanceof Error && 'response' in error
-        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
-        : undefined;
-      alert(errorMessage || t('settings.notificationTemplates.errorRevert'));
-    },
   });
 
   const handleCustomize = async (template: NotificationTemplateListItem) => {
@@ -153,8 +137,6 @@ export default function NotificationTemplatesPanel() {
           />
         </Card>
       )}
-
-      {revertMutation.isPending && null}
 
       {selectedTemplate && (
         <NotificationTemplateEditor
