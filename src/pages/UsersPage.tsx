@@ -17,8 +17,7 @@ import { Card, CardBody } from '../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
-import { ListboxOption } from '../components/catalyst/listbox';
-import { FilterChipListbox, ChipDivider } from '../components/ui/FilterChipListbox';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 
 // Seniority order — when a user has multiple roles, the higher-rank role
 // shows first. Anything not in this map sorts after, alphabetically. Match
@@ -222,13 +221,12 @@ export default function UsersPage() {
               ariaLabel={t('users.filter.role')}
               value={roleFilter || null}
               displayValue={roleFilter ? roles.find((r) => r.id === roleFilter)?.name ?? null : null}
+              resetLabel={t('users.filter.allRoles')}
               onChange={(id) => setRoleFilter(id ?? '')}
               onClear={() => setRoleFilter('')}
             >
-              <ListboxOption value={null}>{t('users.filter.allRoles')}</ListboxOption>
-              <ChipDivider />
               {roles.map((role) => (
-                <ListboxOption key={role.id} value={role.id}>{role.name}</ListboxOption>
+                <ChipListboxOption key={role.id} value={role.id}>{role.name}</ChipListboxOption>
               ))}
             </FilterChipListbox>
           )}
@@ -238,13 +236,12 @@ export default function UsersPage() {
             ariaLabel={t('users.filter.status')}
             value={statusFilter || null}
             displayValue={statusFilter ? t(`users.filter.${statusFilter}`) : null}
+            resetLabel={t('users.filter.all')}
             onChange={(id) => setStatusFilter(id ?? '')}
             onClear={() => setStatusFilter('')}
           >
-            <ListboxOption value={null}>{t('users.filter.all')}</ListboxOption>
-            <ChipDivider />
-            <ListboxOption value="enabled">{t('users.filter.enabled')}</ListboxOption>
-            <ListboxOption value="disabled">{t('users.filter.disabled')}</ListboxOption>
+            <ChipListboxOption value="enabled">{t('users.filter.enabled')}</ChipListboxOption>
+            <ChipListboxOption value="disabled">{t('users.filter.disabled')}</ChipListboxOption>
           </FilterChipListbox>
         </ListToolbar>
       )}

@@ -11,8 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from './catalyst/badge';
 import { Text } from './catalyst/text';
 import { Subheading } from './catalyst/heading';
-import { ListboxOption } from './catalyst/listbox';
-import { FilterChipListbox, ChipDivider } from './ui/FilterChipListbox';
+import { FilterChipListbox, ChipListboxOption } from './ui/FilterChipListbox';
 import { Button } from './catalyst/button';
 import { EnvelopeIcon, DevicePhoneMobileIcon, BellIcon } from '@heroicons/react/24/outline';
 
@@ -116,6 +115,7 @@ export default function NotificationLogsList({
             ariaLabel={t('notifications.logs.table.status')}
             value={statusFilter || null}
             displayValue={statusFilter ? t(`notifications.logs.status.${statusFilter.toLowerCase()}`) : null}
+            resetLabel={t('notifications.logs.filters.allStatuses')}
             onChange={(value) => {
               setStatusFilter((value ?? '') as NotificationStatus | '');
               setPage(0);
@@ -125,13 +125,11 @@ export default function NotificationLogsList({
               setPage(0);
             }}
           >
-            <ListboxOption value={null}>{t('notifications.logs.filters.allStatuses')}</ListboxOption>
-            <ChipDivider />
-            <ListboxOption value={NotificationStatus.DELIVERED}>{t('notifications.logs.status.delivered')}</ListboxOption>
-            <ListboxOption value={NotificationStatus.SENT}>{t('notifications.logs.status.sent')}</ListboxOption>
-            <ListboxOption value={NotificationStatus.PENDING}>{t('notifications.logs.status.pending')}</ListboxOption>
-            <ListboxOption value={NotificationStatus.BOUNCED}>{t('notifications.logs.status.bounced')}</ListboxOption>
-            <ListboxOption value={NotificationStatus.FAILED}>{t('notifications.logs.status.failed')}</ListboxOption>
+            <ChipListboxOption value={NotificationStatus.DELIVERED}>{t('notifications.logs.status.delivered')}</ChipListboxOption>
+            <ChipListboxOption value={NotificationStatus.SENT}>{t('notifications.logs.status.sent')}</ChipListboxOption>
+            <ChipListboxOption value={NotificationStatus.PENDING}>{t('notifications.logs.status.pending')}</ChipListboxOption>
+            <ChipListboxOption value={NotificationStatus.BOUNCED}>{t('notifications.logs.status.bounced')}</ChipListboxOption>
+            <ChipListboxOption value={NotificationStatus.FAILED}>{t('notifications.logs.status.failed')}</ChipListboxOption>
           </FilterChipListbox>
           <FilterChipListbox
             label={t('notifications.logs.table.channel')}
@@ -154,12 +152,11 @@ export default function NotificationLogsList({
               setChannelFilter('');
               setPage(0);
             }}
+            resetLabel={t('notifications.logs.filters.allChannels')}
           >
-            <ListboxOption value={null}>{t('notifications.logs.filters.allChannels')}</ListboxOption>
-            <ChipDivider />
-            <ListboxOption value={NotificationChannel.EMAIL}>{t('notifications.preferences.channelEmail')}</ListboxOption>
-            <ListboxOption value={NotificationChannel.SMS}>{t('notifications.preferences.channelSms')}</ListboxOption>
-            <ListboxOption value={NotificationChannel.PUSH}>{t('notifications.preferences.channelPush')}</ListboxOption>
+            <ChipListboxOption value={NotificationChannel.EMAIL}>{t('notifications.preferences.channelEmail')}</ChipListboxOption>
+            <ChipListboxOption value={NotificationChannel.SMS}>{t('notifications.preferences.channelSms')}</ChipListboxOption>
+            <ChipListboxOption value={NotificationChannel.PUSH}>{t('notifications.preferences.channelPush')}</ChipListboxOption>
           </FilterChipListbox>
         </div>
       </div>

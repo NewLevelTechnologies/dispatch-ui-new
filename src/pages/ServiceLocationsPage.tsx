@@ -20,8 +20,7 @@ import {
 } from '../components/ui/DenseTable';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
-import { ListboxOption } from '../components/catalyst/listbox';
-import { FilterChipListbox, ChipDivider } from '../components/ui/FilterChipListbox';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 
@@ -236,13 +235,12 @@ export default function ServiceLocationsPage() {
               ariaLabel={t('serviceLocations.filter.region')}
               value={regionId || null}
               displayValue={regionId ? activeRegions.find((r) => r.id === regionId)?.name ?? null : null}
+              resetLabel={t('serviceLocations.filter.allRegions')}
               onChange={(id) => updateFilters({ region: id ?? '' })}
               onClear={() => updateFilters({ region: '' })}
             >
-              <ListboxOption value={null}>{t('serviceLocations.filter.allRegions')}</ListboxOption>
-              <ChipDivider />
               {activeRegions.map((r) => (
-                <ListboxOption key={r.id} value={r.id}>{r.name}</ListboxOption>
+                <ChipListboxOption key={r.id} value={r.id}>{r.name}</ChipListboxOption>
               ))}
             </FilterChipListbox>
           )}

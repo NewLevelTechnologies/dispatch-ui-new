@@ -28,8 +28,7 @@ import {
 } from '../components/ui/DenseTable';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
-import { ListboxOption } from '../components/catalyst/listbox';
-import { FilterChipListbox, ChipDivider } from '../components/ui/FilterChipListbox';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 
@@ -226,6 +225,7 @@ export default function EquipmentPage() {
             ariaLabel={t('equipment.form.type')}
             value={typeFilter || null}
             displayValue={typeFilter ? equipmentTypes.find((tx) => tx.id === typeFilter)?.name ?? null : null}
+            resetLabel={t('equipment.filter.allTypes')}
             onChange={(id) => {
               setTypeFilter(id ?? '');
               setCategoryFilter('');
@@ -237,10 +237,8 @@ export default function EquipmentPage() {
               setPage(0);
             }}
           >
-            <ListboxOption value={null}>{t('equipment.filter.allTypes')}</ListboxOption>
-            <ChipDivider />
             {equipmentTypes.map((tx) => (
-              <ListboxOption key={tx.id} value={tx.id}>{tx.name}</ListboxOption>
+              <ChipListboxOption key={tx.id} value={tx.id}>{tx.name}</ChipListboxOption>
             ))}
           </FilterChipListbox>
 
@@ -252,6 +250,7 @@ export default function EquipmentPage() {
               ariaLabel={t('equipment.form.category')}
               value={categoryFilter || null}
               displayValue={categoryFilter ? equipmentCategories.find((c) => c.id === categoryFilter)?.name ?? null : null}
+              resetLabel={t('equipment.filter.allCategories')}
               onChange={(id) => {
                 setCategoryFilter(id ?? '');
                 setPage(0);
@@ -261,10 +260,8 @@ export default function EquipmentPage() {
                 setPage(0);
               }}
             >
-              <ListboxOption value={null}>{t('equipment.filter.allCategories')}</ListboxOption>
-              <ChipDivider />
               {equipmentCategories.map((cat) => (
-                <ListboxOption key={cat.id} value={cat.id}>{cat.name}</ListboxOption>
+                <ChipListboxOption key={cat.id} value={cat.id}>{cat.name}</ChipListboxOption>
               ))}
             </FilterChipListbox>
           )}

@@ -21,8 +21,7 @@ import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
-import { ListboxOption } from '../components/catalyst/listbox';
-import { FilterChipListbox } from '../components/ui/FilterChipListbox';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import IconButton from '../components/IconButton';
 import { Input } from '../components/catalyst/input';
 import { Field, Label } from '../components/catalyst/fieldset';
@@ -525,9 +524,9 @@ export default function WorkOrdersPage() {
                   onClear={() => updateParams({ type: [], page: null })}
                 >
                   {activeTypes.map((tx) => (
-                    <ListboxOption key={tx.id} value={tx.id}>
+                    <ChipListboxOption key={tx.id} value={tx.id}>
                       {tx.name}
-                    </ListboxOption>
+                    </ChipListboxOption>
                   ))}
                 </FilterChipListbox>
               )}
@@ -543,9 +542,9 @@ export default function WorkOrdersPage() {
                   onClear={() => updateParams({ division: [], page: null })}
                 >
                   {activeDivisions.map((d) => (
-                    <ListboxOption key={d.id} value={d.id}>
+                    <ChipListboxOption key={d.id} value={d.id}>
                       {d.name}
-                    </ListboxOption>
+                    </ChipListboxOption>
                   ))}
                 </FilterChipListbox>
               )}
@@ -561,9 +560,9 @@ export default function WorkOrdersPage() {
                   onClear={() => updateParams({ region: [], page: null })}
                 >
                   {activeRegions.map((r) => (
-                    <ListboxOption key={r.id} value={r.id}>
+                    <ChipListboxOption key={r.id} value={r.id}>
                       {r.name}
-                    </ListboxOption>
+                    </ChipListboxOption>
                   ))}
                 </FilterChipListbox>
               )}
@@ -579,9 +578,9 @@ export default function WorkOrdersPage() {
                   onClear={() => updateParams({ itemStatus: [], page: null })}
                 >
                   {activeItemStatuses.map((s) => (
-                    <ListboxOption key={s.id} value={s.id}>
+                    <ChipListboxOption key={s.id} value={s.id}>
                       {s.name}
-                    </ListboxOption>
+                    </ChipListboxOption>
                   ))}
                 </FilterChipListbox>
               )}
@@ -606,11 +605,12 @@ export default function WorkOrdersPage() {
                   updateParams(updates);
                 }}
                 onClear={() => updateParams({ date: null, from: null, to: null, page: null })}
+                resetLabel={t('workOrders.dates.any')}
               >
-                {DATE_PRESETS.map((p) => (
-                  <ListboxOption key={p.id || 'any'} value={p.id || null}>
+                {DATE_PRESETS.filter((p) => p.id !== '').map((p) => (
+                  <ChipListboxOption key={p.id} value={p.id}>
                     {t(p.labelKey)}
-                  </ListboxOption>
+                  </ChipListboxOption>
                 ))}
               </FilterChipListbox>
 
@@ -630,9 +630,9 @@ export default function WorkOrdersPage() {
                   });
                 }}
                 onClear={() => updateParams({ archived: null, page: null })}
+                resetLabel={t('workOrders.filters.archivedHidden')}
               >
-                <ListboxOption value={null}>{t('workOrders.filters.archivedHidden')}</ListboxOption>
-                <ListboxOption value="shown">{t('workOrders.filters.archivedShown')}</ListboxOption>
+                <ChipListboxOption value="shown">{t('workOrders.filters.archivedShown')}</ChipListboxOption>
               </FilterChipListbox>
 
               {activeChips.length > 0 && (
