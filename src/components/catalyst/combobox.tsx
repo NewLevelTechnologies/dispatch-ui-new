@@ -47,7 +47,7 @@ export function Combobox<T>({
           // Background color is moved to control and shadow is removed in dark mode so hide `before` pseudo
           'dark:before:hidden',
           // Focus ring
-          'after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-transparent after:ring-inset sm:focus-within:after:ring-2 sm:focus-within:after:ring-blue-500',
+          'after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-transparent after:ring-inset sm:focus-within:after:ring-2 sm:focus-within:after:ring-accent-500',
           // Disabled state
           'has-data-disabled:opacity-50 has-data-disabled:before:bg-zinc-950/5 has-data-disabled:before:shadow-none',
           // Invalid state
@@ -85,7 +85,7 @@ export function Combobox<T>({
         />
         <Headless.ComboboxButton className="group absolute inset-y-0 right-0 flex items-center px-2">
           <svg
-            className="size-5 stroke-zinc-500 group-data-disabled:stroke-zinc-600 group-data-hover:stroke-zinc-700 sm:size-4 dark:stroke-zinc-400 dark:group-data-hover:stroke-zinc-300 forced-colors:stroke-[CanvasText]"
+            className="size-5 stroke-fg-muted group-data-disabled:stroke-fg-dim group-data-hover:stroke-fg-strong sm:size-4 forced-colors:stroke-[CanvasText]"
             viewBox="0 0 16 16"
             aria-hidden="true"
             fill="none"

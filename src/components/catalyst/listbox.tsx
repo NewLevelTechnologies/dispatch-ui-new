@@ -35,7 +35,7 @@ export function Listbox<T>({
           // Hide default focus styles
           'focus:outline-hidden',
           // Focus ring
-          'after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-transparent after:ring-inset data-focus:after:ring-2 data-focus:after:ring-blue-500',
+          'after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-transparent after:ring-inset data-focus:after:ring-2 data-focus:after:ring-accent-500',
           // Disabled state
           'data-disabled:opacity-50 data-disabled:before:bg-zinc-950/5 data-disabled:before:shadow-none',
         ])}
@@ -65,7 +65,7 @@ export function Listbox<T>({
         />
         <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
           <svg
-            className="size-5 stroke-zinc-500 group-data-disabled:stroke-zinc-600 sm:size-4 dark:stroke-zinc-400 forced-colors:stroke-[CanvasText]"
+            className="size-5 stroke-fg-muted group-data-disabled:stroke-fg-dim sm:size-4 forced-colors:stroke-[CanvasText]"
             viewBox="0 0 16 16"
             aria-hidden="true"
             fill="none"
