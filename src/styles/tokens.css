@@ -95,27 +95,27 @@
 
 /* ── Dark theme ──────────────────────────────────────────────────── */
 .theme-dark {
-  --bg:           oklch(17% 0.008 250);
-  --bg-sunken:    oklch(14% 0.008 250);
-  --bg-elev:      oklch(21% 0.01 250);
-  --bg-elev-2:    oklch(24% 0.011 250);
-  --bg-hover:     oklch(26% 0.012 250);
-  --bg-active:    oklch(29% 0.014 250);
+  --bg:                 oklch(24% 0.003 250);   /* topbar */
+  --bg-sunken:          oklch(21% 0.003 250);   /* content pane */
+  --bg-elev:            oklch(27% 0.004 250);   /* cards */
+  --bg-elev-2:          oklch(30% 0.005 250);
+  --bg-hover:           oklch(32% 0.006 250);
+  --bg-active:          oklch(35% 0.008 250);
 
-  --sidebar-bg:    oklch(13% 0.008 255);
-  --sidebar-bg-2:  oklch(17% 0.01 255);
-  --sidebar-fg:    oklch(85% 0.008 255);
-  --sidebar-fg-dim:oklch(58% 0.01 255);
-  --sidebar-border:oklch(22% 0.011 255);
+  --sidebar-bg:         oklch(18% 0.003 255);
+  --sidebar-bg-2:       oklch(22% 0.004 255);
+  --sidebar-fg:         oklch(94% 0.004 255);
+  --sidebar-fg-dim:     oklch(68% 0.005 255);
+  --sidebar-border:     oklch(26% 0.005 255);
 
-  --fg:        oklch(92% 0.008 250);
-  --fg-strong: oklch(98% 0.004 250);
-  --fg-muted:  oklch(68% 0.012 250);
-  --fg-dim:    oklch(62% 0.012 250);
+  --fg:                 oklch(94% 0.004 250);
+  --fg-strong:          oklch(99% 0.002 250);
+  --fg-muted:           oklch(76% 0.006 250);
+  --fg-dim:             oklch(68% 0.006 250);
 
-  --border:        oklch(28% 0.013 250);
-  --border-strong: oklch(35% 0.015 250);
-  --border-soft:   oklch(24% 0.011 250);
+  --border:             oklch(40% 0.006 250);
+  --border-strong:      oklch(42% 0.008 250);
+  --border-soft:        oklch(30% 0.005 250);
 
   --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.4);
   --shadow-md: 0 1px 3px 0 rgba(0,0,0,0.5), 0 1px 2px -1px rgba(0,0,0,0.4);
