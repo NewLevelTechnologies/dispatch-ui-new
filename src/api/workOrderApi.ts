@@ -239,7 +239,7 @@ export interface TransitionWorkItemStatusRequest {
 export interface ListWorkOrdersParams {
   // Free-text search across workOrderNumber, customerOrderNumber, customer name/phone,
   // service location name/address, site contact name, and description.
-  search?: string;
+  q?: string;
 
   // Lifecycle / progress
   lifecycleState?: LifecycleState;

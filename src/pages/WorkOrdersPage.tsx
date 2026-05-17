@@ -184,7 +184,7 @@ export default function WorkOrdersPage() {
   // every call, which would bust the queryParams useMemo and refetch on every
   // render even when nothing changed.
   const tabId = (searchParams.get('tab') as LifecycleTabId | null) ?? DEFAULT_TAB;
-  const urlSearch = searchParams.get('search') ?? '';
+  const urlSearch = searchParams.get('q') ?? '';
   const typeIds = useMemo(() => searchParams.getAll('type'), [searchParams]);
   const divisionIds = useMemo(() => searchParams.getAll('division'), [searchParams]);
   const regionIds = useMemo(() => searchParams.getAll('region'), [searchParams]);
@@ -232,7 +232,7 @@ export default function WorkOrdersPage() {
 
   const handleSearchInputChange = (value: string) => {
     setSearchInput(value);
-    updateParams({ search: value || null, page: null }, { replace: true });
+    updateParams({ q: value || null, page: null }, { replace: true });
   };
 
   // ── Tenant config queries (for filter dropdowns) ──────────────────────────
@@ -279,7 +279,7 @@ export default function WorkOrdersPage() {
   const queryParams: ListWorkOrdersParams = useMemo(
     () => ({
       ...tab.params,
-      search: deferredSearch || undefined,
+      q: deferredSearch || undefined,
       workOrderTypeIds: typeIds.length > 0 ? typeIds : undefined,
       divisionIds: divisionIds.length > 0 ? divisionIds : undefined,
       dispatchRegionIds: regionIds.length > 0 ? regionIds : undefined,
@@ -393,7 +393,7 @@ export default function WorkOrdersPage() {
       key: 'search',
       label: t('common.search').replace('...', ''),
       value: `"${urlSearch}"`,
-      onClear: () => updateParams({ search: null, page: null }),
+      onClear: () => updateParams({ q: null, page: null }),
     });
   }
   if (typeIds.length > 0) {
