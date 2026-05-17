@@ -180,9 +180,11 @@ describe('NotificationLogsList', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    // Find and change status filter
-    const statusSelect = screen.getByDisplayValue('All Statuses');
-    await user.selectOptions(statusSelect, 'DELIVERED');
+    // Open the Status chip and pick Delivered. The chip is a Headless UI
+    // Listbox — trigger is a button with aria-label "Status", options expose
+    // role="option".
+    await user.click(screen.getByRole('button', { name: 'Status' }));
+    await user.click(await screen.findByRole('option', { name: 'Delivered' }));
 
     await waitFor(() => {
       expect(api.notificationApi.getNotificationLogs).toHaveBeenCalledWith(
@@ -203,9 +205,8 @@ describe('NotificationLogsList', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    // Find and change channel filter
-    const channelSelect = screen.getByDisplayValue('All Channels');
-    await user.selectOptions(channelSelect, 'EMAIL');
+    await user.click(screen.getByRole('button', { name: 'Channel' }));
+    await user.click(await screen.findByRole('option', { name: 'Email' }));
 
     await waitFor(() => {
       expect(api.notificationApi.getNotificationLogs).toHaveBeenCalledWith(

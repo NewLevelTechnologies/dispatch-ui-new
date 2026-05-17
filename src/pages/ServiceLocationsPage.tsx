@@ -22,7 +22,8 @@ import { dense } from '../components/ui/dense';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
 import { Input, InputGroup } from '../components/catalyst/input';
-import { Select } from '../components/catalyst/select';
+import { ListboxOption } from '../components/catalyst/listbox';
+import { FilterChipListbox, ChipDivider } from '../components/ui/FilterChipListbox';
 import { Pagination, PaginationGap, PaginationList, PaginationNext, PaginationPage, PaginationPrevious } from '../components/catalyst/pagination';
 
 export default function ServiceLocationsPage() {
@@ -229,19 +230,20 @@ export default function ServiceLocationsPage() {
             />
           </InputGroup>
           {activeRegions.length > 0 && (
-            <div className="w-44">
-              <Select
-                aria-label={t('serviceLocations.filter.region')}
-                value={regionId}
-                onChange={(e) => updateFilters({ region: e.target.value })}
-                className={dense.select}
-              >
-                <option value="">{t('serviceLocations.filter.allRegions')}</option>
-                {activeRegions.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </Select>
-            </div>
+            <FilterChipListbox
+              label={t('serviceLocations.filter.region')}
+              ariaLabel={t('serviceLocations.filter.region')}
+              value={regionId || null}
+              displayValue={regionId ? activeRegions.find((r) => r.id === regionId)?.name ?? null : null}
+              onChange={(id) => updateFilters({ region: id ?? '' })}
+              onClear={() => updateFilters({ region: '' })}
+            >
+              <ListboxOption value={null}>{t('serviceLocations.filter.allRegions')}</ListboxOption>
+              <ChipDivider />
+              {activeRegions.map((r) => (
+                <ListboxOption key={r.id} value={r.id}>{r.name}</ListboxOption>
+              ))}
+            </FilterChipListbox>
           )}
         </div>
 

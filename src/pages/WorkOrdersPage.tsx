@@ -1,9 +1,7 @@
-import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import clsx from 'clsx';
-import * as Headless from '@headlessui/react';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import {
   workOrderApi,
@@ -24,6 +22,7 @@ import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { ListboxOption } from '../components/catalyst/listbox';
+import { FilterChipListbox, ChipDivider } from '../components/ui/FilterChipListbox';
 import IconButton from '../components/IconButton';
 import { Input, InputGroup } from '../components/catalyst/input';
 import { Checkbox, CheckboxField } from '../components/catalyst/checkbox';
@@ -161,92 +160,6 @@ function formatDate(dateString?: string | null) {
 
 function isCancelled(wo: WorkOrderSummary): boolean {
   return wo.lifecycleState === 'CANCELLED';
-}
-
-// ─── FilterChipListbox ───────────────────────────────────────────────────────
-// Chip body opens a Listbox popover; clear × is a sibling button. Two adjacent
-// buttons inside one bordered wrapper — keeps the clear click from bubbling
-// into the ListboxButton's open handler.
-//
-// Listbox (not Menu) is the correct primitive: screen readers announce
-// "<option>, selected" for the currently-applied filter via aria-selected,
-// which a menu can't communicate. Keyboard nav, type-ahead, Esc-to-close,
-// click-outside, and floating positioning all come from Headless UI.
-//
-// The reset row uses <ListboxOption value={null}>. Hosts pass `value={x || null}`
-// so empty-string URL params map cleanly to the null option.
-function FilterChipListbox({
-  label,
-  value,
-  displayValue,
-  ariaLabel,
-  onChange,
-  onClear,
-  children,
-}: {
-  label: string;
-  value: string | null;
-  displayValue?: string | null;
-  ariaLabel: string;
-  onChange: (value: string | null) => void;
-  onClear?: () => void;
-  children: ReactNode;
-}) {
-  const isSet = value != null && displayValue != null && displayValue !== '';
-  return (
-    <Headless.Listbox value={value} onChange={onChange}>
-      <span
-        className={clsx(
-          'inline-flex h-8 items-center overflow-hidden rounded-md border bg-bg-elev text-[12px] transition-colors',
-          isSet
-            ? 'border-accent-500/35 bg-accent-500/5 hover:bg-[color-mix(in_oklch,var(--accent-500)_12%,var(--bg-elev))]'
-            : 'border-border hover:bg-bg-hover'
-        )}
-      >
-        <Headless.ListboxButton
-          aria-label={ariaLabel}
-          className="flex h-full items-center gap-1.5 px-2.5 font-medium text-fg outline-none focus:outline-none"
-        >
-          <span className="text-fg-muted">{label}</span>
-          {isSet ? (
-            <span className="font-semibold text-fg-strong">{displayValue}</span>
-          ) : (
-            <span className="text-fg-dim">+</span>
-          )}
-        </Headless.ListboxButton>
-        {isSet && onClear && (
-          <button
-            type="button"
-            aria-label={`${ariaLabel} — clear`}
-            onClick={onClear}
-            className="flex h-full items-center border-l border-accent-500/20 px-1.5 text-fg-dim hover:bg-bg-hover hover:text-fg-strong"
-          >
-            ×
-          </button>
-        )}
-      </span>
-      <Headless.ListboxOptions
-        transition
-        anchor="bottom start"
-        className={clsx(
-          '[--anchor-gap:--spacing(2)] [--anchor-padding:--spacing(1)] [--anchor-offset:-6px]',
-          'isolate w-max rounded-xl p-1',
-          'outline outline-transparent focus:outline-hidden',
-          'overflow-y-auto',
-          'bg-bg-elev/95 backdrop-blur-xl',
-          'shadow-lg ring-1 ring-border',
-          'transition data-leave:duration-100 data-leave:ease-in data-closed:data-leave:opacity-0'
-        )}
-      >
-        {children}
-      </Headless.ListboxOptions>
-    </Headless.Listbox>
-  );
-}
-
-// Visual separator between the reset row and real options. Matches DropdownDivider styling.
-function ChipDivider() {
-  return <hr className="mx-3 my-1 h-px border-0 bg-border-soft" />;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────

@@ -11,7 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from './catalyst/badge';
 import { Text } from './catalyst/text';
 import { Subheading } from './catalyst/heading';
-import { Select } from './catalyst/select';
+import { ListboxOption } from './catalyst/listbox';
+import { FilterChipListbox, ChipDivider } from './ui/FilterChipListbox';
 import { Button } from './catalyst/button';
 import { EnvelopeIcon, DevicePhoneMobileIcon, BellIcon } from '@heroicons/react/24/outline';
 
@@ -110,36 +111,56 @@ export default function NotificationLogsList({
       <div className="flex items-center justify-between mb-2">
         <Subheading>{t('notifications.logs.title')}</Subheading>
         <div className="flex gap-2">
-          <Select
-            name="statusFilter"
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as NotificationStatus | '');
+          <FilterChipListbox
+            label={t('notifications.logs.table.status')}
+            ariaLabel={t('notifications.logs.table.status')}
+            value={statusFilter || null}
+            displayValue={statusFilter ? t(`notifications.logs.status.${statusFilter.toLowerCase()}`) : null}
+            onChange={(value) => {
+              setStatusFilter((value ?? '') as NotificationStatus | '');
               setPage(0);
             }}
-            className="w-40"
-          >
-            <option value="">{t('notifications.logs.filters.allStatuses')}</option>
-            <option value={NotificationStatus.DELIVERED}>{t('notifications.logs.status.delivered')}</option>
-            <option value={NotificationStatus.SENT}>{t('notifications.logs.status.sent')}</option>
-            <option value={NotificationStatus.PENDING}>{t('notifications.logs.status.pending')}</option>
-            <option value={NotificationStatus.BOUNCED}>{t('notifications.logs.status.bounced')}</option>
-            <option value={NotificationStatus.FAILED}>{t('notifications.logs.status.failed')}</option>
-          </Select>
-          <Select
-            name="channelFilter"
-            value={channelFilter}
-            onChange={(e) => {
-              setChannelFilter(e.target.value as NotificationChannel | '');
+            onClear={() => {
+              setStatusFilter('');
               setPage(0);
             }}
-            className="w-40"
           >
-            <option value="">{t('notifications.logs.filters.allChannels')}</option>
-            <option value={NotificationChannel.EMAIL}>{t('notifications.preferences.channelEmail')}</option>
-            <option value={NotificationChannel.SMS}>{t('notifications.preferences.channelSms')}</option>
-            <option value={NotificationChannel.PUSH}>{t('notifications.preferences.channelPush')}</option>
-          </Select>
+            <ListboxOption value={null}>{t('notifications.logs.filters.allStatuses')}</ListboxOption>
+            <ChipDivider />
+            <ListboxOption value={NotificationStatus.DELIVERED}>{t('notifications.logs.status.delivered')}</ListboxOption>
+            <ListboxOption value={NotificationStatus.SENT}>{t('notifications.logs.status.sent')}</ListboxOption>
+            <ListboxOption value={NotificationStatus.PENDING}>{t('notifications.logs.status.pending')}</ListboxOption>
+            <ListboxOption value={NotificationStatus.BOUNCED}>{t('notifications.logs.status.bounced')}</ListboxOption>
+            <ListboxOption value={NotificationStatus.FAILED}>{t('notifications.logs.status.failed')}</ListboxOption>
+          </FilterChipListbox>
+          <FilterChipListbox
+            label={t('notifications.logs.table.channel')}
+            ariaLabel={t('notifications.logs.table.channel')}
+            value={channelFilter || null}
+            displayValue={
+              channelFilter === NotificationChannel.EMAIL
+                ? t('notifications.preferences.channelEmail')
+                : channelFilter === NotificationChannel.SMS
+                  ? t('notifications.preferences.channelSms')
+                  : channelFilter === NotificationChannel.PUSH
+                    ? t('notifications.preferences.channelPush')
+                    : null
+            }
+            onChange={(value) => {
+              setChannelFilter((value ?? '') as NotificationChannel | '');
+              setPage(0);
+            }}
+            onClear={() => {
+              setChannelFilter('');
+              setPage(0);
+            }}
+          >
+            <ListboxOption value={null}>{t('notifications.logs.filters.allChannels')}</ListboxOption>
+            <ChipDivider />
+            <ListboxOption value={NotificationChannel.EMAIL}>{t('notifications.preferences.channelEmail')}</ListboxOption>
+            <ListboxOption value={NotificationChannel.SMS}>{t('notifications.preferences.channelSms')}</ListboxOption>
+            <ListboxOption value={NotificationChannel.PUSH}>{t('notifications.preferences.channelPush')}</ListboxOption>
+          </FilterChipListbox>
         </div>
       </div>
 

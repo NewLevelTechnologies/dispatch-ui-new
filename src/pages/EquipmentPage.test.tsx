@@ -340,9 +340,11 @@ describe('EquipmentPage', () => {
 
     await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
 
-    // Pick type — kicks off categories query and refetches list
-    const [typeSelect, categorySelect] = screen.getAllByRole('combobox');
-    await user.selectOptions(typeSelect, 't-hvac');
+    // Pick type via the FilterChipListbox. Trigger button is labeled "Type";
+    // options expose role="option". Picking a type also kicks off the
+    // categories query and makes the Category chip appear.
+    await user.click(screen.getByRole('button', { name: 'Type' }));
+    await user.click(await screen.findByRole('option', { name: 'HVAC' }));
 
     await waitFor(() => {
       expect(mockEquipmentCategoriesGetAll).toHaveBeenCalledWith('t-hvac');
@@ -351,9 +353,10 @@ describe('EquipmentPage', () => {
       expect(mockEquipmentList.mock.calls.some(([args]) => args?.equipmentTypeId === 't-hvac')).toBe(true);
     });
 
-    // Pick category
-    await waitFor(() => expect(categorySelect).not.toBeDisabled());
-    await user.selectOptions(categorySelect, 'c-furnace');
+    // Category chip only renders once a type is set. Wait for it.
+    const categoryChip = await screen.findByRole('button', { name: 'Category' });
+    await user.click(categoryChip);
+    await user.click(await screen.findByRole('option', { name: 'Furnace' }));
     await waitFor(() => {
       expect(mockEquipmentList.mock.calls.some(([args]) => args?.equipmentCategoryId === 'c-furnace')).toBe(true);
     });

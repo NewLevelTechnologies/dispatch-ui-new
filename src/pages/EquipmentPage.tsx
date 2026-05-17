@@ -30,7 +30,8 @@ import { dense } from '../components/ui/dense';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
 import { Input, InputGroup } from '../components/catalyst/input';
-import { Select } from '../components/catalyst/select';
+import { ListboxOption } from '../components/catalyst/listbox';
+import { FilterChipListbox, ChipDivider } from '../components/ui/FilterChipListbox';
 
 const PAGE_SIZE = 50;
 
@@ -205,41 +206,53 @@ export default function EquipmentPage() {
             />
           </InputGroup>
 
-          <div className="w-48">
-            <Select
-              value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value);
+          <FilterChipListbox
+            label={t('equipment.form.type')}
+            ariaLabel={t('equipment.form.type')}
+            value={typeFilter || null}
+            displayValue={typeFilter ? equipmentTypes.find((tx) => tx.id === typeFilter)?.name ?? null : null}
+            onChange={(id) => {
+              setTypeFilter(id ?? '');
+              setCategoryFilter('');
+              setPage(0);
+            }}
+            onClear={() => {
+              setTypeFilter('');
+              setCategoryFilter('');
+              setPage(0);
+            }}
+          >
+            <ListboxOption value={null}>{t('equipment.filter.allTypes')}</ListboxOption>
+            <ChipDivider />
+            {equipmentTypes.map((tx) => (
+              <ListboxOption key={tx.id} value={tx.id}>{tx.name}</ListboxOption>
+            ))}
+          </FilterChipListbox>
+
+          {/* Category chip only appears once a type is chosen — categories
+              are scoped to a type, so the picker is meaningless without one. */}
+          {typeFilter && (
+            <FilterChipListbox
+              label={t('equipment.form.category')}
+              ariaLabel={t('equipment.form.category')}
+              value={categoryFilter || null}
+              displayValue={categoryFilter ? equipmentCategories.find((c) => c.id === categoryFilter)?.name ?? null : null}
+              onChange={(id) => {
+                setCategoryFilter(id ?? '');
+                setPage(0);
+              }}
+              onClear={() => {
                 setCategoryFilter('');
                 setPage(0);
               }}
-              className={dense.select}
-              aria-label={t('equipment.filter.allTypes')}
             >
-              <option value="">{t('equipment.filter.allTypes')}</option>
-              {equipmentTypes.map((type) => (
-                <option key={type.id} value={type.id}>{type.name}</option>
-              ))}
-            </Select>
-          </div>
-
-          <div className="w-48">
-            <Select
-              value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value);
-                setPage(0);
-              }}
-              disabled={!typeFilter}
-              className={dense.select}
-              aria-label={t('equipment.filter.allCategories')}
-            >
-              <option value="">{t('equipment.filter.allCategories')}</option>
+              <ListboxOption value={null}>{t('equipment.filter.allCategories')}</ListboxOption>
+              <ChipDivider />
               {equipmentCategories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                <ListboxOption key={cat.id} value={cat.id}>{cat.name}</ListboxOption>
               ))}
-            </Select>
-          </div>
+            </FilterChipListbox>
+          )}
         </div>
 
         <ViewTabs
