@@ -229,14 +229,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </DropdownButton>
               <DropdownMenu className="min-w-64" anchor="top start">
                 <div className="px-3 py-2">
-                  <div className="text-sm font-medium text-zinc-900 dark:text-white mb-2">{t('common.theme')}</div>
+                  <div className="text-sm font-medium text-fg-strong mb-2">{t('common.theme')}</div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setMode('light')}
                       className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
                         mode === 'light'
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+                          ? 'bg-accent-500 text-white'
+                          : 'bg-bg-hover text-fg hover:bg-bg-active'
                       }`}
                       aria-label="Light mode"
                     >
@@ -246,22 +246,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       onClick={() => setMode('dark')}
                       className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
                         mode === 'dark'
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+                          ? 'bg-accent-500 text-white'
+                          : 'bg-bg-hover text-fg hover:bg-bg-active'
                       }`}
                       aria-label="Dark mode"
                     >
                       <MoonIcon className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="mt-3 mb-2 text-sm font-medium text-zinc-900 dark:text-white">{t('common.themeAccent')}</div>
+                  <div className="mt-3 mb-2 text-sm font-medium text-fg-strong">{t('common.themeAccent')}</div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setAccent('warm')}
                       className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
                         accent === 'warm'
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+                          ? 'bg-accent-500 text-white'
+                          : 'bg-bg-hover text-fg hover:bg-bg-active'
                       }`}
                       aria-label="Warm accent"
                     >
@@ -271,8 +271,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       onClick={() => setAccent('cool')}
                       className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
                         accent === 'cool'
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+                          ? 'bg-accent-500 text-white'
+                          : 'bg-bg-hover text-fg hover:bg-bg-active'
                       }`}
                       aria-label="Cool accent"
                     >
