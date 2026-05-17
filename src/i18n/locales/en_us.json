@@ -57,6 +57,7 @@
     "recentEntities": "Recent {{entities}}",
     "restoring": "Restoring...",
     "search": "Search...",
+    "selectedCount": "{{count}} selected",
     "show": "Show",
     "view": "View",
     "viewAll": "View all",

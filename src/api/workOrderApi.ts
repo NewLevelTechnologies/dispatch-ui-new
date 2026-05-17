@@ -245,13 +245,20 @@ export interface ListWorkOrdersParams {
   lifecycleState?: LifecycleState;
   progressCategory?: ProgressCategory;
 
-  // Tenant taxonomy
+  // Tenant taxonomy. Prefer the plural form (workOrderTypeIds: string[]) — the
+  // backend OR's within a filter and AND's across filters. Singulars are still
+  // accepted server-side for back-compat, but if both are sent the plural wins
+  // — don't pass both for the same filter.
   workOrderTypeId?: string;
+  workOrderTypeIds?: string[];
   divisionId?: string;
+  divisionIds?: string[];
   dispatchRegionId?: string;
+  dispatchRegionIds?: string[];
 
   // At least one work item must be in this status (specific tenant status, not a category)
   workItemStatusId?: string;
+  workItemStatusIds?: string[];
 
   // Customer scope
   customerId?: string;
@@ -281,12 +288,17 @@ export interface ListWorkOrdersParams {
   sort?: `${WorkOrderSortField},${SortDirection}`;
 }
 
-function cleanParams(params?: ListWorkOrdersParams): Record<string, string | number | boolean> {
+function cleanParams(params?: ListWorkOrdersParams): Record<string, string | number | boolean | string[]> {
   if (!params) return {};
-  const out: Record<string, string | number | boolean> = {};
+  const out: Record<string, string | number | boolean | string[]> = {};
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null || value === '') continue;
-    out[key] = value;
+    if (Array.isArray(value)) {
+      if (value.length === 0) continue;
+      out[key] = value;
+    } else {
+      out[key] = value;
+    }
   }
   return out;
 }

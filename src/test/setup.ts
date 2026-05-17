@@ -114,6 +114,7 @@ vi.mock('react-i18next', () => {
     'common.recentEntities': 'Recent {{entities}}',
     'common.restoring': 'Restoring...',
     'common.search': 'Search...',
+    'common.selectedCount': '{{count}} selected',
     'common.show': 'Show',
     'common.view': 'View',
     'common.viewAll': 'View all',

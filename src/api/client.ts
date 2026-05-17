@@ -8,6 +8,10 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Serialize array params as repeated keys (?id=a&id=b) instead of the
+  // axios default of bracketed indexes (?id[]=a&id[]=b). Spring binds
+  // List<T> @RequestParam from the repeated form.
+  paramsSerializer: { indexes: null },
 });
 
 // Request interceptor to add JWT token

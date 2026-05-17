@@ -22,7 +22,7 @@ import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { ListboxOption } from '../components/catalyst/listbox';
-import { FilterChipListbox, ChipDivider } from '../components/ui/FilterChipListbox';
+import { FilterChipListbox } from '../components/ui/FilterChipListbox';
 import IconButton from '../components/IconButton';
 import { Input, InputGroup } from '../components/catalyst/input';
 import { Checkbox, CheckboxField } from '../components/catalyst/checkbox';
@@ -175,12 +175,20 @@ export default function WorkOrdersPage() {
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrderSummary | null>(null);
 
   // ── Read filter state from URL ────────────────────────────────────────────
+  // The four taxonomy filters are multi-value — read with getAll(). Old single-
+  // value bookmarks (?type=uuid) just work: getAll returns ['uuid']. We never
+  // write the old key name, so URLs migrate to the multi-value shape on first
+  // interaction without an explicit rewrite step.
+  //
+  // The array reads are memoized: searchParams.getAll() returns a fresh array
+  // every call, which would bust the queryParams useMemo and refetch on every
+  // render even when nothing changed.
   const tabId = (searchParams.get('tab') as LifecycleTabId | null) ?? DEFAULT_TAB;
   const urlSearch = searchParams.get('search') ?? '';
-  const typeId = searchParams.get('type') ?? '';
-  const divisionId = searchParams.get('division') ?? '';
-  const regionId = searchParams.get('region') ?? '';
-  const itemStatusId = searchParams.get('itemStatus') ?? '';
+  const typeIds = useMemo(() => searchParams.getAll('type'), [searchParams]);
+  const divisionIds = useMemo(() => searchParams.getAll('division'), [searchParams]);
+  const regionIds = useMemo(() => searchParams.getAll('region'), [searchParams]);
+  const itemStatusIds = useMemo(() => searchParams.getAll('itemStatus'), [searchParams]);
   const datePreset = (searchParams.get('date') as DatePreset | null) ?? '';
   const customFrom = searchParams.get('from') ?? '';
   const customTo = searchParams.get('to') ?? '';
@@ -199,16 +207,21 @@ export default function WorkOrdersPage() {
   }, [urlSearch]);
 
   // ── URL writer ────────────────────────────────────────────────────────────
-  // Pass null to remove a param; pass a string/number/true to set it.
-  // Pass `replace: true` for high-frequency updates (typing) so the back button
-  // doesn't have to step through every keystroke.
+  // Pass null / '' / false / [] to remove a param; pass a string/number/true
+  // or string[] to set it. Arrays write as repeated params (?type=a&type=b),
+  // matching what the backend prefers and what URLSearchParams.getAll() reads
+  // back naturally. Pass `replace: true` for high-frequency updates (typing)
+  // so the back button doesn't have to step through every keystroke.
   function updateParams(
-    updates: Record<string, string | number | boolean | null>,
+    updates: Record<string, string | number | boolean | string[] | null>,
     options: { replace?: boolean } = {}
   ) {
     const next = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(updates)) {
-      if (value === null || value === '' || value === false) {
+      if (Array.isArray(value)) {
+        next.delete(key);
+        for (const v of value) next.append(key, v);
+      } else if (value === null || value === '' || value === false) {
         next.delete(key);
       } else {
         next.set(key, String(value));
@@ -259,21 +272,25 @@ export default function WorkOrdersPage() {
   );
 
   // ── Build the API query params ────────────────────────────────────────────
+  // The four taxonomy filters use the plural form (workOrderTypeIds, etc.).
+  // Don't send both singular and plural for the same filter — backend's
+  // precedence rule is "plural wins," so the singular would be dead weight at
+  // best and a footgun at worst.
   const queryParams: ListWorkOrdersParams = useMemo(
     () => ({
       ...tab.params,
       search: deferredSearch || undefined,
-      workOrderTypeId: typeId || undefined,
-      divisionId: divisionId || undefined,
-      dispatchRegionId: regionId || undefined,
-      workItemStatusId: itemStatusId || undefined,
+      workOrderTypeIds: typeIds.length > 0 ? typeIds : undefined,
+      divisionIds: divisionIds.length > 0 ? divisionIds : undefined,
+      dispatchRegionIds: regionIds.length > 0 ? regionIds : undefined,
+      workItemStatusIds: itemStatusIds.length > 0 ? itemStatusIds : undefined,
       scheduledDateFrom: dateRange.from,
       scheduledDateTo: dateRange.to,
       includeArchived: includeArchived || undefined,
       page: pageNumber - 1, // URL is 1-based; backend Spring Page is 0-based
       size: PAGE_SIZE,
     }),
-    [tab, deferredSearch, typeId, divisionId, regionId, itemStatusId, dateRange, includeArchived, pageNumber]
+    [tab, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, dateRange, includeArchived, pageNumber]
   );
 
   const { data: pageData, isLoading, error } = useQuery({
@@ -357,6 +374,18 @@ export default function WorkOrdersPage() {
   const lookupName = (id: string, list: { id: string; name: string }[]) =>
     list.find((x) => x.id === id)?.name ?? id;
 
+  // Multi-value chip label: "Installation" → "Installation, Service" → "3 selected".
+  // Caller drives the format; the chip primitive doesn't know what an option means.
+  const formatMultiValue = (
+    ids: string[],
+    list: { id: string; name: string }[]
+  ): string | null => {
+    if (ids.length === 0) return null;
+    if (ids.length === 1) return lookupName(ids[0], list);
+    if (ids.length === 2) return ids.map((id) => lookupName(id, list)).join(', ');
+    return t('common.selectedCount', { count: ids.length });
+  };
+
   type ActiveChip = { key: string; label: string; value: string; onClear: () => void };
   const activeChips: ActiveChip[] = [];
   if (urlSearch) {
@@ -367,36 +396,36 @@ export default function WorkOrdersPage() {
       onClear: () => updateParams({ search: null, page: null }),
     });
   }
-  if (typeId) {
+  if (typeIds.length > 0) {
     activeChips.push({
       key: 'type',
       label: t('workOrders.form.type'),
-      value: lookupName(typeId, activeTypes),
-      onClear: () => updateParams({ type: null, page: null }),
+      value: formatMultiValue(typeIds, activeTypes) ?? '',
+      onClear: () => updateParams({ type: [], page: null }),
     });
   }
-  if (divisionId) {
+  if (divisionIds.length > 0) {
     activeChips.push({
       key: 'division',
       label: getName('division'),
-      value: lookupName(divisionId, activeDivisions),
-      onClear: () => updateParams({ division: null, page: null }),
+      value: formatMultiValue(divisionIds, activeDivisions) ?? '',
+      onClear: () => updateParams({ division: [], page: null }),
     });
   }
-  if (regionId) {
+  if (regionIds.length > 0) {
     activeChips.push({
       key: 'region',
       label: t('workOrders.filters.region'),
-      value: lookupName(regionId, activeRegions),
-      onClear: () => updateParams({ region: null, page: null }),
+      value: formatMultiValue(regionIds, activeRegions) ?? '',
+      onClear: () => updateParams({ region: [], page: null }),
     });
   }
-  if (itemStatusId) {
+  if (itemStatusIds.length > 0) {
     activeChips.push({
       key: 'itemStatus',
       label: t('workOrders.filters.itemStatus'),
-      value: lookupName(itemStatusId, activeItemStatuses),
-      onClear: () => updateParams({ itemStatus: null, page: null }),
+      value: formatMultiValue(itemStatusIds, activeItemStatuses) ?? '',
+      onClear: () => updateParams({ itemStatus: [], page: null }),
     });
   }
   if (datePreset !== '') {
@@ -485,17 +514,19 @@ export default function WorkOrdersPage() {
                 />
               </InputGroup>
 
+              {/* Four taxonomy chips are multi-select. No "Any X" reset row —
+                  the × button clears all, and an empty array means "show all"
+                  by way of the empty-state chip styling. */}
               {activeTypes.length > 0 && (
                 <FilterChipListbox
+                  multiple
                   label={t('workOrders.form.type')}
                   ariaLabel={t('workOrders.form.type')}
-                  value={typeId || null}
-                  displayValue={typeId ? lookupName(typeId, activeTypes) : null}
-                  onChange={(id) => updateParams({ type: id, page: null })}
-                  onClear={() => updateParams({ type: null, page: null })}
+                  value={typeIds}
+                  displayValue={formatMultiValue(typeIds, activeTypes)}
+                  onChange={(ids) => updateParams({ type: ids, page: null })}
+                  onClear={() => updateParams({ type: [], page: null })}
                 >
-                  <ListboxOption value={null}>{t('workOrders.filters.anyType')}</ListboxOption>
-                  <ChipDivider />
                   {activeTypes.map((tx) => (
                     <ListboxOption key={tx.id} value={tx.id}>
                       {tx.name}
@@ -506,17 +537,14 @@ export default function WorkOrdersPage() {
 
               {activeDivisions.length > 0 && (
                 <FilterChipListbox
+                  multiple
                   label={getName('division')}
                   ariaLabel={getName('division')}
-                  value={divisionId || null}
-                  displayValue={divisionId ? lookupName(divisionId, activeDivisions) : null}
-                  onChange={(id) => updateParams({ division: id, page: null })}
-                  onClear={() => updateParams({ division: null, page: null })}
+                  value={divisionIds}
+                  displayValue={formatMultiValue(divisionIds, activeDivisions)}
+                  onChange={(ids) => updateParams({ division: ids, page: null })}
+                  onClear={() => updateParams({ division: [], page: null })}
                 >
-                  <ListboxOption value={null}>
-                    {t('workOrders.filters.any', { entity: getName('division') })}
-                  </ListboxOption>
-                  <ChipDivider />
                   {activeDivisions.map((d) => (
                     <ListboxOption key={d.id} value={d.id}>
                       {d.name}
@@ -527,15 +555,14 @@ export default function WorkOrdersPage() {
 
               {activeRegions.length > 0 && (
                 <FilterChipListbox
+                  multiple
                   label={t('workOrders.filters.region')}
                   ariaLabel={t('workOrders.filters.region')}
-                  value={regionId || null}
-                  displayValue={regionId ? lookupName(regionId, activeRegions) : null}
-                  onChange={(id) => updateParams({ region: id, page: null })}
-                  onClear={() => updateParams({ region: null, page: null })}
+                  value={regionIds}
+                  displayValue={formatMultiValue(regionIds, activeRegions)}
+                  onChange={(ids) => updateParams({ region: ids, page: null })}
+                  onClear={() => updateParams({ region: [], page: null })}
                 >
-                  <ListboxOption value={null}>{t('workOrders.filters.anyRegion')}</ListboxOption>
-                  <ChipDivider />
                   {activeRegions.map((r) => (
                     <ListboxOption key={r.id} value={r.id}>
                       {r.name}
@@ -546,15 +573,14 @@ export default function WorkOrdersPage() {
 
               {activeItemStatuses.length > 0 && (
                 <FilterChipListbox
+                  multiple
                   label={t('workOrders.filters.itemStatus')}
                   ariaLabel={t('workOrders.filters.itemStatus')}
-                  value={itemStatusId || null}
-                  displayValue={itemStatusId ? lookupName(itemStatusId, activeItemStatuses) : null}
-                  onChange={(id) => updateParams({ itemStatus: id, page: null })}
-                  onClear={() => updateParams({ itemStatus: null, page: null })}
+                  value={itemStatusIds}
+                  displayValue={formatMultiValue(itemStatusIds, activeItemStatuses)}
+                  onChange={(ids) => updateParams({ itemStatus: ids, page: null })}
+                  onClear={() => updateParams({ itemStatus: [], page: null })}
                 >
-                  <ListboxOption value={null}>{t('workOrders.filters.anyItemStatus')}</ListboxOption>
-                  <ChipDivider />
                   {activeItemStatuses.map((s) => (
                     <ListboxOption key={s.id} value={s.id}>
                       {s.name}
