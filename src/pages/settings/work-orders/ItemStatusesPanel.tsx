@@ -14,6 +14,7 @@ import { Text } from '../../../components/catalyst/text';
 import { Button } from '../../../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from '../../../components/catalyst/dropdown';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
+import IconButton from '../../../components/IconButton';
 import { Pill } from '../../../components/ui/Pill';
 import { Card, CardBody } from '../../../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow } from '../../../components/ui/DenseTable';
@@ -216,8 +217,8 @@ export default function ItemStatusesPanel() {
                       <td className="right">
                         {canEdit && (
                           <Dropdown>
-                            <DropdownButton plain aria-label={t('common.moreOptions')}>
-                              <EllipsisVerticalIcon />
+                            <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                              <EllipsisVerticalIcon className="size-4" />
                             </DropdownButton>
                             <DropdownMenu anchor="bottom end">
                               <DropdownItem onClick={() => handleEdit(status)}>

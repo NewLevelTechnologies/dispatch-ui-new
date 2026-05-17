@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, ArrowPathIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import IconButton from '../components/IconButton';
 import { userApi, type Role, type RestoreAllDefaultsResponse } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import RoleFormDialog from '../components/RoleFormDialog';
@@ -281,8 +282,8 @@ export default function RolesPage() {
                         <td className="right">
                           <div onClick={(e) => e.stopPropagation()}>
                             <Dropdown>
-                              <DropdownButton plain aria-label={t('common.moreOptions')}>
-                                <EllipsisVerticalIcon className="size-5" />
+                              <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                                <EllipsisVerticalIcon className="size-4" />
                               </DropdownButton>
                               <DropdownMenu anchor="bottom end">
                                 {canEditRoles && !role.isProtected && (

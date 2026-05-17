@@ -22,6 +22,7 @@ import { Dialog, DialogActions, DialogBody, DialogTitle } from '../../../compone
 import { Field, FieldGroup, Fieldset, Label } from '../../../components/catalyst/fieldset';
 import { Input } from '../../../components/catalyst/input';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
+import IconButton from '../../../components/IconButton';
 import { Card, CardBody } from '../../../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow } from '../../../components/ui/DenseTable';
 import { SettingsListFooter } from '../../../components/settings/SettingsListFooter';
@@ -196,8 +197,8 @@ export default function EquipmentTypesPanel() {
                       <td className="right">
                         {canEdit && (
                           <Dropdown>
-                            <DropdownButton plain aria-label={t('common.moreOptions')}>
-                              <EllipsisVerticalIcon />
+                            <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                              <EllipsisVerticalIcon className="size-4" />
                             </DropdownButton>
                             <DropdownMenu anchor="bottom end">
                               <DropdownItem onClick={() => handleEdit(item)}>

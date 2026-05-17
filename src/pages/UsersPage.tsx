@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import IconButton from '../components/IconButton';
 import { userApi, type User } from '../api';
 import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
 import UserFormDialog from '../components/UserFormDialog';
@@ -326,8 +327,8 @@ export default function UsersPage() {
                           {(canEditUsers || canDeleteUsers) && (
                             <div onClick={(e) => e.stopPropagation()}>
                               <Dropdown>
-                                <DropdownButton plain aria-label={t('common.moreOptions')}>
-                                  <EllipsisVerticalIcon className="size-5" />
+                                <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                                  <EllipsisVerticalIcon className="size-4" />
                                 </DropdownButton>
                                 <DropdownMenu anchor="bottom end">
                                   {canEditUsers && (
