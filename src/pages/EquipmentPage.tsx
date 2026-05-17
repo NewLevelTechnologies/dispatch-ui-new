@@ -126,11 +126,11 @@ export default function EquipmentPage() {
 
   const getStatusBadge = (status: EquipmentStatus | undefined) => {
     if (status === EquipmentStatus.RETIRED) {
-      return <Pill tone="neutral" dot>{t('equipment.status.retired')}</Pill>;
+      return <Pill tone="neutral">{t('equipment.status.retired')}</Pill>;
     }
     // Default to active when the backend omits status (older payloads). Most
     // equipment is active, so this avoids a misleading "Retired" badge.
-    return <Pill tone="success" dot>{t('equipment.status.active')}</Pill>;
+    return <Pill tone="success">{t('equipment.status.active')}</Pill>;
   };
 
   const formatTypeCategory = (item: EquipmentSummary) => {

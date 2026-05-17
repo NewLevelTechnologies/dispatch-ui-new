@@ -13,7 +13,6 @@ import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
-import { Pill } from '../components/ui/Pill';
 import { ViewTabs } from '../components/ui/Tabs';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
@@ -348,18 +347,17 @@ export default function ServiceLocationsPage() {
                         </td>
                         <td className="muted">{t('serviceLocations.table.neverServiced')}</td>
                         <td>
-                          <Pill
-                            tone={
+                          <span
+                            className={
                               location.status === 'ACTIVE'
-                                ? 'success'
+                                ? 'text-success-500 font-medium'
                                 : location.status === 'INACTIVE'
-                                ? 'warning'
-                                : 'neutral'
+                                ? 'text-fg-muted'
+                                : 'text-fg-dim'
                             }
-                            dot
                           >
                             {t(`serviceLocations.status.${location.status.toLowerCase()}`)}
-                          </Pill>
+                          </span>
                         </td>
                         <td>
                           {(canEditServiceLocations || canCloseServiceLocations) && (

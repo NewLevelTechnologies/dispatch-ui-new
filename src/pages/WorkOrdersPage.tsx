@@ -876,7 +876,7 @@ export default function WorkOrdersPage() {
                           )}
                         </td>
                         <td>
-                          <Pill tone={PRIORITY_TONES[workOrder.priority ?? 'NORMAL']} dot>
+                          <Pill tone={PRIORITY_TONES[workOrder.priority ?? 'NORMAL']}>
                             {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[workOrder.priority ?? 'NORMAL']}`)}
                           </Pill>
                         </td>

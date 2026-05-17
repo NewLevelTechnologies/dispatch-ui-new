@@ -323,7 +323,7 @@ export default function CustomersPage() {
                           )}
                         </td>
                         <td>
-                          <Pill tone={customer.status === 'ACTIVE' ? 'success' : 'neutral'} dot>
+                          <Pill tone={customer.status === 'ACTIVE' ? 'success' : 'neutral'}>
                             {customer.status === 'ACTIVE' ? t('common.active') : t('common.inactive')}
                           </Pill>
                         </td>

@@ -139,7 +139,7 @@ export default function WarehousesPage() {
   };
 
   const getStatusBadge = (status: WarehouseStatus) => {
-    return <Pill tone={status === 'ACTIVE' ? 'success' : 'neutral'} dot>{status}</Pill>;
+    return <Pill tone={status === 'ACTIVE' ? 'success' : 'neutral'}>{status}</Pill>;
   };
 
   const warehouseCount = safeWarehouses.length;
