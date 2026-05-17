@@ -1,13 +1,16 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGlossary } from '../../contexts/GlossaryContext';
+import { useHasAnyCapability } from '../../hooks/useCurrentUser';
 import AppLayout from '../../components/AppLayout';
 import { PageHead } from '../../components/ui/PageHead';
 import { Card, CardBody } from '../../components/ui/Card';
+import { SoonBadge } from '../../components/settings/SoonBadge';
 
 interface NavItem {
   label: string;
   to: string;
+  soon?: boolean;
 }
 
 interface NavSection {
@@ -18,12 +21,15 @@ interface NavSection {
 export default function SettingsLayout() {
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const canViewUsers = useHasAnyCapability('VIEW_USERS');
 
   const sections: NavSection[] = [
     {
       label: t('settings.sections.organization'),
       items: [
-        { label: t('settings.nav.general'), to: '/settings/general' },
+        { label: t('settings.nav.companyProfile'), to: '/settings/company-profile' },
+        { label: t('settings.nav.businessDefaults'), to: '/settings/business-defaults', soon: true },
+        { label: t('settings.nav.modulesFeatures'), to: '/settings/modules-features', soon: true },
         { label: t('settings.nav.terminology'), to: '/settings/terminology' },
         { label: t('settings.nav.notificationTemplates'), to: '/settings/notification-templates' },
       ],
@@ -55,6 +61,7 @@ export default function SettingsLayout() {
     {
       label: t('settings.sections.access'),
       items: [
+        ...(canViewUsers ? [{ label: t('entities.users'), to: '/settings/access/users' }] : []),
         { label: getName('role', true), to: '/settings/access/roles' },
       ],
     },
@@ -82,14 +89,15 @@ export default function SettingsLayout() {
                             to={item.to}
                             className={({ isActive }) =>
                               [
-                                'block rounded-md px-2 py-1.5 text-[12.5px] transition-colors',
+                                'flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[12.5px] transition-colors',
                                 isActive
                                   ? 'bg-accent-500/10 font-semibold text-accent-700 dark:text-accent-300'
                                   : 'text-fg hover:bg-bg-hover hover:text-fg-strong',
                               ].join(' ')
                             }
                           >
-                            {item.label}
+                            <span className="truncate">{item.label}</span>
+                            {item.soon && <SoonBadge />}
                           </NavLink>
                         </li>
                       ))}

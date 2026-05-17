@@ -252,7 +252,7 @@ describe('UsersPage', () => {
     const nameCell = screen.getByText('John Doe');
     await user.click(nameCell);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/users/user-1');
+    expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users/user-1');
   });
 
   it('opens edit dialog when edit button is clicked', async () => {
@@ -631,7 +631,7 @@ describe('UsersPage', () => {
       const nameCell = screen.getByText('John Doe');
       await user.click(nameCell);
 
-      expect(mockNavigate).toHaveBeenCalledWith('/users/user-1');
+      expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users/user-1');
     });
 
     it('does not navigate when clicking dropdown button', async () => {
@@ -652,7 +652,7 @@ describe('UsersPage', () => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      const dropdownButtons = screen.getAllByRole('button', { name: '' });
+      const dropdownButtons = screen.queryAllByRole('button', { name: '' });
       if (dropdownButtons.length > 0) {
         await user.click(dropdownButtons[0]);
         // Should not navigate

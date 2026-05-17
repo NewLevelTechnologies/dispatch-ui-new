@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { userApi, type User } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
-import AppLayout from '../components/AppLayout';
 import UserFormDialog from '../components/UserFormDialog';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
@@ -148,7 +147,7 @@ export default function UsersPage() {
   };
 
   return (
-    <AppLayout>
+    <>
       <div className="flex items-center justify-between">
         <div>
           <Heading>{t('entities.users')}</Heading>
@@ -265,12 +264,12 @@ export default function UsersPage() {
               {filteredUsers.map((user) => (
                 <TableRow
                   key={user.id}
-                  href={`/users/${user.id}`}
+                  href={`/settings/access/users/${user.id}`}
                   onClick={(e: React.MouseEvent) => {
                     // Only navigate if not clicking dropdown or its children
                     const target = e.target as HTMLElement;
                     if (!target.closest('[role="menu"]') && !target.closest('button[aria-label]')) {
-                      navigate(`/users/${user.id}`);
+                      navigate(`/settings/access/users/${user.id}`);
                     }
                   }}
                   className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
@@ -368,6 +367,6 @@ export default function UsersPage() {
           </Button>
         </AlertActions>
       </Alert>
-    </AppLayout>
+    </>
   );
 }

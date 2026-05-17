@@ -981,18 +981,74 @@
       "titleEdit": "Edit Filter Size",
       "width": "Width (in)"
     },
+    "businessDefaults": {
+      "description": "How operations and money behave by default. Used when nothing more specific is set on a record.",
+      "financial": "Financial",
+      "operational": "Operational",
+      "taxRateHelper": "e.g. 0.0825 = 8.25%",
+      "termsHelper": "Pre-filled on new invoices; individual invoices can override.",
+      "timezoneHelper": "Used for scheduling, dispatch windows, and timestamps on customer-facing documents.",
+      "terms": {
+        "dueOnReceipt": "Due on receipt",
+        "net15": "Net 15",
+        "net30": "Net 30",
+        "net45": "Net 45",
+        "net60": "Net 60"
+      },
+      "title": "Business Defaults"
+    },
+    "companyProfile": {
+      "description": "Your business identity. Name and address appear on customer-facing documents (invoices, quotes, dispatch emails); the logo appears in the app header and email templates.",
+      "logo": "Logo",
+      "logoHelperLong": "PNG, JPG, or SVG · max 5 MB · square images render best (transparent background recommended)",
+      "logoNone": "No logo",
+      "logoReplace": "Replace",
+      "logoRemove": "Remove",
+      "logoUploadedAt": "uploaded {{date}}",
+      "logoUploaded": "Logo uploaded",
+      "logoSection": "Appears in the app header and email templates",
+      "shortNameHint": "appears in nav",
+      "title": "Company Profile"
+    },
+    "modulesFeatures": {
+      "communications": "Communications",
+      "description": "Turn product capabilities on or off for your organization. Some modules are still in development.",
+      "selfService": "Self-service",
+      "title": "Modules & Features",
+      "workflow": "Workflow",
+      "feature": {
+        "approvals": "Approvals",
+        "approvalsDesc": "Require manager sign-off on quotes above a threshold.",
+        "customerPortal": "Customer Portal",
+        "customerPortalDesc": "Let customers view invoices, quotes, and upcoming visits.",
+        "email": "Email Notifications",
+        "emailDesc": "Send automated emails (work order confirmations, dispatch updates, receipts).",
+        "jobCosting": "Job Costing",
+        "jobCostingDesc": "Track labor and parts cost against revenue per work order.",
+        "onlineBooking": "Online Booking",
+        "onlineBookingDesc": "Customers can request a visit from a public booking page.",
+        "sms": "SMS Notifications",
+        "smsDesc": "Send text reminders and en-route messages from the tenant phone number."
+      }
+    },
     "nav": {
+      "businessDefaults": "Business Defaults",
+      "companyProfile": "Company Profile",
       "equipmentCategories": "Categories",
       "equipmentTypes": "Types",
       "filterSizes": "Filter Sizes",
       "general": "General",
       "itemStatuses": "Item Statuses",
+      "modulesFeatures": "Modules & Features",
       "notificationTemplates": "Notification Templates",
       "statusWorkflows": "Status Workflows",
       "terminology": "Terminology",
       "types": "Types",
       "workflowConfig": "Workflow Config"
     },
+    "planned": "Planned",
+    "resetDefaults": "Reset to defaults",
+    "saveChanges": "Save changes",
     "sections": {
       "access": "Access",
       "dispatch": "{{dispatch}}",
@@ -1000,6 +1056,8 @@
       "organization": "Organization",
       "workOrders": "{{workOrders}}"
     },
+    "showingCount": "Showing {{count}} {{noun}}",
+    "soon": "Soon",
     "statusWorkflows": {
       "addRule": "Add Transition",
       "description": "Define which status transitions are allowed. Only enforced when 'Enforce Workflow' is enabled in Workflow Config.",

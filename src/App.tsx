@@ -30,7 +30,9 @@ import UserDetailPage from './pages/UserDetailPage';
 import RolesPage from './pages/RolesPage';
 import RoleDetailPage from './pages/RoleDetailPage';
 import SettingsLayout from './pages/settings/SettingsLayout';
-import GeneralPanel from './pages/settings/GeneralPanel';
+import CompanyProfilePanel from './pages/settings/CompanyProfilePanel';
+import BusinessDefaultsPanel from './pages/settings/BusinessDefaultsPanel';
+import ModulesFeaturesPanel from './pages/settings/ModulesFeaturesPanel';
 import TerminologyPanel from './pages/settings/TerminologyPanel';
 import NotificationTemplatesPanel from './pages/settings/NotificationTemplatesPanel';
 import DispatchRegionsPanel from './pages/settings/DispatchRegionsPanel';
@@ -132,14 +134,15 @@ function App() {
       <Route path="/availability" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AvailabilityPage />} />} />
       <Route path="/recurring-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<RecurringOrdersPage />} />} />
       <Route path="/scheduling" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<SchedulingPage />} />} />
-      <Route path="/users" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<UsersPage />} />} />
-      <Route path="/users/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<UserDetailPage />} />} />
       {/* Legacy redirects: /roles moved under /settings/access */}
       <Route path="/roles" element={<Navigate to="/settings/access/roles" replace />} />
       <Route path="/roles/:id" element={<LegacyRolesRedirect />} />
       <Route path="/settings" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<SettingsLayout />} />}>
-        <Route index element={<Navigate to="/settings/general" replace />} />
-        <Route path="general" element={<GeneralPanel />} />
+        <Route index element={<Navigate to="/settings/company-profile" replace />} />
+        <Route path="general" element={<Navigate to="/settings/company-profile" replace />} />
+        <Route path="company-profile" element={<CompanyProfilePanel />} />
+        <Route path="business-defaults" element={<BusinessDefaultsPanel />} />
+        <Route path="modules-features" element={<ModulesFeaturesPanel />} />
         <Route path="terminology" element={<TerminologyPanel />} />
         <Route path="notification-templates" element={<NotificationTemplatesPanel />} />
         <Route path="dispatch-regions" element={<DispatchRegionsPanel />} />
@@ -151,6 +154,8 @@ function App() {
         <Route path="equipment/types" element={<EquipmentTypesPanel />} />
         <Route path="equipment/categories" element={<EquipmentCategoriesPanel />} />
         <Route path="equipment/filter-sizes" element={<FilterSizesPanel />} />
+        <Route path="access/users" element={<UsersPage />} />
+        <Route path="access/users/:id" element={<UserDetailPage />} />
         <Route path="access/roles" element={<RolesPage />} />
         <Route path="access/roles/:id" element={<RoleDetailPage />} />
       </Route>
