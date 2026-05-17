@@ -2,7 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import {
   workOrderApi,
   workOrderTypesApi,
@@ -24,10 +24,8 @@ import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel,
 import { ListboxOption } from '../components/catalyst/listbox';
 import { FilterChipListbox } from '../components/ui/FilterChipListbox';
 import IconButton from '../components/IconButton';
-import { Input, InputGroup } from '../components/catalyst/input';
-import { Checkbox, CheckboxField } from '../components/catalyst/checkbox';
+import { Input } from '../components/catalyst/input';
 import { Field, Label } from '../components/catalyst/fieldset';
-import { Pagination, PaginationGap, PaginationList, PaginationNext, PaginationPage, PaginationPrevious } from '../components/catalyst/pagination';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
@@ -36,6 +34,8 @@ import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
 import { dense } from '../components/ui/dense';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListFooter } from '../components/ui/ListFooter';
 
 // ─── Filter constants ────────────────────────────────────────────────────────
 
@@ -501,19 +501,16 @@ export default function WorkOrdersPage() {
             are reserved for content surfaces (the table below); the filter
             row is an action affordance. */}
         <div className="mb-3">
-          <div className="flex flex-wrap items-end gap-2">
-              <InputGroup className="min-w-[260px] flex-1">
-                <MagnifyingGlassIcon data-slot="icon" />
-                <Input
-                  type="text"
-                  placeholder={t('workOrders.filters.searchPlaceholder')}
-                  value={searchInput}
-                  onChange={(e) => handleSearchInputChange(e.target.value)}
-                  aria-label={t('common.search')}
-                  className={dense.input}
-                />
-              </InputGroup>
-
+          <ListToolbar
+            search={
+              <ListSearch
+                placeholder={t('workOrders.filters.searchPlaceholder', { customer: getName('customer') })}
+                value={searchInput}
+                onChange={handleSearchInputChange}
+                ariaLabel={t('common.search')}
+              />
+            }
+          >
               {/* Four taxonomy chips are multi-select. No "Any X" reset row —
                   the × button clears all, and an empty array means "show all"
                   by way of the empty-state chip styling. */}
@@ -617,14 +614,26 @@ export default function WorkOrdersPage() {
                 ))}
               </FilterChipListbox>
 
-              <CheckboxField className="ml-2 flex-none">
-                <Checkbox
-                  name="includeArchived"
-                  checked={includeArchived}
-                  onChange={(checked) => updateParams({ archived: checked ? 'true' : null, page: null })}
-                />
-                <Label className="text-sm">{t('workOrders.actions.showArchived')}</Label>
-              </CheckboxField>
+              {/* Archived: hidden by default. "Archived only" is a backend
+                  gap (no `archivedOnly` param yet) — surfaced as an option
+                  but mapped to includeArchived=true for now so the user
+                  isn't blocked from at least *finding* archived rows. */}
+              <FilterChipListbox
+                label={t('workOrders.filters.archived')}
+                ariaLabel={t('workOrders.filters.archived')}
+                value={includeArchived ? 'shown' : null}
+                displayValue={includeArchived ? t('workOrders.filters.archivedShown') : null}
+                onChange={(id) => {
+                  updateParams({
+                    archived: id === 'shown' || id === 'only' ? 'true' : null,
+                    page: null,
+                  });
+                }}
+                onClear={() => updateParams({ archived: null, page: null })}
+              >
+                <ListboxOption value={null}>{t('workOrders.filters.archivedHidden')}</ListboxOption>
+                <ListboxOption value="shown">{t('workOrders.filters.archivedShown')}</ListboxOption>
+              </FilterChipListbox>
 
               {activeChips.length > 0 && (
                 <button
@@ -635,7 +644,7 @@ export default function WorkOrdersPage() {
                   {t('workOrders.filters.clearAll')}
                 </button>
               )}
-            </div>
+          </ListToolbar>
 
             {/* Custom date range inputs — surface only when the date chip is in custom mode */}
             {datePreset === 'custom' && (
@@ -843,53 +852,16 @@ export default function WorkOrdersPage() {
                 </tbody>
               </DenseTable>
 
-              {/* Footer row inside the Card. Catalyst Pagination hrefs preserve
-                  filter params and SPA-navigate via RouterLink, so middle-click
-                  / Cmd-click opens a new tab with the right URL. */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-3 py-2 text-[11.5px] text-fg-muted">
-                  <span>
-                    {t('common.pagination.showing', {
-                      start: showingStart,
-                      end: showingEnd,
-                      total: totalElements.toLocaleString(),
-                    })}
-                  </span>
-                  <Pagination className="m-0">
-                    <PaginationPrevious href={pageNumber > 1 ? pageHref(pageNumber - 1) : null} />
-                    <PaginationList>
-                      {(() => {
-                        const pages: (number | 'gap')[] = [];
-                        if (totalPages <= 7) {
-                          for (let i = 1; i <= totalPages; i++) pages.push(i);
-                        } else {
-                          pages.push(1);
-                          if (pageNumber > 3) pages.push('gap');
-                          const start = Math.max(2, pageNumber - 1);
-                          const end = Math.min(totalPages - 1, pageNumber + 1);
-                          for (let i = start; i <= end; i++) pages.push(i);
-                          if (pageNumber < totalPages - 2) pages.push('gap');
-                          pages.push(totalPages);
-                        }
-                        return pages.map((p, idx) =>
-                          p === 'gap' ? (
-                            <PaginationGap key={`gap-${idx}`} />
-                          ) : (
-                            <PaginationPage
-                              key={p}
-                              href={pageHref(p)}
-                              current={p === pageNumber}
-                            >
-                              {String(p)}
-                            </PaginationPage>
-                          )
-                        );
-                      })()}
-                    </PaginationList>
-                    <PaginationNext href={pageNumber < totalPages ? pageHref(pageNumber + 1) : null} />
-                  </Pagination>
-                </div>
-              )}
+              <ListFooter
+                page={pageNumber}
+                totalPages={totalPages}
+                pageHref={pageHref}
+                left={t('common.pagination.showing', {
+                  start: showingStart,
+                  end: showingEnd,
+                  total: totalElements.toLocaleString(),
+                })}
+              />
             </CardBody>
           </Card>
         )}

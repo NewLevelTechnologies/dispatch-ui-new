@@ -459,14 +459,16 @@ describe('EquipmentPage', () => {
 
     await waitFor(() => expect(screen.getByText('Page 1 Item')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /next/i }));
+    // ListFooter pagination renders as router links (so middle-click opens a
+    // new tab). Catalyst gives each chevron arrow an aria-label of "Previous
+    // page" / "Next page".
+    await user.click(screen.getByRole('link', { name: /next page/i }));
     await waitFor(() => {
       expect(mockEquipmentList.mock.calls.some(([args]) => args?.page === 1)).toBe(true);
     });
 
-    await user.click(screen.getByRole('button', { name: /previous/i }));
+    await user.click(screen.getByRole('link', { name: /previous page/i }));
     await waitFor(() => {
-      // The last call should be back to page 0
       const lastArgs = mockEquipmentList.mock.calls[mockEquipmentList.mock.calls.length - 1][0];
       expect(lastArgs?.page).toBe(0);
     });

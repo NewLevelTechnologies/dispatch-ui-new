@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Button } from '../components/catalyst/button';
-import { Input, InputGroup } from '../components/catalyst/input';
+import { Input } from '../components/catalyst/input';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Select } from '../components/catalyst/select';
@@ -16,7 +15,8 @@ import { Pill } from '../components/ui/Pill';
 import {
   DenseTable, DenseTHead, DenseRow,
 } from '../components/ui/DenseTable';
-import { dense } from '../components/ui/dense';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListFooter } from '../components/ui/ListFooter';
 import { QuoteStatus, quotesApi } from '../api/financialApi';
 import type { Quote, CreateQuoteRequest, CreateQuoteLineItemRequest } from '../api/financialApi';
 import { customerApi } from '../api/customerApi';
@@ -200,10 +200,16 @@ export default function QuotesPage() {
   };
 
   const quoteCount = Array.isArray(quotes) ? quotes.length : 0;
+  const quoteNoun = (n: number) =>
+    n === 1 ? getName('quote').toLowerCase() : getName('quote', true).toLowerCase();
   const quoteSubtitle = quoteCount > 0
     ? (filteredQuotes.length === quoteCount
-        ? `${quoteCount.toLocaleString()} ${quoteCount === 1 ? getName('quote').toLowerCase() : getName('quote', true).toLowerCase()}`
-        : `${filteredQuotes.length} of ${quoteCount}`)
+        ? `${quoteCount.toLocaleString()} ${quoteNoun(quoteCount)}`
+        : t('common.pagination.showing', {
+            start: filteredQuotes.length > 0 ? 1 : 0,
+            end: filteredQuotes.length,
+            total: quoteCount.toLocaleString(),
+          }))
     : t('quotes.description');
 
   return (
@@ -219,18 +225,18 @@ export default function QuotesPage() {
           }
         />
 
-        <div className="mb-3 flex flex-wrap items-end gap-2">
-          <InputGroup className="min-w-[260px] flex-1">
-            <MagnifyingGlassIcon data-slot="icon" />
-            <Input
-              type="text"
-              placeholder={t('common.search')}
+        <ListToolbar
+          search={
+            <ListSearch
+              placeholder={t('quotes.search.placeholder', {
+                entity: getName('quote'),
+                customer: getName('customer'),
+              })}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={dense.input}
+              onChange={setSearchTerm}
             />
-          </InputGroup>
-        </div>
+          }
+        />
 
         {quotesLoading ? (
           <Card>
@@ -288,6 +294,16 @@ export default function QuotesPage() {
                   ))}
                 </tbody>
               </DenseTable>
+              <ListFooter
+                page={1}
+                totalPages={1}
+                pageHref={() => '#'}
+                left={t('common.pagination.showing', {
+                  start: filteredQuotes.length > 0 ? 1 : 0,
+                  end: filteredQuotes.length,
+                  total: quoteCount.toLocaleString(),
+                })}
+              />
             </CardBody>
           </Card>
         )}

@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Button } from '../components/catalyst/button';
-import { Input, InputGroup } from '../components/catalyst/input';
+import { Input } from '../components/catalyst/input';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Select } from '../components/catalyst/select';
@@ -16,7 +15,8 @@ import { Pill } from '../components/ui/Pill';
 import {
   DenseTable, DenseTHead, DenseRow,
 } from '../components/ui/DenseTable';
-import { dense } from '../components/ui/dense';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListFooter } from '../components/ui/ListFooter';
 import { InvoiceStatus, invoicesApi } from '../api/financialApi';
 import type { Invoice, CreateInvoiceRequest, CreateInvoiceLineItemRequest } from '../api/financialApi';
 import { customerApi } from '../api/customerApi';
@@ -216,10 +216,19 @@ export default function InvoicesPage() {
   };
 
   const invoiceCount = Array.isArray(invoices) ? invoices.length : 0;
+  // Use the filtered count when filtering, otherwise the total — both descriptions
+  // refer to what's *currently visible*, matching the subtitle pattern used on
+  // the paginated list pages.
+  const invoiceNoun = (n: number) =>
+    n === 1 ? getName('invoice').toLowerCase() : getName('invoice', true).toLowerCase();
   const invoiceSubtitle = invoiceCount > 0
     ? (filteredInvoices.length === invoiceCount
-        ? `${invoiceCount.toLocaleString()} ${invoiceCount === 1 ? getName('invoice').toLowerCase() : getName('invoice', true).toLowerCase()}`
-        : `${filteredInvoices.length} of ${invoiceCount}`)
+        ? `${invoiceCount.toLocaleString()} ${invoiceNoun(invoiceCount)}`
+        : t('common.pagination.showing', {
+            start: filteredInvoices.length > 0 ? 1 : 0,
+            end: filteredInvoices.length,
+            total: invoiceCount.toLocaleString(),
+          }))
     : t('invoices.description');
 
   return (
@@ -235,19 +244,18 @@ export default function InvoicesPage() {
           }
         />
 
-        {/* Search row */}
-        <div className="mb-3 flex flex-wrap items-end gap-2">
-          <InputGroup className="min-w-[260px] flex-1">
-            <MagnifyingGlassIcon data-slot="icon" />
-            <Input
-              type="text"
-              placeholder={t('common.search')}
+        <ListToolbar
+          search={
+            <ListSearch
+              placeholder={t('invoices.search.placeholder', {
+                entity: getName('invoice'),
+                customer: getName('customer'),
+              })}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={dense.input}
+              onChange={setSearchTerm}
             />
-          </InputGroup>
-        </div>
+          }
+        />
 
         {invoicesLoading ? (
           <Card>
@@ -315,6 +323,16 @@ export default function InvoicesPage() {
                   ))}
                 </tbody>
               </DenseTable>
+              <ListFooter
+                page={1}
+                totalPages={1}
+                pageHref={() => '#'}
+                left={t('common.pagination.showing', {
+                  start: filteredInvoices.length > 0 ? 1 : 0,
+                  end: filteredInvoices.length,
+                  total: invoiceCount.toLocaleString(),
+                })}
+              />
             </CardBody>
           </Card>
         )}

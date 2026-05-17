@@ -1,8 +1,8 @@
 import { useState, useDeferredValue } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import { useGlossary } from '../contexts/GlossaryContext';
 import {
   equipmentApi,
@@ -26,12 +26,12 @@ import { ViewTabs } from '../components/ui/Tabs';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
-import { dense } from '../components/ui/dense';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
-import { Input, InputGroup } from '../components/catalyst/input';
 import { ListboxOption } from '../components/catalyst/listbox';
 import { FilterChipListbox, ChipDivider } from '../components/ui/FilterChipListbox';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListFooter } from '../components/ui/ListFooter';
 
 const PAGE_SIZE = 50;
 
@@ -48,7 +48,17 @@ export default function EquipmentPage() {
   // Empty string = "All" (both ACTIVE and RETIRED). Default lands on ACTIVE so
   // retired equipment doesn't crowd the day-to-day view.
   const [statusFilter, setStatusFilter] = useState<EquipmentStatus | ''>(EquipmentStatus.ACTIVE);
-  const [page, setPage] = useState(0); // 0-indexed
+  // Page lives in the URL (1-based) so middle-click on pagination opens the
+  // right page in a new tab. Internal `page` here stays 0-based to match the
+  // backend Spring Page contract.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = Math.max(0, parseInt(searchParams.get('page') ?? '1', 10) - 1);
+  const setPage = (next: number) => {
+    const params = new URLSearchParams(searchParams);
+    if (next <= 0) params.delete('page');
+    else params.set('page', String(next + 1));
+    setSearchParams(params);
+  };
   const [sortBy] = useState<EquipmentSortField>('name');
   const [sortDir] = useState<EquipmentSortDirection>('asc');
 
@@ -165,17 +175,26 @@ export default function EquipmentPage() {
     { id: '', label: t('equipment.status.all') },
   ];
 
+  const equipmentNoun = totalElements === 1
+    ? getName('equipment').toLowerCase()
+    : getName('equipment', true).toLowerCase();
   const subtitle = totalElements > 0
-    ? `${totalElements.toLocaleString()} ${totalElements === 1 ? getName('equipment').toLowerCase() : getName('equipment', true).toLowerCase()}${
-        totalElements > PAGE_SIZE
-          ? ' · ' + t('common.pagination.showing', {
-              start: page * PAGE_SIZE + 1,
-              end: Math.min((page + 1) * PAGE_SIZE, totalElements),
-              total: totalElements.toLocaleString(),
-            })
-          : ''
-      }`
+    ? (statusFilter === EquipmentStatus.ACTIVE
+        ? `${totalElements.toLocaleString()} ${t('equipment.status.active').toLowerCase()} ${equipmentNoun}`
+        : statusFilter === EquipmentStatus.RETIRED
+          ? `${totalElements.toLocaleString()} ${t('equipment.status.retired').toLowerCase()} ${equipmentNoun}`
+          : `${totalElements.toLocaleString()} ${equipmentNoun}`)
     : null;
+
+  const pageHref = (oneBased: number): string => {
+    const next = new URLSearchParams(searchParams);
+    if (oneBased <= 1) next.delete('page');
+    else next.set('page', String(oneBased));
+    const qs = next.toString();
+    return qs ? `?${qs}` : '?';
+  };
+  const showingStart = totalElements === 0 ? 0 : page * PAGE_SIZE + 1;
+  const showingEnd = Math.min((page + 1) * PAGE_SIZE, totalElements);
 
   return (
     <AppLayout>
@@ -190,22 +209,18 @@ export default function EquipmentPage() {
           }
         />
 
-        {/* Search + type + category filters */}
-        <div className="mb-3 flex flex-wrap items-end gap-2">
-          <InputGroup className="min-w-[260px] flex-1">
-            <MagnifyingGlassIcon data-slot="icon" />
-            <Input
-              type="text"
-              placeholder={t('common.search')}
+        <ListToolbar
+          search={
+            <ListSearch
+              placeholder={t('equipment.search.placeholder')}
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
+              onChange={(value) => {
+                setSearchQuery(value);
                 setPage(0);
               }}
-              className={dense.input}
             />
-          </InputGroup>
-
+          }
+        >
           <FilterChipListbox
             label={t('equipment.form.type')}
             ariaLabel={t('equipment.form.type')}
@@ -253,7 +268,7 @@ export default function EquipmentPage() {
               ))}
             </FilterChipListbox>
           )}
-        </div>
+        </ListToolbar>
 
         <ViewTabs
           className="mb-3"
@@ -392,27 +407,16 @@ export default function EquipmentPage() {
                 </tbody>
               </DenseTable>
 
-              {totalPages > 1 && (
-                <div className="flex items-center justify-end gap-2 border-t border-border-soft bg-bg-elev-2 px-3 py-2 text-[11.5px] text-fg-muted">
-                  <Button
-                    plain
-                    disabled={page === 0}
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  >
-                    {t('common.pagination.previous')}
-                  </Button>
-                  <span>
-                    {t('common.pagination.pageOf', { page: page + 1, total: totalPages })}
-                  </span>
-                  <Button
-                    plain
-                    disabled={page >= totalPages - 1}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    {t('common.pagination.next')}
-                  </Button>
-                </div>
-              )}
+              <ListFooter
+                page={page + 1}
+                totalPages={totalPages}
+                pageHref={pageHref}
+                left={t('common.pagination.showing', {
+                  start: showingStart,
+                  end: showingEnd,
+                  total: totalElements.toLocaleString(),
+                })}
+              />
             </CardBody>
           </Card>
         )}

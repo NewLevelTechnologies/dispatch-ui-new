@@ -2,7 +2,7 @@ import { useEffect, useState, useDeferredValue } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon, HomeIcon, BuildingOfficeIcon, CreditCardIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, HomeIcon, BuildingOfficeIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 import { customerApi, type Customer } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
@@ -12,8 +12,6 @@ import { formatPhone } from '../utils/formatPhone';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
-import { Input, InputGroup } from '../components/catalyst/input';
-import { Pagination, PaginationGap, PaginationList, PaginationNext, PaginationPage, PaginationPrevious } from '../components/catalyst/pagination';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
@@ -21,7 +19,8 @@ import { ViewTabs } from '../components/ui/Tabs';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
-import { dense } from '../components/ui/dense';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListFooter } from '../components/ui/ListFooter';
 
 export default function CustomersPage() {
   const navigate = useNavigate();
@@ -118,12 +117,18 @@ export default function CustomersPage() {
     { id: 'INACTIVE', label: t('common.inactive') },
   ];
 
+  // Subtitle describes the currently-displayed set. The status tab is already
+  // reflected in totalCustomers; we lean on the active tab label rather than
+  // re-deriving the breakdown (would require a separate counts endpoint).
+  const customerNoun = totalCustomers === 1
+    ? getName('customer').toLowerCase()
+    : getName('customer', true).toLowerCase();
   const customerSubtitle = totalCustomers > 0
-    ? `${totalCustomers.toLocaleString()} ${totalCustomers === 1 ? getName('customer').toLowerCase() : getName('customer', true).toLowerCase()}${
-        totalCustomers > PAGE_SIZE
-          ? ' · ' + t('common.pagination.showing', { start: showingStart, end: showingEnd, total: totalCustomers.toLocaleString() })
-          : ''
-      }`
+    ? (statusFilter === 'ACTIVE'
+        ? `${totalCustomers.toLocaleString()} ${t('common.active').toLowerCase()} ${customerNoun}`
+        : statusFilter === 'INACTIVE'
+          ? `${totalCustomers.toLocaleString()} ${t('common.inactive').toLowerCase()} ${customerNoun}`
+          : `${totalCustomers.toLocaleString()} ${customerNoun}`)
     : null;
 
   const deleteMutation = useMutation({
@@ -175,22 +180,18 @@ export default function CustomersPage() {
           }
         />
 
-        {/* Search row — loose on canvas */}
-        <div className="mb-3 flex flex-wrap items-end gap-2">
-          <InputGroup className="min-w-[260px] flex-1">
-            <MagnifyingGlassIcon data-slot="icon" />
-            <Input
-              type="text"
-              placeholder={t('common.search')}
+        <ListToolbar
+          search={
+            <ListSearch
+              placeholder={t('customers.search.placeholder')}
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                updateFilters({ search: e.target.value }, { replace: true });
+              onChange={(value) => {
+                setSearchQuery(value);
+                updateFilters({ search: value }, { replace: true });
               }}
-              className={dense.input}
             />
-          </InputGroup>
-        </div>
+          }
+        />
 
         {/* Status tabs */}
         <ViewTabs
@@ -371,46 +372,16 @@ export default function CustomersPage() {
                 </tbody>
               </DenseTable>
 
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-3 py-2 text-[11.5px] text-fg-muted">
-                  <span>
-                    {t('common.pagination.showing', {
-                      start: showingStart,
-                      end: showingEnd,
-                      total: totalCustomers.toLocaleString(),
-                    })}
-                  </span>
-                  <Pagination className="m-0">
-                    <PaginationPrevious href={page > 1 ? pageHref(page - 1) : null} />
-                    <PaginationList>
-                      {(() => {
-                        const pages: (number | 'gap')[] = [];
-                        if (totalPages <= 7) {
-                          for (let i = 1; i <= totalPages; i++) pages.push(i);
-                        } else {
-                          pages.push(1);
-                          if (page > 3) pages.push('gap');
-                          const start = Math.max(2, page - 1);
-                          const end = Math.min(totalPages - 1, page + 1);
-                          for (let i = start; i <= end; i++) pages.push(i);
-                          if (page < totalPages - 2) pages.push('gap');
-                          pages.push(totalPages);
-                        }
-                        return pages.map((p, idx) =>
-                          p === 'gap' ? (
-                            <PaginationGap key={`gap-${idx}`} />
-                          ) : (
-                            <PaginationPage key={p} href={pageHref(p)} current={p === page}>
-                              {String(p)}
-                            </PaginationPage>
-                          )
-                        );
-                      })()}
-                    </PaginationList>
-                    <PaginationNext href={page < totalPages ? pageHref(page + 1) : null} />
-                  </Pagination>
-                </div>
-              )}
+              <ListFooter
+                page={page}
+                totalPages={totalPages}
+                pageHref={pageHref}
+                left={t('common.pagination.showing', {
+                  start: showingStart,
+                  end: showingEnd,
+                  total: totalCustomers.toLocaleString(),
+                })}
+              />
             </CardBody>
           </Card>
         )}

@@ -336,7 +336,7 @@ describe('WorkOrdersPage', () => {
       renderWithProviders(<WorkOrdersPage />);
 
       expect(
-        screen.getByPlaceholderText(/search by wo#, customer, phone, address/i)
+        screen.getByPlaceholderText(/search by wo#, customer, or address/i)
       ).toBeInTheDocument();
     });
 
@@ -346,27 +346,28 @@ describe('WorkOrdersPage', () => {
 
       renderWithProviders(<WorkOrdersPage />);
 
-      const searchInput = screen.getByPlaceholderText(/search by wo#, customer, phone, address/i);
+      const searchInput = screen.getByPlaceholderText(/search by wo#, customer, or address/i);
       await user.type(searchInput, 'lenox');
 
-      // Wait past the 300ms debounce for the new request to fire
+      // Wait past the 300ms debounce for the new request to fire. The backend
+      // takes the search term as `q` (see ListWorkOrdersParams), not `search`.
       await waitFor(() => {
         const workOrderCalls = vi.mocked(apiClient.get).mock.calls.filter(
           ([url]) => url === '/work-orders'
         );
         const lastCall = workOrderCalls[workOrderCalls.length - 1];
-        expect(lastCall?.[1]?.params).toEqual(expect.objectContaining({ search: 'lenox' }));
+        expect(lastCall?.[1]?.params).toEqual(expect.objectContaining({ q: 'lenox' }));
       }, { timeout: 2000 });
     });
 
     it('reflects URL search param in the search input', async () => {
       vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
 
-      renderWithProviders(<WorkOrdersPage />, { initialPath: '/?search=lenox' });
+      // The URL param matches the API param: `q`, not `search`.
+      renderWithProviders(<WorkOrdersPage />, { initialPath: '/?q=lenox' });
 
-      // The search input value is hydrated from the URL on mount.
       await waitFor(() => {
-        expect(screen.getByPlaceholderText(/search by wo#, customer, phone, address/i)).toHaveValue('lenox');
+        expect(screen.getByPlaceholderText(/search by wo#, customer, or address/i)).toHaveValue('lenox');
       });
     });
 

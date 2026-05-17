@@ -1,22 +1,52 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import IconButton from '../components/IconButton';
-import { userApi, type User } from '../api';
+import { userApi, type User, type Role } from '../api';
 import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
 import UserFormDialog from '../components/UserFormDialog';
-import { Heading } from '../components/catalyst/heading';
+import { PageHead } from '../components/ui/PageHead';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
-import { Input } from '../components/catalyst/input';
 import { Alert, AlertActions, AlertDescription, AlertTitle } from '../components/catalyst/alert';
 import { Avatar } from '../components/ui/Avatar';
 import { Pill } from '../components/ui/Pill';
 import { Card, CardBody } from '../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
-import { SettingsListFooter } from '../components/settings/SettingsListFooter';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListFooter } from '../components/ui/ListFooter';
+import { ListboxOption } from '../components/catalyst/listbox';
+import { FilterChipListbox, ChipDivider } from '../components/ui/FilterChipListbox';
+
+// Seniority order — when a user has multiple roles, the higher-rank role
+// shows first. Anything not in this map sorts after, alphabetically. Match
+// against the role name case-insensitively so this survives backend casing
+// drift (e.g. "Field Supervisor" vs "FIELD_SUPERVISOR").
+const ROLE_SENIORITY = [
+  'admin',
+  'dispatcher',
+  'field supervisor',
+  'csr',
+  'technician',
+  'installer',
+];
+
+function roleRank(name: string): number {
+  const key = name.toLowerCase().replace(/[_-]+/g, ' ').trim();
+  const idx = ROLE_SENIORITY.indexOf(key);
+  return idx === -1 ? ROLE_SENIORITY.length : idx;
+}
+
+function sortRolesBySeniority(roles: Role[]): Role[] {
+  return [...roles].sort((a, b) => {
+    const ra = roleRank(a.name);
+    const rb = roleRank(b.name);
+    if (ra !== rb) return ra - rb;
+    return a.name.localeCompare(b.name);
+  });
+}
 
 export default function UsersPage() {
   const navigate = useNavigate();
@@ -110,37 +140,30 @@ export default function UsersPage() {
   };
 
   // Filter users based on search query, role, and status
-  const filteredUsers = users?.filter((user) => {
-    // Search filter
-    const query = searchQuery.toLowerCase();
-    const roleNames = user.roles?.map(r => r.name.toLowerCase()).join(' ') || '';
-    const matchesSearch = !query || (
-      user.firstName.toLowerCase().includes(query) ||
-      user.lastName.toLowerCase().includes(query) ||
-      user.email.toLowerCase().includes(query) ||
-      roleNames.includes(query)
-    );
+  const filteredUsers = useMemo(() => {
+    return users?.filter((user) => {
+      // Search filter
+      const query = searchQuery.toLowerCase();
+      const roleNames = user.roles?.map(r => r.name.toLowerCase()).join(' ') || '';
+      const matchesSearch = !query || (
+        user.firstName.toLowerCase().includes(query) ||
+        user.lastName.toLowerCase().includes(query) ||
+        user.email.toLowerCase().includes(query) ||
+        roleNames.includes(query)
+      );
 
-    // Role filter
-    const matchesRole = !roleFilter || user.roles?.some(r => r.id === roleFilter);
+      // Role filter
+      const matchesRole = !roleFilter || user.roles?.some(r => r.id === roleFilter);
 
-    // Status filter
-    const matchesStatus = !statusFilter || (
-      (statusFilter === 'enabled' && user.enabled) ||
-      (statusFilter === 'disabled' && !user.enabled)
-    );
+      // Status filter
+      const matchesStatus = !statusFilter || (
+        (statusFilter === 'enabled' && user.enabled) ||
+        (statusFilter === 'disabled' && !user.enabled)
+      );
 
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
-  // Clear all filters
-  const clearFilters = () => {
-    setRoleFilter('');
-    setStatusFilter('');
-  };
-
-  // Check if any filters are active
-  const hasActiveFilters = roleFilter || statusFilter;
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [users, searchQuery, roleFilter, statusFilter]);
 
   // Format date helper
   const formatDate = (dateString: string) => {
@@ -151,80 +174,79 @@ export default function UsersPage() {
     });
   };
 
+  // Subtitle reflects the *displayed* set (matches filtered count) and adds
+  // an "X disabled" breakdown when it's non-zero — Users loads all rows on a
+  // single GET, so this is cheap.
+  const totalUsers = users?.length ?? 0;
+  const displayedCount = filteredUsers?.length ?? 0;
+  const disabledCount = useMemo(
+    () => (filteredUsers ?? []).filter((u) => !u.enabled).length,
+    [filteredUsers]
+  );
+  const userSubtitle = (() => {
+    if (totalUsers === 0) return null;
+    const parts: string[] = [];
+    parts.push(`${displayedCount.toLocaleString()} ${displayedCount === 1 ? t('entities.user').toLowerCase() : t('entities.users').toLowerCase()}`);
+    if (disabledCount > 0) {
+      parts.push(t('users.breakdown.disabled', { count: disabledCount }));
+    }
+    return parts.join(' · ');
+  })();
+
   return (
     <>
-      <div className="flex items-center justify-between">
-        <div>
-          <Heading>{t('entities.users')}</Heading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {t('users.description')}
-          </p>
-        </div>
-        {canInviteUsers && (
-          <Button color="accent" onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.user') })}</Button>
-        )}
-      </div>
+      <PageHead
+        title={t('entities.users')}
+        sub={userSubtitle}
+        actions={
+          canInviteUsers ? (
+            <Button color="accent" onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.user') })}</Button>
+          ) : null
+        }
+      />
 
-      {/* Search Bar and Filters */}
+      {/* Search + filter chips */}
       {users && users.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2 items-center">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[250px]">
-            <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-zinc-500" />
-            <Input
-              type="search"
+        <ListToolbar
+          search={
+            <ListSearch
               placeholder={t('users.search.placeholder')}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              onChange={setSearchQuery}
             />
-          </div>
+          }
+        >
+          {roles && roles.length > 0 && (
+            <FilterChipListbox
+              label={t('users.filter.role')}
+              ariaLabel={t('users.filter.role')}
+              value={roleFilter || null}
+              displayValue={roleFilter ? roles.find((r) => r.id === roleFilter)?.name ?? null : null}
+              onChange={(id) => setRoleFilter(id ?? '')}
+              onClear={() => setRoleFilter('')}
+            >
+              <ListboxOption value={null}>{t('users.filter.allRoles')}</ListboxOption>
+              <ChipDivider />
+              {roles.map((role) => (
+                <ListboxOption key={role.id} value={role.id}>{role.name}</ListboxOption>
+              ))}
+            </FilterChipListbox>
+          )}
 
-          {/* Filters */}
-          <div className="flex gap-2 items-center flex-shrink-0">
-            {/* Role Filter */}
-            <Dropdown>
-              <DropdownButton outline>
-                {t('users.filter.role')}: {roleFilter ? roles?.find(r => r.id === roleFilter)?.name : t('users.filter.allRoles')}
-              </DropdownButton>
-              <DropdownMenu>
-                <DropdownItem onClick={() => setRoleFilter('')}>
-                  <DropdownLabel>{t('users.filter.allRoles')}</DropdownLabel>
-                </DropdownItem>
-                {roles?.map(role => (
-                  <DropdownItem key={role.id} onClick={() => setRoleFilter(role.id)}>
-                    <DropdownLabel>{role.name}</DropdownLabel>
-                  </DropdownItem>
-                ))}
-              </DropdownMenu>
-            </Dropdown>
-
-            {/* Status Filter */}
-            <Dropdown>
-              <DropdownButton outline>
-                {t('users.filter.status')}: {statusFilter ? t(`users.filter.${statusFilter}`) : t('users.filter.all')}
-              </DropdownButton>
-              <DropdownMenu>
-                <DropdownItem onClick={() => setStatusFilter('')}>
-                  <DropdownLabel>{t('users.filter.all')}</DropdownLabel>
-                </DropdownItem>
-                <DropdownItem onClick={() => setStatusFilter('enabled')}>
-                  <DropdownLabel>{t('users.filter.enabled')}</DropdownLabel>
-                </DropdownItem>
-                <DropdownItem onClick={() => setStatusFilter('disabled')}>
-                  <DropdownLabel>{t('users.filter.disabled')}</DropdownLabel>
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-
-            {/* Clear Filters */}
-            {hasActiveFilters && (
-              <Button plain onClick={clearFilters}>
-                {t('users.filter.clearFilters')}
-              </Button>
-            )}
-          </div>
-        </div>
+          <FilterChipListbox
+            label={t('users.filter.status')}
+            ariaLabel={t('users.filter.status')}
+            value={statusFilter || null}
+            displayValue={statusFilter ? t(`users.filter.${statusFilter}`) : null}
+            onChange={(id) => setStatusFilter(id ?? '')}
+            onClear={() => setStatusFilter('')}
+          >
+            <ListboxOption value={null}>{t('users.filter.all')}</ListboxOption>
+            <ChipDivider />
+            <ListboxOption value="enabled">{t('users.filter.enabled')}</ListboxOption>
+            <ListboxOption value="disabled">{t('users.filter.disabled')}</ListboxOption>
+          </FilterChipListbox>
+        </ListToolbar>
       )}
 
       {isLoading && (
@@ -300,11 +322,23 @@ export default function UsersPage() {
                         </td>
                         <td>
                           {user.roles && user.roles.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {user.roles.map((role) => (
-                                <Pill key={role.id} tone="neutral">{role.name}</Pill>
-                              ))}
-                            </div>
+                            (() => {
+                              const ordered = sortRolesBySeniority(user.roles);
+                              const visible = ordered.slice(0, 2);
+                              const overflow = ordered.slice(2);
+                              return (
+                                <div className="flex flex-wrap gap-1">
+                                  {visible.map((role) => (
+                                    <Pill key={role.id} tone="neutral">{role.name}</Pill>
+                                  ))}
+                                  {overflow.length > 0 && (
+                                    <span title={overflow.map((r) => r.name).join(', ')}>
+                                      <Pill tone="neutral">+{overflow.length}</Pill>
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()
                           ) : (
                             <span className="text-fg-dim">—</span>
                           )}
@@ -362,20 +396,23 @@ export default function UsersPage() {
                   })}
                 </tbody>
               </DenseTable>
+              <ListFooter
+                page={1}
+                totalPages={1}
+                pageHref={() => '#'}
+                left={
+                  <>
+                    {t('settings.showingCount', {
+                      count: displayedCount,
+                      noun: t('entities.users').toLowerCase(),
+                    })}
+                    {disabledCount > 0 && (
+                      <> · {t('users.breakdown.disabled', { count: disabledCount })}</>
+                    )}
+                  </>
+                }
+              />
             </CardBody>
-            <SettingsListFooter
-              count={filteredUsers.length}
-              noun={t('entities.users').toLowerCase()}
-              extra={(() => {
-                const disabledCount = filteredUsers.filter((u) => !u.enabled).length;
-                if (disabledCount === 0) return null;
-                return (
-                  <span>
-                    {t('users.breakdown.disabled', { count: disabledCount })}
-                  </span>
-                );
-              })()}
-            />
           </Card>
 
           {filteredUsers.length === 0 && searchQuery && (

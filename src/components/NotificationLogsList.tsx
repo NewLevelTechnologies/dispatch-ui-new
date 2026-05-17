@@ -241,26 +241,18 @@ export default function NotificationLogsList({
             </TableBody>
           </Table>
 
-          {/* Pagination */}
+          {/* Pagination — visually matches the list-page footer band,
+              but uses local state (no router) since this component renders
+              embedded inside tabs/drawers, not as a standalone page. */}
           {totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between">
-              <div className="flex gap-4 text-sm text-zinc-600 dark:text-zinc-400">
-                <span>{t('common.pagination.showing', { start: page * 20 + 1, end: Math.min((page + 1) * 20, totalElements), total: totalElements })}</span>
-                <span>{t('common.pagination.pageOf', { page: currentPage, total: totalPages })}</span>
-              </div>
+            <div className="mt-3 flex items-center justify-between rounded-md border border-border-soft bg-bg-elev-2 px-3 py-2 text-[11.5px] text-fg-muted">
+              <span>{t('common.pagination.showing', { start: page * 20 + 1, end: Math.min((page + 1) * 20, totalElements), total: totalElements })}</span>
               <div className="flex gap-2">
-                <Button
-                  plain
-                  disabled={page === 0}
-                  onClick={() => setPage(page - 1)}
-                >
+                <Button plain disabled={page === 0} onClick={() => setPage(page - 1)}>
                   {t('common.pagination.previous')}
                 </Button>
-                <Button
-                  plain
-                  disabled={page === totalPages - 1}
-                  onClick={() => setPage(page + 1)}
-                >
+                <span>{t('common.pagination.pageOf', { page: currentPage, total: totalPages })}</span>
+                <Button plain disabled={page === totalPages - 1} onClick={() => setPage(page + 1)}>
                   {t('common.pagination.next')}
                 </Button>
               </div>

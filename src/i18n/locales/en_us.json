@@ -193,6 +193,9 @@
     "filter": {
       "allStatuses": "All Statuses"
     },
+    "search": {
+      "placeholder": "Search by name, phone, or email…"
+    },
     "form": {
       "accessInstructionsOptional": "Access Instructions (optional)",
       "accessInstructionsPlaceholder": "e.g., Use back entrance, gate code 1234",
@@ -351,6 +354,9 @@
       "allStatuses": "All statuses",
       "region": "Region"
     },
+    "search": {
+      "placeholder": "Search by name or address…"
+    },
     "status": {
       "active": "Active",
       "closed": "Closed",
@@ -475,6 +481,9 @@
       "allCategories": "All Categories",
       "allTypes": "All Types"
     },
+    "search": {
+      "placeholder": "Search by serial number, model, or location…"
+    },
     "picker": {
       "clear": "Clear selection",
       "createNew": "+ Create new {{entity, lowercase}} \"{{name}}\"",
@@ -551,6 +560,9 @@
   },
   "invoices": {
     "description": "Manage customer invoices and billing",
+    "search": {
+      "placeholder": "Search by {{entity, lowercase}} #, {{customer, lowercase}}, or amount…"
+    },
     "form": {
       "addLineItem": "Add Line Item",
       "balanceDue": "Balance Due",
@@ -636,6 +648,9 @@
   },
   "payments": {
     "description": "Track customer payments and transactions",
+    "search": {
+      "placeholder": "Search by reference, {{customer, lowercase}}, or {{invoice, lowercase}} #…"
+    },
     "form": {
       "amount": "Amount",
       "balance": "Balance",
@@ -759,6 +774,9 @@
   },
   "quotes": {
     "description": "Create and manage customer quotes",
+    "search": {
+      "placeholder": "Search by {{entity, lowercase}} #, {{customer, lowercase}}, or amount…"
+    },
     "form": {
       "addLineItem": "Add Line Item",
       "customer": "Customer",
@@ -1673,6 +1691,10 @@
       "anyItemStatus": "Any item status",
       "anyRegion": "Any region",
       "anyType": "Any type",
+      "archived": "Archived",
+      "archivedHidden": "hidden",
+      "archivedOnly": "only",
+      "archivedShown": "shown",
       "blocked": "Blocked",
       "cancelled": "Cancelled",
       "clearAll": "Clear all",
@@ -1683,7 +1705,7 @@
       "open": "Open",
       "region": "Region",
       "scheduled": "Scheduled",
-      "searchPlaceholder": "Search by WO#, customer, phone, address…"
+      "searchPlaceholder": "Search by WO#, {{customer, lowercase}}, or address…"
     },
     "form": {
       "customerOrderNumber": "Customer PO",

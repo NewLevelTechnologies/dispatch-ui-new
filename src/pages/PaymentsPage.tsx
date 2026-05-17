@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Button } from '../components/catalyst/button';
-import { Input, InputGroup } from '../components/catalyst/input';
+import { Input } from '../components/catalyst/input';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
 import {
   DenseTable, DenseTHead, DenseRow,
 } from '../components/ui/DenseTable';
-import { dense } from '../components/ui/dense';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListFooter } from '../components/ui/ListFooter';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Select } from '../components/catalyst/select';
@@ -178,10 +178,16 @@ export default function PaymentsPage() {
   };
 
   const paymentsCount = Array.isArray(payments) ? payments.length : 0;
+  const paymentNoun = (n: number) =>
+    n === 1 ? getName('payment').toLowerCase() : getName('payment', true).toLowerCase();
   const subtitle = paymentsCount > 0
     ? (filteredPayments.length === paymentsCount
-        ? `${paymentsCount.toLocaleString()} ${paymentsCount === 1 ? getName('payment').toLowerCase() : getName('payment', true).toLowerCase()}`
-        : `${filteredPayments.length} of ${paymentsCount}`)
+        ? `${paymentsCount.toLocaleString()} ${paymentNoun(paymentsCount)}`
+        : t('common.pagination.showing', {
+            start: filteredPayments.length > 0 ? 1 : 0,
+            end: filteredPayments.length,
+            total: paymentsCount.toLocaleString(),
+          }))
     : t('payments.description');
 
   return (
@@ -197,18 +203,18 @@ export default function PaymentsPage() {
           }
         />
 
-        <div className="mb-3 flex flex-wrap items-end gap-2">
-          <InputGroup className="min-w-[260px] flex-1">
-            <MagnifyingGlassIcon data-slot="icon" />
-            <Input
-              type="text"
-              placeholder={t('common.search')}
+        <ListToolbar
+          search={
+            <ListSearch
+              placeholder={t('payments.search.placeholder', {
+                customer: getName('customer'),
+                invoice: getName('invoice'),
+              })}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={dense.input}
+              onChange={setSearchTerm}
             />
-          </InputGroup>
-        </div>
+          }
+        />
 
         {paymentsLoading ? (
           <Card>
@@ -255,6 +261,16 @@ export default function PaymentsPage() {
                   ))}
                 </tbody>
               </DenseTable>
+              <ListFooter
+                page={1}
+                totalPages={1}
+                pageHref={() => '#'}
+                left={t('common.pagination.showing', {
+                  start: filteredPayments.length > 0 ? 1 : 0,
+                  end: filteredPayments.length,
+                  total: paymentsCount.toLocaleString(),
+                })}
+              />
             </CardBody>
           </Card>
         )}

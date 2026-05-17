@@ -296,7 +296,8 @@ describe('ServiceLocationsPage', () => {
     renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?status=ACTIVE' });
 
     await waitFor(() => {
-      expect(screen.getByText('2 service locations')).toBeInTheDocument();
+      // Subtitle reflects the filtered set: "2 active service locations".
+      expect(screen.getByText(/2 active service locations/i)).toBeInTheDocument();
     });
 
     const activeTab = screen.getByRole('tab', { name: /^active$/i });

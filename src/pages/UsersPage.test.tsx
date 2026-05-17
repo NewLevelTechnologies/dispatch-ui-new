@@ -84,12 +84,12 @@ describe('UsersPage', () => {
     expect(screen.getByRole('button', { name: /add user/i })).toBeInTheDocument();
   });
 
-  it('displays page description', () => {
+  it('displays page heading', () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
 
     renderWithProviders(<UsersPage />);
 
-    expect(screen.getByText(/manage user accounts and permissions/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /users/i })).toBeInTheDocument();
   });
 
   it('displays loading state while fetching users', () => {
@@ -584,7 +584,7 @@ describe('UsersPage', () => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      expect(screen.getByRole('button', { name: /role:.*all roles/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Role$/i })).toBeInTheDocument();
     });
 
     it('displays status filter dropdown', async () => {
@@ -604,7 +604,7 @@ describe('UsersPage', () => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      expect(screen.getByRole('button', { name: /status:.*all/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Status$/i })).toBeInTheDocument();
     });
   });
 
@@ -761,12 +761,12 @@ describe('UsersPage', () => {
         expect(screen.getByText('Jane Smith')).toBeInTheDocument();
       });
 
-      // Open role filter dropdown
-      const roleFilterButton = screen.getByRole('button', { name: /role:.*all roles/i });
+      // Open role filter chip
+      const roleFilterButton = screen.getByRole('button', { name: /^Role$/i });
       await user.click(roleFilterButton);
 
-      // Select "Admin" role
-      const adminOption = screen.getByRole('menuitem', { name: /^admin$/i });
+      // FilterChipListbox renders options as role="option" via Headless.Listbox.
+      const adminOption = screen.getByRole('option', { name: /^admin$/i });
       await user.click(adminOption);
 
       // Should only show John Doe (Admin)
@@ -795,20 +795,19 @@ describe('UsersPage', () => {
       });
 
       // Filter by Admin
-      const roleFilterButton = screen.getByRole('button', { name: /role:.*all roles/i });
+      const roleFilterButton = screen.getByRole('button', { name: /^Role$/i });
       await user.click(roleFilterButton);
-      const adminOption = screen.getByRole('menuitem', { name: /^admin$/i });
+      const adminOption = screen.getByRole('option', { name: /^admin$/i });
       await user.click(adminOption);
 
       await waitFor(() => {
         expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
       });
 
-      // Reset filter
-      const roleFilterButton2 = screen.getByRole('button', { name: /role:.*admin/i });
-      await user.click(roleFilterButton2);
-      const allRolesOption = screen.getByRole('menuitem', { name: /all roles/i });
-      await user.click(allRolesOption);
+      // Reset filter via the chip's × clear button (no "All Roles" reset row
+      // in multi-state filter chips — the × is the canonical clear).
+      const clearRole = screen.getByRole('button', { name: /role.*clear/i });
+      await user.click(clearRole);
 
       // Both users should be visible again
       await waitFor(() => {
@@ -838,12 +837,11 @@ describe('UsersPage', () => {
         expect(screen.getByText('Jane Smith')).toBeInTheDocument();
       });
 
-      // Open status filter dropdown
-      const statusFilterButton = screen.getByRole('button', { name: /status:.*all/i });
+      // Open status filter chip
+      const statusFilterButton = screen.getByRole('button', { name: /^Status$/i });
       await user.click(statusFilterButton);
 
-      // Select "Enabled"
-      const enabledOption = screen.getByRole('menuitem', { name: /^enabled$/i });
+      const enabledOption = screen.getByRole('option', { name: /^enabled$/i });
       await user.click(enabledOption);
 
       // Should only show enabled users (John and Bob)
@@ -873,12 +871,11 @@ describe('UsersPage', () => {
         expect(screen.getByText('Jane Smith')).toBeInTheDocument();
       });
 
-      // Open status filter dropdown
-      const statusFilterButton = screen.getByRole('button', { name: /status:.*all/i });
+      // Open status filter chip
+      const statusFilterButton = screen.getByRole('button', { name: /^Status$/i });
       await user.click(statusFilterButton);
 
-      // Select "Disabled"
-      const disabledOption = screen.getByRole('menuitem', { name: /^disabled$/i });
+      const disabledOption = screen.getByRole('option', { name: /^disabled$/i });
       await user.click(disabledOption);
 
       // Should only show Jane Smith (disabled)
@@ -908,20 +905,18 @@ describe('UsersPage', () => {
       });
 
       // Filter by enabled
-      const statusFilterButton = screen.getByRole('button', { name: /status:.*all/i });
+      const statusFilterButton = screen.getByRole('button', { name: /^Status$/i });
       await user.click(statusFilterButton);
-      const enabledOption = screen.getByRole('menuitem', { name: /^enabled$/i });
+      const enabledOption = screen.getByRole('option', { name: /^enabled$/i });
       await user.click(enabledOption);
 
       await waitFor(() => {
         expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
       });
 
-      // Reset filter
-      const statusFilterButton2 = screen.getByRole('button', { name: /status:.*enabled/i });
-      await user.click(statusFilterButton2);
-      const allOption = screen.getByRole('menuitem', { name: /^all$/i });
-      await user.click(allOption);
+      // Reset via the chip's × clear button.
+      const clearStatus = screen.getByRole('button', { name: /status.*clear/i });
+      await user.click(clearStatus);
 
       // All users should be visible again
       await waitFor(() => {
@@ -932,8 +927,8 @@ describe('UsersPage', () => {
     });
   });
 
-  describe('Clear Filters', () => {
-    it('displays "Clear Filters" button when filters are active', async () => {
+  describe('Per-chip clear', () => {
+    it('shows clear (×) on chips when set, hides on chips when empty', async () => {
       vi.mocked(apiClient.get).mockImplementation((url) => {
         if (url === '/users') {
           return Promise.resolve({ data: mockUsers });
@@ -951,22 +946,22 @@ describe('UsersPage', () => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      // No clear button initially
-      expect(screen.queryByRole('button', { name: /clear filters/i })).not.toBeInTheDocument();
+      // No per-chip clear button initially (chips are in their empty state)
+      expect(screen.queryByRole('button', { name: /status.*clear/i })).not.toBeInTheDocument();
 
       // Apply a filter
-      const statusFilterButton = screen.getByRole('button', { name: /status:.*all/i });
+      const statusFilterButton = screen.getByRole('button', { name: /^Status$/i });
       await user.click(statusFilterButton);
-      const enabledOption = screen.getByRole('menuitem', { name: /^enabled$/i });
+      const enabledOption = screen.getByRole('option', { name: /^enabled$/i });
       await user.click(enabledOption);
 
-      // Clear button should appear
+      // The chip now exposes its × clear button.
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /clear filters/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /status.*clear/i })).toBeInTheDocument();
       });
     });
 
-    it('clears all filters when "Clear Filters" button is clicked', async () => {
+    it('clears each filter independently via its × button', async () => {
       vi.mocked(apiClient.get).mockImplementation((url) => {
         if (url === '/users') {
           return Promise.resolve({ data: mockUsers });
@@ -985,17 +980,17 @@ describe('UsersPage', () => {
       });
 
       // Apply role filter
-      const roleFilterButton = screen.getByRole('button', { name: /role:.*all roles/i });
+      const roleFilterButton = screen.getByRole('button', { name: /^Role$/i });
       await user.click(roleFilterButton);
-      const adminOption = screen.getByRole('menuitem', { name: /^admin$/i });
+      const adminOption = screen.getByRole('option', { name: /^admin$/i });
       await user.click(adminOption);
 
       // Apply status filter
       await waitFor(() => {
-        const statusFilterButton = screen.getByRole('button', { name: /status:.*all/i });
+        const statusFilterButton = screen.getByRole('button', { name: /^Status$/i });
         return user.click(statusFilterButton);
       });
-      const enabledOption = screen.getByRole('menuitem', { name: /^enabled$/i });
+      const enabledOption = screen.getByRole('option', { name: /^enabled$/i });
       await user.click(enabledOption);
 
       // Only John should be visible (Admin + Enabled)
@@ -1005,9 +1000,9 @@ describe('UsersPage', () => {
         expect(screen.queryByText('Bob Johnson')).not.toBeInTheDocument();
       });
 
-      // Clear all filters
-      const clearButton = screen.getByRole('button', { name: /clear filters/i });
-      await user.click(clearButton);
+      // Clear each filter via its × button
+      await user.click(screen.getByRole('button', { name: /role.*clear/i }));
+      await user.click(screen.getByRole('button', { name: /status.*clear/i }));
 
       // All users should be visible again
       await waitFor(() => {
