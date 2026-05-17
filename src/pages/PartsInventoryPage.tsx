@@ -12,6 +12,7 @@ import {
 } from '../components/ui/DenseTable';
 import { dense } from '../components/ui/dense';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
+import IconButton from '../components/IconButton';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, FieldGroup, Fieldset, Label } from '../components/catalyst/fieldset';
 import { Input, InputGroup } from '../components/catalyst/input';
@@ -248,8 +249,8 @@ export default function PartsInventoryPage() {
                       <td className="right num strong">{formatCurrency(item.unitCost)}</td>
                       <td>
                         <Dropdown>
-                          <DropdownButton plain aria-label={t('common.moreOptions')}>
-                            <EllipsisVerticalIcon className="size-5" />
+                          <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                            <EllipsisVerticalIcon className="size-4" />
                           </DropdownButton>
                           <DropdownMenu anchor="bottom end">
                             <DropdownItem onClick={() => handleEdit(item)}>

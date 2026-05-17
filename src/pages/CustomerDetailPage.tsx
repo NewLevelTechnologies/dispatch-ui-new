@@ -32,6 +32,7 @@ import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
+import IconButton from '../components/IconButton';
 import { Input, InputGroup } from '../components/catalyst/input';
 import {
   ArrowLeftIcon,
@@ -243,8 +244,8 @@ export default function CustomerDetailPage() {
                 <TableCell>
                   <div className="-mx-3 -my-1.5 sm:-mx-2.5">
                     <Dropdown>
-                      <DropdownButton plain aria-label={t('common.moreOptions')}>
-                        <EllipsisVerticalIcon className="size-5" />
+                      <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                        <EllipsisVerticalIcon className="size-4" />
                       </DropdownButton>
                       <DropdownMenu anchor="bottom end">
                         <DropdownItem onClick={() => handleEditEquipment(item)}>

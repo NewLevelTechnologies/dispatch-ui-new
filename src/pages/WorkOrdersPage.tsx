@@ -22,6 +22,7 @@ import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
+import IconButton from '../components/IconButton';
 import { Input, InputGroup } from '../components/catalyst/input';
 import { Checkbox, CheckboxField } from '../components/catalyst/checkbox';
 import { Field, Label } from '../components/catalyst/fieldset';
@@ -885,8 +886,8 @@ export default function WorkOrdersPage() {
                         </td>
                         <td>
                           <Dropdown>
-                            <DropdownButton plain aria-label={t('common.moreOptions')}>
-                              <EllipsisVerticalIcon className="size-5" />
+                            <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                              <EllipsisVerticalIcon className="size-4" />
                             </DropdownButton>
                             <DropdownMenu anchor="bottom end">
                               <DropdownItem onClick={() => handleEdit(workOrder)}>

@@ -53,6 +53,7 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from '../components/catalyst/dropdown';
+import IconButton from '../components/IconButton';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -579,8 +580,8 @@ export default function EquipmentDetailPage() {
               {t('common.edit')}
             </Button>
             <Dropdown>
-              <DropdownButton plain aria-label={t('common.moreOptions')}>
-                <EllipsisVerticalIcon className="size-5" />
+              <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                <EllipsisVerticalIcon className="size-4" />
               </DropdownButton>
               <DropdownMenu anchor="bottom end">
                 <DropdownItem onClick={handleDeleteEquipment}>
@@ -1028,8 +1029,8 @@ export default function EquipmentDetailPage() {
                           <TableCell>
                             <div className="-mx-3 -my-1.5 sm:-mx-2.5">
                               <Dropdown>
-                                <DropdownButton plain aria-label={t('common.moreOptions')}>
-                                  <EllipsisVerticalIcon className="size-5" />
+                                <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                                  <EllipsisVerticalIcon className="size-4" />
                                 </DropdownButton>
                                 <DropdownMenu anchor="bottom end">
                                   <DropdownItem onClick={() => openEditFilter(f)}>

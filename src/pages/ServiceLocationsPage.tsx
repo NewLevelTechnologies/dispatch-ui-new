@@ -20,6 +20,7 @@ import {
 } from '../components/ui/DenseTable';
 import { dense } from '../components/ui/dense';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
+import IconButton from '../components/IconButton';
 import { Input, InputGroup } from '../components/catalyst/input';
 import { Select } from '../components/catalyst/select';
 import { Pagination, PaginationGap, PaginationList, PaginationNext, PaginationPage, PaginationPrevious } from '../components/catalyst/pagination';
@@ -369,8 +370,8 @@ export default function ServiceLocationsPage() {
                         <td>
                           {(canEditServiceLocations || canCloseServiceLocations) && (
                             <Dropdown>
-                              <DropdownButton plain aria-label={t('common.moreOptions')}>
-                                <EllipsisVerticalIcon className="size-5" />
+                              <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                                <EllipsisVerticalIcon className="size-4" />
                               </DropdownButton>
                               <DropdownMenu anchor="bottom end">
                                 <DropdownItem onClick={() => navigate(`/service-locations/${location.id}`)}>

@@ -11,6 +11,7 @@ import CustomerFormDialog from '../components/CustomerFormDialog';
 import { formatPhone } from '../utils/formatPhone';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
+import IconButton from '../components/IconButton';
 import { Input, InputGroup } from '../components/catalyst/input';
 import { Pagination, PaginationGap, PaginationList, PaginationNext, PaginationPage, PaginationPrevious } from '../components/catalyst/pagination';
 import { PageHead } from '../components/ui/PageHead';
@@ -333,8 +334,8 @@ export default function CustomersPage() {
                         <td>
                           {(canEditCustomers || canArchiveCustomers) && (
                             <Dropdown>
-                              <DropdownButton plain aria-label={t('common.moreOptions')}>
-                                <EllipsisVerticalIcon className="size-5" />
+                              <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                                <EllipsisVerticalIcon className="size-4" />
                               </DropdownButton>
                               <DropdownMenu anchor="bottom end">
                                 <DropdownItem onClick={() => navigate(`/customers/${customer.id}`)}>

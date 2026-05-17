@@ -1,7 +1,7 @@
 # Dense table row actions — use IconButton, not Catalyst Button
 
-**Status:** convention. Applied to the settings list pages; not yet swept through the
-main list pages.
+**Status:** convention. Swept across all `src/pages/*.tsx` list and detail pages
+(2026-05-17). Default for any new `<DenseTable>` row trigger.
 
 ## TL;DR
 
@@ -59,29 +59,17 @@ the Catalyst Button, so the button is absorbed and the row's height is driven by
 text, not the trigger. Sparse rows on those pages (all dashes, no second line) **will**
 pop taller than their neighbours — that's the same root cause, just less visible.
 
-## Recommended sweep (follow-up)
+## Still on the old pattern
 
-Swap every row-level `<DropdownButton plain><EllipsisVerticalIcon /></DropdownButton>`
-to `<DropdownButton as={IconButton}><EllipsisVerticalIcon className="size-4" /></DropdownButton>`.
+These two render through Catalyst's `<Table dense>` (not the `.dense-table` /
+`DenseTable` primitive this doc targets), so the height math is different and they
+weren't touched in the sweep:
 
-Files still on the old pattern (as of 2026-05-16):
+- `src/components/FinancialQuotesTab.tsx`
+- `src/components/WorkItemsTable.tsx`
 
-- `src/pages/PartsInventoryPage.tsx`
-- `src/pages/AvailabilityPage.tsx`
-- `src/pages/DispatchesPage.tsx`
-- `src/pages/WorkOrderDetailPage.tsx`
-- `src/pages/WarehousesPage.tsx`
-- `src/pages/ServiceLocationsPage.tsx`
-- `src/pages/ServiceLocationDetailPage.tsx`
-- `src/pages/RecurringOrdersPage.tsx`
-- `src/pages/WorkOrdersPage.tsx`
-- `src/pages/CustomerDetailPage.tsx`
-- `src/pages/EquipmentPage.tsx`
-- `src/pages/CustomersPage.tsx`
-- `src/pages/EquipmentDetailPage.tsx`
-- `src/pages/settings/DispatchRegionsPanel.tsx`
-- `src/pages/settings/equipment/EquipmentCategoriesPanel.tsx`
-- `src/pages/settings/equipment/FilterSizesPanel.tsx`
+If either is migrated to `DenseTable` later, swap the trigger to `IconButton` at the
+same time.
 
 ## Don't fight Catalyst's defaults
 

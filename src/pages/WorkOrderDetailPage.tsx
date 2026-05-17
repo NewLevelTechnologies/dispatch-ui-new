@@ -48,6 +48,7 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from '../components/catalyst/dropdown';
+import IconButton from '../components/IconButton';
 import {
   DescriptionList,
   DescriptionTerm,
@@ -663,8 +664,8 @@ export default function WorkOrderDetailPage() {
                 {t('common.edit')}
               </Button>
               <Dropdown>
-                <DropdownButton plain aria-label={t('common.moreOptions')}>
-                  <EllipsisHorizontalIcon className="size-5" />
+                <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                  <EllipsisHorizontalIcon className="size-4" />
                 </DropdownButton>
                 <DropdownMenu anchor="bottom end">
                   <DropdownItem disabled>
