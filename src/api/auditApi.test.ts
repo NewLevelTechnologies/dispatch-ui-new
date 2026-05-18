@@ -22,6 +22,7 @@ describe('auditApi', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockLogs });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: undefined });
   });
 
   it('getEntityHistory hits /audit/:entityType/:entityId', async () => {
@@ -47,5 +48,10 @@ describe('auditApi', () => {
     expect(apiClient.get).toHaveBeenCalledWith('/audit/recent', {
       params: { limit: 10 },
     });
+  });
+
+  it('enrichLatestSignIn POSTs to /audit/sign-ins/enrich-latest', async () => {
+    await auditApi.enrichLatestSignIn();
+    expect(apiClient.post).toHaveBeenCalledWith('/audit/sign-ins/enrich-latest');
   });
 });
