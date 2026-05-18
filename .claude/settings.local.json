@@ -44,7 +44,18 @@
       "Bash(/tmp/update_tests.sh)",
       "Bash(git reset *)",
       "WebFetch(domain:catalyst.tailwindui.com)",
-      "Read(//Users/paulwilcox/Documents/dispatch-api/**)"
+      "Read(//Users/paulwilcox/Documents/dispatch-api/**)",
+      "Bash(awk -F'|' '{ gsub\\(/^ +| +$/, \"\", $4\\); if \\($4+0 < 75 && $4 != \"\"\\) print $0 }')",
+      "Bash(sort -t'|' -k4 -n)",
+      "Bash(awk -F'|' 'NF >= 6 { gsub\\(/^ +| +$/, \"\", $4\\); if \\($4+0 < 75 && $4+0 > 0\\) print $0 }')",
+      "Bash(npx eslint *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(awk -F'|' '$5 != \" 100 \" && $5 != \"\" {print $5, $1}')",
+      "Read(//private/tmp/**)",
+      "Bash(grep -n \"<AppLayout>\\\\|</AppLayout>\\\\|^      <div>\\\\s*$\\\\|^      </div>\\\\s*$\" src/pages/CustomersPage.tsx)",
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
+      "Bash(awk -F'|' '$4+0 < 80 {print $1, \"fn:\"$4}')",
+      "Bash(npx vitest *)"
     ]
   }
 }

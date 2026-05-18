@@ -5,26 +5,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
 import { userApi, dispatchRegionApi, type User, type Role } from '../api';
+import { RoleChip } from '../components/RoleChip';
+import { roleColor } from '../utils/roleColor';
 import { auditApi, type AccountActivityEvent } from '../api/auditApi';
 import { formatPhone } from '../utils/formatPhone';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/catalyst/button';
-
-// Stable per-role accent — same approach the v1.5 design uses to keep
-// the Field Supervisor / Dispatcher / Admin chips visually distinct
-// without a hand-maintained color table. Hash by role name → one of
-// nine well-spaced hues, oklch lightness/chroma chosen to read in both
-// themes. The number string is purely for stability across reloads.
-const ROLE_HUES = [25, 200, 270, 150, 85, 215, 320, 50, 240];
-function roleAccent(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
-  const hue = ROLE_HUES[Math.abs(h) % ROLE_HUES.length];
-  // 'Admin' deserves a hotter color so it pops in the chip row.
-  if (/admin/i.test(name)) return 'oklch(55% 0.18 25)';
-  return `oklch(60% 0.14 ${hue})`;
-}
 
 function formatDateShort(d: string | Date | undefined): string {
   if (!d) return '—';
@@ -262,28 +249,23 @@ function Header({
       </div>
       <div className="flex flex-shrink-0 gap-1.5">
         {canResendInvitation && (
-          <button
+          <Button
+            outline
+            size="xs"
             onClick={onResendInvitation}
             disabled={resendInvitationPending}
-            className="inline-flex h-[30px] items-center rounded-md border border-border bg-bg-elev px-3 text-[12.5px] font-semibold text-fg-strong hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             {resendInvitationPending ? 'Resending…' : 'Resend invitation'}
-          </button>
+          </Button>
         )}
         {onEdit && (
-          <button
-            onClick={onEdit}
-            className="inline-flex h-[30px] items-center gap-1.5 rounded-md border border-accent-700/80 bg-gradient-to-b from-accent-500 to-accent-600 px-3 text-[12.5px] font-semibold text-white shadow-[0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.18)] hover:from-accent-400 hover:to-accent-500"
-          >
+          <Button color="accent" size="xs" onClick={onEdit}>
             Edit user
-          </button>
+          </Button>
         )}
-        <button
-          aria-label="More options"
-          className="inline-flex h-[30px] items-center justify-center rounded-md border border-border bg-bg-elev px-2 text-fg-muted hover:bg-bg-hover hover:text-fg-strong"
-        >
-          <EllipsisHorizontalIcon className="size-4" />
-        </button>
+        <Button outline size="xs" aria-label="More options">
+          <EllipsisHorizontalIcon data-slot="icon" />
+        </Button>
       </div>
     </div>
   );
@@ -309,22 +291,6 @@ function RoleStack({ roles, max = 3 }: { roles: Role[]; max?: number }) {
         </span>
       )}
     </div>
-  );
-}
-
-function RoleChip({ name }: { name: string }) {
-  const color = roleAccent(name);
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2 py-[2px] text-[11px] font-semibold"
-      style={{
-        background: `color-mix(in oklch, ${color} 14%, var(--bg-elev))`,
-        color,
-      }}
-    >
-      <span className="size-1.5 rounded-full" style={{ background: color }} />
-      {name}
-    </span>
   );
 }
 
@@ -361,12 +327,9 @@ function RolesAndRegionsCard({
             )}
           </div>
           {onEditAccess && (
-            <button
-              onClick={onEditAccess}
-              className="inline-flex h-[26px] items-center rounded-md border border-border bg-bg-elev px-2.5 text-[11.5px] font-semibold text-fg-strong hover:bg-bg-hover"
-            >
+            <Button outline size="xxs" onClick={onEditAccess}>
               Edit access
-            </button>
+            </Button>
           )}
         </div>
 
@@ -478,7 +441,7 @@ function CapabilityDetail({ user }: { user: User }) {
                     {sources.length > 0 && sources.length < (user.roles?.length ?? 0) && (
                       <span
                         className="rounded px-1 text-[9px] font-bold uppercase tracking-wider text-white"
-                        style={{ background: roleAccent(sources[0].name) }}
+                        style={{ background: roleColor(sources[0].name) }}
                       >
                         {sources[0].name
                           .split(' ')
@@ -611,13 +574,14 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
                 <div className="mt-0.5 text-[10.5px] leading-snug text-fg-dim">{it.hint}</div>
               )}
             </div>
-            <button
+            <Button
+              outline
+              size="xxs"
               onClick={() => handleClick(it)}
               disabled={!canEdit || it.pending}
-              className="inline-flex h-[26px] items-center rounded-md border border-border bg-bg-elev px-2.5 text-[11.5px] font-semibold text-fg-strong hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               {it.actionLabel}
-            </button>
+            </Button>
           </div>
         ))}
       </div>
@@ -651,6 +615,28 @@ function rolePayloadName(payload: AccountActivityEvent['payload']): string {
 // Round a window duration to the largest human-friendly unit. Sign-in
 // attempt windows are typically minutes; this rolls up to "Nh" if a
 // window ever grows past 60 minutes so the meta line doesn't say "73 min".
+// Cheap UA → "Browser · OS" for the sign-in meta line. Heuristic, not
+// authoritative — the value only ever appears as a sub-line under "Signed
+// in", so a wrong-but-close label is fine. Order matters: Edge UA strings
+// also contain "Chrome", iOS Chrome also contains "Safari", etc.
+function describeUserAgent(ua: string | null): string | null {
+  if (!ua) return null;
+  let browser: string | null = null;
+  if (/Edg\//.test(ua)) browser = 'Edge';
+  else if (/OPR\//.test(ua)) browser = 'Opera';
+  else if (/Firefox\//.test(ua)) browser = 'Firefox';
+  else if (/Chrome\//.test(ua)) browser = 'Chrome';
+  else if (/Safari\//.test(ua)) browser = 'Safari';
+  let os: string | null = null;
+  if (/iPhone|iPad|iOS/.test(ua)) os = /iPad/.test(ua) ? 'iPad' : 'iOS';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/Mac OS X|Macintosh/.test(ua)) os = 'macOS';
+  else if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Linux/.test(ua)) os = 'Linux';
+  const parts = [browser, os].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
+}
+
 function formatWindowSeconds(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 60) {
     return `${Math.max(1, Math.round(seconds))}s`;
@@ -691,6 +677,18 @@ function classifyEvent(event: AccountActivityEvent): {
       return { kind: 'security', text: '2FA reset' };
     case 'GLOBAL_SIGNOUT':
       return { kind: 'security', text: 'Signed out of all sessions' };
+    case 'SIGN_IN_SUCCESS': {
+      // Meta is "Browser · OS · IP" when both userAgent and ip are
+      // populated. Backend doesn't fill these in yet — render an empty
+      // meta rather than a misleading placeholder until it does.
+      const ua = describeUserAgent(event.userAgent);
+      const parts = [ua, event.ip].filter((p): p is string => !!p);
+      return {
+        kind: 'signin',
+        text: 'Signed in',
+        meta: parts.length ? parts.join(' · ') : undefined,
+      };
+    }
     case 'SIGN_IN_FAILED_RUN': {
       const p = (event.payload ?? {}) as {
         attemptCount?: unknown;
@@ -760,7 +758,7 @@ function AccountActivityCard({ userId }: { userId: string }) {
         <div>
           <div className="text-[13px] font-semibold text-fg-strong">Account activity</div>
           <div className="mt-0.5 text-[11px] text-fg-muted">
-            Account-level events. Record edits appear on each record.
+            Sign-ins, access changes, security events. Record edits appear on each record.
           </div>
         </div>
       </div>
@@ -835,24 +833,13 @@ function LifecycleFooter({
       </div>
       <div>
         {user.enabled ? (
-          <button
-            onClick={onDeactivate}
-            disabled={pending}
-            className="inline-flex h-[26px] items-center rounded-md border bg-bg-elev px-2.5 text-[11.5px] font-semibold text-danger-500 hover:bg-bg-hover disabled:opacity-60"
-            style={{
-              borderColor: 'color-mix(in oklch, var(--danger-500) 35%, var(--border))',
-            }}
-          >
+          <Button outline="red" size="xxs" onClick={onDeactivate} disabled={pending}>
             Deactivate
-          </button>
+          </Button>
         ) : (
-          <button
-            onClick={onActivate}
-            disabled={pending}
-            className="inline-flex h-[26px] items-center rounded-md border border-border bg-bg-elev px-2.5 text-[11.5px] font-semibold text-fg-strong hover:bg-bg-hover disabled:opacity-60"
-          >
+          <Button outline size="xxs" onClick={onActivate} disabled={pending}>
             Reactivate
-          </button>
+          </Button>
         )}
       </div>
     </div>

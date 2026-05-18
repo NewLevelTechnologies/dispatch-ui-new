@@ -12,6 +12,7 @@ import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } f
 import { Alert, AlertActions, AlertDescription, AlertTitle } from '../components/catalyst/alert';
 import { Avatar } from '../components/ui/Avatar';
 import { Pill } from '../components/ui/Pill';
+import { RoleChip } from '../components/RoleChip';
 import { Card, CardBody } from '../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
@@ -316,7 +317,7 @@ export default function UsersPage() {
                               return (
                                 <div className="flex flex-wrap gap-1">
                                   {visible.map((role) => (
-                                    <Pill key={role.id} tone="neutral">{role.name}</Pill>
+                                    <RoleChip key={role.id} name={role.name} />
                                   ))}
                                   {overflow.length > 0 && (
                                     <span title={overflow.map((r) => r.name).join(', ')}>

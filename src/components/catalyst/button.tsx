@@ -5,20 +5,40 @@ import { Link } from './link'
 
 const styles = {
   base: [
-    // Base
+    // Base — sizing lives in the `sizes` block below so we can mix tighter
+    // admin-tool sizes (xs, xxs) with the stock Catalyst sizing (md).
     // items-center (not items-baseline) so an icon child renders on the same
     // visual midline as the label — items-baseline aligns to the text baseline
     // and the icon ends up visibly higher than the letters.
-    'relative isolate inline-flex items-center justify-center gap-x-1.5 rounded-lg border text-base/6 font-semibold',
-    // Sizing
-    'px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)] sm:text-sm/6',
+    'relative isolate inline-flex items-center justify-center rounded-lg border font-semibold',
     // Focus
     'focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-blue-500',
     // Disabled
     'data-disabled:opacity-50',
-    // Icon
-    '*:data-[slot=icon]:-mx-0.5 *:data-[slot=icon]:my-0.5 *:data-[slot=icon]:size-5 *:data-[slot=icon]:shrink-0 *:data-[slot=icon]:self-center *:data-[slot=icon]:text-(--btn-icon) sm:*:data-[slot=icon]:my-1 sm:*:data-[slot=icon]:size-4 forced-colors:[--btn-icon:ButtonText] forced-colors:data-hover:[--btn-icon:ButtonText]',
+    // Icon (color + base layout; size + margin live per-size below)
+    '*:data-[slot=icon]:-mx-0.5 *:data-[slot=icon]:shrink-0 *:data-[slot=icon]:self-center *:data-[slot=icon]:text-(--btn-icon) forced-colors:[--btn-icon:ButtonText] forced-colors:data-hover:[--btn-icon:ButtonText]',
   ],
+  sizes: {
+    // Stock Catalyst sizing — bigger on mobile, tighter at sm breakpoint.
+    // Default when no `size` prop is set, so existing call sites are unaffected.
+    md: [
+      'gap-x-1.5 text-base/6',
+      'px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)] sm:text-sm/6',
+      '*:data-[slot=icon]:my-0.5 *:data-[slot=icon]:size-5 sm:*:data-[slot=icon]:my-1 sm:*:data-[slot=icon]:size-4',
+    ],
+    // Admin-tool tight — 30px tall, 12.5px text, 10px horizontal padding, 4px gap.
+    // Use on page headers and form submits.
+    xs: [
+      'h-[30px] gap-1 px-2.5 text-[12.5px]',
+      '*:data-[slot=icon]:size-4',
+    ],
+    // Section-level tight — 26px tall, 11.5px text. Use inside cards / rows
+    // where the action belongs to a section, not the page.
+    xxs: [
+      'h-[26px] gap-1 px-2.5 text-[11.5px]',
+      '*:data-[slot=icon]:size-3.5',
+    ],
+  },
   solid: [
     // Optical border, implemented as the button background to avoid corner artifacts
     'border-transparent bg-(--btn-border)',
@@ -43,14 +63,24 @@ const styles = {
     // Disabled
     'data-disabled:before:shadow-none data-disabled:after:shadow-none',
   ],
-  outline: [
-    // Base
-    'border-zinc-950/10 text-zinc-950 data-active:bg-zinc-950/2.5 data-hover:bg-zinc-950/2.5',
-    // Dark mode
-    'dark:border-white/15 dark:text-white dark:[--btn-bg:transparent] dark:data-active:bg-white/5 dark:data-hover:bg-white/5',
-    // Icon
-    '[--btn-icon:var(--color-zinc-500)] data-active:[--btn-icon:var(--color-zinc-700)] data-hover:[--btn-icon:var(--color-zinc-700)] dark:data-active:[--btn-icon:var(--color-zinc-400)] dark:data-hover:[--btn-icon:var(--color-zinc-400)]',
-  ],
+  outline: {
+    default: [
+      // Base
+      'border-zinc-950/10 text-zinc-950 data-active:bg-zinc-950/2.5 data-hover:bg-zinc-950/2.5',
+      // Dark mode
+      'dark:border-white/15 dark:text-white dark:[--btn-bg:transparent] dark:data-active:bg-white/5 dark:data-hover:bg-white/5',
+      // Icon
+      '[--btn-icon:var(--color-zinc-500)] data-active:[--btn-icon:var(--color-zinc-700)] data-hover:[--btn-icon:var(--color-zinc-700)] dark:data-active:[--btn-icon:var(--color-zinc-400)] dark:data-hover:[--btn-icon:var(--color-zinc-400)]',
+    ],
+    // Destructive trigger — quieter than solid red. Solid red is reserved
+    // for the confirmation button inside the modal that fires after this
+    // one is clicked. Two-step pacing: discovery quiet, confirmation loud.
+    red: [
+      'border-red-500/40 text-red-600 data-active:bg-red-500/10 data-hover:border-red-500/60 data-hover:bg-red-500/5',
+      'dark:border-red-400/30 dark:text-red-400 dark:[--btn-bg:transparent] dark:data-active:bg-red-500/15 dark:data-hover:bg-red-500/10',
+      '[--btn-icon:var(--color-red-500)] data-active:[--btn-icon:var(--color-red-600)] data-hover:[--btn-icon:var(--color-red-600)]',
+    ],
+  },
   plain: [
     // Base
     'border-transparent text-zinc-950 data-active:bg-zinc-950/5 data-hover:bg-zinc-950/5',
@@ -159,30 +189,38 @@ const styles = {
       '[--btn-icon:var(--color-rose-300)] data-active:[--btn-icon:var(--color-rose-200)] data-hover:[--btn-icon:var(--color-rose-200)]',
     ],
     // Brand button — follows the warm/cool accent token at runtime.
+    // Background is rendered as a 500→600 vertical gradient on the `:before`
+    // layer (light mode); dark mode falls back to the flat `--btn-bg` color
+    // because Catalyst's solid base hides `:before` in dark.
     accent: [
       'text-white [--btn-hover-overlay:var(--color-white)]/12 [--btn-bg:var(--color-accent-500)] [--btn-border:var(--color-accent-700)]',
+      'before:bg-gradient-to-b before:from-accent-500 before:to-accent-600',
       '[--btn-icon:var(--color-accent-200)] data-active:[--btn-icon:var(--color-accent-100)] data-hover:[--btn-icon:var(--color-accent-100)]',
     ],
   },
 }
 
+type OutlineVariant = true | 'red'
+
 type ButtonProps = (
   | { color?: keyof typeof styles.colors; outline?: never; plain?: never }
-  | { color?: never; outline: true; plain?: never }
+  | { color?: never; outline: OutlineVariant; plain?: never }
   | { color?: never; outline?: never; plain: true }
-) & { className?: string; children: React.ReactNode } & (
+) & { size?: keyof typeof styles.sizes; className?: string; children: React.ReactNode } & (
     | ({ href?: never } & Omit<Headless.ButtonProps, 'as' | 'className'>)
     | ({ href: string } & Omit<React.ComponentPropsWithoutRef<typeof Link>, 'className'>)
   )
 
 export const Button = forwardRef(function Button(
-  { color, outline, plain, className, children, ...props }: ButtonProps,
+  { color, outline, plain, size, className, children, ...props }: ButtonProps,
   ref: React.ForwardedRef<HTMLElement>
 ) {
+  const outlineStyle = outline ? styles.outline[outline === true ? 'default' : outline] : null
   const classes = clsx(
     className,
     styles.base,
-    outline ? styles.outline : plain ? styles.plain : clsx(styles.solid, styles.colors[color ?? 'dark/zinc'])
+    styles.sizes[size ?? 'md'],
+    outlineStyle ? outlineStyle : plain ? styles.plain : clsx(styles.solid, styles.colors[color ?? 'dark/zinc'])
   )
 
   return typeof props.href === 'string' ? (
