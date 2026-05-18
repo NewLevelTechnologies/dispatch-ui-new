@@ -15,11 +15,15 @@
       // Sets theme-light/theme-dark (and accent-cool) on <html> before React
       // mounts so first paint matches the persisted theme. Mirror of
       // themeBootstrapScript in src/components/ThemeProvider.tsx.
+      //
+      // Default = light + cool. We don't fall through to the OS color-scheme
+      // preference — the app is an internal CSR tool that's used all day in
+      // bright office light, so light is the right starting point regardless
+      // of what the user has set on their machine.
       (function () {
         try {
-          var m = localStorage.getItem('theme-mode');
-          var a = localStorage.getItem('theme-accent');
-          if (!m) m = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          var m = localStorage.getItem('theme-mode') || 'light';
+          var a = localStorage.getItem('theme-accent') || 'cool';
           document.documentElement.classList.add('theme-' + m);
           if (a === 'cool') document.documentElement.classList.add('accent-cool');
           document.documentElement.style.colorScheme = m;
