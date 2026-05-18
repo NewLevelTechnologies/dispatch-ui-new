@@ -12,7 +12,6 @@ import {
   Cog6ToothIcon,
   SunIcon,
   MoonIcon,
-  SwatchIcon,
   DocumentTextIcon,
   DocumentChartBarIcon,
   CreditCardIcon,
@@ -22,14 +21,17 @@ import {
   ClockIcon,
   ArrowPathIcon,
   MapPinIcon,
+  EllipsisHorizontalIcon,
+  LifebuoyIcon,
+  ArrowRightStartOnRectangleIcon,
 } from '@heroicons/react/24/outline';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarHeading, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
 import { Navbar } from './catalyst/navbar';
-import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
-import { Avatar } from './catalyst/avatar';
+import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
 import { useTheme } from './ThemeProvider';
-import { useHasAnyCapability } from '../hooks/useCurrentUser';
+import { useCurrentUser, useHasAnyCapability } from '../hooks/useCurrentUser';
+import { roleColor } from '../utils/roleColor';
 
 const ENV_BADGE: Record<string, { label: string; className: string }> = {
   development: { label: 'DEV', className: 'bg-warning-500/20 text-warning-500 ring-warning-500/30' },
@@ -43,6 +45,23 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const { mode, accent, setMode, setAccent } = useTheme();
+  const { data: currentUser } = useCurrentUser();
+
+  // Sidebar identity row: show full name + primary role once /me resolves.
+  // Falls back to the Cognito loginId so first paint never shows a blank slot.
+  const loginEmail = user?.signInDetails?.loginId ?? '';
+  const fullName = currentUser
+    ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
+    : loginEmail;
+  const primaryRole = currentUser?.roles?.[0]?.name;
+  const avatarKey = fullName || loginEmail || 'U';
+  const avatarBg = roleColor(avatarKey);
+  const avatarInitials = (() => {
+    if (currentUser?.firstName || currentUser?.lastName) {
+      return `${currentUser.firstName?.[0] ?? ''}${currentUser.lastName?.[0] ?? ''}`.toUpperCase() || 'U';
+    }
+    return loginEmail.charAt(0).toUpperCase() || 'U';
+  })();
 
   // Permission checks for navigation visibility
   const canViewSettings = useHasAnyCapability('VIEW_SETTINGS');
@@ -217,21 +236,44 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
 
           <SidebarFooter>
             <Dropdown>
-              <DropdownButton as={SidebarItem}>
-                <Avatar
-                  slot="icon"
-                  initials={user?.signInDetails?.loginId?.charAt(0).toUpperCase() || 'U'}
-                  className="size-6"
-                />
-                <span className="truncate">{user?.signInDetails?.loginId}</span>
+              <DropdownButton
+                as="button"
+                className="flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-left text-sidebar-fg hover:bg-sidebar-bg-2 focus:outline-none data-active:bg-sidebar-bg-2"
+                aria-label={t('account.menu')}
+              >
+                <span
+                  className="relative grid size-[30px] shrink-0 place-items-center rounded-full text-[11px] font-semibold text-white"
+                  style={{
+                    background: avatarBg,
+                    border: `1px solid color-mix(in oklch, ${avatarBg} 70%, black)`,
+                  }}
+                  aria-hidden="true"
+                >
+                  {avatarInitials}
+                  <span
+                    className="absolute right-0 bottom-0 size-2 rounded-full ring-2 ring-sidebar-bg"
+                    style={{ background: 'oklch(70% 0.18 145)' }}
+                  />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                  <span className="truncate text-[12px] font-semibold text-white">
+                    {fullName || loginEmail}
+                  </span>
+                  {primaryRole && (
+                    <span className="truncate text-[10.5px] text-sidebar-fg-dim">
+                      {primaryRole}
+                    </span>
+                  )}
+                </span>
+                <EllipsisHorizontalIcon className="size-4 shrink-0 text-sidebar-fg-dim" />
               </DropdownButton>
               <DropdownMenu className="min-w-64" anchor="top start">
                 <div className="px-3 py-2">
-                  <div className="text-sm font-medium text-fg-strong mb-2">{t('common.theme')}</div>
+                  <div className="mb-2 text-sm font-medium text-fg-strong">{t('common.theme')}</div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setMode('light')}
-                      className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                      className={`flex flex-1 items-center justify-center rounded-md px-3 py-2 text-sm transition-colors ${
                         mode === 'light'
                           ? 'bg-accent-500 text-white'
                           : 'bg-bg-hover text-fg hover:bg-bg-active'
@@ -242,7 +284,7 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                     </button>
                     <button
                       onClick={() => setMode('dark')}
-                      className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                      className={`flex flex-1 items-center justify-center rounded-md px-3 py-2 text-sm transition-colors ${
                         mode === 'dark'
                           ? 'bg-accent-500 text-white'
                           : 'bg-bg-hover text-fg hover:bg-bg-active'
@@ -256,32 +298,51 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                   <div className="flex gap-2">
                     <button
                       onClick={() => setAccent('warm')}
-                      className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                      className={`flex items-center justify-center rounded-md px-3 py-2 transition-colors ${
                         accent === 'warm'
-                          ? 'bg-accent-500 text-white'
-                          : 'bg-bg-hover text-fg hover:bg-bg-active'
+                          ? 'bg-accent-500'
+                          : 'bg-bg-hover hover:bg-bg-active'
                       }`}
-                      aria-label="Warm accent"
+                      aria-label={t('common.themeAccentWarm')}
+                      title={t('common.themeAccentWarm')}
                     >
-                      <SwatchIcon className="h-4 w-4" /> {t('common.themeAccentWarm')}
+                      <span
+                        className="size-4 rounded-full ring-1 ring-black/10"
+                        style={{ background: 'oklch(68% 0.185 50)' }}
+                      />
                     </button>
                     <button
                       onClick={() => setAccent('cool')}
-                      className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                      className={`flex items-center justify-center rounded-md px-3 py-2 transition-colors ${
                         accent === 'cool'
-                          ? 'bg-accent-500 text-white'
-                          : 'bg-bg-hover text-fg hover:bg-bg-active'
+                          ? 'bg-accent-500'
+                          : 'bg-bg-hover hover:bg-bg-active'
                       }`}
-                      aria-label="Cool accent"
+                      aria-label={t('common.themeAccentCool')}
+                      title={t('common.themeAccentCool')}
                     >
-                      <SwatchIcon className="h-4 w-4" /> {t('common.themeAccentCool')}
+                      <span
+                        className="size-4 rounded-full ring-1 ring-black/10"
+                        style={{ background: 'oklch(56% 0.125 215)' }}
+                      />
                     </button>
                   </div>
                 </div>
+                <DropdownDivider />
                 <DropdownItem href="/account/settings">
+                  <Cog6ToothIcon data-slot="icon" />
                   <DropdownLabel>{t('account.settings')}</DropdownLabel>
                 </DropdownItem>
-                <DropdownItem onClick={() => signOut()}>
+                <DropdownItem onClick={() => { /* Help & Support — placeholder until docs/widget ships */ }}>
+                  <LifebuoyIcon data-slot="icon" />
+                  <DropdownLabel>{t('common.helpSupport')}</DropdownLabel>
+                </DropdownItem>
+                <DropdownDivider />
+                <DropdownItem
+                  onClick={() => signOut()}
+                  className="text-danger-500 data-focus:bg-danger-500/10 data-focus:text-danger-500 *:data-[slot=icon]:text-danger-500 data-focus:*:data-[slot=icon]:text-danger-500"
+                >
+                  <ArrowRightStartOnRectangleIcon data-slot="icon" />
                   <DropdownLabel>{t('common.signOut')}</DropdownLabel>
                 </DropdownItem>
               </DropdownMenu>
