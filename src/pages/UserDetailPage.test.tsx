@@ -26,6 +26,7 @@ describe('UserDetailPage', () => {
     lastName: 'Doe',
     email: 'john.doe@example.com',
     enabled: true,
+    invitationStatus: 'ACTIVE' as const,
     roles: [
       { id: 'role-1', name: 'Admin', description: 'Administrator role' },
     ],
@@ -78,7 +79,14 @@ describe('UserDetailPage', () => {
       if (url === '/tenant/dispatch-regions?includeInactive=true') {
         return Promise.resolve({ data: mockDispatchRegions });
       }
-      if (url === `/audit/user/${user.id}` || url === `/audit/TenantUser/${user.id}`) {
+      // v1.5 backs the activity card with the new curated feed at
+      // /audit/account-activity/{userId}. Keep the legacy entity-history
+      // URLs mocked too in case some path still touches them.
+      if (
+        url === `/audit/account-activity/${user.id}` ||
+        url === `/audit/user/${user.id}` ||
+        url === `/audit/TenantUser/${user.id}`
+      ) {
         if (auditLog === 'loading') {
           return new Promise(() => {}); // Never resolve for loading state
         }
@@ -172,10 +180,11 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    // Email appears twice (header and details), so use getAllByText
+    // Email and role chip render in the header card; status text is "Active"
+    // in the v1.5 inline status line (was "Enabled" in the prior Catalyst layout).
     expect(screen.getAllByText('john.doe@example.com')[0]).toBeInTheDocument();
-    expect(screen.getByText('Admin')).toBeInTheDocument();
-    expect(screen.getByText('Enabled')).toBeInTheDocument();
+    expect(screen.getAllByText('Admin').length).toBeGreaterThan(0);
+    expect(screen.getByText('Active')).toBeInTheDocument();
   });
 
   it('renders the formatted phone number with a tel: link when present', async () => {
@@ -215,7 +224,7 @@ describe('UserDetailPage', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('opens edit dialog when edit button is clicked', async () => {
+  it('navigates to the edit page when the edit button is clicked', async () => {
     setupStandardMocks({});
 
     const user = userEvent.setup();
@@ -229,21 +238,86 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    const editButton = screen.getByRole('button', { name: /^edit$/i });
+    // The primary header action is now a single "Edit user" button that
+    // navigates to the dedicated edit page (replacing the prior dialog).
+    const editButton = screen.getByRole('button', { name: /edit user/i });
     await user.click(editButton);
 
-    // Dialog should be open
+    expect(mockNavigate).toHaveBeenCalledWith(`/settings/access/users/${mockUser.id}/edit`);
+  });
+
+  it('hides the Resend Invitation button when invitationStatus is ACTIVE', async () => {
+    setupStandardMocks({}); // default mockUser.invitationStatus is ACTIVE
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
     await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+    });
+
+    // The button is conditional on the invite lifecycle — accepted users
+    // don't have one outstanding to resend.
+    expect(
+      screen.queryByRole('button', { name: /resend invitation/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it.each(['INVITED' as const, 'INVITATION_EXPIRED' as const])(
+    'shows Resend Invitation when invitationStatus is %s',
+    async (status) => {
+      setupStandardMocks({ user: { ...mockUser, invitationStatus: status } });
+
+      renderWithProviders(<UserDetailPage />, {
+        initialEntries: ['/users/user-123'],
+        path: '/users/:id',
+      });
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+      });
+
+      expect(
+        screen.getByRole('button', { name: /resend invitation/i })
+      ).toBeInTheDocument();
+    }
+  );
+
+  it('calls the resend endpoint when Resend Invitation is clicked', async () => {
+    setupStandardMocks({ user: { ...mockUser, invitationStatus: 'INVITED' } });
+    const postSpy = vi.mocked(apiClient.post).mockResolvedValue({ data: undefined });
+
+    const user = userEvent.setup();
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+    });
+
+    const resendButton = screen.getByRole('button', { name: /resend invitation/i });
+    await user.click(resendButton);
+
+    await waitFor(() => {
+      // userApi.resendInvitation(id) → POST /users/{id}/invitation/resend
+      expect(postSpy).toHaveBeenCalledWith('/users/user-123/invitation/resend');
     });
   });
 
-  it('disables user when disable button is clicked with confirmation', async () => {
+  it('deactivates user when deactivate button is clicked with confirmation', async () => {
     // Mock window.confirm to return true BEFORE rendering
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     setupStandardMocks({});
 
-    const putSpy = vi.mocked(apiClient.put).mockResolvedValue({ data: { ...mockUser, enabled: false } });
+    // Backend dropped `enabled` from PUT /users/{id} — activate/deactivate
+    // are now their own POST endpoints. The handlers also emit matching
+    // activity-feed rows server-side.
+    const postSpy = vi.mocked(apiClient.post).mockResolvedValue({ data: { ...mockUser, enabled: false } });
 
     const user = userEvent.setup();
 
@@ -256,7 +330,9 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    const disableButton = screen.getByRole('button', { name: /disable/i });
+    // The v1.5 lifecycle footer renames the destructive action from
+    // "Disable" → "Deactivate" to match the spec.
+    const disableButton = screen.getByRole('button', { name: /^deactivate$/i });
     await user.click(disableButton);
 
     // Confirm was called
@@ -264,13 +340,13 @@ describe('UserDetailPage', () => {
 
     // API was called
     await waitFor(() => {
-      expect(putSpy).toHaveBeenCalledWith('/users/user-123', { enabled: false });
+      expect(postSpy).toHaveBeenCalledWith('/users/user-123/deactivate');
     });
 
     confirmSpy.mockRestore();
   });
 
-  it('does not disable user when confirmation is cancelled', async () => {
+  it('does not deactivate user when confirmation is cancelled', async () => {
     setupStandardMocks({}); // Audit log
 
     // Mock window.confirm to return false
@@ -287,7 +363,7 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    const disableButton = screen.getByRole('button', { name: /disable/i });
+    const disableButton = screen.getByRole('button', { name: /^deactivate$/i });
     await user.click(disableButton);
 
     // Confirm was called
@@ -299,14 +375,14 @@ describe('UserDetailPage', () => {
     confirmSpy.mockRestore();
   });
 
-  it('enables disabled user when enable button is clicked with confirmation', async () => {
+  it('reactivates disabled user when reactivate button is clicked with confirmation', async () => {
     const disabledUser = { ...mockUser, enabled: false };
 
     // Mock window.confirm to return true BEFORE rendering
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     setupStandardMocks({ user: disabledUser });
 
-    const putSpy = vi.mocked(apiClient.put).mockResolvedValue({ data: { ...disabledUser, enabled: true } });
+    const postSpy = vi.mocked(apiClient.post).mockResolvedValue({ data: { ...disabledUser, enabled: true } });
 
     const user = userEvent.setup();
 
@@ -320,34 +396,29 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    // Verify disabled badge is showing
+    // The inline status line shows "Disabled" for non-enabled users.
     expect(screen.getByText('Disabled')).toBeInTheDocument();
 
-    // Find enable button - it should be the second button (after Edit)
-    const buttons = await screen.findAllByRole('button');
-    const enableButton = buttons.find(btn => btn.textContent?.includes('Enable'));
-    expect(enableButton).toBeDefined();
-
-    // Click enable button
-    await user.click(enableButton!);
+    // The lifecycle footer surfaces a "Reactivate" button when the user
+    // is disabled (was "Enable" in the prior layout).
+    const reactivateButton = screen.getByRole('button', { name: /^reactivate$/i });
+    await user.click(reactivateButton);
 
     // Confirm was called
     expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('John Doe'));
 
     // API was called
     await waitFor(() => {
-      expect(putSpy).toHaveBeenCalled();
+      expect(postSpy).toHaveBeenCalled();
     }, { timeout: 5000 });
 
-    expect(putSpy).toHaveBeenCalledWith('/users/user-123', { enabled: true });
+    expect(postSpy).toHaveBeenCalledWith('/users/user-123/activate');
 
     confirmSpy.mockRestore();
   });
 
-  it('navigates back when back button is clicked from success state', async () => {
+  it('renders an "all users" back link on the success state', async () => {
     setupStandardMocks({}); // Audit log
-
-    const user = userEvent.setup();
 
     renderWithProviders(<UserDetailPage />, {
       initialEntries: ['/users/user-123'],
@@ -358,41 +429,11 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    const backButton = screen.getAllByRole('button', { name: /back/i })[0];
-    await user.click(backButton);
-
-    expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users');
-  });
-
-  it('closes edit dialog when cancel is clicked', async () => {
-    setupStandardMocks({}); // Audit log
-
-    const user = userEvent.setup();
-
-    renderWithProviders(<UserDetailPage />, {
-      initialEntries: ['/users/user-123'],
-      path: '/users/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
-    });
-
-    // Open dialog
-    const editButton = screen.getByRole('button', { name: /^edit$/i });
-    await user.click(editButton);
-
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Close dialog
-    const cancelButton = screen.getByRole('button', { name: /cancel/i });
-    await user.click(cancelButton);
-
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    });
+    // The success-state back affordance is a React Router <Link>, not a button.
+    // Asserting the href is enough — actually clicking it would require a full
+    // <Router> with the destination route registered.
+    const backLink = screen.getByRole('link', { name: /all users/i });
+    expect(backLink).toHaveAttribute('href', '/settings/access/users');
   });
 
   it('displays all user information sections', async () => {
@@ -407,12 +448,13 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    // Check all sections are rendered (updated for new layout)
-    expect(screen.getByText('Role & Permissions')).toBeInTheDocument();
-    expect(screen.getByText('Capabilities')).toBeInTheDocument();
-
-    // Note: Audit History section requires VIEW_AUDIT_LOGS capability
-    // The test setup includes this capability in setup.ts
+    // v1.5 collapses the prior "Role & Permissions" + "Capabilities" cards
+    // into a single Roles/Regions card with a capability-detail expander.
+    // The detail is collapsed by default and surfaced by a count + link.
+    expect(screen.getByText('Roles')).toBeInTheDocument();
+    expect(screen.getByText('Regions')).toBeInTheDocument();
+    expect(screen.getByText('Security')).toBeInTheDocument();
+    expect(screen.getByText('Account activity')).toBeInTheDocument();
   });
 
   it('displays dispatch regions when user has assigned regions', async () => {
@@ -477,7 +519,7 @@ describe('UserDetailPage', () => {
     });
   });
 
-  it('displays capabilities section', async () => {
+  it('surfaces the capability count with a "view details" link', async () => {
     setupStandardMocks({}); // Audit log
 
     renderWithProviders(<UserDetailPage />, {
@@ -489,12 +531,18 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    // Check capabilities section is displayed with count
-    expect(screen.getByText('Capabilities')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument(); // 3 capabilities count
+    // v1.5 swaps the dedicated "Capabilities" card for an inline count
+    // ("3 capabilities granted") + expander on the combined Roles/Regions
+    // card. The count and trailing label render in separate spans for
+    // typography (mono digit + sans label), so match them independently.
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText(/capabilities granted/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /view detailed permissions/i })
+    ).toBeInTheDocument();
   });
 
-  it('shows dispatch regions section in role & permissions', async () => {
+  it('shows the regions row on the combined Roles/Regions card', async () => {
     setupStandardMocks({}); // Audit log
 
     renderWithProviders(<UserDetailPage />, {
@@ -506,13 +554,14 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    // Check the "Assigned Regions" label is displayed
+    // v1.5 renames "Assigned Regions" → "Regions" and moves the row into
+    // the same card as Roles instead of a separate description-list field.
     await waitFor(() => {
-      expect(screen.getByText('Assigned Regions')).toBeInTheDocument();
+      expect(screen.getByText('Regions')).toBeInTheDocument();
     });
   });
 
-  it('does not call disable when confirmation is cancelled', async () => {
+  it('does not call deactivate when confirmation is cancelled', async () => {
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     setupStandardMocks({}); // Audit log
@@ -526,76 +575,45 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    const disableButton = screen.getByRole('button', { name: /disable/i });
+    const disableButton = screen.getByRole('button', { name: /^deactivate$/i });
     await user.click(disableButton);
 
     expect(confirmSpy).toHaveBeenCalled();
-    // Should not have called the API since confirmation was cancelled
-    expect(apiClient.put).not.toHaveBeenCalled();
+    // Should not have called the activate/deactivate endpoint since
+    // confirmation was cancelled. (Activate/deactivate moved from PUT
+    // + body to dedicated POST endpoints.)
+    expect(apiClient.post).not.toHaveBeenCalled();
 
     confirmSpy.mockRestore();
   });
 
-  it('closes edit dialog when cancel is clicked', async () => {
-    const user = userEvent.setup();
-    setupStandardMocks({}); // Audit log
-
-    renderWithProviders(<UserDetailPage />, {
-      initialEntries: ['/users/user-123'],
-      path: '/users/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
-    });
-
-    // Open edit dialog
-    const editButton = screen.getByRole('button', { name: /edit/i });
-    await user.click(editButton);
-
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Cancel
-    const cancelButton = screen.getByRole('button', { name: /cancel/i });
-    await user.click(cancelButton);
-
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    });
-  });
-
-  it('displays audit log when available', async () => {
-    const mockAuditLog = [
+  it('displays activity feed events with classified labels', async () => {
+    // New backend shape: { id, occurredAt, actionType, payload, actor, ip, userAgent }
+    // Role events populate payload.roleName; lifecycle/security events leave
+    // payload null. Actor is null only for system-originated events (today
+    // just user_created until actor plumbing lands).
+    const mockActivity = [
       {
-        id: 'audit-1',
-        tenantId: 'tenant-123',
-        userId: 'user-123',
-        userEmail: 'john.doe@test.com',
-        userName: 'John Doe',
-        entityType: 'TenantUser',
-        entityId: 'user-123',
-        timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 minutes ago
-        action: 'UPDATE',
-        oldValues: { firstName: 'John' },
-        newValues: { firstName: 'Jane' },
+        id: 'a-1',
+        occurredAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+        actionType: 'ROLE_ADDED',
+        payload: { roleId: 'role-1', roleName: 'Dispatcher' },
+        actor: { id: 'u-9', name: 'Maria Chen' },
+        ip: '1.2.3.4',
+        userAgent: 'Mozilla/5.0',
       },
       {
-        id: 'audit-2',
-        tenantId: 'tenant-123',
-        userId: 'user-123',
-        userEmail: 'john.doe@test.com',
-        userName: 'John Doe',
-        entityType: 'TenantUser',
-        entityId: 'user-123',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), // 3 hours ago
-        action: 'CREATE',
-        newValues: { firstName: 'John', lastName: 'Doe', email: 'john.doe@test.com' },
+        id: 'a-2',
+        occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+        actionType: 'USER_CREATED',
+        payload: null,
+        actor: null,
+        ip: null,
+        userAgent: null,
       },
     ];
 
-    setupStandardMocks({ auditLog: mockAuditLog });
+    setupStandardMocks({ auditLog: mockActivity });
 
     renderWithProviders(<UserDetailPage />, {
       initialEntries: ['/users/user-123'],
@@ -606,15 +624,13 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    // Check audit log is displayed
     await waitFor(() => {
-      expect(screen.getByText('UPDATE')).toBeInTheDocument();
-      expect(screen.getByText('CREATE')).toBeInTheDocument();
+      // ROLE_ADDED interpolates payload.roleName into the label.
+      expect(screen.getByText('Role "Dispatcher" added')).toBeInTheDocument();
+      expect(screen.getByText('Account created')).toBeInTheDocument();
+      // Actor is rendered as "· By {name}" when present; absent when null.
+      expect(screen.getByText('· By Maria Chen')).toBeInTheDocument();
     });
-
-    // Check changes are formatted (using getAllByText since firstName appears in both events)
-    const firstNameElements = screen.getAllByText(/firstName/i);
-    expect(firstNameElements.length).toBeGreaterThan(0);
   });
 
   it('displays loading state for audit log', async () => {
@@ -679,48 +695,30 @@ describe('UserDetailPage', () => {
     });
   });
 
-  it('formats different audit event types with correct badge colors', async () => {
-    const mockAuditLog = [
-      {
-        id: 'audit-1',
-        tenantId: 'tenant-123',
-        userId: 'user-123',
-        userEmail: 'john.doe@test.com',
-        userName: 'John Doe',
-        entityType: 'TenantUser',
-        entityId: 'user-123',
-        timestamp: new Date().toISOString(),
-        action: 'CREATE',
-        newValues: { firstName: 'John', lastName: 'Doe' },
-      },
-      {
-        id: 'audit-2',
-        tenantId: 'tenant-123',
-        userId: 'user-123',
-        userEmail: 'john.doe@test.com',
-        userName: 'John Doe',
-        entityType: 'TenantUser',
-        entityId: 'user-123',
-        timestamp: new Date().toISOString(),
-        action: 'UPDATE',
-        oldValues: { email: 'old@email.com' },
-        newValues: { email: 'new@email.com' },
-      },
-      {
-        id: 'audit-3',
-        tenantId: 'tenant-123',
-        userId: 'user-123',
-        userEmail: 'john.doe@test.com',
-        userName: 'John Doe',
-        entityType: 'TenantUser',
-        entityId: 'user-123',
-        timestamp: new Date().toISOString(),
-        action: 'DELETE',
-        oldValues: { firstName: 'John', lastName: 'Doe' },
-      },
+  it('classifies the full activity actionType enum', async () => {
+    const now = Date.now();
+    const ts = (offsetSec: number) => new Date(now - offsetSec * 1000).toISOString();
+    const actor = { id: 'u-9', name: 'Maria Chen' };
+
+    // Cover each branch of classifyEvent: lifecycle (created/activated/
+    // deactivated/invitation_resent), access (role added/removed), security
+    // (password reset / mfa reset / global signout), and the forward-compat
+    // default for an unknown actionType.
+    const mockActivity = [
+      { id: 'a-1', occurredAt: ts(10),  actionType: 'USER_CREATED',        payload: null, actor: null, ip: null, userAgent: null },
+      { id: 'a-2', occurredAt: ts(20),  actionType: 'USER_ACTIVATED',      payload: null, actor, ip: null, userAgent: null },
+      { id: 'a-3', occurredAt: ts(30),  actionType: 'USER_DEACTIVATED',    payload: null, actor, ip: null, userAgent: null },
+      { id: 'a-4', occurredAt: ts(40),  actionType: 'INVITATION_RESENT',   payload: null, actor, ip: null, userAgent: null },
+      { id: 'a-5', occurredAt: ts(50),  actionType: 'ROLE_ADDED',          payload: { roleId: 'r1', roleName: 'Dispatcher' }, actor, ip: null, userAgent: null },
+      { id: 'a-6', occurredAt: ts(60),  actionType: 'ROLE_REMOVED',        payload: { roleId: 'r2', roleName: 'Sales' },      actor, ip: null, userAgent: null },
+      { id: 'a-7', occurredAt: ts(70),  actionType: 'PASSWORD_RESET_SENT', payload: null, actor, ip: null, userAgent: null },
+      { id: 'a-8', occurredAt: ts(80),  actionType: 'MFA_RESET',           payload: null, actor, ip: null, userAgent: null },
+      { id: 'a-9', occurredAt: ts(90),  actionType: 'GLOBAL_SIGNOUT',      payload: null, actor, ip: null, userAgent: null },
+      // Forward-compat: unknown values must render with a generic label.
+      { id: 'a-10', occurredAt: ts(100), actionType: 'SOMETHING_NEW',      payload: null, actor, ip: null, userAgent: null },
     ];
 
-    setupStandardMocks({ auditLog: mockAuditLog });
+    setupStandardMocks({ auditLog: mockActivity });
 
     renderWithProviders(<UserDetailPage />, {
       initialEntries: ['/users/user-123'],
@@ -731,32 +729,76 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    // Check all event types are displayed (this tests getActionColor)
     await waitFor(() => {
-      expect(screen.getByText('CREATE')).toBeInTheDocument();
-      expect(screen.getByText('UPDATE')).toBeInTheDocument();
-      expect(screen.getByText('DELETE')).toBeInTheDocument();
+      expect(screen.getByText('Account created')).toBeInTheDocument();
+      expect(screen.getByText('Account activated')).toBeInTheDocument();
+      expect(screen.getByText('Account deactivated')).toBeInTheDocument();
+      expect(screen.getByText('Invitation resent')).toBeInTheDocument();
+      expect(screen.getByText('Role "Dispatcher" added')).toBeInTheDocument();
+      expect(screen.getByText('Role "Sales" removed')).toBeInTheDocument();
+      expect(screen.getByText('Password reset link sent')).toBeInTheDocument();
+      expect(screen.getByText('2FA reset')).toBeInTheDocument();
+      expect(screen.getByText('Signed out of all sessions')).toBeInTheDocument();
+      // Unknown actionType falls through to the generic "Activity" label.
+      expect(screen.getByText('Activity')).toBeInTheDocument();
     });
   });
 
-  it('formats timestamp correctly', async () => {
+  it('renders SIGN_IN_FAILED_RUN with attempt-count + window meta line', async () => {
+    // SIGN_IN_FAILED_RUN ships once the Cognito Lambda triggers deploy.
+    // Payload is { attemptCount, windowSeconds, firstAt, lastAt }; the meta
+    // line "5 attempts · within 2 min" is composed client-side from
+    // attemptCount + windowSeconds (rounded to the largest sensible unit).
+    const mockActivity = [
+      {
+        id: 'a-1',
+        occurredAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+        actionType: 'SIGN_IN_FAILED_RUN',
+        payload: {
+          attemptCount: 5,
+          windowSeconds: 120,
+          firstAt: '2026-05-18T14:20:00Z',
+          lastAt: '2026-05-18T14:22:00Z',
+        },
+        actor: null,
+        ip: '1.2.3.4',
+        userAgent: 'Mozilla/5.0',
+      },
+    ];
+
+    setupStandardMocks({ auditLog: mockActivity });
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed sign-in attempts')).toBeInTheDocument();
+      // 120 seconds → "2 min" via the formatWindowSeconds rollup.
+      expect(screen.getByText('· 5 attempts · within 2 min')).toBeInTheDocument();
+    });
+  });
+
+  it('renders old timestamps without erroring', async () => {
     const oldDate = new Date(Date.now() - 1000 * 60 * 60 * 24 * 10); // 10 days ago
-    const mockAuditLog = [
+    const mockActivity = [
       {
-        id: 'audit-1',
-        tenantId: 'tenant-123',
-        userId: 'user-123',
-        userEmail: 'john.doe@test.com',
-        userName: 'John Doe',
-        entityType: 'TenantUser',
-        entityId: 'user-123',
-        timestamp: oldDate.toISOString(),
-        action: 'CREATE',
-        newValues: { firstName: 'John', lastName: 'Doe' },
+        id: 'a-1',
+        occurredAt: oldDate.toISOString(),
+        actionType: 'USER_CREATED',
+        payload: null,
+        actor: null,
+        ip: null,
+        userAgent: null,
       },
     ];
 
-    setupStandardMocks({ auditLog: mockAuditLog });
+    setupStandardMocks({ auditLog: mockActivity });
 
     renderWithProviders(<UserDetailPage />, {
       initialEntries: ['/users/user-123'],
@@ -767,14 +809,16 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    // Check date is formatted (AuditHistory uses toLocaleString)
+    // Old timestamps (>7 days) render as "Mon D" in the v1.5 relTime
+    // helper. We don't pin the exact string — just confirm the activity
+    // entry rendered so the time column was reached.
     await waitFor(() => {
-      expect(screen.getByText('CREATE')).toBeInTheDocument();
+      expect(screen.getByText('Account created')).toBeInTheDocument();
     });
   });
 
 
-  it('does not call enable when confirmation is cancelled', async () => {
+  it('does not call reactivate when confirmation is cancelled', async () => {
     const disabledUser = { ...mockUser, enabled: false };
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     setupStandardMocks({ user: disabledUser });
@@ -790,16 +834,14 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    // Find enable button
-    const buttons = await screen.findAllByRole('button');
-    const enableButton = buttons.find(btn => btn.textContent?.includes('Enable'));
-    expect(enableButton).toBeDefined();
-
-    await user.click(enableButton!);
+    const reactivateButton = screen.getByRole('button', { name: /^reactivate$/i });
+    await user.click(reactivateButton);
 
     expect(confirmSpy).toHaveBeenCalled();
-    // Should not have called the API since confirmation was cancelled
-    expect(apiClient.put).not.toHaveBeenCalled();
+    // Should not have called the activate/deactivate endpoint since
+    // confirmation was cancelled. (Activate/deactivate moved from PUT
+    // + body to dedicated POST endpoints.)
+    expect(apiClient.post).not.toHaveBeenCalled();
 
     confirmSpy.mockRestore();
   });

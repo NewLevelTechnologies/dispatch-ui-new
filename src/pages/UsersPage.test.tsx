@@ -254,7 +254,7 @@ describe('UsersPage', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users/user-1');
   });
 
-  it('opens edit dialog when edit button is clicked', async () => {
+  it('navigates to edit page when edit menu item is clicked', async () => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
       if (url === '/users') {
         return Promise.resolve({ data: mockUsers });
@@ -272,18 +272,15 @@ describe('UsersPage', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    // Click the dropdown button
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
 
-    // Click edit option
     const editButton = screen.getByRole('menuitem', { name: /edit/i });
     await user.click(editButton);
 
-    // Dialog should open
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    });
+    // Edit now navigates to the dedicated edit page instead of opening a dialog.
+    // mockUsers[0] is the first user — assert the route uses its id.
+    expect(mockNavigate).toHaveBeenCalledWith(`/settings/access/users/${mockUsers[0].id}/edit`);
   });
 
   it('does not navigate when dropdown is clicked', async () => {
@@ -384,7 +381,7 @@ describe('UsersPage', () => {
       }
       return Promise.reject(new Error('Unknown URL'));
     });
-    vi.mocked(apiClient.put).mockResolvedValue({ data: { ...mockUsers[0], enabled: false } });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { ...mockUsers[0], enabled: false } });
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
 
@@ -403,7 +400,10 @@ describe('UsersPage', () => {
     await user.click(disableButton);
 
     await waitFor(() => {
-      expect(apiClient.put).toHaveBeenCalledWith('/users/user-1', { enabled: false });
+      // PUT /users/{id} no longer takes an `enabled` field; activation
+      // moved to a dedicated POST endpoint that also emits the matching
+      // activity-feed event server-side.
+      expect(apiClient.post).toHaveBeenCalledWith('/users/user-1/deactivate');
     });
 
     confirmSpy.mockRestore();
@@ -660,8 +660,8 @@ describe('UsersPage', () => {
     });
   });
 
-  describe('Add User Dialog', () => {
-    it('opens add dialog when "Add User" button is clicked', async () => {
+  describe('Invite navigation', () => {
+    it('navigates to the invite page when "Add User" is clicked', async () => {
       vi.mocked(apiClient.get).mockImplementation((url) => {
         if (url === '/users') {
           return Promise.resolve({ data: mockUsers });
@@ -682,12 +682,10 @@ describe('UsersPage', () => {
       const addButton = screen.getByRole('button', { name: /add user/i });
       await user.click(addButton);
 
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
-      });
+      expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users/new');
     });
 
-    it('opens add dialog when "Add your first user" button is clicked', async () => {
+    it('navigates to the invite page when "Add your first user" is clicked', async () => {
       vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
       const user = userEvent.setup();
 
@@ -700,44 +698,7 @@ describe('UsersPage', () => {
       const addFirstButton = screen.getByRole('button', { name: /add your first user/i });
       await user.click(addFirstButton);
 
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
-      });
-    });
-
-    it('closes dialog and resets state when dialog is closed', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
-      const user = userEvent.setup();
-
-      renderWithProviders(<UsersPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-      });
-
-      // Open add dialog
-      const addButton = screen.getByRole('button', { name: /add user/i });
-      await user.click(addButton);
-
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
-      });
-
-      // Close dialog
-      const cancelButton = screen.getByRole('button', { name: /cancel/i });
-      await user.click(cancelButton);
-
-      await waitFor(() => {
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      });
+      expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users/new');
     });
   });
 
@@ -1087,7 +1048,7 @@ describe('UsersPage', () => {
         }
         return Promise.reject(new Error('Unknown URL'));
       });
-      vi.mocked(apiClient.put).mockResolvedValue({ data: { ...mockUsers[1], enabled: true } });
+      vi.mocked(apiClient.post).mockResolvedValue({ data: { ...mockUsers[1], enabled: true } });
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
       const user = userEvent.setup();
 
@@ -1106,7 +1067,8 @@ describe('UsersPage', () => {
       await user.click(enableButton);
 
       await waitFor(() => {
-        expect(apiClient.put).toHaveBeenCalledWith('/users/user-2', { enabled: true });
+        // Same migration as deactivate — see the disable test above.
+        expect(apiClient.post).toHaveBeenCalledWith('/users/user-2/activate');
       });
 
       confirmSpy.mockRestore();

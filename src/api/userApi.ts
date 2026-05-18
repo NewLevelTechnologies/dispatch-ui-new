@@ -1,6 +1,13 @@
 // User API Client
 import apiClient from './client';
 
+// Where a user sits in the invitation lifecycle. `ACTIVE` means the user
+// has accepted; `INVITED` means an invitation email is outstanding;
+// `INVITATION_EXPIRED` means the link aged out and a new one must be
+// sent. The detail page surfaces a "Resend Invitation" action on the
+// two non-active states.
+export type InvitationStatus = 'INVITED' | 'INVITATION_EXPIRED' | 'ACTIVE';
+
 export interface User {
   id: string;
   tenantId: string;
@@ -10,6 +17,7 @@ export interface User {
   lastName: string;
   phoneNumber: string | null;
   enabled: boolean;
+  invitationStatus?: InvitationStatus;
   roles?: Role[];
   capabilities?: string[];
   dispatchRegionIds?: string[];
@@ -150,14 +158,38 @@ export const userApi = {
     return response.data;
   },
 
+  // Backend dropped the `enabled` field from PUT /users/{id} — sending it
+  // is silently ignored now. Activation/deactivation goes through the
+  // dedicated POST endpoints, which also emit the matching activity-feed
+  // events (USER_ACTIVATED / USER_DEACTIVATED + cascade GLOBAL_SIGNOUT).
+  // The original method names are preserved so call sites stay the same.
   enable: async (id: string): Promise<User> => {
-    const response = await apiClient.put<User>(`/users/${id}`, { enabled: true });
+    const response = await apiClient.post<User>(`/users/${id}/activate`);
     return response.data;
   },
 
   disable: async (id: string): Promise<User> => {
-    const response = await apiClient.put<User>(`/users/${id}`, { enabled: false });
+    const response = await apiClient.post<User>(`/users/${id}/deactivate`);
     return response.data;
+  },
+
+  // Admin Security-card actions. Each returns 204 on success.
+  sendPasswordResetLink: async (id: string): Promise<void> => {
+    await apiClient.post(`/users/${id}/reset-password`);
+  },
+
+  resetMfa: async (id: string): Promise<void> => {
+    await apiClient.post(`/users/${id}/mfa-reset`);
+  },
+
+  signOutEverywhere: async (id: string): Promise<void> => {
+    await apiClient.post(`/users/${id}/sign-out`);
+  },
+
+  // Returns 409 if the user is past the invitation state — caller should
+  // surface that distinctly from a transient failure.
+  resendInvitation: async (id: string): Promise<void> => {
+    await apiClient.post(`/users/${id}/invitation/resend`);
   },
 
   delete: async (id: string): Promise<void> => {
