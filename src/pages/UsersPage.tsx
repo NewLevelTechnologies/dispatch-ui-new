@@ -6,7 +6,6 @@ import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import IconButton from '../components/IconButton';
 import { userApi, type User, type Role } from '../api';
 import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
-import UserFormDialog from '../components/UserFormDialog';
 import { PageHead } from '../components/ui/PageHead';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
@@ -51,8 +50,6 @@ export default function UsersPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -99,13 +96,11 @@ export default function UsersPage() {
   });
 
   const handleAdd = () => {
-    setSelectedUser(null);
-    setIsDialogOpen(true);
+    navigate('/settings/access/users/new');
   };
 
   const handleEdit = (user: User) => {
-    setSelectedUser(user);
-    setIsDialogOpen(true);
+    navigate(`/settings/access/users/${user.id}/edit`);
   };
 
   const handleDisable = (user: User) => {
@@ -131,11 +126,6 @@ export default function UsersPage() {
     if (userToDelete) {
       deleteMutation.mutate(userToDelete.id);
     }
-  };
-
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
-    setSelectedUser(null);
   };
 
   // Filter users based on search query, role, and status
@@ -421,13 +411,6 @@ export default function UsersPage() {
           )}
         </div>
       )}
-
-      <UserFormDialog
-        isOpen={isDialogOpen}
-        onClose={handleCloseDialog}
-        user={selectedUser}
-        roles={roles || []}
-      />
 
       <Alert open={isDeleteAlertOpen} onClose={() => setIsDeleteAlertOpen(false)}>
         <AlertTitle>{t('common.actions.deleteConfirm', { name: userToDelete ? `${userToDelete.firstName} ${userToDelete.lastName}` : '' })}</AlertTitle>

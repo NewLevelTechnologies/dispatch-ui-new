@@ -27,6 +27,7 @@ import RecurringOrdersPage from './pages/RecurringOrdersPage';
 import SchedulingPage from './pages/SchedulingPage';
 import UsersPage from './pages/UsersPage';
 import UserDetailPage from './pages/UserDetailPage';
+import { UserInvitePage, UserEditPage } from './pages/UserFormPage';
 import RolesPage from './pages/RolesPage';
 import RoleDetailPage from './pages/RoleDetailPage';
 import SettingsLayout from './pages/settings/SettingsLayout';
@@ -155,7 +156,9 @@ function App() {
         <Route path="equipment/categories" element={<EquipmentCategoriesPanel />} />
         <Route path="equipment/filter-sizes" element={<FilterSizesPanel />} />
         <Route path="access/users" element={<UsersPage />} />
+        <Route path="access/users/new" element={<UserInvitePage />} />
         <Route path="access/users/:id" element={<UserDetailPage />} />
+        <Route path="access/users/:id/edit" element={<UserEditPage />} />
         <Route path="access/roles" element={<RolesPage />} />
         <Route path="access/roles/:id" element={<RoleDetailPage />} />
       </Route>
