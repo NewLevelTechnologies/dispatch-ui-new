@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeftIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { userApi, dispatchRegionApi, type User, type Role } from '../api';
 import { RoleChip } from '../components/RoleChip';
 import { roleColor } from '../utils/roleColor';
@@ -263,9 +263,6 @@ function Header({
             Edit user
           </Button>
         )}
-        <Button outline size="xs" aria-label="More options">
-          <EllipsisHorizontalIcon data-slot="icon" />
-        </Button>
       </div>
     </div>
   );
