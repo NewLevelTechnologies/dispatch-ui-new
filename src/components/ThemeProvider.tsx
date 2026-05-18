@@ -26,18 +26,19 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<Mode>('light');
-  const [accent, setAccentState] = useState<Accent>('warm');
+  const [accent, setAccentState] = useState<Accent>('cool');
 
-  // Hydrate from localStorage / system preference on first client render.
-  // The bootstrap script in index.html already set the matching classes on
-  // <html> pre-mount, so this just syncs React state to what's on the DOM.
+  // Hydrate from localStorage on first client render. The bootstrap script in
+  // index.html already set the matching classes on <html> pre-mount, so this
+  // just syncs React state to what's on the DOM. Default = light + cool; we
+  // intentionally don't honor the OS color-scheme preference (see comment in
+  // index.html for the rationale).
   useEffect(() => {
     const saved = localStorage.getItem('theme-mode') as Mode | null;
     const savedAccent = localStorage.getItem('theme-accent') as Accent | null;
-    const prefers = window.matchMedia('(prefers-color-scheme: dark)').matches;
     /* eslint-disable react-hooks/set-state-in-effect */
-    setModeState(saved ?? (prefers ? 'dark' : 'light'));
-    setAccentState(savedAccent ?? 'warm');
+    setModeState(saved ?? 'light');
+    setAccentState(savedAccent ?? 'cool');
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
@@ -78,9 +79,8 @@ export function useTheme() {
 export const themeBootstrapScript = `
 (function() {
   try {
-    var m = localStorage.getItem('theme-mode');
-    var a = localStorage.getItem('theme-accent');
-    if (!m) m = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    var m = localStorage.getItem('theme-mode') || 'light';
+    var a = localStorage.getItem('theme-accent') || 'cool';
     document.documentElement.classList.add('theme-' + m);
     if (a === 'cool') document.documentElement.classList.add('accent-cool');
     document.documentElement.style.colorScheme = m;
