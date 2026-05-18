@@ -151,7 +151,11 @@ export default function UserDetailPage() {
           </div>
           {canEditUsers && (
             <div className="flex gap-2">
-              <Button color="zinc" onClick={handleEdit}>
+              <Button
+                outline
+                onClick={handleEdit}
+                className="border-border text-fg-strong hover:bg-bg-hover dark:border-border dark:text-fg-strong dark:hover:bg-bg-hover"
+              >
                 {t('common.edit')}
               </Button>
               {user.enabled ? (

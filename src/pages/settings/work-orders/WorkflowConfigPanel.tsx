@@ -200,7 +200,7 @@ export default function WorkflowConfigPanel() {
               <Button plain type="button" onClick={handleCancel} disabled={updateMutation.isPending}>
                 {t('common.cancel')}
               </Button>
-              <Button type="button" onClick={handleSave} disabled={updateMutation.isPending}>
+              <Button color="accent" type="button" onClick={handleSave} disabled={updateMutation.isPending}>
                 {updateMutation.isPending ? t('common.saving') : t('settings.saveChanges')}
               </Button>
             </div>

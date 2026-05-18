@@ -575,8 +575,12 @@ export default function EquipmentDetailPage() {
           {/* Header action group. Edit opens the full form dialog; the
               overflow menu carries the destructive Delete. */}
           <div className="flex items-center gap-1">
-            <Button outline onClick={() => setIsEditDialogOpen(true)}>
-              <PencilIcon className="size-4" />
+            <Button
+              outline
+              onClick={() => setIsEditDialogOpen(true)}
+              className="border-border text-fg-strong hover:bg-bg-hover dark:border-border dark:text-fg-strong dark:hover:bg-bg-hover"
+            >
+              <PencilIcon data-slot="icon" />
               {t('common.edit')}
             </Button>
             <Dropdown>

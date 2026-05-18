@@ -154,7 +154,11 @@ export default function RoleDetailPage() {
           {(canEditRoles || canCreateRoles || canDeleteRoles) && (
             <div className="flex gap-2">
               {canEditRoles && !role.isProtected && (
-                <Button color="zinc" onClick={handleEdit}>
+                <Button
+                  outline
+                  onClick={handleEdit}
+                  className="border-border text-fg-strong hover:bg-bg-hover dark:border-border dark:text-fg-strong dark:hover:bg-bg-hover"
+                >
                   {t('common.edit')}
                 </Button>
               )}

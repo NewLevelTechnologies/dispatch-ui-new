@@ -241,8 +241,12 @@ export default function ServiceLocationDetailPage() {
               </Text>
             </div>
             {canEditServiceLocations && (
-              <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
-                <PencilIcon className="size-4" />
+              <Button
+                outline
+                onClick={() => setIsEditDialogOpen(true)}
+                className="border-border text-fg-strong hover:bg-bg-hover dark:border-border dark:text-fg-strong dark:hover:bg-bg-hover"
+              >
+                <PencilIcon data-slot="icon" />
                 {t('common.edit')}
               </Button>
             )}

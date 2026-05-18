@@ -7,7 +7,6 @@ import IconButton from '../components/IconButton';
 import { userApi, type Role, type RestoreAllDefaultsResponse } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import RoleFormDialog from '../components/RoleFormDialog';
-import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Input, InputGroup } from '../components/catalyst/input';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
@@ -15,6 +14,7 @@ import { Alert, AlertActions, AlertDescription, AlertTitle } from '../components
 import { Pill } from '../components/ui/Pill';
 import { Card, CardBody } from '../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
+import { PageHead } from '../components/ui/PageHead';
 import { SettingsListFooter } from '../components/settings/SettingsListFooter';
 
 export default function RolesPage() {
@@ -154,35 +154,40 @@ export default function RolesPage() {
     );
   }, [roles, searchQuery]);
 
+  const totalRoles = roles?.length ?? 0;
+  const displayedRoles = filteredRoles.length;
+  const roleSubtitle = totalRoles > 0
+    ? (displayedRoles === totalRoles
+        ? `${totalRoles.toLocaleString()} ${totalRoles === 1 ? t('entities.role').toLowerCase() : t('entities.roles').toLowerCase()}`
+        : `${displayedRoles} of ${totalRoles} ${t('entities.roles').toLowerCase()}`)
+    : null;
+
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <Heading>{t('entities.roles')}</Heading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {t('roles.description')}
-          </p>
-        </div>
-        {(canCreateRoles || canEditRoles) && (
-          <div className="flex gap-2">
-            {canEditRoles && (
-              <Button plain onClick={handleRestoreAllDefaults}>
-                <ArrowPathIcon className="size-4" />
-                {t('roles.actions.restoreAllDefaults')}
-              </Button>
-            )}
-            {canCreateRoles && (
-              <Button color="accent" onClick={handleAdd}>
-                {t('common.actions.add', { entity: t('entities.role') })}
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+      <PageHead
+        title={t('entities.roles')}
+        sub={roleSubtitle}
+        actions={
+          (canCreateRoles || canEditRoles) ? (
+            <>
+              {canEditRoles && (
+                <Button plain onClick={handleRestoreAllDefaults} className="whitespace-nowrap">
+                  <ArrowPathIcon data-slot="icon" />
+                  {t('roles.actions.restoreAllDefaults')}
+                </Button>
+              )}
+              {canCreateRoles && (
+                <Button color="accent" onClick={handleAdd}>
+                  {t('common.actions.add', { entity: t('entities.role') })}
+                </Button>
+              )}
+            </>
+          ) : null
+        }
+      />
 
-      {/* Quick Search Bar */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
+      <div className="mb-3 flex items-center gap-4">
+        <InputGroup className="min-w-[260px] flex-1 max-w-md">
           <MagnifyingGlassIcon data-slot="icon" />
           <Input
             type="text"
@@ -191,13 +196,6 @@ export default function RolesPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </InputGroup>
-        {roles && roles.length > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredRoles.length === roles.length
-              ? `${roles.length} ${roles.length === 1 ? t('entities.role').toLowerCase() : t('entities.roles').toLowerCase()}`
-              : `${filteredRoles.length} of ${roles.length}`}
-          </div>
-        )}
       </div>
 
       {isLoading && (

@@ -61,14 +61,23 @@ export function SettingsPageHeader({
               <Button plain type="button" onClick={onCancel} disabled={saving}>
                 {t('common.cancel')}
               </Button>
-              <Button type="button" onClick={onSave} disabled={saving}>
+              <Button color="accent" type="button" onClick={onSave} disabled={saving}>
                 {saving ? t('common.saving') : (saveLabel ?? t('settings.saveChanges'))}
               </Button>
             </>
           ) : (
             onEdit && (
-              <Button outline type="button" onClick={onEdit}>
-                <PencilIcon className="size-4" />
+              // Edit is the secondary action on a view-mode page (90% of
+              // visits don't touch it). Demoted from filled-primary to an
+              // outlined treatment using project tokens. Reserve accent for
+              // Save / Add / net-new creation.
+              <Button
+                outline
+                type="button"
+                onClick={onEdit}
+                className="border-border text-fg-strong hover:bg-bg-hover dark:border-border dark:text-fg-strong dark:hover:bg-bg-hover"
+              >
+                <PencilIcon data-slot="icon" />
                 {t('common.edit')}
               </Button>
             )

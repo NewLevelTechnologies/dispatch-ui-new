@@ -654,13 +654,14 @@ export default function WorkOrderDetailPage() {
                 outline
                 onClick={() => setEditWorkOrderDialogOpen(true)}
                 disabled={isCancelled || isArchived}
+                className="border-border text-fg-strong hover:bg-bg-hover dark:border-border dark:text-fg-strong dark:hover:bg-bg-hover"
                 title={
                   isCancelled || isArchived
                     ? t('workOrders.detail.frozen')
                     : undefined
                 }
               >
-                <PencilIcon className="size-4" />
+                <PencilIcon data-slot="icon" />
                 {t('common.edit')}
               </Button>
               <Dropdown>

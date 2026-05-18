@@ -77,12 +77,12 @@ describe('RolesPage', () => {
     expect(screen.getByRole('button', { name: /add role/i })).toBeInTheDocument();
   });
 
-  it('displays page description', () => {
+  it('displays page heading', () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
 
     renderWithProviders(<RolesPage />);
 
-    expect(screen.getByText(/manage roles and their capabilities/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /roles/i })).toBeInTheDocument();
   });
 
   it('displays loading state while fetching roles', () => {
