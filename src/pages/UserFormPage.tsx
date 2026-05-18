@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { userApi, dispatchRegionApi, type Role } from '../api';
 import { roleColor } from '../utils/roleColor';
+import { Button } from '../components/catalyst/button';
 
 // Above this many roles, the role grid switches on a search field and
 // pins selected roles to the top so they don't scroll out of view.
@@ -368,23 +369,21 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
             )}
           </div>
           <span className="flex-1" />
-          <Link
-            to={cancelHref}
-            className="inline-flex h-[30px] items-center rounded-md px-3 text-[12.5px] font-semibold text-fg-muted hover:bg-bg-hover hover:text-fg-strong"
-          >
+          <Button href={cancelHref} plain size="xs">
             Cancel
-          </Link>
-          <button
+          </Button>
+          <Button
             type="submit"
+            color="accent"
+            size="xs"
             disabled={submitting || (isInvite && formData.roleIds.length === 0)}
-            className="inline-flex h-[30px] items-center gap-1.5 rounded-md border border-accent-700/80 bg-gradient-to-b from-accent-500 to-accent-600 px-3 text-[12.5px] font-semibold text-white shadow-[0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.18)] hover:from-accent-400 hover:to-accent-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting
               ? t('common.saving')
               : isInvite
                 ? 'Send invitation'
                 : 'Save changes'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

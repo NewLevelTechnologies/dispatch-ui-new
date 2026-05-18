@@ -249,28 +249,23 @@ function Header({
       </div>
       <div className="flex flex-shrink-0 gap-1.5">
         {canResendInvitation && (
-          <button
+          <Button
+            outline
+            size="xs"
             onClick={onResendInvitation}
             disabled={resendInvitationPending}
-            className="inline-flex h-[30px] items-center rounded-md border border-border bg-bg-elev px-3 text-[12.5px] font-semibold text-fg-strong hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             {resendInvitationPending ? 'Resending…' : 'Resend invitation'}
-          </button>
+          </Button>
         )}
         {onEdit && (
-          <button
-            onClick={onEdit}
-            className="inline-flex h-[30px] items-center gap-1.5 rounded-md border border-accent-700/80 bg-gradient-to-b from-accent-500 to-accent-600 px-3 text-[12.5px] font-semibold text-white shadow-[0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.18)] hover:from-accent-400 hover:to-accent-500"
-          >
+          <Button color="accent" size="xs" onClick={onEdit}>
             Edit user
-          </button>
+          </Button>
         )}
-        <button
-          aria-label="More options"
-          className="inline-flex h-[30px] items-center justify-center rounded-md border border-border bg-bg-elev px-2 text-fg-muted hover:bg-bg-hover hover:text-fg-strong"
-        >
-          <EllipsisHorizontalIcon className="size-4" />
-        </button>
+        <Button outline size="xs" aria-label="More options">
+          <EllipsisHorizontalIcon data-slot="icon" />
+        </Button>
       </div>
     </div>
   );
@@ -332,12 +327,9 @@ function RolesAndRegionsCard({
             )}
           </div>
           {onEditAccess && (
-            <button
-              onClick={onEditAccess}
-              className="inline-flex h-[26px] items-center rounded-md border border-border bg-bg-elev px-2.5 text-[11.5px] font-semibold text-fg-strong hover:bg-bg-hover"
-            >
+            <Button outline size="xxs" onClick={onEditAccess}>
               Edit access
-            </button>
+            </Button>
           )}
         </div>
 
@@ -582,13 +574,14 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
                 <div className="mt-0.5 text-[10.5px] leading-snug text-fg-dim">{it.hint}</div>
               )}
             </div>
-            <button
+            <Button
+              outline
+              size="xxs"
               onClick={() => handleClick(it)}
               disabled={!canEdit || it.pending}
-              className="inline-flex h-[26px] items-center rounded-md border border-border bg-bg-elev px-2.5 text-[11.5px] font-semibold text-fg-strong hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               {it.actionLabel}
-            </button>
+            </Button>
           </div>
         ))}
       </div>
@@ -840,24 +833,13 @@ function LifecycleFooter({
       </div>
       <div>
         {user.enabled ? (
-          <button
-            onClick={onDeactivate}
-            disabled={pending}
-            className="inline-flex h-[26px] items-center rounded-md border bg-bg-elev px-2.5 text-[11.5px] font-semibold text-danger-500 hover:bg-bg-hover disabled:opacity-60"
-            style={{
-              borderColor: 'color-mix(in oklch, var(--danger-500) 35%, var(--border))',
-            }}
-          >
+          <Button outline="red" size="xxs" onClick={onDeactivate} disabled={pending}>
             Deactivate
-          </button>
+          </Button>
         ) : (
-          <button
-            onClick={onActivate}
-            disabled={pending}
-            className="inline-flex h-[26px] items-center rounded-md border border-border bg-bg-elev px-2.5 text-[11.5px] font-semibold text-fg-strong hover:bg-bg-hover disabled:opacity-60"
-          >
+          <Button outline size="xxs" onClick={onActivate} disabled={pending}>
             Reactivate
-          </button>
+          </Button>
         )}
       </div>
     </div>
