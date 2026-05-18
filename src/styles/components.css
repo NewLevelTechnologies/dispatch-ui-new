@@ -167,15 +167,26 @@
    the row's primary identifier so the user always knows which row
    they're on even when scrolled past the right-edge columns. The thead
    corner cell needs a higher z-index than the body sticky cells so it
-   wins both axes when the user scrolls both ways. */
-.dense-table thead th:first-child,
-.dense-table tbody td:first-child {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  box-shadow: inset -1px 0 0 var(--border-soft);
+   wins both axes when the user scrolls both ways.
+
+   Gated on a container query against the card-body wrapper (see
+   `.card-body.flush:has(> .dense-table)` below, which sets
+   `container-type: inline-size`). At desktop widths the wrapper is wide
+   enough that the table doesn't scroll, so the sticky edge and its
+   border render as noise; we suppress them entirely. Threshold of
+   1023px is a proxy for "this card body probably isn't wide enough to
+   fit the table" — at tablet widths and below, scroll usually kicks in
+   and the sticky edge earns its keep. */
+@container (max-width: 1023px) {
+  .dense-table thead th:first-child,
+  .dense-table tbody td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    box-shadow: inset -1px 0 0 var(--border-soft);
+  }
+  .dense-table thead th:first-child { z-index: 3; }
 }
-.dense-table thead th:first-child { z-index: 3; }
 .dense-table tbody tr:hover td:first-child { background: var(--bg-hover); }
 .dense-table tbody tr.urgent td:first-child {
   background: color-mix(in oklch, var(--danger-500) 5%, var(--bg-elev));
@@ -193,11 +204,17 @@
 
 /* When a flush card body wraps a dense table, let the table scroll
    horizontally if it's wider than the card. Without this, the table
-   pushes the page out and breaks the layout. */
+   pushes the page out and breaks the layout.
+
+   `container-type: inline-size` establishes this element as the
+   container queried by the sticky-left rules above — when the wrapper
+   is wide enough that the table doesn't overflow, the first column
+   drops its sticky edge entirely. */
 .card-body.flush:has(> .dense-table),
 .card-body.flush:has(> table.dense-table) {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  container-type: inline-size;
 }
 
 /* ── Mobile: row-as-card layout ──────────────────────────────────── */
