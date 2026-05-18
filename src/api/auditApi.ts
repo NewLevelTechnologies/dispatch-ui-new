@@ -108,6 +108,21 @@ export const auditApi = {
     );
     return response.data;
   },
+
+  /**
+   * Tell the backend to attach IP / User-Agent to the caller's most-recent
+   * SIGN_IN_SUCCESS row. Cognito post-auth ships the row with those fields
+   * null because the Cognito Lambda trigger can't see the originating
+   * request's IP — this endpoint reads them off the first authenticated
+   * request and back-fills.
+   *
+   * Always returns 204 (including when there's no row to enrich), so
+   * fire-and-forget is safe. Call once per sign-in, on first load after
+   * the auth redirect.
+   */
+  enrichLatestSignIn: async (): Promise<void> => {
+    await apiClient.post('/audit/sign-ins/enrich-latest');
+  },
 };
 
 export default auditApi;

@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { tenantSettingsApi } from './api';
+import { tenantSettingsApi, auditApi } from './api';
 import { GlossaryProvider } from './contexts/GlossaryContext';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -70,6 +70,28 @@ function App() {
       queryClient.clear();
     }
   }, [authStatus, queryClient]);
+
+  // After a successful sign-in, back-fill IP + User-Agent onto the most
+  // recent SIGN_IN_SUCCESS audit row. Cognito's post-auth Lambda can't see
+  // the originating request, so the backend reads them from the first
+  // authenticated request instead. Fire only on the unauthenticated →
+  // authenticated transition (not on 'configuring' → 'authenticated', which
+  // is a token refresh on page reload — those rows already exist enriched).
+  // 2s delay smooths over SNS→SQS propagation lag per backend guidance.
+  const prevAuthStatus = useRef(authStatus);
+  useEffect(() => {
+    const wasUnauthenticated = prevAuthStatus.current === 'unauthenticated';
+    prevAuthStatus.current = authStatus;
+    if (wasUnauthenticated && authStatus === 'authenticated') {
+      const t = setTimeout(() => {
+        auditApi.enrichLatestSignIn().catch(() => {
+          // 204 on success, anything else is non-fatal — the row stays
+          // un-enriched but the user is signed in and the page works.
+        });
+      }, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [authStatus]);
 
   // Load tenant settings (includes glossary)
   const { data: tenantSettings, isLoading: settingsLoading, error: settingsError } = useQuery({
