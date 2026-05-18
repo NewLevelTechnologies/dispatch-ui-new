@@ -33,6 +33,10 @@ export type ActivityActionType =
   | 'MFA_RESET'
   | 'GLOBAL_SIGNOUT'
   | 'INVITATION_RESENT'
+  // Emitted by the Cognito post-authentication Lambda on every
+  // successful sign-in. UI composes the meta line ("Chrome · macOS ·
+  // 73.41.18.204") from the row's userAgent + ip fields.
+  | 'SIGN_IN_SUCCESS'
   // Ships once the Cognito Lambda triggers deploy. Payload is
   // { attemptCount, windowSeconds, firstAt, lastAt }; the meta line
   // ("5 attempts · within 2 min") is composed client-side.

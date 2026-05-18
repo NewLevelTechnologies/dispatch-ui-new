@@ -1255,7 +1255,7 @@
     "description": "People who can sign in to the app. Assign each user a role — roles determine which screens and actions they can access. Manage role permissions under Access › Roles.",
     "detail": {
       "accountActivity": "Account activity",
-      "accountActivityHelper": "Account-level events. Record edits appear on each record.",
+      "accountActivityHelper": "Sign-ins, access changes, security events. Record edits appear on each record.",
       "accountActivated": "Account activated",
       "accountCreated": "Account created",
       "accountDeactivated": "Account deactivated",

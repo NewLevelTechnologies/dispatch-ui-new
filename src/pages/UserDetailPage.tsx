@@ -5,26 +5,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
 import { userApi, dispatchRegionApi, type User, type Role } from '../api';
+import { RoleChip } from '../components/RoleChip';
+import { roleColor } from '../utils/roleColor';
 import { auditApi, type AccountActivityEvent } from '../api/auditApi';
 import { formatPhone } from '../utils/formatPhone';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/catalyst/button';
-
-// Stable per-role accent — same approach the v1.5 design uses to keep
-// the Field Supervisor / Dispatcher / Admin chips visually distinct
-// without a hand-maintained color table. Hash by role name → one of
-// nine well-spaced hues, oklch lightness/chroma chosen to read in both
-// themes. The number string is purely for stability across reloads.
-const ROLE_HUES = [25, 200, 270, 150, 85, 215, 320, 50, 240];
-function roleAccent(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
-  const hue = ROLE_HUES[Math.abs(h) % ROLE_HUES.length];
-  // 'Admin' deserves a hotter color so it pops in the chip row.
-  if (/admin/i.test(name)) return 'oklch(55% 0.18 25)';
-  return `oklch(60% 0.14 ${hue})`;
-}
 
 function formatDateShort(d: string | Date | undefined): string {
   if (!d) return '—';
@@ -312,22 +299,6 @@ function RoleStack({ roles, max = 3 }: { roles: Role[]; max?: number }) {
   );
 }
 
-function RoleChip({ name }: { name: string }) {
-  const color = roleAccent(name);
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2 py-[2px] text-[11px] font-semibold"
-      style={{
-        background: `color-mix(in oklch, ${color} 14%, var(--bg-elev))`,
-        color,
-      }}
-    >
-      <span className="size-1.5 rounded-full" style={{ background: color }} />
-      {name}
-    </span>
-  );
-}
-
 // ──────────────────────────────────────────────────────────────────
 // Roles + Regions — combined card with capabilities expander
 // ──────────────────────────────────────────────────────────────────
@@ -478,7 +449,7 @@ function CapabilityDetail({ user }: { user: User }) {
                     {sources.length > 0 && sources.length < (user.roles?.length ?? 0) && (
                       <span
                         className="rounded px-1 text-[9px] font-bold uppercase tracking-wider text-white"
-                        style={{ background: roleAccent(sources[0].name) }}
+                        style={{ background: roleColor(sources[0].name) }}
                       >
                         {sources[0].name
                           .split(' ')
@@ -651,6 +622,28 @@ function rolePayloadName(payload: AccountActivityEvent['payload']): string {
 // Round a window duration to the largest human-friendly unit. Sign-in
 // attempt windows are typically minutes; this rolls up to "Nh" if a
 // window ever grows past 60 minutes so the meta line doesn't say "73 min".
+// Cheap UA → "Browser · OS" for the sign-in meta line. Heuristic, not
+// authoritative — the value only ever appears as a sub-line under "Signed
+// in", so a wrong-but-close label is fine. Order matters: Edge UA strings
+// also contain "Chrome", iOS Chrome also contains "Safari", etc.
+function describeUserAgent(ua: string | null): string | null {
+  if (!ua) return null;
+  let browser: string | null = null;
+  if (/Edg\//.test(ua)) browser = 'Edge';
+  else if (/OPR\//.test(ua)) browser = 'Opera';
+  else if (/Firefox\//.test(ua)) browser = 'Firefox';
+  else if (/Chrome\//.test(ua)) browser = 'Chrome';
+  else if (/Safari\//.test(ua)) browser = 'Safari';
+  let os: string | null = null;
+  if (/iPhone|iPad|iOS/.test(ua)) os = /iPad/.test(ua) ? 'iPad' : 'iOS';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/Mac OS X|Macintosh/.test(ua)) os = 'macOS';
+  else if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Linux/.test(ua)) os = 'Linux';
+  const parts = [browser, os].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
+}
+
 function formatWindowSeconds(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 60) {
     return `${Math.max(1, Math.round(seconds))}s`;
@@ -691,6 +684,18 @@ function classifyEvent(event: AccountActivityEvent): {
       return { kind: 'security', text: '2FA reset' };
     case 'GLOBAL_SIGNOUT':
       return { kind: 'security', text: 'Signed out of all sessions' };
+    case 'SIGN_IN_SUCCESS': {
+      // Meta is "Browser · OS · IP" when both userAgent and ip are
+      // populated. Backend doesn't fill these in yet — render an empty
+      // meta rather than a misleading placeholder until it does.
+      const ua = describeUserAgent(event.userAgent);
+      const parts = [ua, event.ip].filter((p): p is string => !!p);
+      return {
+        kind: 'signin',
+        text: 'Signed in',
+        meta: parts.length ? parts.join(' · ') : undefined,
+      };
+    }
     case 'SIGN_IN_FAILED_RUN': {
       const p = (event.payload ?? {}) as {
         attemptCount?: unknown;
@@ -760,7 +765,7 @@ function AccountActivityCard({ userId }: { userId: string }) {
         <div>
           <div className="text-[13px] font-semibold text-fg-strong">Account activity</div>
           <div className="mt-0.5 text-[11px] text-fg-muted">
-            Account-level events. Record edits appear on each record.
+            Sign-ins, access changes, security events. Record edits appear on each record.
           </div>
         </div>
       </div>
