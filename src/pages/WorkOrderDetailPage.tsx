@@ -567,11 +567,12 @@ export default function WorkOrderDetailPage() {
           column scrolls in its own viewport. AppLayout uses min-h-svh so we have
           to compute the page height explicitly (7rem ≈ AppLayout's chrome on lg+:
           p-2 + p-10 + main pt-2/pb-2). Below lg, fall back to natural document
-          flow with the sticky header. */}
+          flow with a non-sticky header (mobile redesign is queued; the sticky
+          treatment was getting in the way more than helping). */}
       <div className="flex flex-col lg:h-[calc(100svh-7rem)] lg:overflow-hidden">
-        {/* Header — sticky on small viewports; on lg+ it's a static layout row
-            since the parent has overflow-hidden and the body grid scrolls per-column. */}
-        <div className="sticky top-0 z-10 border-b border-zinc-950/10 bg-white/95 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-zinc-900/95 lg:relative lg:shrink-0 lg:top-auto">
+        {/* Header — static block below lg, layout-row on lg+ where the parent
+            has overflow-hidden and the body grid scrolls per-column. */}
+        <div className="border-b border-zinc-950/10 bg-white px-4 py-3 dark:border-white/10 dark:bg-zinc-900 lg:shrink-0">
           {/* Back link */}
           <div className="mb-2">
             <Button plain onClick={() => navigate('/work-orders')}>
