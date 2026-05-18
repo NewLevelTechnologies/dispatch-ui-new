@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../../test/utils';
 import FilterSizesPanel from './FilterSizesPanel';
 
@@ -141,18 +141,32 @@ describe('FilterSizesPanel', () => {
     confirmSpy.mockRestore();
   });
 
-  it('reorders via the up and down arrows', async () => {
+  it('reorders rows via drag-and-drop, posting the new id order', async () => {
     mockGetAll.mockResolvedValue([
       { id: 's1', tenantId: 't', lengthIn: 16, widthIn: 20, thicknessIn: 1, sortOrder: 0, archivedAt: null, createdAt: '' },
       { id: 's2', tenantId: 't', lengthIn: 20, widthIn: 25, thicknessIn: 1, sortOrder: 1, archivedAt: null, createdAt: '' },
     ]);
     mockReorder.mockResolvedValue([]);
-    const user = userEvent.setup();
     renderWithProviders(<FilterSizesPanel />);
 
     await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
-    const upButtons = screen.getAllByRole('button', { name: /move up/i });
-    await user.click(upButtons[1]);
+
+    const firstRow = screen.getByText('16×20×1').closest('tr')!;
+    const secondRow = screen.getByText('20×25×1').closest('tr')!;
+
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: vi.fn(),
+      getData: vi.fn(),
+      types: [],
+      files: [],
+      items: [],
+    };
+
+    fireEvent.dragStart(secondRow, { dataTransfer });
+    fireEvent.dragOver(firstRow, { dataTransfer });
+    fireEvent.drop(firstRow, { dataTransfer });
 
     await waitFor(() => {
       expect(mockReorder).toHaveBeenCalledWith(['s2', 's1']);

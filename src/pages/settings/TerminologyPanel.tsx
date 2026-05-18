@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { tenantSettingsApi, glossaryApi, getApiErrorMessage, type Glossary } from '../../api';
+import {
+  tenantSettingsApi,
+  glossaryApi,
+  getApiErrorMessage,
+  type Glossary,
+} from '../../api';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { useHasCapability } from '../../hooks/useCurrentUser';
-import { Heading } from '../../components/catalyst/heading';
 import { Text } from '../../components/catalyst/text';
 import { Button } from '../../components/catalyst/button';
 import { Input } from '../../components/catalyst/input';
-import { Divider } from '../../components/catalyst/divider';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/catalyst/table';
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import { Card } from '../../components/ui/Card';
+import { SettingsPageHeader } from '../../components/settings/SettingsPageHeader';
 
 export default function TerminologyPanel() {
   const queryClient = useQueryClient();
@@ -47,10 +50,7 @@ export default function TerminologyPanel() {
       setIsEditing(false);
     },
     onError: (error: unknown) => {
-      const errorMessage = error instanceof Error && 'response' in error
-        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
-        : undefined;
-      alert(errorMessage || t('tenantSettings.messages.errorUpdateSettings'));
+      alert(getApiErrorMessage(error) || t('tenantSettings.messages.errorUpdateSettings'));
     },
   });
 
@@ -64,107 +64,149 @@ export default function TerminologyPanel() {
     }));
   };
 
-  const handleGlossaryReset = (entityCode: string) => {
-    setGlossaryCustomizations((prev) => {
-      const updated = { ...prev };
-      delete updated[entityCode];
-      return updated;
-    });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = () => {
     const cleanedGlossary = Object.fromEntries(
       Object.entries(glossaryCustomizations).filter(
-        ([, value]) => value.singular?.trim() || value.plural?.trim()
-      )
+        ([, value]) => value.singular?.trim() || value.plural?.trim(),
+      ),
     );
     updateMutation.mutate(cleanedGlossary);
   };
 
+  const handleCancel = () => {
+    setGlossaryCustomizations(settings?.glossary || {});
+    setIsEditing(false);
+  };
+
+  const handleResetToDefaults = () => {
+    setGlossaryCustomizations({});
+  };
+
   if (isLoading) {
-    return <Text className="text-zinc-500">{t('tenantSettings.messages.loadingSettings')}</Text>;
+    return <Text className="text-fg-muted">{t('tenantSettings.messages.loadingSettings')}</Text>;
   }
-
   if (error) {
-    return <Text className="text-red-600">{getApiErrorMessage(error) || t('tenantSettings.messages.errorLoadingSettings')}</Text>;
-  }
-
-  if (!isEditing) {
     return (
-      <div>
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <Heading>{t('tenantSettings.tabs.terminology')}</Heading>
-            <Text className="mt-1">{t('tenantSettings.glossary.description')}</Text>
-          </div>
-          {canEdit && <Button onClick={() => setIsEditing(true)}>{t('common.edit')}</Button>}
-        </div>
-
-        {settings?.glossary && Object.keys(settings.glossary).length > 0 ? (
-          <div>
-            <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-              {t('tenantSettings.glossary.customizedCount', { count: Object.keys(settings.glossary).length })}
-            </Text>
-            <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-              <TableHead>
-                <TableRow>
-                  <TableHeader>{t('tenantSettings.glossary.entity')}</TableHeader>
-                  <TableHeader>{t('tenantSettings.glossary.singularForm')}</TableHeader>
-                  <TableHeader>{t('tenantSettings.glossary.pluralForm')}</TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {Object.entries(settings.glossary).map(([code, entry]) => (
-                  <TableRow key={code}>
-                    <TableCell className="font-medium capitalize">{code.replace(/_/g, ' ')}</TableCell>
-                    <TableCell>{entry.singular}</TableCell>
-                    <TableCell>{entry.plural}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-            {t('tenantSettings.glossary.emptyState')}
-          </Text>
-        )}
-      </div>
+      <Text className="text-danger-500">
+        {getApiErrorMessage(error) || t('tenantSettings.messages.errorLoadingSettings')}
+      </Text>
     );
   }
 
   return (
     <div>
-      <div className="mb-6">
-        <Heading>{t('tenantSettings.tabs.terminology')}</Heading>
-        <Text className="mt-1">{t('tenantSettings.glossary.description')}</Text>
-      </div>
+      <SettingsPageHeader
+        title={t('settings.terminology.title')}
+        description={t('settings.terminology.description')}
+        editing={isEditing}
+        canEdit={canEdit}
+        onEdit={() => setIsEditing(true)}
+        onCancel={handleCancel}
+        onSave={handleSave}
+        saving={updateMutation.isPending}
+        secondary={
+          isEditing && canEdit ? (
+            <Button plain type="button" onClick={handleResetToDefaults}>
+              {t('settings.resetDefaults')}
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <form onSubmit={handleSubmit}>
-        {availableEntities && availableEntities.length > 0 ? (
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('tenantSettings.glossary.entity')}</TableHeader>
-                <TableHeader>{t('tenantSettings.glossary.singularForm')}</TableHeader>
-                <TableHeader>{t('tenantSettings.glossary.pluralForm')}</TableHeader>
-                <TableHeader className="w-16"></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+      {(() => {
+        if (!availableEntities || availableEntities.length === 0) {
+          return (
+            <Card className="overflow-hidden">
+              <div className="px-4 py-6 text-sm text-fg-muted">
+                {t('tenantSettings.glossary.loadingEntities')}
+              </div>
+            </Card>
+          );
+        }
+
+        // View mode: show only the customized entries (empty state if none).
+        if (!isEditing) {
+          const customized = availableEntities.filter((entity) => {
+            const c = glossaryCustomizations[entity.code];
+            return c?.singular?.trim() || c?.plural?.trim();
+          });
+
+          if (customized.length === 0) {
+            return (
+              <Card className="overflow-hidden">
+                <div className="px-4 py-6 text-sm text-fg-muted">
+                  {t('tenantSettings.glossary.emptyState')}
+                </div>
+              </Card>
+            );
+          }
+
+          return (
+            <Card className="overflow-hidden">
+              <div className="grid grid-cols-[1fr_minmax(220px,1.2fr)_minmax(220px,1.2fr)] border-b border-border bg-bg-elev-2 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-fg-muted">
+                <div>{t('tenantSettings.glossary.entity')}</div>
+                <div>{t('tenantSettings.glossary.singularForm')}</div>
+                <div>{t('tenantSettings.glossary.pluralForm')}</div>
+              </div>
+              <div className="divide-y divide-border-soft">
+                {customized.map((entity) => {
+                  const customization = glossaryCustomizations[entity.code];
+                  return (
+                    <div
+                      key={entity.code}
+                      className="grid grid-cols-[1fr_minmax(220px,1.2fr)_minmax(220px,1.2fr)] items-start gap-x-4 px-4 py-3"
+                    >
+                      <div>
+                        <div className="text-[13px] font-semibold text-fg-strong">
+                          {entity.defaultSingular}
+                        </div>
+                        {entity.description && (
+                          <div className="text-[11.5px] text-fg-muted mt-0.5 leading-snug">
+                            {entity.description}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-[13px] text-fg-strong pt-1">
+                        {customization?.singular?.trim() || entity.defaultSingular}
+                      </div>
+                      <div className="text-[13px] text-fg-strong pt-1">
+                        {customization?.plural?.trim() || entity.defaultPlural}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          );
+        }
+
+        // Edit mode: full list with placeholder = default
+        return (
+          <Card className="overflow-hidden">
+            <div className="grid grid-cols-[1fr_minmax(220px,1.2fr)_minmax(220px,1.2fr)] border-b border-border bg-bg-elev-2 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-fg-muted">
+              <div>{t('tenantSettings.glossary.entity')}</div>
+              <div>{t('tenantSettings.glossary.singularForm')}</div>
+              <div>{t('tenantSettings.glossary.pluralForm')}</div>
+            </div>
+            <div className="divide-y divide-border-soft">
               {availableEntities.map((entity) => {
                 const customization = glossaryCustomizations[entity.code];
-                const isCustomized = customization?.singular || customization?.plural;
                 return (
-                  <TableRow key={entity.code}>
-                    <TableCell className="font-medium">
-                      <div className="capitalize">{entity.code.replace(/_/g, ' ')}</div>
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400 font-normal mt-0.5">
-                        {entity.description}
+                  <div
+                    key={entity.code}
+                    className="grid grid-cols-[1fr_minmax(220px,1.2fr)_minmax(220px,1.2fr)] items-start gap-x-4 px-4 py-3"
+                  >
+                    <div>
+                      <div className="text-[13px] font-semibold text-fg-strong">
+                        {entity.defaultSingular}
                       </div>
-                    </TableCell>
-                    <TableCell>
+                      {entity.description && (
+                        <div className="text-[11.5px] text-fg-muted mt-0.5 leading-snug">
+                          {entity.description}
+                        </div>
+                      )}
+                    </div>
+                    <div>
                       <Input
                         name={`glossary-${entity.code}-singular`}
                         value={customization?.singular || ''}
@@ -172,10 +214,9 @@ export default function TerminologyPanel() {
                           handleGlossaryChange(entity.code, 'singular', e.target.value)
                         }
                         placeholder={entity.defaultSingular}
-                        className="h-8 text-sm"
                       />
-                    </TableCell>
-                    <TableCell>
+                    </div>
+                    <div>
                       <Input
                         name={`glossary-${entity.code}-plural`}
                         value={customization?.plural || ''}
@@ -183,47 +224,15 @@ export default function TerminologyPanel() {
                           handleGlossaryChange(entity.code, 'plural', e.target.value)
                         }
                         placeholder={entity.defaultPlural}
-                        className="h-8 text-sm"
                       />
-                    </TableCell>
-                    <TableCell>
-                      {isCustomized && (
-                        <Button
-                          type="button"
-                          plain
-                          onClick={() => handleGlossaryReset(entity.code)}
-                          className="text-xs"
-                          title={t('tenantSettings.glossary.resetToDefault')}
-                        >
-                          <ArrowPathIcon className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                  </div>
                 );
               })}
-            </TableBody>
-          </Table>
-        ) : (
-          <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-            {t('tenantSettings.glossary.loadingEntities')}
-          </Text>
-        )}
-
-        <Divider className="my-6" />
-
-        <div className="flex justify-end gap-3">
-          <Button plain type="button" onClick={() => {
-            setIsEditing(false);
-            setGlossaryCustomizations(settings?.glossary || {});
-          }}>
-            {t('common.cancel')}
-          </Button>
-          <Button type="submit" disabled={updateMutation.isPending}>
-            {updateMutation.isPending ? t('common.saving') : t('common.update')}
-          </Button>
-        </div>
-      </form>
+            </div>
+          </Card>
+        );
+      })()}
     </div>
   );
 }

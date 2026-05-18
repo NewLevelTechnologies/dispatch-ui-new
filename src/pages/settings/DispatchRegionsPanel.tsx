@@ -9,10 +9,13 @@ import { Heading } from '../../components/catalyst/heading';
 import IconButton from '../../components/IconButton';
 import { Text } from '../../components/catalyst/text';
 import { Button } from '../../components/catalyst/button';
-import { Badge } from '../../components/catalyst/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/catalyst/table';
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from '../../components/catalyst/dropdown';
-import { ChevronUpIcon, ChevronDownIcon, EllipsisVerticalIcon } from '@heroicons/react/16/solid';
+import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
+import { Pill } from '../../components/ui/Pill';
+import { Card, CardBody } from '../../components/ui/Card';
+import { DenseTable, DenseTHead, DenseRow } from '../../components/ui/DenseTable';
+import { SettingsListFooter } from '../../components/settings/SettingsListFooter';
+import { DragHandle } from '../../components/settings/DragHandle';
 
 export default function DispatchRegionsPanel() {
   const queryClient = useQueryClient();
@@ -23,6 +26,8 @@ export default function DispatchRegionsPanel() {
 
   const [selectedRegion, setSelectedRegion] = useState<DispatchRegion | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const { data: regions, isLoading, error } = useQuery({
     queryKey: ['dispatch-regions'],
@@ -85,19 +90,11 @@ export default function DispatchRegionsPanel() {
     ? Math.max(...sorted.map((r) => r.sortOrder)) + 1
     : 0;
 
-  const moveUp = (region: DispatchRegion) => {
-    const i = activeSorted.findIndex((r) => r.id === region.id);
-    if (i <= 0) return;
+  const performReorder = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= activeSorted.length || to >= activeSorted.length) return;
     const reordered = [...activeSorted];
-    [reordered[i], reordered[i - 1]] = [reordered[i - 1], reordered[i]];
-    reorderMutation.mutate(reordered.map((r) => r.id));
-  };
-
-  const moveDown = (region: DispatchRegion) => {
-    const i = activeSorted.findIndex((r) => r.id === region.id);
-    if (i < 0 || i >= activeSorted.length - 1) return;
-    const reordered = [...activeSorted];
-    [reordered[i], reordered[i + 1]] = [reordered[i + 1], reordered[i]];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
     reorderMutation.mutate(reordered.map((r) => r.id));
   };
 
@@ -111,7 +108,7 @@ export default function DispatchRegionsPanel() {
           </Text>
         </div>
         {canEdit && (
-          <Button onClick={handleAdd}>
+          <Button color="accent" onClick={handleAdd}>
             {t('common.actions.add', { entity: `${getName('dispatch')} ${t('entities.region')}` })}
           </Button>
         )}
@@ -126,105 +123,122 @@ export default function DispatchRegionsPanel() {
       {regions && regions.length === 0 && <Text>{t('dispatchRegions.empty', { dispatch: getName('dispatch') })}</Text>}
 
       {sorted.length > 0 && (
-        <div>
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('dispatchRegions.table.name')}</TableHeader>
-                <TableHeader>{t('dispatchRegions.table.abbreviation')}</TableHeader>
-                <TableHeader>{t('dispatchRegions.table.state')}</TableHeader>
-                <TableHeader className="w-24"></TableHeader>
-                <TableHeader>{t('dispatchRegions.table.status')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sorted.map((region) => {
-                const activeIndex = region.isActive
-                  ? activeSorted.findIndex((r) => r.id === region.id)
-                  : -1;
-                const canMoveUp = activeIndex > 0;
-                const canMoveDown = activeIndex >= 0 && activeIndex < activeSorted.length - 1;
-                return (
-                <TableRow key={region.id}>
-                  <TableCell className="font-medium">
-                    {region.name}
-                    {region.description && (
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400 font-normal mt-0.5">
-                        {region.description}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-zinc-500">{region.abbreviation}</TableCell>
-                  <TableCell className="text-zinc-500">{region.state || '-'}</TableCell>
-                  <TableCell>
-                    {canEdit && region.isActive && (
-                      <div className="flex items-center gap-0.5">
-                        <IconButton
-                          onClick={() => moveUp(region)}
-                          disabled={!canMoveUp || reorderMutation.isPending}
-                          title={t('common.moveUp')}
-                          aria-label={t('common.moveUp')}
-                        >
-                          <ChevronUpIcon className="h-4 w-4" />
-                        </IconButton>
-                        <IconButton
-                          onClick={() => moveDown(region)}
-                          disabled={!canMoveDown || reorderMutation.isPending}
-                          title={t('common.moveDown')}
-                          aria-label={t('common.moveDown')}
-                        >
-                          <ChevronDownIcon className="h-4 w-4" />
-                        </IconButton>
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {region.isActive ? (
-                      /* eslint-disable-next-line i18next/no-literal-string */
-                      <Badge color="lime">Active</Badge>
-                    ) : (
-                      /* eslint-disable-next-line i18next/no-literal-string */
-                      <Badge color="zinc">Inactive</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5 flex items-center justify-end">
-                      {canEdit && (
-                        <Dropdown>
-                          <DropdownButton plain aria-label={t('common.moreOptions')}>
-                            <EllipsisVerticalIcon />
-                          </DropdownButton>
-                          <DropdownMenu anchor="bottom end">
-                            <DropdownItem onClick={() => handleEdit(region)}>
-                              {t('common.edit')}
-                            </DropdownItem>
-                            {region.isActive ? (
-                              <DropdownItem onClick={() => handleDelete(region)}>
-                                {t('dispatchRegions.actions.deactivate')}
+        <Card>
+          <CardBody flush>
+            <DenseTable>
+              <DenseTHead>
+                <tr>
+                  <th style={{ width: 32 }}></th>
+                  <th>{t('dispatchRegions.table.name')}</th>
+                  <th>{t('dispatchRegions.table.abbreviation')}</th>
+                  <th>{t('dispatchRegions.table.state')}</th>
+                  <th>{t('dispatchRegions.table.status')}</th>
+                  <th style={{ width: 40 }}></th>
+                </tr>
+              </DenseTHead>
+              <tbody>
+                {sorted.map((region) => {
+                  const activeIndex = region.isActive
+                    ? activeSorted.findIndex((r) => r.id === region.id)
+                    : -1;
+                  const draggable = canEdit && region.isActive;
+                  const isDragging = draggable && dragIndex === activeIndex;
+                  const isDragOver =
+                    draggable && dragOverIndex === activeIndex && dragIndex !== null && dragIndex !== activeIndex;
+                  return (
+                    <DenseRow
+                      key={region.id}
+                      draggable={draggable}
+                      onDragStart={(e: React.DragEvent) => {
+                        if (!draggable) return;
+                        setDragIndex(activeIndex);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragOver={(e: React.DragEvent) => {
+                        if (dragIndex === null || activeIndex < 0) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        if (dragOverIndex !== activeIndex) setDragOverIndex(activeIndex);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverIndex === activeIndex) setDragOverIndex(null);
+                      }}
+                      onDrop={(e: React.DragEvent) => {
+                        e.preventDefault();
+                        if (dragIndex !== null && activeIndex >= 0) performReorder(dragIndex, activeIndex);
+                        setDragIndex(null);
+                        setDragOverIndex(null);
+                      }}
+                      onDragEnd={() => {
+                        setDragIndex(null);
+                        setDragOverIndex(null);
+                      }}
+                      className={
+                        [
+                          !region.isActive && 'opacity-55',
+                          isDragging && 'opacity-50',
+                          isDragOver && 'outline outline-2 outline-accent-500/40 outline-offset-[-2px]',
+                        ].filter(Boolean).join(' ')
+                      }
+                    >
+                      <td>{draggable && <DragHandle />}</td>
+                      <td>
+                        <div className="strong">{region.name}</div>
+                        {region.description && (
+                          <div className="muted mt-0.5">{region.description}</div>
+                        )}
+                      </td>
+                      <td className="muted">{region.abbreviation}</td>
+                      <td className="muted">{region.state || '—'}</td>
+                      <td>
+                        {region.isActive ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-success-500" />
+                            <span>{t('common.active')}</span>
+                          </span>
+                        ) : (
+                          <Pill tone="neutral">{t('common.inactive')}</Pill>
+                        )}
+                      </td>
+                      <td className="right">
+                        {canEdit && (
+                          <Dropdown>
+                            <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                              <EllipsisVerticalIcon className="size-4" />
+                            </DropdownButton>
+                            <DropdownMenu anchor="bottom end">
+                              <DropdownItem onClick={() => handleEdit(region)}>
+                                {t('common.edit')}
                               </DropdownItem>
-                            ) : (
-                              <DropdownItem onClick={() => handleReactivate(region)}>
-                                {t('dispatchRegions.actions.reactivate')}
-                              </DropdownItem>
-                            )}
-                          </DropdownMenu>
-                        </Dropdown>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-
-          <div className="mt-2 flex items-center justify-between text-sm">
-            <Text>
-              {t('common.show')} {sorted.length} {getName('dispatch').toLowerCase()} {t('entities.regions').toLowerCase()} ({sorted.filter(r => r.isActive).length} {t('common.active').toLowerCase()})
-            </Text>
-          </div>
-        </div>
+                              {region.isActive ? (
+                                <DropdownItem onClick={() => handleDelete(region)}>
+                                  {t('dispatchRegions.actions.deactivate')}
+                                </DropdownItem>
+                              ) : (
+                                <DropdownItem onClick={() => handleReactivate(region)}>
+                                  {t('dispatchRegions.actions.reactivate')}
+                                </DropdownItem>
+                              )}
+                            </DropdownMenu>
+                          </Dropdown>
+                        )}
+                      </td>
+                    </DenseRow>
+                  );
+                })}
+              </tbody>
+            </DenseTable>
+          </CardBody>
+          <SettingsListFooter
+            count={sorted.length}
+            noun={`${getName('dispatch').toLowerCase()} ${t('entities.regions').toLowerCase()}`}
+            extra={(() => {
+              const inactive = sorted.length - activeSorted.length;
+              if (inactive === 0) return null;
+              return <span>{t('dispatchRegions.breakdown.inactive', { count: inactive })}</span>;
+            })()}
+          />
+        </Card>
       )}
 
       <DispatchRegionFormDialog

@@ -1,8 +1,8 @@
 import { useState, useDeferredValue } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import { useGlossary } from '../contexts/GlossaryContext';
 import {
   equipmentApi,
@@ -17,13 +17,20 @@ import {
 import AppLayout from '../components/AppLayout';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
-import { Heading } from '../components/catalyst/heading';
+import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { Button } from '../components/catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
+import { PageHead } from '../components/ui/PageHead';
+import { Card, CardBody } from '../components/ui/Card';
+import { Pill } from '../components/ui/Pill';
+import { ViewTabs } from '../components/ui/Tabs';
+import {
+  DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
+} from '../components/ui/DenseTable';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
-import { Input, InputGroup } from '../components/catalyst/input';
-import { Select } from '../components/catalyst/select';
+import IconButton from '../components/IconButton';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListFooter } from '../components/ui/ListFooter';
 
 const PAGE_SIZE = 50;
 
@@ -40,7 +47,17 @@ export default function EquipmentPage() {
   // Empty string = "All" (both ACTIVE and RETIRED). Default lands on ACTIVE so
   // retired equipment doesn't crowd the day-to-day view.
   const [statusFilter, setStatusFilter] = useState<EquipmentStatus | ''>(EquipmentStatus.ACTIVE);
-  const [page, setPage] = useState(0); // 0-indexed
+  // Page lives in the URL (1-based) so middle-click on pagination opens the
+  // right page in a new tab. Internal `page` here stays 0-based to match the
+  // backend Spring Page contract.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = Math.max(0, parseInt(searchParams.get('page') ?? '1', 10) - 1);
+  const setPage = (next: number) => {
+    const params = new URLSearchParams(searchParams);
+    if (next <= 0) params.delete('page');
+    else params.set('page', String(next + 1));
+    setSearchParams(params);
+  };
   const [sortBy] = useState<EquipmentSortField>('name');
   const [sortDir] = useState<EquipmentSortDirection>('asc');
 
@@ -120,11 +137,11 @@ export default function EquipmentPage() {
 
   const getStatusBadge = (status: EquipmentStatus | undefined) => {
     if (status === EquipmentStatus.RETIRED) {
-      return <Badge color="zinc">{t('equipment.status.retired')}</Badge>;
+      return <Pill tone="neutral">{t('equipment.status.retired')}</Pill>;
     }
     // Default to active when the backend omits status (older payloads). Most
     // equipment is active, so this avoids a misleading "Retired" badge.
-    return <Badge color="lime">{t('equipment.status.active')}</Badge>;
+    return <Pill tone="success">{t('equipment.status.active')}</Pill>;
   };
 
   const formatTypeCategory = (item: EquipmentSummary) => {
@@ -140,244 +157,267 @@ export default function EquipmentPage() {
   };
 
   // Compose the address line from the discrete fields the backend returns.
-  // Pieces are joined with ", " then ` ${zip}` so missing trailing fields don't
-  // leave dangling commas.
+  // Street + city run through titleCaseAddress (db is uppercase); state and
+  // zip stay raw. "City, ST ZIP" tail uses a space between state and zip.
   const formatAddress = (item: EquipmentSummary): string => {
     const parts: string[] = [];
-    if (item.streetAddress) parts.push(item.streetAddress);
-    const cityState = [item.city, item.state].filter(Boolean).join(', ');
+    if (item.streetAddress) parts.push(titleCaseAddress(item.streetAddress));
+    const stateZip = [item.state, item.zipCode].filter(Boolean).join(' ');
+    const cityState = [titleCaseAddress(item.city), stateZip].filter(Boolean).join(', ');
     if (cityState) parts.push(cityState);
-    const tail = parts.join(', ');
-    return item.zipCode ? `${tail} ${item.zipCode}`.trim() : tail;
+    return parts.join(', ');
   };
+
+  const statusViewTabs = [
+    { id: EquipmentStatus.ACTIVE, label: t('equipment.status.active') },
+    { id: EquipmentStatus.RETIRED, label: t('equipment.status.retired') },
+    { id: '', label: t('equipment.status.all') },
+  ];
+
+  const equipmentNoun = totalElements === 1
+    ? getName('equipment').toLowerCase()
+    : getName('equipment', true).toLowerCase();
+  const subtitle = totalElements > 0
+    ? (statusFilter === EquipmentStatus.ACTIVE
+        ? `${totalElements.toLocaleString()} ${t('equipment.status.active').toLowerCase()} ${equipmentNoun}`
+        : statusFilter === EquipmentStatus.RETIRED
+          ? `${totalElements.toLocaleString()} ${t('equipment.status.retired').toLowerCase()} ${equipmentNoun}`
+          : `${totalElements.toLocaleString()} ${equipmentNoun}`)
+    : null;
+
+  const pageHref = (oneBased: number): string => {
+    const next = new URLSearchParams(searchParams);
+    if (oneBased <= 1) next.delete('page');
+    else next.set('page', String(oneBased));
+    const qs = next.toString();
+    return qs ? `?${qs}` : '?';
+  };
+  const showingStart = totalElements === 0 ? 0 : page * PAGE_SIZE + 1;
+  const showingEnd = Math.min((page + 1) * PAGE_SIZE, totalElements);
 
   return (
     <AppLayout>
-      <div className="flex items-center justify-between gap-4">
-        <Heading>{getName('equipment', true)}</Heading>
-        <Button onClick={handleAdd}>
-          {t('common.actions.add', { entity: getName('equipment') })}
-        </Button>
-      </div>
+      <div>
+        <PageHead
+          title={getName('equipment', true)}
+          sub={subtitle}
+          actions={
+            <Button color="accent" onClick={handleAdd}>
+              {t('common.actions.add', { entity: getName('equipment') })}
+            </Button>
+          }
+        />
 
-      {/* Filters */}
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <InputGroup className="flex-1 min-w-64 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
+        <ListToolbar
+          search={
+            <ListSearch
+              placeholder={t('equipment.search.placeholder')}
+              value={searchQuery}
+              onChange={(value) => {
+                setSearchQuery(value);
+                setPage(0);
+              }}
+            />
+          }
+        >
+          <FilterChipListbox
+            label={t('equipment.form.type')}
+            ariaLabel={t('equipment.form.type')}
+            value={typeFilter || null}
+            displayValue={typeFilter ? equipmentTypes.find((tx) => tx.id === typeFilter)?.name ?? null : null}
+            resetLabel={t('equipment.filter.allTypes')}
+            onChange={(id) => {
+              setTypeFilter(id ?? '');
+              setCategoryFilter('');
               setPage(0);
             }}
-          />
-        </InputGroup>
+            onClear={() => {
+              setTypeFilter('');
+              setCategoryFilter('');
+              setPage(0);
+            }}
+          >
+            {equipmentTypes.map((tx) => (
+              <ChipListboxOption key={tx.id} value={tx.id}>{tx.name}</ChipListboxOption>
+            ))}
+          </FilterChipListbox>
 
-        <Select
-          value={typeFilter}
-          onChange={(e) => {
-            setTypeFilter(e.target.value);
-            setCategoryFilter('');
-            setPage(0);
-          }}
-          className="max-w-48"
-        >
-          <option value="">{t('equipment.filter.allTypes')}</option>
-          {equipmentTypes.map((type) => (
-            <option key={type.id} value={type.id}>
-              {type.name}
-            </option>
-          ))}
-        </Select>
+          {/* Category chip only appears once a type is chosen — categories
+              are scoped to a type, so the picker is meaningless without one. */}
+          {typeFilter && (
+            <FilterChipListbox
+              label={t('equipment.form.category')}
+              ariaLabel={t('equipment.form.category')}
+              value={categoryFilter || null}
+              displayValue={categoryFilter ? equipmentCategories.find((c) => c.id === categoryFilter)?.name ?? null : null}
+              resetLabel={t('equipment.filter.allCategories')}
+              onChange={(id) => {
+                setCategoryFilter(id ?? '');
+                setPage(0);
+              }}
+              onClear={() => {
+                setCategoryFilter('');
+                setPage(0);
+              }}
+            >
+              {equipmentCategories.map((cat) => (
+                <ChipListboxOption key={cat.id} value={cat.id}>{cat.name}</ChipListboxOption>
+              ))}
+            </FilterChipListbox>
+          )}
+        </ListToolbar>
 
-        <Select
-          value={categoryFilter}
-          onChange={(e) => {
-            setCategoryFilter(e.target.value);
-            setPage(0);
-          }}
-          disabled={!typeFilter}
-          className="max-w-48"
-        >
-          <option value="">{t('equipment.filter.allCategories')}</option>
-          {equipmentCategories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
-          ))}
-        </Select>
-
-        <Select
+        <ViewTabs
+          className="mb-3"
           value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value as EquipmentStatus | '');
+          onChange={(id) => {
+            setStatusFilter(id as EquipmentStatus | '');
             setPage(0);
           }}
-          className="max-w-36"
-          aria-label={t('common.form.status')}
-        >
-          <option value={EquipmentStatus.ACTIVE}>{t('equipment.status.active')}</option>
-          <option value={EquipmentStatus.RETIRED}>{t('equipment.status.retired')}</option>
-          <option value="">{t('equipment.status.all')}</option>
-        </Select>
+          tabs={statusViewTabs}
+        />
 
-        {totalElements > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400 ml-auto">
-            {t('common.pagination.showing', {
-              start: page * PAGE_SIZE + 1,
-              end: Math.min((page + 1) * PAGE_SIZE, totalElements),
-              total: totalElements,
-            })}
-          </div>
+        {error && (
+          <Card className="border-danger-500/40 bg-danger-100/40">
+            <CardBody>
+              <p className="text-[12.5px] text-danger-500">
+                {t('common.actions.errorLoading', { entities: getName('equipment', true) })}: {(error as Error).message}
+              </p>
+            </CardBody>
+          </Card>
+        )}
+
+        {isLoading ? (
+          <Card>
+            <CardBody>
+              <p className="text-center text-[12.5px] text-fg-muted">
+                {t('common.actions.loading', { entities: getName('equipment', true) })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : equipment.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-[12.5px] text-fg-muted">
+                {deferredSearch || typeFilter || categoryFilter
+                  ? t('common.actions.noMatchSearch', { entities: getName('equipment', true) })
+                  : t('common.actions.notFound', { entities: getName('equipment', true) })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : (
+          <Card>
+            <CardBody flush>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{t('common.form.name')}</th>
+                    <th>{getName('service_location')}</th>
+                    <th>{t('equipment.table.type')}</th>
+                    <th>{t('equipment.table.makeModel')}</th>
+                    <th>{t('equipment.form.serialNumber')}</th>
+                    <th>{t('equipment.form.locationOnSite')}</th>
+                    <th>{t('common.form.status')}</th>
+                    <th></th>
+                  </tr>
+                </DenseTHead>
+                <tbody>
+                  {equipment.map((item) => (
+                    <DenseRow key={item.id}>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <RouterLink to={`/equipment/${item.id}`}>
+                            <EquipmentThumbnail
+                              url={item.profileImageUrl}
+                              name={item.name}
+                              sizeClass="size-12"
+                              fit="contain"
+                            />
+                          </RouterLink>
+                          <CellStack>
+                            <CellTop>
+                              <RouterLink
+                                to={`/equipment/${item.id}`}
+                                className="hover:text-accent-500 hover:underline"
+                              >
+                                {item.name}
+                              </RouterLink>
+                            </CellTop>
+                            {item.parentId && item.parentName && (
+                              <CellSub>
+                                <RouterLink
+                                  to={`/equipment/${item.parentId}`}
+                                  className="hover:text-accent-500 hover:underline"
+                                >
+                                  {t('equipment.table.componentOf', {
+                                    entity: getName('equipment_component'),
+                                    parent: item.parentName,
+                                  })}
+                                </RouterLink>
+                              </CellSub>
+                            )}
+                          </CellStack>
+                        </div>
+                      </td>
+                      <td>
+                        {item.serviceLocationId ? (
+                          <RouterLink
+                            to={`/service-locations/${item.serviceLocationId}`}
+                            className="block hover:text-accent-500"
+                          >
+                            <CellStack>
+                              <CellTop>{item.serviceLocationName || formatAddress(item) || '-'}</CellTop>
+                              <CellSub>
+                                {[
+                                  item.serviceLocationName ? formatAddress(item) : null,
+                                  item.customerName,
+                                ].filter(Boolean).join(' · ')}
+                              </CellSub>
+                            </CellStack>
+                          </RouterLink>
+                        ) : (
+                          <span className="muted">-</span>
+                        )}
+                      </td>
+                      <td>{formatTypeCategory(item)}</td>
+                      <td>{formatMakeModel(item)}</td>
+                      <td>{item.serialNumber || '-'}</td>
+                      <td>{item.locationOnSite || '-'}</td>
+                      <td>{getStatusBadge(item.status)}</td>
+                      <td>
+                        <Dropdown>
+                          <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                            <EllipsisVerticalIcon className="size-4" />
+                          </DropdownButton>
+                          <DropdownMenu anchor="bottom end">
+                            <DropdownItem onClick={() => handleEdit(item)}>
+                              <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                            </DropdownItem>
+                            <DropdownItem onClick={() => handleDelete(item)}>
+                              <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                            </DropdownItem>
+                          </DropdownMenu>
+                        </Dropdown>
+                      </td>
+                    </DenseRow>
+                  ))}
+                </tbody>
+              </DenseTable>
+
+              <ListFooter
+                page={page + 1}
+                totalPages={totalPages}
+                pageHref={pageHref}
+                left={t('common.pagination.showing', {
+                  start: showingStart,
+                  end: showingEnd,
+                  total: totalElements.toLocaleString(),
+                })}
+              />
+            </CardBody>
+          </Card>
         )}
       </div>
-
-      {error && (
-        <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-          <p className="text-sm text-red-800 dark:text-red-400">
-            {t('common.actions.errorLoading', { entities: getName('equipment', true) })}: {(error as Error).message}
-          </p>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.loading', { entities: getName('equipment', true) })}
-          </p>
-        </div>
-      ) : equipment.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {deferredSearch || typeFilter || categoryFilter
-              ? t('common.actions.noMatchSearch', { entities: getName('equipment', true) })
-              : t('common.actions.notFound', { entities: getName('equipment', true) })}
-          </p>
-        </div>
-      ) : (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('common.form.name')}</TableHeader>
-                <TableHeader>{getName('service_location')}</TableHeader>
-                <TableHeader>{t('equipment.table.type')}</TableHeader>
-                <TableHeader>{t('equipment.table.makeModel')}</TableHeader>
-                <TableHeader>{t('equipment.form.serialNumber')}</TableHeader>
-                <TableHeader>{t('equipment.form.locationOnSite')}</TableHeader>
-                <TableHeader>{t('common.form.status')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {equipment.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <RouterLink
-                        to={`/equipment/${item.id}`}
-                        className="text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
-                      >
-                        <EquipmentThumbnail
-                          url={item.profileImageUrl}
-                          name={item.name}
-                          sizeClass="size-12"
-                          fit="contain"
-                        />
-                      </RouterLink>
-                      <div className="flex min-w-0 flex-col">
-                        <RouterLink
-                          to={`/equipment/${item.id}`}
-                          className="truncate text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
-                        >
-                          {item.name}
-                        </RouterLink>
-                        {item.parentId && item.parentName && (
-                          <RouterLink
-                            to={`/equipment/${item.parentId}`}
-                            className="truncate text-xs text-zinc-500 hover:text-blue-600 hover:underline dark:text-zinc-500 dark:hover:text-blue-400"
-                          >
-                            {t('equipment.table.componentOf', {
-                              entity: getName('equipment_component'),
-                              parent: item.parentName,
-                            })}
-                          </RouterLink>
-                        )}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {item.serviceLocationId ? (
-                      <RouterLink
-                        to={`/service-locations/${item.serviceLocationId}`}
-                        className="flex flex-col text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
-                      >
-                        <span>{item.serviceLocationName || formatAddress(item) || '-'}</span>
-                        <span className="text-xs text-zinc-500 dark:text-zinc-500">
-                          {[
-                            item.serviceLocationName ? formatAddress(item) : null,
-                            item.customerName,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </span>
-                      </RouterLink>
-                    ) : (
-                      <span>-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{formatTypeCategory(item)}</TableCell>
-                  <TableCell>{formatMakeModel(item)}</TableCell>
-                  <TableCell>{item.serialNumber || '-'}</TableCell>
-                  <TableCell>{item.locationOnSite || '-'}</TableCell>
-                  <TableCell>{getStatusBadge(item.status)}</TableCell>
-                  <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                      <Dropdown>
-                        <DropdownButton plain aria-label={t('common.moreOptions')}>
-                          <EllipsisVerticalIcon className="size-5" />
-                        </DropdownButton>
-                        <DropdownMenu anchor="bottom end">
-                          <DropdownItem onClick={() => handleEdit(item)}>
-                            <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handleDelete(item)}>
-                            <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          {totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <Button
-                plain
-                disabled={page === 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                {t('common.pagination.previous')}
-              </Button>
-              <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                {t('common.pagination.pageOf', { page: page + 1, total: totalPages })}
-              </span>
-              <Button
-                plain
-                disabled={page >= totalPages - 1}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                {t('common.pagination.next')}
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
 
       <EquipmentFormDialog
         isOpen={isDialogOpen}

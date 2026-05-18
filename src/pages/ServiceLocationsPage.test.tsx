@@ -132,22 +132,24 @@ describe('ServiceLocationsPage', () => {
 
   it('filters locations by status', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
-    const user = userEvent.setup();
 
-    renderWithProviders(<ServiceLocationsPage />);
+    // URL drives the filter; render with ?status=ACTIVE to verify hydration.
+    renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?status=ACTIVE' });
 
     await waitFor(() => {
       expect(screen.getByText('Main Office')).toBeInTheDocument();
     });
 
-    // Filter to ACTIVE only
-    const activeButton = screen.getByRole('button', { name: /^active$/i });
-    await user.click(activeButton);
+    const activeTab = screen.getByRole('tab', { name: /^active$/i });
+    expect(activeTab).toHaveAttribute('aria-selected', 'true');
 
-    // Button should show as selected
-    await waitFor(() => {
-      expect(activeButton).toHaveClass('font-semibold');
-    });
+    // And the list query was issued with status=ACTIVE
+    const listCalls = vi.mocked(apiClient.get).mock.calls.filter(
+      ([url]) => url === '/service-locations'
+    );
+    expect(
+      listCalls.some(([, opts]) => (opts as { params?: { status?: string } } | undefined)?.params?.status === 'ACTIVE')
+    ).toBe(true);
   });
 
   it('searches locations by name', async () => {
@@ -264,90 +266,56 @@ describe('ServiceLocationsPage', () => {
 
   it('filters locations by inactive status', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
-    const user = userEvent.setup();
 
-    renderWithProviders(<ServiceLocationsPage />);
+    renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?status=INACTIVE' });
 
     await waitFor(() => {
       expect(screen.getByText('Main Office')).toBeInTheDocument();
     });
 
-    // Filter to INACTIVE only
-    const inactiveButton = screen.getByRole('button', { name: /^inactive$/i });
-    await user.click(inactiveButton);
-
-    // Button should show as selected
-    await waitFor(() => {
-      expect(inactiveButton).toHaveClass('font-semibold');
-    });
+    const inactiveTab = screen.getByRole('tab', { name: /^inactive$/i });
+    expect(inactiveTab).toHaveAttribute('aria-selected', 'true');
   });
 
   it('filters locations by closed status', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
-    const user = userEvent.setup();
 
-    renderWithProviders(<ServiceLocationsPage />);
+    renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?status=CLOSED' });
 
     await waitFor(() => {
       expect(screen.getByText('Main Office')).toBeInTheDocument();
     });
 
-    // Filter to CLOSED only
-    const closedButton = screen.getByRole('button', { name: /^closed$/i });
-    await user.click(closedButton);
-
-    // Button should show as selected
-    await waitFor(() => {
-      expect(closedButton).toHaveClass('font-semibold');
-    });
+    const closedTab = screen.getByRole('tab', { name: /^closed$/i });
+    expect(closedTab).toHaveAttribute('aria-selected', 'true');
   });
 
   it('displays filtered count when filter is active', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
-    const user = userEvent.setup();
 
-    renderWithProviders(<ServiceLocationsPage />);
+    renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?status=ACTIVE' });
 
     await waitFor(() => {
-      expect(screen.getByText('2 service locations')).toBeInTheDocument();
+      // Subtitle reflects the filtered set: "2 active service locations".
+      expect(screen.getByText(/2 active service locations/i)).toBeInTheDocument();
     });
 
-    // Filter to ACTIVE only
-    const activeButton = screen.getByRole('button', { name: /^active$/i });
-    await user.click(activeButton);
-
-    // Button should show as selected
-    await waitFor(() => {
-      expect(activeButton).toHaveClass('font-semibold');
-    });
+    const activeTab = screen.getByRole('tab', { name: /^active$/i });
+    expect(activeTab).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('resets filter when "all" button is clicked', async () => {
+  it('resets filter when "all" tab is selected by default', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
-    const user = userEvent.setup();
 
+    // No status param → "All Statuses" is the active tab
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Main Office')).toBeInTheDocument();
     });
 
-    // Filter to ACTIVE only
-    const activeButton = screen.getByRole('button', { name: /^active$/i });
-    await user.click(activeButton);
-
-    await waitFor(() => {
-      expect(activeButton).toHaveClass('font-semibold');
-    });
-
-    // Reset filter
-    const allButton = screen.getByRole('button', { name: /all statuses/i });
-    await user.click(allButton);
-
-    // All button should now be selected
-    await waitFor(() => {
-      expect(allButton).toHaveClass('font-semibold');
-    });
+    const allTab = screen.getByRole('tab', { name: /all statuses/i });
+    expect(allTab).toHaveAttribute('aria-selected', 'true');
   });
 
   it('displays "add first" button in empty state', async () => {

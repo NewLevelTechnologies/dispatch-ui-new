@@ -1,18 +1,24 @@
-/* eslint-disable i18next/no-literal-string */
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { notificationTemplateApi, getApiErrorMessage, type NotificationTemplateListItem, type NotificationTemplate } from '../../api';
+import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import {
+  notificationTemplateApi,
+  getApiErrorMessage,
+  type NotificationTemplateListItem,
+  type NotificationTemplate,
+} from '../../api';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import NotificationTemplateEditor from '../../components/NotificationTemplateEditor';
 import { Heading } from '../../components/catalyst/heading';
 import { Text } from '../../components/catalyst/text';
-import { Button } from '../../components/catalyst/button';
-import { Badge } from '../../components/catalyst/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/catalyst/table';
-import { EnvelopeIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
+import { EnvelopeIcon, ChatBubbleLeftIcon } from '@heroicons/react/24/outline';
+import { Pill } from '../../components/ui/Pill';
+import { Card, CardBody } from '../../components/ui/Card';
+import { DenseTable, DenseTHead, DenseRow } from '../../components/ui/DenseTable';
+import { SettingsListFooter } from '../../components/settings/SettingsListFooter';
 
 export default function NotificationTemplatesPanel() {
-  const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const canView = useHasCapability('VIEW_SETTINGS');
   const canEdit = useHasCapability('EDIT_SETTINGS');
   const [selectedTemplate, setSelectedTemplate] = useState<NotificationTemplate | null>(null);
@@ -24,21 +30,6 @@ export default function NotificationTemplatesPanel() {
     enabled: canView,
   });
 
-  const revertMutation = useMutation({
-    mutationFn: (id: string) => notificationTemplateApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notification-templates'] });
-      setIsEditorOpen(false);
-      setSelectedTemplate(null);
-    },
-    onError: (error: unknown) => {
-      const errorMessage = error instanceof Error && 'response' in error
-        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
-        : undefined;
-      alert(errorMessage || 'Failed to revert template to default');
-    },
-  });
-
   const handleCustomize = async (template: NotificationTemplateListItem) => {
     try {
       const fullTemplate = await notificationTemplateApi.getById(template.id);
@@ -46,17 +37,7 @@ export default function NotificationTemplatesPanel() {
       setIsEditorOpen(true);
     } catch (err) {
       console.error('Failed to load template details:', err);
-      alert('Failed to load template details');
-    }
-  };
-
-  const handleRevertToDefault = (template: NotificationTemplateListItem) => {
-    if (
-      window.confirm(
-        `Are you sure you want to revert "${template.displayName}" to the system default? Your customizations will be lost.`
-      )
-    ) {
-      revertMutation.mutate(template.id);
+      alert(t('settings.notificationTemplates.errorLoadDetail'));
     }
   };
 
@@ -67,77 +48,94 @@ export default function NotificationTemplatesPanel() {
 
   return (
     <div>
-      <Heading>Notification Templates</Heading>
-      <Text className="mt-1 mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-        Customize email and SMS notification templates for your organization. Templates use Mustache syntax for variable substitution.
-      </Text>
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <Heading>{t('settings.nav.notificationTemplates')}</Heading>
+          <Text className="mt-1 text-sm text-fg-muted max-w-3xl">
+            {t('settings.notificationTemplates.description')}
+          </Text>
+        </div>
+      </div>
 
-      {isLoading && <Text>Loading templates...</Text>}
-      {error && <Text className="text-red-600">{getApiErrorMessage(error) || 'Failed to load notification templates.'}</Text>}
-      {templates && templates.length === 0 && <Text>No notification templates found.</Text>}
+      {isLoading && <Text>{t('settings.notificationTemplates.loading')}</Text>}
+      {error && (
+        <Text className="text-danger-500">
+          {getApiErrorMessage(error) || t('settings.notificationTemplates.errorLoad')}
+        </Text>
+      )}
+      {templates && templates.length === 0 && <Text>{t('settings.notificationTemplates.empty')}</Text>}
 
       {templates && templates.length > 0 && (
-        <div>
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>Template</TableHeader>
-                <TableHeader>Channel</TableHeader>
-                <TableHeader>Subject</TableHeader>
-                <TableHeader>Status</TableHeader>
-                <TableHeader>Version</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {templates.map((template) => (
-                <TableRow key={template.id}>
-                  <TableCell className="font-medium">{template.displayName}</TableCell>
-                  <TableCell className="text-zinc-500">
-                    {template.channel === 'EMAIL' ? (
-                      <>
-                        <EnvelopeIcon className="inline h-4 w-4 mr-1.5" />
-                        Email
-                      </>
-                    ) : (
-                      <>
-                        <DevicePhoneMobileIcon className="inline h-4 w-4 mr-1.5" />
-                        SMS
-                      </>
-                    )}
-                  </TableCell>
-                  <TableCell className="max-w-md truncate text-zinc-500">{template.subject || '-'}</TableCell>
-                  <TableCell>
-                    {template.isSystemTemplate ? (
-                      <Badge color="zinc">System Default</Badge>
-                    ) : (
-                      <Badge color="blue">Customized</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-zinc-500">v{template.version}</TableCell>
-                  <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5 flex items-center justify-end gap-2">
+        <Card>
+          <CardBody flush>
+            <DenseTable>
+              <DenseTHead>
+                <tr>
+                  <th>{t('settings.notificationTemplates.table.channel')}</th>
+                  <th>{t('settings.notificationTemplates.table.template')}</th>
+                  <th>{t('settings.notificationTemplates.table.subject')}</th>
+                  <th>{t('settings.notificationTemplates.table.status')}</th>
+                  <th>{t('settings.notificationTemplates.table.version')}</th>
+                  <th style={{ width: 80 }}></th>
+                </tr>
+              </DenseTHead>
+              <tbody>
+                {templates.map((template) => (
+                  <DenseRow key={template.id}>
+                    <td>
+                      <span className="inline-flex items-center gap-1.5 text-fg-muted">
+                        {template.channel === 'EMAIL' ? (
+                          <>
+                            <EnvelopeIcon className="size-3.5" />
+                            <span>{t('settings.notificationTemplates.channel.email')}</span>
+                          </>
+                        ) : (
+                          <>
+                            <ChatBubbleLeftIcon className="size-3.5" />
+                            <span>{t('settings.notificationTemplates.channel.sms')}</span>
+                          </>
+                        )}
+                      </span>
+                    </td>
+                    <td className="strong">{template.displayName}</td>
+                    <td>
+                      <span className="block max-w-[380px] truncate font-mono text-[11.5px] text-fg-muted">
+                        {template.subject || '—'}
+                      </span>
+                    </td>
+                    <td>
+                      {template.isSystemTemplate ? (
+                        <Pill tone="neutral">{t('settings.notificationTemplates.status.systemDefault')}</Pill>
+                      ) : (
+                        <Pill tone="accent" dot>{t('settings.notificationTemplates.status.customized')}</Pill>
+                      )}
+                    </td>
+                    <td className="num muted">
+                      {t('settings.notificationTemplates.versionShort', { version: template.version })}
+                    </td>
+                    <td className="right">
                       {canEdit && (
-                        <Button plain onClick={() => handleCustomize(template)}>
-                          {template.isSystemTemplate ? 'Customize' : 'Edit'}
-                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => handleCustomize(template)}
+                          className="text-[11.5px] font-semibold text-accent-700 hover:text-accent-500 dark:text-accent-300"
+                        >
+                          {template.isSystemTemplate
+                            ? t('settings.notificationTemplates.action.customize')
+                            : t('settings.notificationTemplates.action.edit')}
+                        </button>
                       )}
-                      {canEdit && !template.isSystemTemplate && (
-                        <Button plain onClick={() => handleRevertToDefault(template)}>
-                          Revert to Default
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          <div className="mt-2 flex items-center justify-between text-sm">
-            <Text>Showing {templates.length} templates</Text>
-          </div>
-        </div>
+                    </td>
+                  </DenseRow>
+                ))}
+              </tbody>
+            </DenseTable>
+          </CardBody>
+          <SettingsListFooter
+            count={templates.length}
+            noun={t('settings.notificationTemplates.nounPlural')}
+          />
+        </Card>
       )}
 
       {selectedTemplate && (

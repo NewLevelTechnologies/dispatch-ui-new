@@ -86,6 +86,68 @@ const filteredItems = useMemo(() => {
 
 ---
 
+## Form Controls
+
+Pick the right primitive for each control. The choices have real UX and accessibility consequences — a filter chip and a form select are not interchangeable.
+
+### List-page filters → `FilterChipListbox`
+
+Filter rows above list tables use the chip pattern. Empty state shows `+ Label`; applied state shows `Label: Value ×` with an accent tint. Built on `Headless.Listbox` so screen readers announce the applied option as "selected" via `aria-selected` — a `Menu` (Catalyst `Dropdown`) cannot communicate this.
+
+```tsx
+import { ListboxOption } from '../components/catalyst/listbox';
+import { FilterChipListbox, ChipDivider } from '../components/ui/FilterChipListbox';
+
+<FilterChipListbox
+  label={t('workOrders.form.type')}
+  ariaLabel={t('workOrders.form.type')}
+  value={typeId || null}
+  displayValue={typeId ? lookupName(typeId, types) : null}
+  onChange={(id) => updateParams({ type: id, page: null })}
+  onClear={() => updateParams({ type: null, page: null })}
+>
+  <ListboxOption value={null}>Any type</ListboxOption>
+  <ChipDivider />
+  {types.map((t) => <ListboxOption key={t.id} value={t.id}>{t.name}</ListboxOption>)}
+</FilterChipListbox>
+```
+
+Reference: `src/pages/WorkOrdersPage.tsx` (all five filters), `EquipmentPage.tsx`, `ServiceLocationsPage.tsx`, `NotificationLogsList.tsx`.
+
+### Form selects → Catalyst `Select` (default)
+
+For plain text-only options (state codes, timezones, simple enum picks, taxonomy IDs), use Catalyst `Select` — it wraps a native `<select>`. It renders instantly, gets free mobile OS pickers, handles 50-item lists effortlessly, and looks like a proper form input.
+
+```tsx
+import { Select } from '../components/catalyst/select';
+
+<Field>
+  <Label>State</Label>
+  <Select name="state" value={state} onChange={(e) => setState(e.target.value)}>
+    <option value="">Select…</option>
+    {US_STATES.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}
+  </Select>
+</Field>
+```
+
+### Form selects → Catalyst `Listbox` wrapper (rich options only)
+
+Reach for Catalyst's `Listbox` wrapper *only* when option rows carry icons, secondary descriptions, avatars, or grouping. Native `<select>` can't render those.
+
+If options are just text, `Select` is the right primitive — don't reach for `Listbox` for visual polish alone.
+
+### High-cardinality pickers → typeahead picker
+
+For customer, service-location, equipment, and other pickers with hundreds or thousands of options, use the existing typeahead picker components (`CustomerPicker`, `ServiceLocationPicker`, `EquipmentPicker`). They debounce a server-side search and render results in a popup.
+
+These currently hand-roll the Input + popup pattern because Catalyst's `Combobox` wrapper assumes client-side filtering. A future rebuild on `Headless.Combobox` (skipping Catalyst's virtual wrapper) is queued with the dialog/detail-page redesign work — don't replace them ad-hoc.
+
+### Row-action menus → Catalyst `Dropdown` (Menu)
+
+For ellipsis-trigger menus of actions on a table row (Edit, Cancel, Delete, etc.), use Catalyst `Dropdown`. This is a Menu pattern (no selected state), so `Dropdown` is correct.
+
+---
+
 ## CSR Quick Checklist
 
 When adding/updating entity pages:

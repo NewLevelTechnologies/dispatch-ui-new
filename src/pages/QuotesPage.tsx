@@ -1,18 +1,22 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
-import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
-import { Input, InputGroup } from '../components/catalyst/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
+import { Input } from '../components/catalyst/input';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
+import { PageHead } from '../components/ui/PageHead';
+import { Card, CardBody } from '../components/ui/Card';
+import { Pill } from '../components/ui/Pill';
+import {
+  DenseTable, DenseTHead, DenseRow,
+} from '../components/ui/DenseTable';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListFooter } from '../components/ui/ListFooter';
 import { QuoteStatus, quotesApi } from '../api/financialApi';
 import type { Quote, CreateQuoteRequest, CreateQuoteLineItemRequest } from '../api/financialApi';
 import { customerApi } from '../api/customerApi';
@@ -166,14 +170,14 @@ export default function QuotesPage() {
   };
 
   const getStatusBadge = (status: QuoteStatus) => {
-    const colors: Record<QuoteStatus, 'lime' | 'sky' | 'amber' | 'rose' | 'zinc'> = {
-      [QuoteStatus.DRAFT]: 'zinc',
-      [QuoteStatus.SENT]: 'sky',
-      [QuoteStatus.ACCEPTED]: 'lime',
-      [QuoteStatus.DECLINED]: 'rose',
-      [QuoteStatus.EXPIRED]: 'amber',
+    const tones: Record<QuoteStatus, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
+      [QuoteStatus.DRAFT]: 'neutral',
+      [QuoteStatus.SENT]: 'info',
+      [QuoteStatus.ACCEPTED]: 'success',
+      [QuoteStatus.DECLINED]: 'danger',
+      [QuoteStatus.EXPIRED]: 'warning',
     };
-    return <Badge color={colors[status]}>{t(`quotes.status.${status.toLowerCase()}`)}</Badge>;
+    return <Pill tone={tones[status]} dot>{t(`quotes.status.${status.toLowerCase()}`)}</Pill>;
   };
 
   const getCustomerName = (customerId: string) => {
@@ -195,89 +199,115 @@ export default function QuotesPage() {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  const quoteCount = Array.isArray(quotes) ? quotes.length : 0;
+  const quoteNoun = (n: number) =>
+    n === 1 ? getName('quote').toLowerCase() : getName('quote', true).toLowerCase();
+  const quoteSubtitle = quoteCount > 0
+    ? (filteredQuotes.length === quoteCount
+        ? `${quoteCount.toLocaleString()} ${quoteNoun(quoteCount)}`
+        : t('common.pagination.showing', {
+            start: filteredQuotes.length > 0 ? 1 : 0,
+            end: filteredQuotes.length,
+            total: quoteCount.toLocaleString(),
+          }))
+    : t('quotes.description');
+
   return (
     <AppLayout>
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <Heading>{getName('quote', true)}</Heading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{t('quotes.description')}</p>
-        </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          {t('common.actions.create', { entity: getName('quote') })}
-        </Button>
-      </div>
+      <div>
+        <PageHead
+          title={getName('quote', true)}
+          sub={quoteSubtitle}
+          actions={
+            <Button color="accent" onClick={() => setIsCreateOpen(true)}>
+              {t('common.actions.create', { entity: getName('quote') })}
+            </Button>
+          }
+        />
 
-      {/* Quick Search Bar */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </InputGroup>
-        {quotes && quotes.length > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredQuotes.length === quotes.length
-              ? `${quotes.length} ${quotes.length === 1 ? getName('quote').toLowerCase() : getName('quote', true).toLowerCase()}`
-              : `${filteredQuotes.length} of ${quotes.length}`}
-          </div>
+        <ListToolbar
+          search={
+            <ListSearch
+              placeholder={t('quotes.search.placeholder', {
+                entity: getName('quote'),
+                customer: getName('customer'),
+              })}
+              value={searchTerm}
+              onChange={setSearchTerm}
+            />
+          }
+        />
+
+        {quotesLoading ? (
+          <Card>
+            <CardBody>
+              <p className="text-center text-[12.5px] text-fg-muted">
+                {t('common.actions.loading', { entities: getName('quote', true) })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : filteredQuotes.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-[12.5px] text-fg-muted">
+                {searchTerm ? t('common.actions.noMatchSearch', { entities: getName('quote', true) }) : t('common.actions.notFound', { entities: getName('quote', true) })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : (
+          <Card>
+            <CardBody flush>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{t('quotes.table.quoteNumber')}</th>
+                    <th>{t('quotes.table.customer')}</th>
+                    <th>{t('quotes.table.quoteDate')}</th>
+                    <th>{t('quotes.table.expirationDate')}</th>
+                    <th className="right">{t('quotes.table.totalAmount')}</th>
+                    <th>{t('quotes.table.status')}</th>
+                    <th></th>
+                  </tr>
+                </DenseTHead>
+                <tbody>
+                  {filteredQuotes.map((quote) => (
+                    <DenseRow key={quote.id}>
+                      <td><span className="id-mono text-fg-muted">{quote.quoteNumber}</span></td>
+                      <td className="strong">{getCustomerName(quote.customerId)}</td>
+                      <td>{formatDate(quote.quoteDate)}</td>
+                      <td>{formatDate(quote.expirationDate)}</td>
+                      <td className="right num strong">{formatCurrency(quote.totalAmount)}</td>
+                      <td>{getStatusBadge(quote.status)}</td>
+                      <td>
+                        <Button
+                          plain
+                          onClick={() => {
+                            setSelectedQuote(quote);
+                            setNewStatus(quote.status);
+                            setIsStatusOpen(true);
+                          }}
+                        >
+                          {t('common.edit')}
+                        </Button>
+                      </td>
+                    </DenseRow>
+                  ))}
+                </tbody>
+              </DenseTable>
+              <ListFooter
+                page={1}
+                totalPages={1}
+                pageHref={() => '#'}
+                left={t('common.pagination.showing', {
+                  start: filteredQuotes.length > 0 ? 1 : 0,
+                  end: filteredQuotes.length,
+                  total: quoteCount.toLocaleString(),
+                })}
+              />
+            </CardBody>
+          </Card>
         )}
       </div>
-
-      {quotesLoading ? (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: getName('quote', true) })}</p>
-        </div>
-      ) : filteredQuotes.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {searchTerm ? t('common.actions.noMatchSearch', { entities: getName('quote', true) }) : t('common.actions.notFound', { entities: getName('quote', true) })}
-          </p>
-        </div>
-      ) : (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-          <TableHead>
-            <TableRow>
-              <TableHeader>{t('quotes.table.quoteNumber')}</TableHeader>
-              <TableHeader>{t('quotes.table.customer')}</TableHeader>
-              <TableHeader>{t('quotes.table.quoteDate')}</TableHeader>
-              <TableHeader>{t('quotes.table.expirationDate')}</TableHeader>
-              <TableHeader>{t('quotes.table.totalAmount')}</TableHeader>
-              <TableHeader>{t('quotes.table.status')}</TableHeader>
-              <TableHeader></TableHeader>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredQuotes.map((quote) => (
-              <TableRow key={quote.id}>
-                <TableCell className="font-medium">{quote.quoteNumber}</TableCell>
-                <TableCell>{getCustomerName(quote.customerId)}</TableCell>
-                <TableCell>{formatDate(quote.quoteDate)}</TableCell>
-                <TableCell>{formatDate(quote.expirationDate)}</TableCell>
-                <TableCell>{formatCurrency(quote.totalAmount)}</TableCell>
-                <TableCell>{getStatusBadge(quote.status)}</TableCell>
-                <TableCell>
-                  <Button
-                    plain
-                    onClick={() => {
-                      setSelectedQuote(quote);
-                      setNewStatus(quote.status);
-                      setIsStatusOpen(true);
-                    }}
-                  >
-                    {t('common.edit')}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        </div>
-      )}
 
       {/* Create Quote Dialog */}
       <Dialog open={isCreateOpen} onClose={setIsCreateOpen}>

@@ -48,6 +48,7 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from '../components/catalyst/dropdown';
+import IconButton from '../components/IconButton';
 import {
   DescriptionList,
   DescriptionTerm,
@@ -653,18 +654,19 @@ export default function WorkOrderDetailPage() {
                 outline
                 onClick={() => setEditWorkOrderDialogOpen(true)}
                 disabled={isCancelled || isArchived}
+                className="border-border text-fg-strong hover:bg-bg-hover dark:border-border dark:text-fg-strong dark:hover:bg-bg-hover"
                 title={
                   isCancelled || isArchived
                     ? t('workOrders.detail.frozen')
                     : undefined
                 }
               >
-                <PencilIcon className="size-4" />
+                <PencilIcon data-slot="icon" />
                 {t('common.edit')}
               </Button>
               <Dropdown>
-                <DropdownButton plain aria-label={t('common.moreOptions')}>
-                  <EllipsisHorizontalIcon className="size-5" />
+                <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                  <EllipsisHorizontalIcon className="size-4" />
                 </DropdownButton>
                 <DropdownMenu anchor="bottom end">
                   <DropdownItem disabled>

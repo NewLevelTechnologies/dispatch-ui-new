@@ -77,12 +77,12 @@ describe('RolesPage', () => {
     expect(screen.getByRole('button', { name: /add role/i })).toBeInTheDocument();
   });
 
-  it('displays page description', () => {
+  it('displays page heading', () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
 
     renderWithProviders(<RolesPage />);
 
-    expect(screen.getByText(/manage roles and their capabilities/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /roles/i })).toBeInTheDocument();
   });
 
   it('displays loading state while fetching roles', () => {
@@ -109,18 +109,18 @@ describe('RolesPage', () => {
     expect(screen.getByText('Manages office operations')).toBeInTheDocument();
   });
 
-  it('displays capability count badges', async () => {
+  it('displays Built-in / Custom type pills per role', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
 
     renderWithProviders(<RolesPage />);
 
     await waitFor(() => {
-      const badges = screen.getAllByText(/3.*capabilities/i);
-      expect(badges.length).toBeGreaterThan(0);
+      // Both mock roles are non-protected → "Custom" pills.
+      expect(screen.getAllByText('Custom').length).toBeGreaterThan(0);
     });
   });
 
-  it('displays dash for missing descriptions', async () => {
+  it('displays an em-dash for missing descriptions', async () => {
     const roleWithoutDescription = {
       ...mockRoles[0],
       description: undefined,
@@ -134,37 +134,7 @@ describe('RolesPage', () => {
       expect(screen.getByText('Field Technician')).toBeInTheDocument();
     });
 
-    const dashElements = screen.getAllByText('-');
-    expect(dashElements.length).toBeGreaterThan(0);
-  });
-
-  it('displays dash when role has no capabilities', async () => {
-    const roleWithoutCapabilities = {
-      ...mockRoles[0],
-      capabilities: [],
-    };
-
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [roleWithoutCapabilities] });
-
-    renderWithProviders(<RolesPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Field Technician')).toBeInTheDocument();
-    });
-
-    const dashElements = screen.getAllByText('-');
-    expect(dashElements.length).toBeGreaterThan(0);
-  });
-
-  it('formats dates correctly', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
-
-    renderWithProviders(<RolesPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Jan 15, 2024')).toBeInTheDocument();
-      expect(screen.getByText('Jan 20, 2024')).toBeInTheDocument();
-    });
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
   it('displays error message when fetch fails', async () => {

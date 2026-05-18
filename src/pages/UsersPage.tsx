@@ -1,19 +1,51 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { userApi, type User } from '../api';
-import { useHasCapability } from '../hooks/useCurrentUser';
-import AppLayout from '../components/AppLayout';
+import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
+import IconButton from '../components/IconButton';
+import { userApi, type User, type Role } from '../api';
+import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
 import UserFormDialog from '../components/UserFormDialog';
-import { Heading } from '../components/catalyst/heading';
+import { PageHead } from '../components/ui/PageHead';
 import { Button } from '../components/catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
-import { Input } from '../components/catalyst/input';
 import { Alert, AlertActions, AlertDescription, AlertTitle } from '../components/catalyst/alert';
+import { Avatar } from '../components/ui/Avatar';
+import { Pill } from '../components/ui/Pill';
+import { Card, CardBody } from '../components/ui/Card';
+import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListFooter } from '../components/ui/ListFooter';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+
+// Seniority order — when a user has multiple roles, the higher-rank role
+// shows first. Anything not in this map sorts after, alphabetically. Match
+// against the role name case-insensitively so this survives backend casing
+// drift (e.g. "Field Supervisor" vs "FIELD_SUPERVISOR").
+const ROLE_SENIORITY = [
+  'admin',
+  'dispatcher',
+  'field supervisor',
+  'csr',
+  'technician',
+  'installer',
+];
+
+function roleRank(name: string): number {
+  const key = name.toLowerCase().replace(/[_-]+/g, ' ').trim();
+  const idx = ROLE_SENIORITY.indexOf(key);
+  return idx === -1 ? ROLE_SENIORITY.length : idx;
+}
+
+function sortRolesBySeniority(roles: Role[]): Role[] {
+  return [...roles].sort((a, b) => {
+    const ra = roleRank(a.name);
+    const rb = roleRank(b.name);
+    if (ra !== rb) return ra - rb;
+    return a.name.localeCompare(b.name);
+  });
+}
 
 export default function UsersPage() {
   const navigate = useNavigate();
@@ -31,6 +63,7 @@ export default function UsersPage() {
   const canInviteUsers = useHasCapability('INVITE_USERS');
   const canEditUsers = useHasCapability('EDIT_USERS');
   const canDeleteUsers = useHasCapability('DELETE_USERS');
+  const { data: currentUser } = useCurrentUser();
 
   const { data: users, isLoading, error } = useQuery({
     queryKey: ['users'],
@@ -106,37 +139,30 @@ export default function UsersPage() {
   };
 
   // Filter users based on search query, role, and status
-  const filteredUsers = users?.filter((user) => {
-    // Search filter
-    const query = searchQuery.toLowerCase();
-    const roleNames = user.roles?.map(r => r.name.toLowerCase()).join(' ') || '';
-    const matchesSearch = !query || (
-      user.firstName.toLowerCase().includes(query) ||
-      user.lastName.toLowerCase().includes(query) ||
-      user.email.toLowerCase().includes(query) ||
-      roleNames.includes(query)
-    );
+  const filteredUsers = useMemo(() => {
+    return users?.filter((user) => {
+      // Search filter
+      const query = searchQuery.toLowerCase();
+      const roleNames = user.roles?.map(r => r.name.toLowerCase()).join(' ') || '';
+      const matchesSearch = !query || (
+        user.firstName.toLowerCase().includes(query) ||
+        user.lastName.toLowerCase().includes(query) ||
+        user.email.toLowerCase().includes(query) ||
+        roleNames.includes(query)
+      );
 
-    // Role filter
-    const matchesRole = !roleFilter || user.roles?.some(r => r.id === roleFilter);
+      // Role filter
+      const matchesRole = !roleFilter || user.roles?.some(r => r.id === roleFilter);
 
-    // Status filter
-    const matchesStatus = !statusFilter || (
-      (statusFilter === 'enabled' && user.enabled) ||
-      (statusFilter === 'disabled' && !user.enabled)
-    );
+      // Status filter
+      const matchesStatus = !statusFilter || (
+        (statusFilter === 'enabled' && user.enabled) ||
+        (statusFilter === 'disabled' && !user.enabled)
+      );
 
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
-  // Clear all filters
-  const clearFilters = () => {
-    setRoleFilter('');
-    setStatusFilter('');
-  };
-
-  // Check if any filters are active
-  const hasActiveFilters = roleFilter || statusFilter;
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [users, searchQuery, roleFilter, statusFilter]);
 
   // Format date helper
   const formatDate = (dateString: string) => {
@@ -147,80 +173,77 @@ export default function UsersPage() {
     });
   };
 
-  return (
-    <AppLayout>
-      <div className="flex items-center justify-between">
-        <div>
-          <Heading>{t('entities.users')}</Heading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {t('users.description')}
-          </p>
-        </div>
-        {canInviteUsers && (
-          <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.user') })}</Button>
-        )}
-      </div>
+  // Subtitle reflects the *displayed* set (matches filtered count) and adds
+  // an "X disabled" breakdown when it's non-zero — Users loads all rows on a
+  // single GET, so this is cheap.
+  const totalUsers = users?.length ?? 0;
+  const displayedCount = filteredUsers?.length ?? 0;
+  const disabledCount = useMemo(
+    () => (filteredUsers ?? []).filter((u) => !u.enabled).length,
+    [filteredUsers]
+  );
+  const userSubtitle = (() => {
+    if (totalUsers === 0) return null;
+    const parts: string[] = [];
+    parts.push(`${displayedCount.toLocaleString()} ${displayedCount === 1 ? t('entities.user').toLowerCase() : t('entities.users').toLowerCase()}`);
+    if (disabledCount > 0) {
+      parts.push(t('users.breakdown.disabled', { count: disabledCount }));
+    }
+    return parts.join(' · ');
+  })();
 
-      {/* Search Bar and Filters */}
+  return (
+    <>
+      <PageHead
+        title={t('entities.users')}
+        sub={userSubtitle}
+        actions={
+          canInviteUsers ? (
+            <Button color="accent" onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.user') })}</Button>
+          ) : null
+        }
+      />
+
+      {/* Search + filter chips */}
       {users && users.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2 items-center">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[250px]">
-            <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-zinc-500" />
-            <Input
-              type="search"
+        <ListToolbar
+          search={
+            <ListSearch
               placeholder={t('users.search.placeholder')}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              onChange={setSearchQuery}
             />
-          </div>
+          }
+        >
+          {roles && roles.length > 0 && (
+            <FilterChipListbox
+              label={t('users.filter.role')}
+              ariaLabel={t('users.filter.role')}
+              value={roleFilter || null}
+              displayValue={roleFilter ? roles.find((r) => r.id === roleFilter)?.name ?? null : null}
+              resetLabel={t('users.filter.allRoles')}
+              onChange={(id) => setRoleFilter(id ?? '')}
+              onClear={() => setRoleFilter('')}
+            >
+              {roles.map((role) => (
+                <ChipListboxOption key={role.id} value={role.id}>{role.name}</ChipListboxOption>
+              ))}
+            </FilterChipListbox>
+          )}
 
-          {/* Filters */}
-          <div className="flex gap-2 items-center flex-shrink-0">
-            {/* Role Filter */}
-            <Dropdown>
-              <DropdownButton outline>
-                {t('users.filter.role')}: {roleFilter ? roles?.find(r => r.id === roleFilter)?.name : t('users.filter.allRoles')}
-              </DropdownButton>
-              <DropdownMenu>
-                <DropdownItem onClick={() => setRoleFilter('')}>
-                  <DropdownLabel>{t('users.filter.allRoles')}</DropdownLabel>
-                </DropdownItem>
-                {roles?.map(role => (
-                  <DropdownItem key={role.id} onClick={() => setRoleFilter(role.id)}>
-                    <DropdownLabel>{role.name}</DropdownLabel>
-                  </DropdownItem>
-                ))}
-              </DropdownMenu>
-            </Dropdown>
-
-            {/* Status Filter */}
-            <Dropdown>
-              <DropdownButton outline>
-                {t('users.filter.status')}: {statusFilter ? t(`users.filter.${statusFilter}`) : t('users.filter.all')}
-              </DropdownButton>
-              <DropdownMenu>
-                <DropdownItem onClick={() => setStatusFilter('')}>
-                  <DropdownLabel>{t('users.filter.all')}</DropdownLabel>
-                </DropdownItem>
-                <DropdownItem onClick={() => setStatusFilter('enabled')}>
-                  <DropdownLabel>{t('users.filter.enabled')}</DropdownLabel>
-                </DropdownItem>
-                <DropdownItem onClick={() => setStatusFilter('disabled')}>
-                  <DropdownLabel>{t('users.filter.disabled')}</DropdownLabel>
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-
-            {/* Clear Filters */}
-            {hasActiveFilters && (
-              <Button plain onClick={clearFilters}>
-                {t('users.filter.clearFilters')}
-              </Button>
-            )}
-          </div>
-        </div>
+          <FilterChipListbox
+            label={t('users.filter.status')}
+            ariaLabel={t('users.filter.status')}
+            value={statusFilter || null}
+            displayValue={statusFilter ? t(`users.filter.${statusFilter}`) : null}
+            resetLabel={t('users.filter.all')}
+            onChange={(id) => setStatusFilter(id ?? '')}
+            onClear={() => setStatusFilter('')}
+          >
+            <ChipListboxOption value="enabled">{t('users.filter.enabled')}</ChipListboxOption>
+            <ChipListboxOption value="disabled">{t('users.filter.disabled')}</ChipListboxOption>
+          </FilterChipListbox>
+        </ListToolbar>
       )}
 
       {isLoading && (
@@ -250,96 +273,148 @@ export default function UsersPage() {
 
       {filteredUsers && filteredUsers.length > 0 && (
         <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('common.form.name')}</TableHeader>
-                <TableHeader>{t('common.form.email')}</TableHeader>
-                <TableHeader>{t('common.form.role')}</TableHeader>
-                <TableHeader>{t('common.form.status')}</TableHeader>
-                <TableHeader>{t('users.table.lastUpdated')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow
-                  key={user.id}
-                  href={`/users/${user.id}`}
-                  onClick={(e: React.MouseEvent) => {
-                    // Only navigate if not clicking dropdown or its children
-                    const target = e.target as HTMLElement;
-                    if (!target.closest('[role="menu"]') && !target.closest('button[aria-label]')) {
-                      navigate(`/users/${user.id}`);
-                    }
-                  }}
-                  className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
-                >
-                  <TableCell className="font-medium">
-                    {user.firstName} {user.lastName}
-                  </TableCell>
-                  <TableCell className="text-zinc-500">{user.email}</TableCell>
-                  <TableCell className="text-zinc-500">
-                    {user.roles && user.roles.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {user.roles.map(role => (
-                          <Badge key={role.id} color="sky">{role.name}</Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-zinc-500">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {user.enabled ? (
-                      <Badge color="lime">{t('common.enabled')}</Badge>
-                    ) : (
-                      <Badge color="zinc">{t('common.disabled')}</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-zinc-500">{formatDate(user.updatedAt)}</TableCell>
-                  <TableCell>
-                    {(canEditUsers || canDeleteUsers) && (
-                      <div className="-mx-3 -my-1.5 sm:-mx-2.5" onClick={(e) => e.stopPropagation()}>
-                        <Dropdown>
-                          <DropdownButton plain aria-label={t('common.moreOptions')}>
-                            <EllipsisVerticalIcon className="size-5" />
-                          </DropdownButton>
-                          <DropdownMenu anchor="bottom end">
-                            {canEditUsers && (
-                              <>
-                                <DropdownItem onClick={() => handleEdit(user)}>
-                                  <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                                </DropdownItem>
-                                {user.enabled ? (
-                                  <DropdownItem onClick={() => handleDisable(user)}>
-                                    <DropdownLabel>{t('users.table.disable')}</DropdownLabel>
-                                  </DropdownItem>
-                                ) : (
-                                  <DropdownItem onClick={() => handleEnable(user)}>
-                                    <DropdownLabel>{t('users.table.enable')}</DropdownLabel>
-                                  </DropdownItem>
+          <Card>
+            <CardBody flush>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{t('common.form.name')}</th>
+                    <th>{t('common.form.role')}</th>
+                    <th>{t('users.table.lastActive')}</th>
+                    <th>{t('common.form.status')}</th>
+                    <th style={{ width: 40 }}></th>
+                  </tr>
+                </DenseTHead>
+                <tbody>
+                  {filteredUsers.map((user) => {
+                    const fullName = `${user.firstName} ${user.lastName}`;
+                    const isMe = currentUser?.id === user.id;
+                    const rowOpacity = !user.enabled ? 'opacity-55' : '';
+                    return (
+                      <DenseRow
+                        key={user.id}
+                        onClick={(e: React.MouseEvent) => {
+                          const target = e.target as HTMLElement;
+                          if (!target.closest('[role="menu"]') && !target.closest('button[aria-label]')) {
+                            navigate(`/settings/access/users/${user.id}`);
+                          }
+                        }}
+                        className={`cursor-pointer ${rowOpacity}`}
+                      >
+                        <td>
+                          <div className="flex items-center gap-2.5">
+                            <Avatar name={fullName} size="sm" />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="strong truncate">{fullName}</span>
+                                {isMe && (
+                                  <span className="inline-flex items-center rounded bg-bg-active px-1 py-[1px] text-[9px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
+                                    {t('users.table.you')}
+                                  </span>
                                 )}
-                              </>
-                            )}
-                            {canDeleteUsers && (
-                              <DropdownItem onClick={() => handleDelete(user)}>
-                                <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                              </DropdownItem>
-                            )}
-                          </DropdownMenu>
-                        </Dropdown>
-                      </div>
+                              </div>
+                              <div className="muted truncate">{user.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          {user.roles && user.roles.length > 0 ? (
+                            (() => {
+                              const ordered = sortRolesBySeniority(user.roles);
+                              const visible = ordered.slice(0, 2);
+                              const overflow = ordered.slice(2);
+                              return (
+                                <div className="flex flex-wrap gap-1">
+                                  {visible.map((role) => (
+                                    <Pill key={role.id} tone="neutral">{role.name}</Pill>
+                                  ))}
+                                  {overflow.length > 0 && (
+                                    <span title={overflow.map((r) => r.name).join(', ')}>
+                                      <Pill tone="neutral">+{overflow.length}</Pill>
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-fg-dim">—</span>
+                          )}
+                        </td>
+                        <td className="muted">{formatDate(user.updatedAt)}</td>
+                        <td>
+                          {user.enabled ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-success-500" />
+                              <span>{t('common.active')}</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-fg-muted">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-fg-dim" />
+                              <span>{t('common.disabled')}</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="right">
+                          {(canEditUsers || canDeleteUsers) && (
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <Dropdown>
+                                <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                                  <EllipsisVerticalIcon className="size-4" />
+                                </DropdownButton>
+                                <DropdownMenu anchor="bottom end">
+                                  {canEditUsers && (
+                                    <>
+                                      <DropdownItem onClick={() => handleEdit(user)}>
+                                        <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                                      </DropdownItem>
+                                      {user.enabled ? (
+                                        <DropdownItem onClick={() => handleDisable(user)}>
+                                          <DropdownLabel>{t('users.table.disable')}</DropdownLabel>
+                                        </DropdownItem>
+                                      ) : (
+                                        <DropdownItem onClick={() => handleEnable(user)}>
+                                          <DropdownLabel>{t('users.table.enable')}</DropdownLabel>
+                                        </DropdownItem>
+                                      )}
+                                    </>
+                                  )}
+                                  {canDeleteUsers && (
+                                    <DropdownItem onClick={() => handleDelete(user)}>
+                                      <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                    </DropdownItem>
+                                  )}
+                                </DropdownMenu>
+                              </Dropdown>
+                            </div>
+                          )}
+                        </td>
+                      </DenseRow>
+                    );
+                  })}
+                </tbody>
+              </DenseTable>
+              <ListFooter
+                page={1}
+                totalPages={1}
+                pageHref={() => '#'}
+                left={
+                  <>
+                    {t('settings.showingCount', {
+                      count: displayedCount,
+                      noun: t('entities.users').toLowerCase(),
+                    })}
+                    {disabledCount > 0 && (
+                      <> · {t('users.breakdown.disabled', { count: disabledCount })}</>
                     )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </>
+                }
+              />
+            </CardBody>
+          </Card>
 
           {filteredUsers.length === 0 && searchQuery && (
             <div className="mt-4 text-center">
-              <p className="text-zinc-600 dark:text-zinc-400">
+              <p className="text-fg-muted">
                 {t('users.search.noMatch', { query: searchQuery })}
               </p>
             </div>
@@ -368,6 +443,6 @@ export default function UsersPage() {
           </Button>
         </AlertActions>
       </Alert>
-    </AppLayout>
+    </>
   );
 }

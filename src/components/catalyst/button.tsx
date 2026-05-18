@@ -6,7 +6,10 @@ import { Link } from './link'
 const styles = {
   base: [
     // Base
-    'relative isolate inline-flex items-baseline justify-center gap-x-2 rounded-lg border text-base/6 font-semibold',
+    // items-center (not items-baseline) so an icon child renders on the same
+    // visual midline as the label — items-baseline aligns to the text baseline
+    // and the icon ends up visibly higher than the letters.
+    'relative isolate inline-flex items-center justify-center gap-x-1.5 rounded-lg border text-base/6 font-semibold',
     // Sizing
     'px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)] sm:text-sm/6',
     // Focus
@@ -154,6 +157,11 @@ const styles = {
     rose: [
       'text-white [--btn-hover-overlay:var(--color-white)]/10 [--btn-bg:var(--color-rose-500)] [--btn-border:var(--color-rose-600)]/90',
       '[--btn-icon:var(--color-rose-300)] data-active:[--btn-icon:var(--color-rose-200)] data-hover:[--btn-icon:var(--color-rose-200)]',
+    ],
+    // Brand button — follows the warm/cool accent token at runtime.
+    accent: [
+      'text-white [--btn-hover-overlay:var(--color-white)]/12 [--btn-bg:var(--color-accent-500)] [--btn-border:var(--color-accent-700)]',
+      '[--btn-icon:var(--color-accent-200)] data-active:[--btn-icon:var(--color-accent-100)] data-hover:[--btn-icon:var(--color-accent-100)]',
     ],
   },
 }

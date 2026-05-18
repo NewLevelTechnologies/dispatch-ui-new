@@ -42,56 +42,62 @@ describe('WorkflowConfigPanel', () => {
     vi.clearAllMocks();
   });
 
-  it('renders config in view mode with looked-up names', async () => {
+  it('renders the form with values selected from the loaded config', async () => {
     mockApis();
-    renderWithProviders(<WorkflowConfigPanel />);
+    const { container } = renderWithProviders(<WorkflowConfigPanel />);
 
     await waitFor(() => {
-      expect(screen.getByText('Service Call')).toBeInTheDocument();
+      const typeSelect = container.querySelector('select[name="defaultWorkOrderTypeId"]') as HTMLSelectElement;
+      expect(typeSelect.value).toBe('type-1');
     });
-    expect(screen.getByText('New')).toBeInTheDocument();
-    expect(screen.getByText('Status-based')).toBeInTheDocument();
-    expect(screen.getByText('Disabled')).toBeInTheDocument();
+    expect((container.querySelector('select[name="defaultWorkItemStatusId"]') as HTMLSelectElement).value).toBe('st-1');
+    expect((container.querySelector('select[name="dispatchBoardType"]') as HTMLSelectElement).value).toBe('STATUS_BASED');
+    expect(screen.getByRole('checkbox')).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('shows "None" when no defaults are set', async () => {
+  it('shows "None" option when no defaults are set', async () => {
     mockApis({ ...mockConfig, defaultWorkOrderTypeId: null, defaultWorkItemStatusId: null });
     renderWithProviders(<WorkflowConfigPanel />);
 
     await waitFor(() => {
+      // "None" is the empty-value option text in the dropdowns.
       expect(screen.getAllByText('None').length).toBeGreaterThan(0);
     });
   });
 
-  it('switches to edit mode and shows form fields', async () => {
-    const user = userEvent.setup();
+  it('exposes all form fields without a view/edit toggle', async () => {
     mockApis();
-    renderWithProviders(<WorkflowConfigPanel />);
+    const { container } = renderWithProviders(<WorkflowConfigPanel />);
 
-    await waitFor(() => expect(screen.getByText('Service Call')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(container.querySelector('select[name="defaultWorkOrderTypeId"]')).toBeInTheDocument(),
+    );
 
-    await user.click(screen.getByRole('button', { name: /^edit$/i }));
-
-    expect(screen.getByLabelText(/default work order type/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/default item status/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/dispatch board type/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/enforce status workflow/i)).toBeInTheDocument();
+    expect(container.querySelector('select[name="defaultWorkItemStatusId"]')).toBeInTheDocument();
+    expect(container.querySelector('select[name="dispatchBoardType"]')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox')).toBeInTheDocument();
+    // No "Edit" affordance — the form is always editable in place.
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
   });
 
-  it('submits the update with modified fields', async () => {
+  it('submits the update with modified fields when Save changes is clicked', async () => {
     const user = userEvent.setup();
     mockApis();
     vi.mocked(apiClient.patch).mockResolvedValue({ data: mockConfig });
 
-    renderWithProviders(<WorkflowConfigPanel />);
+    const { container } = renderWithProviders(<WorkflowConfigPanel />);
 
-    await waitFor(() => expect(screen.getByText('Service Call')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(container.querySelector('select[name="defaultWorkOrderTypeId"]')).toBeInTheDocument(),
+    );
 
-    await user.click(screen.getByRole('button', { name: /^edit$/i }));
-
-    await user.selectOptions(screen.getByLabelText(/default work order type/i), 'type-2');
-    await user.click(screen.getByLabelText(/enforce status workflow/i));
-    await user.click(screen.getByRole('button', { name: /^update$/i }));
+    await user.selectOptions(
+      container.querySelector('select[name="defaultWorkOrderTypeId"]') as HTMLSelectElement,
+      'type-2',
+    );
+    // Catalyst Checkbox renders Headless's button with role="checkbox" — not a native input.
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => {
       expect(apiClient.patch).toHaveBeenCalledWith(
@@ -104,18 +110,23 @@ describe('WorkflowConfigPanel', () => {
     });
   });
 
-  it('cancel button reverts to view mode without submitting', async () => {
+  it('cancel reverts unsaved edits back to the loaded values without submitting', async () => {
     const user = userEvent.setup();
     mockApis();
-    renderWithProviders(<WorkflowConfigPanel />);
+    const { container } = renderWithProviders(<WorkflowConfigPanel />);
 
-    await waitFor(() => expect(screen.getByText('Service Call')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(container.querySelector('select[name="defaultWorkOrderTypeId"]')).toBeInTheDocument(),
+    );
 
-    await user.click(screen.getByRole('button', { name: /^edit$/i }));
+    const typeSelect = container.querySelector('select[name="defaultWorkOrderTypeId"]') as HTMLSelectElement;
+    await user.selectOptions(typeSelect, 'type-2');
+    expect(typeSelect.value).toBe('type-2');
+
     await user.click(screen.getByRole('button', { name: /^cancel$/i }));
 
-    // Edit button is back, meaning we're in view mode
-    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument();
+    // After cancel the form snaps back to the loaded config value.
+    expect(typeSelect.value).toBe('type-1');
     expect(apiClient.patch).not.toHaveBeenCalled();
   });
 

@@ -8,7 +8,7 @@ import './index.css';
 import './config/amplify';
 import './i18n/config';
 import App from './App';
-import { ThemeProvider } from './contexts/ThemeContext';
+import { ThemeProvider } from './components/ThemeProvider';
 
 // Create a React Query client
 const queryClient = new QueryClient({

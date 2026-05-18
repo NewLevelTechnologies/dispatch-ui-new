@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
-import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
-import { Input, InputGroup } from '../components/catalyst/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
+import { Input } from '../components/catalyst/input';
+import { PageHead } from '../components/ui/PageHead';
+import { Card, CardBody } from '../components/ui/Card';
+import { Pill } from '../components/ui/Pill';
+import {
+  DenseTable, DenseTHead, DenseRow,
+} from '../components/ui/DenseTable';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListFooter } from '../components/ui/ListFooter';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Select } from '../components/catalyst/select';
@@ -156,7 +160,7 @@ export default function PaymentsPage() {
   };
 
   const getPaymentMethodBadge = (method: PaymentMethod) => {
-    return <Badge color="zinc">{t(`payments.methods.${method.toLowerCase()}`)}</Badge>;
+    return <Pill tone="neutral">{t(`payments.methods.${method.toLowerCase()}`)}</Pill>;
   };
 
   const filteredPayments = Array.isArray(payments) ? payments.filter(payment =>
@@ -173,78 +177,104 @@ export default function PaymentsPage() {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  const paymentsCount = Array.isArray(payments) ? payments.length : 0;
+  const paymentNoun = (n: number) =>
+    n === 1 ? getName('payment').toLowerCase() : getName('payment', true).toLowerCase();
+  const subtitle = paymentsCount > 0
+    ? (filteredPayments.length === paymentsCount
+        ? `${paymentsCount.toLocaleString()} ${paymentNoun(paymentsCount)}`
+        : t('common.pagination.showing', {
+            start: filteredPayments.length > 0 ? 1 : 0,
+            end: filteredPayments.length,
+            total: paymentsCount.toLocaleString(),
+          }))
+    : t('payments.description');
+
   return (
     <AppLayout>
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <Heading>{getName('payment', true)}</Heading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{t('payments.description')}</p>
-        </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          {t('common.actions.create', { entity: getName('payment') })}
-        </Button>
-      </div>
+      <div>
+        <PageHead
+          title={getName('payment', true)}
+          sub={subtitle}
+          actions={
+            <Button color="accent" onClick={() => setIsCreateOpen(true)}>
+              {t('common.actions.create', { entity: getName('payment') })}
+            </Button>
+          }
+        />
 
-      {/* Quick Search Bar */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </InputGroup>
-        {payments && payments.length > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredPayments.length === payments.length
-              ? `${payments.length} ${payments.length === 1 ? getName('payment').toLowerCase() : getName('payment', true).toLowerCase()}`
-              : `${filteredPayments.length} of ${payments.length}`}
-          </div>
+        <ListToolbar
+          search={
+            <ListSearch
+              placeholder={t('payments.search.placeholder', {
+                customer: getName('customer'),
+                invoice: getName('invoice'),
+              })}
+              value={searchTerm}
+              onChange={setSearchTerm}
+            />
+          }
+        />
+
+        {paymentsLoading ? (
+          <Card>
+            <CardBody>
+              <p className="text-center text-[12.5px] text-fg-muted">
+                {t('common.actions.loading', { entities: getName('payment', true) })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : filteredPayments.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-[12.5px] text-fg-muted">
+                {searchTerm ? t('common.actions.noMatchSearch', { entities: getName('payment', true) }) : t('common.actions.notFound', { entities: getName('payment', true) })}
+              </p>
+            </CardBody>
+          </Card>
+        ) : (
+          <Card>
+            <CardBody flush>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{t('payments.table.paymentNumber')}</th>
+                    <th>{t('payments.table.customer')}</th>
+                    <th>{t('payments.table.invoice')}</th>
+                    <th>{t('payments.table.paymentDate')}</th>
+                    <th className="right">{t('payments.table.amount')}</th>
+                    <th>{t('payments.table.method')}</th>
+                    <th>{t('payments.table.reference')}</th>
+                  </tr>
+                </DenseTHead>
+                <tbody>
+                  {filteredPayments.map((payment) => (
+                    <DenseRow key={payment.id}>
+                      <td><span className="id-mono text-fg-muted">{payment.paymentNumber}</span></td>
+                      <td className="strong">{getCustomerName(payment.customerId)}</td>
+                      <td><span className="id-mono text-fg-muted">{getInvoiceNumber(payment.invoiceId)}</span></td>
+                      <td>{formatDate(payment.paymentDate)}</td>
+                      <td className="right num strong">{formatCurrency(payment.amount)}</td>
+                      <td>{getPaymentMethodBadge(payment.paymentMethod)}</td>
+                      <td className="muted">{payment.referenceNumber || '-'}</td>
+                    </DenseRow>
+                  ))}
+                </tbody>
+              </DenseTable>
+              <ListFooter
+                page={1}
+                totalPages={1}
+                pageHref={() => '#'}
+                left={t('common.pagination.showing', {
+                  start: filteredPayments.length > 0 ? 1 : 0,
+                  end: filteredPayments.length,
+                  total: paymentsCount.toLocaleString(),
+                })}
+              />
+            </CardBody>
+          </Card>
         )}
       </div>
-
-      {paymentsLoading ? (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: getName('payment', true) })}</p>
-        </div>
-      ) : filteredPayments.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {searchTerm ? t('common.actions.noMatchSearch', { entities: getName('payment', true) }) : t('common.actions.notFound', { entities: getName('payment', true) })}
-          </p>
-        </div>
-      ) : (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-          <TableHead>
-            <TableRow>
-              <TableHeader>{t('payments.table.paymentNumber')}</TableHeader>
-              <TableHeader>{t('payments.table.customer')}</TableHeader>
-              <TableHeader>{t('payments.table.invoice')}</TableHeader>
-              <TableHeader>{t('payments.table.paymentDate')}</TableHeader>
-              <TableHeader>{t('payments.table.amount')}</TableHeader>
-              <TableHeader>{t('payments.table.method')}</TableHeader>
-              <TableHeader>{t('payments.table.reference')}</TableHeader>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredPayments.map((payment) => (
-              <TableRow key={payment.id}>
-                <TableCell className="font-medium">{payment.paymentNumber}</TableCell>
-                <TableCell>{getCustomerName(payment.customerId)}</TableCell>
-                <TableCell>{getInvoiceNumber(payment.invoiceId)}</TableCell>
-                <TableCell>{formatDate(payment.paymentDate)}</TableCell>
-                <TableCell>{formatCurrency(payment.amount)}</TableCell>
-                <TableCell>{getPaymentMethodBadge(payment.paymentMethod)}</TableCell>
-                <TableCell className="text-zinc-500">{payment.referenceNumber || '-'}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        </div>
-      )}
 
       {/* Create Payment Dialog */}
       <Dialog open={isCreateOpen} onClose={setIsCreateOpen}>

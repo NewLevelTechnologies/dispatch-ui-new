@@ -30,6 +30,7 @@ import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
+import IconButton from '../components/IconButton';
 import { ArrowLeftIcon, EllipsisVerticalIcon, PencilIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { Divider } from '../components/catalyst/divider';
 
@@ -240,8 +241,12 @@ export default function ServiceLocationDetailPage() {
               </Text>
             </div>
             {canEditServiceLocations && (
-              <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
-                <PencilIcon className="size-4" />
+              <Button
+                outline
+                onClick={() => setIsEditDialogOpen(true)}
+                className="border-border text-fg-strong hover:bg-bg-hover dark:border-border dark:text-fg-strong dark:hover:bg-bg-hover"
+              >
+                <PencilIcon data-slot="icon" />
                 {t('common.edit')}
               </Button>
             )}
@@ -482,8 +487,8 @@ export default function ServiceLocationDetailPage() {
                           <TableCell>
                             <div className="-mx-3 -my-1.5 sm:-mx-2.5">
                               <Dropdown>
-                                <DropdownButton plain aria-label={t('common.moreOptions')}>
-                                  <EllipsisVerticalIcon className="size-5" />
+                                <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                                  <EllipsisVerticalIcon className="size-4" />
                                 </DropdownButton>
                                 <DropdownMenu anchor="bottom end">
                                   <DropdownItem onClick={() => handleEditEquipment(item)}>

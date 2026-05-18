@@ -6,7 +6,6 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { userApi, dispatchRegionApi } from '../api';
 import { formatPhone } from '../utils/formatPhone';
 import { useHasCapability } from '../hooks/useCurrentUser';
-import AppLayout from '../components/AppLayout';
 import UserFormDialog from '../components/UserFormDialog';
 import CapabilitiesSection from '../components/CapabilitiesSection';
 import AuditHistory from '../components/AuditHistory';
@@ -87,41 +86,37 @@ export default function UserDetailPage() {
 
   if (isLoading) {
     return (
-      <AppLayout>
-        <div className="p-8 text-center">
-          <p className="text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.loading', { entities: t('entities.user') })}
-          </p>
-        </div>
-      </AppLayout>
+      <div className="p-8 text-center">
+        <p className="text-zinc-600 dark:text-zinc-400">
+          {t('common.actions.loading', { entities: t('entities.user') })}
+        </p>
+      </div>
     );
   }
 
   if (error || !user) {
     return (
-      <AppLayout>
-        <div className="p-8">
-          <div className="rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-            <p className="text-sm text-red-800 dark:text-red-400">
-              {t('common.actions.errorLoading', { entities: t('entities.user') })}
-              {error && `: ${(error as Error).message}`}
-            </p>
-          </div>
-          <Button className="mt-4" onClick={() => navigate('/users')}>
-            <ArrowLeftIcon className="size-4" />
-            {t('common.actions.back')}
-          </Button>
+      <div className="p-8">
+        <div className="rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+          <p className="text-sm text-red-800 dark:text-red-400">
+            {t('common.actions.errorLoading', { entities: t('entities.user') })}
+            {error && `: ${(error as Error).message}`}
+          </p>
         </div>
-      </AppLayout>
+        <Button className="mt-4" onClick={() => navigate('/settings/access/users')}>
+          <ArrowLeftIcon className="size-4" />
+          {t('common.actions.back')}
+        </Button>
+      </div>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div>
         {/* Header */}
         <div className="mb-2">
-          <Button plain onClick={() => navigate('/users')}>
+          <Button plain onClick={() => navigate('/settings/access/users')}>
             <ArrowLeftIcon className="size-4" />
             {t('common.actions.back')}
           </Button>
@@ -156,7 +151,11 @@ export default function UserDetailPage() {
           </div>
           {canEditUsers && (
             <div className="flex gap-2">
-              <Button color="zinc" onClick={handleEdit}>
+              <Button
+                outline
+                onClick={handleEdit}
+                className="border-border text-fg-strong hover:bg-bg-hover dark:border-border dark:text-fg-strong dark:hover:bg-bg-hover"
+              >
                 {t('common.edit')}
               </Button>
               {user.enabled ? (
@@ -242,6 +241,6 @@ export default function UserDetailPage() {
         user={user}
         roles={roles || []}
       />
-    </AppLayout>
+    </>
   );
 }

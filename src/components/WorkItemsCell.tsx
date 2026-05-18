@@ -3,14 +3,16 @@ import {
   type ProgressCategory,
   type WorkItemSummaryProjection,
 } from '../api';
-import { Badge } from './catalyst/badge';
+import { Pill } from './ui/Pill';
 
-const PROGRESS_COLORS: Record<ProgressCategory, 'zinc' | 'blue' | 'amber' | 'lime'> = {
-  NOT_STARTED: 'zinc',
-  IN_PROGRESS: 'blue',
-  BLOCKED: 'amber',
-  COMPLETED: 'lime',
-  CANCELLED: 'zinc',
+type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+
+const PROGRESS_TONES: Record<ProgressCategory, PillTone> = {
+  NOT_STARTED: 'neutral',
+  IN_PROGRESS: 'info',
+  BLOCKED: 'warning',
+  COMPLETED: 'success',
+  CANCELLED: 'neutral',
 };
 
 const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
@@ -62,7 +64,7 @@ interface Props {
 export default function WorkItemsCell({ items, totalCount }: Props) {
   const { t } = useTranslation();
   if (totalCount === 0 || items.length === 0) {
-    return <span className="text-zinc-400 dark:text-zinc-600">—</span>;
+    return <span className="text-fg-dim">—</span>;
   }
   const visible = items.slice(0, WORK_ITEMS_INLINE_CAP);
   const overflow = totalCount - visible.length;
@@ -70,21 +72,16 @@ export default function WorkItemsCell({ items, totalCount }: Props) {
     <div className="flex max-w-[32rem] flex-col gap-1">
       {visible.map((wi, i) => (
         <div key={i} className="flex items-start gap-2">
-          <Badge
-            color={PROGRESS_COLORS[wi.statusCategory]}
-            className="shrink-0"
-          >
-            {t(
-              `workOrders.progress.${PROGRESS_TRANSLATION_KEYS[wi.statusCategory]}`
-            )}
-          </Badge>
-          <span className="line-clamp-5 min-w-0 flex-1 whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
+          <Pill tone={PROGRESS_TONES[wi.statusCategory]} className="shrink-0">
+            {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[wi.statusCategory]}`)}
+          </Pill>
+          <span className="line-clamp-5 min-w-0 flex-1 whitespace-pre-wrap font-[450] text-fg">
             {wi.description}
           </span>
         </div>
       ))}
       {overflow > 0 && (
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+        <span className="text-xs text-fg-muted">
           {t('workOrders.table.workItemsMore', { count: overflow })}
         </span>
       )}

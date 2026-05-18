@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   equipmentTypesApi,
+  equipmentCategoriesApi,
   getApiErrorMessage,
   type EquipmentType,
 } from '../../../api';
@@ -11,43 +13,52 @@ import { Heading } from '../../../components/catalyst/heading';
 import { Text } from '../../../components/catalyst/text';
 import { Button } from '../../../components/catalyst/button';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../../components/catalyst/table';
-import {
   Dropdown,
   DropdownButton,
   DropdownItem,
   DropdownMenu,
 } from '../../../components/catalyst/dropdown';
 import { Dialog, DialogActions, DialogBody, DialogTitle } from '../../../components/catalyst/dialog';
-import IconButton from '../../../components/IconButton';
 import { Field, FieldGroup, Fieldset, Label } from '../../../components/catalyst/fieldset';
 import { Input } from '../../../components/catalyst/input';
-import {
-  ChevronUpIcon,
-  ChevronDownIcon,
-  EllipsisVerticalIcon,
-} from '@heroicons/react/16/solid';
+import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
+import IconButton from '../../../components/IconButton';
+import { Card, CardBody } from '../../../components/ui/Card';
+import { DenseTable, DenseTHead, DenseRow } from '../../../components/ui/DenseTable';
+import { SettingsListFooter } from '../../../components/settings/SettingsListFooter';
+import { DragHandle } from '../../../components/settings/DragHandle';
 
 const QUERY_KEY = ['equipment-types'] as const;
+const CATEGORIES_QUERY_KEY = ['equipment-categories', 'all'] as const;
 
 export default function EquipmentTypesPanel() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const canEdit = useHasCapability('EDIT_SETTINGS');
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selected, setSelected] = useState<EquipmentType | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const { data: items, isLoading, error } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: () => equipmentTypesApi.getAll(),
   });
+
+  const { data: allCategories } = useQuery({
+    queryKey: CATEGORIES_QUERY_KEY,
+    queryFn: () => equipmentCategoriesApi.getAll(),
+  });
+
+  const categoryCountByType = useMemo(() => {
+    const counts: Record<string, number> = {};
+    (allCategories ?? []).forEach((c) => {
+      counts[c.equipmentTypeId] = (counts[c.equipmentTypeId] ?? 0) + 1;
+    });
+    return counts;
+  }, [allCategories]);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => equipmentTypesApi.delete(id),
@@ -71,19 +82,13 @@ export default function EquipmentTypesPanel() {
         (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)
       )
     : [];
-  const nextSortOrder =
-    sorted.length > 0 ? Math.max(...sorted.map((i) => i.sortOrder)) + 1 : 0;
+  const nextSortOrder = sorted.length > 0 ? Math.max(...sorted.map((i) => i.sortOrder)) + 1 : 0;
 
-  const moveUp = (index: number) => {
-    if (index <= 0) return;
+  const performReorder = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= sorted.length || to >= sorted.length) return;
     const reordered = [...sorted];
-    [reordered[index], reordered[index - 1]] = [reordered[index - 1], reordered[index]];
-    reorderMutation.mutate(reordered.map((i) => i.id));
-  };
-  const moveDown = (index: number) => {
-    if (index >= sorted.length - 1) return;
-    const reordered = [...sorted];
-    [reordered[index], reordered[index + 1]] = [reordered[index + 1], reordered[index]];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
     reorderMutation.mutate(reordered.map((i) => i.id));
   };
 
@@ -106,81 +111,117 @@ export default function EquipmentTypesPanel() {
       <div className="mb-4 flex items-start justify-between">
         <div>
           <Heading>{t('settings.equipmentTypes.title')}</Heading>
-          <Text className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          <Text className="mt-1 text-sm text-fg-muted">
             {t('settings.equipmentTypes.description')}
           </Text>
         </div>
         {canEdit && (
-          <Button onClick={handleAdd}>{t('settings.equipmentTypes.add')}</Button>
+          <Button color="accent" onClick={handleAdd}>{t('settings.equipmentTypes.add')}</Button>
         )}
       </div>
 
       {isLoading && <Text>{t('settings.equipmentTypes.loading')}</Text>}
       {error && (
-        <Text className="text-red-600">
+        <Text className="text-danger-500">
           {getApiErrorMessage(error) || t('settings.equipmentTypes.errorLoad')}
         </Text>
       )}
       {items && items.length === 0 && <Text>{t('settings.equipmentTypes.empty')}</Text>}
 
       {sorted.length > 0 && (
-        <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-          <TableHead>
-            <TableRow>
-              <TableHeader>{t('common.form.name')}</TableHeader>
-              <TableHeader className="w-24"></TableHeader>
-              <TableHeader></TableHeader>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {sorted.map((item, index) => (
-              <TableRow key={item.id}>
-                <TableCell className="font-medium">{item.name}</TableCell>
-                <TableCell>
-                  {canEdit && (
-                    <div className="flex items-center gap-0.5">
-                      <IconButton
-                        onClick={() => moveUp(index)}
-                        disabled={index === 0 || reorderMutation.isPending}
-                        title={t('common.moveUp')}
-                        aria-label={t('common.moveUp')}
-                      >
-                        <ChevronUpIcon className="h-4 w-4" />
-                      </IconButton>
-                      <IconButton
-                        onClick={() => moveDown(index)}
-                        disabled={index === sorted.length - 1 || reorderMutation.isPending}
-                        title={t('common.moveDown')}
-                        aria-label={t('common.moveDown')}
-                      >
-                        <ChevronDownIcon className="h-4 w-4" />
-                      </IconButton>
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="-mx-3 -my-1.5 sm:-mx-2.5 flex items-center justify-end">
-                    {canEdit && (
-                      <Dropdown>
-                        <DropdownButton plain aria-label={t('common.moreOptions')}>
-                          <EllipsisVerticalIcon />
-                        </DropdownButton>
-                        <DropdownMenu anchor="bottom end">
-                          <DropdownItem onClick={() => handleEdit(item)}>
-                            {t('common.edit')}
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handleDelete(item)}>
-                            {t('common.delete')}
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <Card>
+          <CardBody flush>
+            <DenseTable>
+              <DenseTHead>
+                <tr>
+                  <th style={{ width: 32 }}></th>
+                  <th>{t('common.form.name')}</th>
+                  <th className="right">{t('settings.equipmentTypes.table.categories')}</th>
+                  <th className="right">{t('settings.equipmentTypes.table.items')}</th>
+                  <th style={{ width: 40 }}></th>
+                </tr>
+              </DenseTHead>
+              <tbody>
+                {sorted.map((item, index) => {
+                  const categoryCount = categoryCountByType[item.id] ?? 0;
+                  const isDragging = dragIndex === index;
+                  const isDragOver = dragOverIndex === index && dragIndex !== null && dragIndex !== index;
+                  return (
+                    <DenseRow
+                      key={item.id}
+                      draggable={canEdit}
+                      onDragStart={(e: React.DragEvent) => {
+                        if (!canEdit) return;
+                        setDragIndex(index);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragOver={(e: React.DragEvent) => {
+                        if (dragIndex === null) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        if (dragOverIndex !== index) setDragOverIndex(index);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverIndex === index) setDragOverIndex(null);
+                      }}
+                      onDrop={(e: React.DragEvent) => {
+                        e.preventDefault();
+                        if (dragIndex !== null) performReorder(dragIndex, index);
+                        setDragIndex(null);
+                        setDragOverIndex(null);
+                      }}
+                      onDragEnd={() => {
+                        setDragIndex(null);
+                        setDragOverIndex(null);
+                      }}
+                      className={
+                        [
+                          isDragging && 'opacity-50',
+                          isDragOver && 'outline outline-2 outline-accent-500/40 outline-offset-[-2px]',
+                        ].filter(Boolean).join(' ')
+                      }
+                    >
+                      <td>{canEdit && <DragHandle />}</td>
+                      <td className="strong">{item.name}</td>
+                      <td className="right num">
+                        <button
+                          type="button"
+                          onClick={() => navigate('/settings/equipment/categories')}
+                          className="inline-flex items-center gap-1 text-fg hover:text-accent-700 dark:hover:text-accent-300"
+                        >
+                          <span>{categoryCount}</span>
+                          <span className="text-fg-dim">→</span>
+                        </button>
+                      </td>
+                      <td className="right num text-fg-dim">—</td>
+                      <td className="right">
+                        {canEdit && (
+                          <Dropdown>
+                            <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                              <EllipsisVerticalIcon className="size-4" />
+                            </DropdownButton>
+                            <DropdownMenu anchor="bottom end">
+                              <DropdownItem onClick={() => handleEdit(item)}>
+                                {t('common.edit')}
+                              </DropdownItem>
+                              <DropdownItem onClick={() => handleDelete(item)}>
+                                {t('common.delete')}
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        )}
+                      </td>
+                    </DenseRow>
+                  );
+                })}
+              </tbody>
+            </DenseTable>
+          </CardBody>
+          <SettingsListFooter
+            count={sorted.length}
+            noun={t('settings.equipmentTypes.title').toLowerCase()}
+          />
+        </Card>
       )}
 
       <EquipmentTypeFormDialog

@@ -157,7 +157,7 @@ describe('UserDetailPage', () => {
     const backButton = screen.getByRole('button', { name: /back/i });
     await user.click(backButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/users');
+    expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users');
   });
 
   it('displays user details when loaded successfully', async () => {
@@ -361,7 +361,7 @@ describe('UserDetailPage', () => {
     const backButton = screen.getAllByRole('button', { name: /back/i })[0];
     await user.click(backButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/users');
+    expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users');
   });
 
   it('closes edit dialog when cancel is clicked', async () => {

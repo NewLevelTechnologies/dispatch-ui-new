@@ -2,7 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import {
   workOrderApi,
   workOrderTypesApi,
@@ -16,18 +16,25 @@ import {
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import WorkItemsCell from '../components/WorkItemsCell';
+import { titleCaseAddress } from '../utils/titleCaseAddress';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';
-import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
-import { Input, InputGroup } from '../components/catalyst/input';
-import { Select } from '../components/catalyst/select';
-import { Checkbox, CheckboxField } from '../components/catalyst/checkbox';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import IconButton from '../components/IconButton';
+import { Input } from '../components/catalyst/input';
 import { Field, Label } from '../components/catalyst/fieldset';
-import { Pagination, PaginationGap, PaginationList, PaginationNext, PaginationPage, PaginationPrevious } from '../components/catalyst/pagination';
+import { PageHead } from '../components/ui/PageHead';
+import { Card, CardBody } from '../components/ui/Card';
+import { Pill } from '../components/ui/Pill';
+import { ViewTabs } from '../components/ui/Tabs';
+import {
+  DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
+} from '../components/ui/DenseTable';
+import { dense } from '../components/ui/dense';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListFooter } from '../components/ui/ListFooter';
 
 // ─── Filter constants ────────────────────────────────────────────────────────
 
@@ -66,12 +73,14 @@ const DATE_PRESETS: { id: DatePreset; labelKey: string }[] = [
 
 const PAGE_SIZE = 50;
 
-const PROGRESS_COLORS: Record<ProgressCategory, 'zinc' | 'sky' | 'blue' | 'amber' | 'lime'> = {
-  NOT_STARTED: 'zinc',
-  IN_PROGRESS: 'blue',
-  BLOCKED: 'amber',
-  COMPLETED: 'lime',
-  CANCELLED: 'zinc',
+type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
+
+const PROGRESS_TONES: Record<ProgressCategory, PillTone> = {
+  NOT_STARTED: 'neutral',
+  IN_PROGRESS: 'info',
+  BLOCKED: 'warning',
+  COMPLETED: 'success',
+  CANCELLED: 'neutral',
 };
 
 const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
@@ -82,12 +91,12 @@ const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
   CANCELLED: 'cancelled',
 };
 
-const PRIORITY_COLORS = {
-  LOW: 'zinc',
-  NORMAL: 'sky',
-  HIGH: 'amber',
-  URGENT: 'rose',
-} as const;
+const PRIORITY_TONES: Record<'LOW' | 'NORMAL' | 'HIGH' | 'URGENT', PillTone> = {
+  LOW: 'neutral',
+  NORMAL: 'info',
+  HIGH: 'warning',
+  URGENT: 'danger',
+};
 
 const PRIORITY_TRANSLATION_KEYS: Record<string, string> = {
   LOW: 'low',
@@ -165,12 +174,20 @@ export default function WorkOrdersPage() {
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrderSummary | null>(null);
 
   // ── Read filter state from URL ────────────────────────────────────────────
+  // The four taxonomy filters are multi-value — read with getAll(). Old single-
+  // value bookmarks (?type=uuid) just work: getAll returns ['uuid']. We never
+  // write the old key name, so URLs migrate to the multi-value shape on first
+  // interaction without an explicit rewrite step.
+  //
+  // The array reads are memoized: searchParams.getAll() returns a fresh array
+  // every call, which would bust the queryParams useMemo and refetch on every
+  // render even when nothing changed.
   const tabId = (searchParams.get('tab') as LifecycleTabId | null) ?? DEFAULT_TAB;
-  const urlSearch = searchParams.get('search') ?? '';
-  const typeId = searchParams.get('type') ?? '';
-  const divisionId = searchParams.get('division') ?? '';
-  const regionId = searchParams.get('region') ?? '';
-  const itemStatusId = searchParams.get('itemStatus') ?? '';
+  const urlSearch = searchParams.get('q') ?? '';
+  const typeIds = useMemo(() => searchParams.getAll('type'), [searchParams]);
+  const divisionIds = useMemo(() => searchParams.getAll('division'), [searchParams]);
+  const regionIds = useMemo(() => searchParams.getAll('region'), [searchParams]);
+  const itemStatusIds = useMemo(() => searchParams.getAll('itemStatus'), [searchParams]);
   const datePreset = (searchParams.get('date') as DatePreset | null) ?? '';
   const customFrom = searchParams.get('from') ?? '';
   const customTo = searchParams.get('to') ?? '';
@@ -189,16 +206,21 @@ export default function WorkOrdersPage() {
   }, [urlSearch]);
 
   // ── URL writer ────────────────────────────────────────────────────────────
-  // Pass null to remove a param; pass a string/number/true to set it.
-  // Pass `replace: true` for high-frequency updates (typing) so the back button
-  // doesn't have to step through every keystroke.
+  // Pass null / '' / false / [] to remove a param; pass a string/number/true
+  // or string[] to set it. Arrays write as repeated params (?type=a&type=b),
+  // matching what the backend prefers and what URLSearchParams.getAll() reads
+  // back naturally. Pass `replace: true` for high-frequency updates (typing)
+  // so the back button doesn't have to step through every keystroke.
   function updateParams(
-    updates: Record<string, string | number | boolean | null>,
+    updates: Record<string, string | number | boolean | string[] | null>,
     options: { replace?: boolean } = {}
   ) {
     const next = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(updates)) {
-      if (value === null || value === '' || value === false) {
+      if (Array.isArray(value)) {
+        next.delete(key);
+        for (const v of value) next.append(key, v);
+      } else if (value === null || value === '' || value === false) {
         next.delete(key);
       } else {
         next.set(key, String(value));
@@ -209,7 +231,7 @@ export default function WorkOrdersPage() {
 
   const handleSearchInputChange = (value: string) => {
     setSearchInput(value);
-    updateParams({ search: value || null, page: null }, { replace: true });
+    updateParams({ q: value || null, page: null }, { replace: true });
   };
 
   // ── Tenant config queries (for filter dropdowns) ──────────────────────────
@@ -249,21 +271,25 @@ export default function WorkOrdersPage() {
   );
 
   // ── Build the API query params ────────────────────────────────────────────
+  // The four taxonomy filters use the plural form (workOrderTypeIds, etc.).
+  // Don't send both singular and plural for the same filter — backend's
+  // precedence rule is "plural wins," so the singular would be dead weight at
+  // best and a footgun at worst.
   const queryParams: ListWorkOrdersParams = useMemo(
     () => ({
       ...tab.params,
-      search: deferredSearch || undefined,
-      workOrderTypeId: typeId || undefined,
-      divisionId: divisionId || undefined,
-      dispatchRegionId: regionId || undefined,
-      workItemStatusId: itemStatusId || undefined,
+      q: deferredSearch || undefined,
+      workOrderTypeIds: typeIds.length > 0 ? typeIds : undefined,
+      divisionIds: divisionIds.length > 0 ? divisionIds : undefined,
+      dispatchRegionIds: regionIds.length > 0 ? regionIds : undefined,
+      workItemStatusIds: itemStatusIds.length > 0 ? itemStatusIds : undefined,
       scheduledDateFrom: dateRange.from,
       scheduledDateTo: dateRange.to,
       includeArchived: includeArchived || undefined,
       page: pageNumber - 1, // URL is 1-based; backend Spring Page is 0-based
       size: PAGE_SIZE,
     }),
-    [tab, deferredSearch, typeId, divisionId, regionId, itemStatusId, dateRange, includeArchived, pageNumber]
+    [tab, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, dateRange, includeArchived, pageNumber]
   );
 
   const { data: pageData, isLoading, error } = useQuery({
@@ -347,40 +373,58 @@ export default function WorkOrdersPage() {
   const lookupName = (id: string, list: { id: string; name: string }[]) =>
     list.find((x) => x.id === id)?.name ?? id;
 
-  const activeChips: { key: string; label: string; onClear: () => void }[] = [];
+  // Multi-value chip label: "Installation" → "Installation, Service" → "3 selected".
+  // Caller drives the format; the chip primitive doesn't know what an option means.
+  const formatMultiValue = (
+    ids: string[],
+    list: { id: string; name: string }[]
+  ): string | null => {
+    if (ids.length === 0) return null;
+    if (ids.length === 1) return lookupName(ids[0], list);
+    if (ids.length === 2) return ids.map((id) => lookupName(id, list)).join(', ');
+    return t('common.selectedCount', { count: ids.length });
+  };
+
+  type ActiveChip = { key: string; label: string; value: string; onClear: () => void };
+  const activeChips: ActiveChip[] = [];
   if (urlSearch) {
     activeChips.push({
       key: 'search',
-      label: `${t('common.search').replace('...', '')}: "${urlSearch}"`,
-      onClear: () => updateParams({ search: null, page: null }),
+      label: t('common.search').replace('...', ''),
+      value: `"${urlSearch}"`,
+      onClear: () => updateParams({ q: null, page: null }),
     });
   }
-  if (typeId) {
+  if (typeIds.length > 0) {
     activeChips.push({
       key: 'type',
-      label: `${t('workOrders.form.type')}: ${lookupName(typeId, activeTypes)}`,
-      onClear: () => updateParams({ type: null, page: null }),
+      label: t('workOrders.form.type'),
+      value: formatMultiValue(typeIds, activeTypes) ?? '',
+      onClear: () => updateParams({ type: [], page: null }),
     });
   }
-  if (divisionId) {
+  if (divisionIds.length > 0) {
     activeChips.push({
       key: 'division',
-      label: `${getName('division')}: ${lookupName(divisionId, activeDivisions)}`,
-      onClear: () => updateParams({ division: null, page: null }),
+      label: getName('division'),
+      value: formatMultiValue(divisionIds, activeDivisions) ?? '',
+      onClear: () => updateParams({ division: [], page: null }),
     });
   }
-  if (regionId) {
+  if (regionIds.length > 0) {
     activeChips.push({
       key: 'region',
-      label: `${t('workOrders.filters.region')}: ${lookupName(regionId, activeRegions)}`,
-      onClear: () => updateParams({ region: null, page: null }),
+      label: t('workOrders.filters.region'),
+      value: formatMultiValue(regionIds, activeRegions) ?? '',
+      onClear: () => updateParams({ region: [], page: null }),
     });
   }
-  if (itemStatusId) {
+  if (itemStatusIds.length > 0) {
     activeChips.push({
       key: 'itemStatus',
-      label: `${t('workOrders.filters.itemStatus')}: ${lookupName(itemStatusId, activeItemStatuses)}`,
-      onClear: () => updateParams({ itemStatus: null, page: null }),
+      label: t('workOrders.filters.itemStatus'),
+      value: formatMultiValue(itemStatusIds, activeItemStatuses) ?? '',
+      onClear: () => updateParams({ itemStatus: [], page: null }),
     });
   }
   if (datePreset !== '') {
@@ -389,7 +433,8 @@ export default function WorkOrdersPage() {
       : t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '');
     activeChips.push({
       key: 'date',
-      label: `${t('workOrders.filters.scheduled')}: ${presetLabel}`,
+      label: t('workOrders.filters.scheduled'),
+      value: presetLabel,
       onClear: () => updateParams({ date: null, from: null, to: null, page: null }),
     });
   }
@@ -400,6 +445,8 @@ export default function WorkOrdersPage() {
   };
 
   // ── Build pagination hrefs that preserve current filter state ─────────────
+  // Catalyst Pagination's hrefs render through RouterLink for SPA navigation
+  // and support middle-click / Cmd-click "open in new tab".
   const pageHref = (target: number): string => {
     const next = new URLSearchParams(searchParams);
     if (target <= 1) next.delete('page');
@@ -408,401 +455,429 @@ export default function WorkOrdersPage() {
     return qs ? `?${qs}` : '?';
   };
 
+  // ── Tab options for ViewTabs (no per-tab counts available yet) ─────────────
+  const viewTabs = LIFECYCLE_TABS.map((f) => ({ id: f.id, label: t(f.labelKey) }));
+
+  const showingStart = totalElements === 0 ? 0 : (pageNumber - 1) * PAGE_SIZE + 1;
+  const showingEnd = Math.min(pageNumber * PAGE_SIZE, totalElements);
+
+  // Subtitle — uses the one count we actually have (active tab's total).
+  // The handoff's "3 open · 1 urgent · 2 scheduled today" pattern wants
+  // per-tab counts, which are gated on a backend counts-summary endpoint.
+  const activeTabLabel = t(tab.labelKey).toLowerCase();
+  const subtitleParts: string[] = [];
+  if (totalElements > 0) {
+    subtitleParts.push(
+      `${totalElements.toLocaleString()} ${activeTabLabel} ${getName('work_order', true).toLowerCase()}`
+    );
+    if (totalElements > PAGE_SIZE) {
+      subtitleParts.push(
+        t('common.pagination.showing', {
+          start: showingStart,
+          end: showingEnd,
+          total: totalElements.toLocaleString(),
+        })
+      );
+    }
+  }
+  const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : null;
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <AppLayout>
-      <div className="flex items-center justify-between gap-4">
-        <Heading>{getName('work_order', true)}</Heading>
-        <Button onClick={handleAdd}>{t('common.actions.create', { entity: getName('work_order') })}</Button>
-      </div>
-
-      {/* Filter bar */}
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        <InputGroup className="min-w-[260px] flex-1">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('workOrders.filters.searchPlaceholder')}
-            value={searchInput}
-            onChange={(e) => handleSearchInputChange(e.target.value)}
-            aria-label={t('common.search')}
-          />
-        </InputGroup>
-
-        {activeTypes.length > 0 && (
-          <div className="w-44">
-            <Select
-              aria-label={t('workOrders.form.type')}
-              value={typeId}
-              onChange={(e) => updateParams({ type: e.target.value || null, page: null })}
-            >
-              <option value="">{t('workOrders.filters.anyType')}</option>
-              {activeTypes.map((tx) => (
-                <option key={tx.id} value={tx.id}>{tx.name}</option>
-              ))}
-            </Select>
-          </div>
-        )}
-
-        {activeDivisions.length > 0 && (
-          <div className="w-44">
-            <Select
-              aria-label={getName('division')}
-              value={divisionId}
-              onChange={(e) => updateParams({ division: e.target.value || null, page: null })}
-            >
-              <option value="">{t('workOrders.filters.any', { entity: getName('division') })}</option>
-              {activeDivisions.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </Select>
-          </div>
-        )}
-
-        {activeRegions.length > 0 && (
-          <div className="w-44">
-            <Select
-              aria-label={t('workOrders.filters.region')}
-              value={regionId}
-              onChange={(e) => updateParams({ region: e.target.value || null, page: null })}
-            >
-              <option value="">{t('workOrders.filters.anyRegion')}</option>
-              {activeRegions.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </Select>
-          </div>
-        )}
-
-        {activeItemStatuses.length > 0 && (
-          <div className="w-44">
-            <Select
-              aria-label={t('workOrders.filters.itemStatus')}
-              value={itemStatusId}
-              onChange={(e) => updateParams({ itemStatus: e.target.value || null, page: null })}
-            >
-              <option value="">{t('workOrders.filters.anyItemStatus')}</option>
-              {activeItemStatuses.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </Select>
-          </div>
-        )}
-
-        <div className="w-40">
-          <Select
-            aria-label={t('workOrders.filters.scheduled')}
-            value={datePreset}
-            onChange={(e) => {
-              const next = e.target.value as DatePreset;
-              // When leaving custom, clear the custom from/to too
-              const updates: Record<string, string | null> = { date: next || null, page: null };
-              if (next !== 'custom') {
-                updates.from = null;
-                updates.to = null;
-              }
-              updateParams(updates);
-            }}
-          >
-            {DATE_PRESETS.map((p) => (
-              <option key={p.id || 'any'} value={p.id}>{t(p.labelKey)}</option>
-            ))}
-          </Select>
-        </div>
-
-        <CheckboxField className="ml-2 flex-none">
-          <Checkbox
-            name="includeArchived"
-            checked={includeArchived}
-            onChange={(checked) => updateParams({ archived: checked ? 'true' : null, page: null })}
-          />
-          <Label className="text-sm">{t('workOrders.actions.showArchived')}</Label>
-        </CheckboxField>
-
-        {pageData && (
-          <div className="ml-auto pb-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {totalElements} {totalElements === 1 ? getName('work_order').toLowerCase() : getName('work_order', true).toLowerCase()}
-          </div>
-        )}
-      </div>
-
-      {/* Custom date range inputs */}
-      {datePreset === 'custom' && (
-        <div className="mt-2 flex flex-wrap items-end gap-2">
-          <Field className="w-44">
-            <Label className="text-xs text-zinc-500">{t('workOrders.dates.from')}</Label>
-            <Input
-              type="date"
-              value={customFrom}
-              onChange={(e) => updateParams({ from: e.target.value || null, page: null })}
-            />
-          </Field>
-          <Field className="w-44">
-            <Label className="text-xs text-zinc-500">{t('workOrders.dates.to')}</Label>
-            <Input
-              type="date"
-              value={customTo}
-              onChange={(e) => updateParams({ to: e.target.value || null, page: null })}
-            />
-          </Field>
-        </div>
-      )}
-
-      {/* Lifecycle / progress tabs */}
-      <div className="mt-3 flex flex-wrap items-center gap-1">
-        {LIFECYCLE_TABS.map((f) => {
-          const isActiveTab = f.id === tabId;
-          return (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => updateParams({ tab: f.id === DEFAULT_TAB ? null : f.id, page: null })}
-              className={[
-                'rounded px-2.5 py-1 text-xs font-medium ring-1 ring-inset transition-colors',
-                isActiveTab
-                  ? 'bg-zinc-900 text-white ring-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:ring-zinc-100'
-                  : 'bg-white text-zinc-600 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-400 dark:ring-zinc-700 dark:hover:bg-zinc-800',
-              ].join(' ')}
-            >
-              {t(f.labelKey)}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Active filter chips */}
-      {activeChips.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {activeChips.map((chip) => (
-            <span
-              key={chip.key}
-              className="inline-flex items-center gap-1 rounded-full bg-zinc-100 py-0.5 pr-1 pl-2.5 text-xs text-zinc-700 ring-1 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700"
-            >
-              {chip.label}
-              <button
-                type="button"
-                onClick={chip.onClear}
-                aria-label={t('common.actions.removeFilter', { name: chip.label })}
-                className="rounded-full p-0.5 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
-              >
-                <XMarkIcon className="size-3.5" />
-              </button>
-            </span>
-          ))}
-          <button
-            type="button"
-            onClick={clearAllFilters}
-            className="ml-1 text-xs font-medium text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-400"
-          >
-            {t('workOrders.filters.clearAll')}
-          </button>
-        </div>
-      )}
-
-      {isLoading && (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: getName('work_order', true) })}</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-          <p className="text-sm text-red-800 dark:text-red-400">
-            {t('common.actions.errorLoading', { entities: getName('work_order', true) })}: {(error as Error).message}
-          </p>
-        </div>
-      )}
-
-      {pageData && workOrders.length === 0 && activeChips.length === 0 && tabId === DEFAULT_TAB && (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: getName('work_order', true) })}</p>
-          <Button className="mt-2" onClick={handleAdd}>
-            {t('common.actions.createFirst', { entity: getName('work_order') })}
-          </Button>
-        </div>
-      )}
-
-      {pageData && workOrders.length === 0 && (activeChips.length > 0 || tabId !== DEFAULT_TAB) && (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.noMatchSearch', { entities: getName('work_order', true) })}
-          </p>
-          {activeChips.length > 0 && (
-            <Button plain className="mt-2" onClick={clearAllFilters}>
-              {t('workOrders.filters.clearAll')}
+      <div>
+        <PageHead
+          title={getName('work_order', true)}
+          sub={subtitle}
+          actions={
+            <Button color="accent" onClick={handleAdd}>
+              {t('common.actions.create', { entity: getName('work_order') })}
             </Button>
-          )}
-        </div>
-      )}
+          }
+        />
 
-      {workOrders.length > 0 && (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('workOrders.table.id')}</TableHeader>
-                <TableHeader>{getName('service_location')}</TableHeader>
-                <TableHeader>{t('workOrders.table.work')}</TableHeader>
-                <TableHeader>{t('workOrders.table.type')}</TableHeader>
-                <TableHeader>{t('workOrders.table.statusHeader')}</TableHeader>
-                <TableHeader>{t('workOrders.table.priority')}</TableHeader>
-                <TableHeader>{t('workOrders.table.scheduled')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {workOrders.map((workOrder) => {
-                const cancelled = isCancelled(workOrder);
-                const archived = !!workOrder.archivedAt;
-                const completed = workOrder.progressCategory === 'COMPLETED';
-                const rowClass = [
-                  cancelled || archived ? 'opacity-60' : '',
-                ].filter(Boolean).join(' ');
-                return (
-                  <TableRow key={workOrder.id} className={rowClass}>
-                    <TableCell className="font-mono text-sm text-zinc-500">
-                      <div className="flex flex-col">
-                        <RouterLink
-                          to={`/work-orders/${workOrder.id}`}
-                          className="text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
-                        >
-                          {workOrder.workOrderNumber || `#${workOrder.id.substring(0, 8)}`}
-                        </RouterLink>
-                        {archived && (
-                          <span className="text-[10px] uppercase tracking-wide text-zinc-400">
-                            {t('workOrders.actions.archived')}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col">
-                        <span>
-                          {workOrder.serviceLocation?.locationName || workOrder.customer?.name || '-'}
-                        </span>
-                        <span className="text-sm text-zinc-500">
-                          {workOrder.serviceLocation?.address.streetAddress || ''}{' '}
-                          {workOrder.serviceLocation?.address.city || ''}, {workOrder.serviceLocation?.address.state || ''}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <WorkItemsCell
-                        items={workOrder.workItems}
-                        totalCount={workOrder.workItemCount}
-                      />
-                    </TableCell>
-                    <TableCell className="text-zinc-600 dark:text-zinc-400">
-                      {activeTypes.find((tp) => tp.id === workOrder.workOrderTypeId)?.name ?? '—'}
-                    </TableCell>
-                    <TableCell>
-                      {cancelled ? (
-                        <div className="flex flex-col gap-0.5">
-                          <Badge color="zinc">{t('workOrders.actions.cancelledBadge')}</Badge>
-                          {workOrder.cancelledAt && (
-                            <span className="text-[10px] text-zinc-500">
-                              {t('workOrders.table.cancelledOn', { date: formatDate(workOrder.cancelledAt) })}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <Badge color={PROGRESS_COLORS[workOrder.progressCategory]}>
-                          {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[workOrder.progressCategory]}`)}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge color={PRIORITY_COLORS[workOrder.priority ?? 'NORMAL']}>
-                        {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[workOrder.priority ?? 'NORMAL']}`)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-zinc-500">
-                      {formatDate(workOrder.scheduledDate)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                        <Dropdown>
-                          <DropdownButton plain aria-label={t('common.moreOptions')}>
-                            <EllipsisVerticalIcon className="size-5" />
-                          </DropdownButton>
-                          <DropdownMenu anchor="bottom end">
-                            <DropdownItem onClick={() => handleEdit(workOrder)}>
-                              <DropdownLabel>{cancelled ? t('common.view') : t('common.edit')}</DropdownLabel>
-                            </DropdownItem>
-                            {!cancelled && !completed && (
-                              <DropdownItem onClick={() => handleCancel(workOrder)}>
-                                <DropdownLabel>{t('workOrders.actions.cancel', { entity: getName('work_order') })}</DropdownLabel>
-                              </DropdownItem>
+        {/* Filter bar — loose on the canvas, not wrapped in a Card. Cards
+            are reserved for content surfaces (the table below); the filter
+            row is an action affordance. */}
+        <div className="mb-3">
+          <ListToolbar
+            search={
+              <ListSearch
+                placeholder={t('workOrders.filters.searchPlaceholder', { customer: getName('customer') })}
+                value={searchInput}
+                onChange={handleSearchInputChange}
+                ariaLabel={t('common.search')}
+              />
+            }
+          >
+              {/* Four taxonomy chips are multi-select. No "Any X" reset row —
+                  the × button clears all, and an empty array means "show all"
+                  by way of the empty-state chip styling. */}
+              {activeTypes.length > 0 && (
+                <FilterChipListbox
+                  multiple
+                  label={t('workOrders.form.type')}
+                  ariaLabel={t('workOrders.form.type')}
+                  value={typeIds}
+                  displayValue={formatMultiValue(typeIds, activeTypes)}
+                  onChange={(ids) => updateParams({ type: ids, page: null })}
+                  onClear={() => updateParams({ type: [], page: null })}
+                >
+                  {activeTypes.map((tx) => (
+                    <ChipListboxOption key={tx.id} value={tx.id}>
+                      {tx.name}
+                    </ChipListboxOption>
+                  ))}
+                </FilterChipListbox>
+              )}
+
+              {activeDivisions.length > 0 && (
+                <FilterChipListbox
+                  multiple
+                  label={getName('division')}
+                  ariaLabel={getName('division')}
+                  value={divisionIds}
+                  displayValue={formatMultiValue(divisionIds, activeDivisions)}
+                  onChange={(ids) => updateParams({ division: ids, page: null })}
+                  onClear={() => updateParams({ division: [], page: null })}
+                >
+                  {activeDivisions.map((d) => (
+                    <ChipListboxOption key={d.id} value={d.id}>
+                      {d.name}
+                    </ChipListboxOption>
+                  ))}
+                </FilterChipListbox>
+              )}
+
+              {activeRegions.length > 0 && (
+                <FilterChipListbox
+                  multiple
+                  label={t('workOrders.filters.region')}
+                  ariaLabel={t('workOrders.filters.region')}
+                  value={regionIds}
+                  displayValue={formatMultiValue(regionIds, activeRegions)}
+                  onChange={(ids) => updateParams({ region: ids, page: null })}
+                  onClear={() => updateParams({ region: [], page: null })}
+                >
+                  {activeRegions.map((r) => (
+                    <ChipListboxOption key={r.id} value={r.id}>
+                      {r.name}
+                    </ChipListboxOption>
+                  ))}
+                </FilterChipListbox>
+              )}
+
+              {activeItemStatuses.length > 0 && (
+                <FilterChipListbox
+                  multiple
+                  label={t('workOrders.filters.itemStatus')}
+                  ariaLabel={t('workOrders.filters.itemStatus')}
+                  value={itemStatusIds}
+                  displayValue={formatMultiValue(itemStatusIds, activeItemStatuses)}
+                  onChange={(ids) => updateParams({ itemStatus: ids, page: null })}
+                  onClear={() => updateParams({ itemStatus: [], page: null })}
+                >
+                  {activeItemStatuses.map((s) => (
+                    <ChipListboxOption key={s.id} value={s.id}>
+                      {s.name}
+                    </ChipListboxOption>
+                  ))}
+                </FilterChipListbox>
+              )}
+
+              <FilterChipListbox
+                label={t('workOrders.filters.scheduled')}
+                ariaLabel={t('workOrders.filters.scheduled')}
+                value={datePreset || null}
+                displayValue={
+                  datePreset === ''
+                    ? null
+                    : datePreset === 'custom'
+                      ? `${customFrom || '…'} – ${customTo || '…'}`
+                      : t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '')
+                }
+                onChange={(id) => {
+                  const updates: Record<string, string | null> = { date: id, page: null };
+                  if (id !== 'custom') {
+                    updates.from = null;
+                    updates.to = null;
+                  }
+                  updateParams(updates);
+                }}
+                onClear={() => updateParams({ date: null, from: null, to: null, page: null })}
+                resetLabel={t('workOrders.dates.any')}
+              >
+                {DATE_PRESETS.filter((p) => p.id !== '').map((p) => (
+                  <ChipListboxOption key={p.id} value={p.id}>
+                    {t(p.labelKey)}
+                  </ChipListboxOption>
+                ))}
+              </FilterChipListbox>
+
+              {/* Archived: hidden by default. "Archived only" is a backend
+                  gap (no `archivedOnly` param yet) — surfaced as an option
+                  but mapped to includeArchived=true for now so the user
+                  isn't blocked from at least *finding* archived rows. */}
+              <FilterChipListbox
+                label={t('workOrders.filters.archived')}
+                ariaLabel={t('workOrders.filters.archived')}
+                value={includeArchived ? 'shown' : null}
+                displayValue={includeArchived ? t('workOrders.filters.archivedShown') : null}
+                onChange={(id) => {
+                  updateParams({
+                    archived: id === 'shown' || id === 'only' ? 'true' : null,
+                    page: null,
+                  });
+                }}
+                onClear={() => updateParams({ archived: null, page: null })}
+                resetLabel={t('workOrders.filters.archivedHidden')}
+              >
+                <ChipListboxOption value="shown">{t('workOrders.filters.archivedShown')}</ChipListboxOption>
+              </FilterChipListbox>
+
+              {activeChips.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="ml-1 text-[11.5px] font-medium text-fg-muted underline-offset-2 hover:underline hover:text-fg-strong"
+                >
+                  {t('workOrders.filters.clearAll')}
+                </button>
+              )}
+          </ListToolbar>
+
+            {/* Custom date range inputs — surface only when the date chip is in custom mode */}
+            {datePreset === 'custom' && (
+              <div className="mt-2 flex flex-wrap items-end gap-2">
+                <Field className="w-44">
+                  <Label className="text-xs text-fg-muted">{t('workOrders.dates.from')}</Label>
+                  <Input
+                    type="date"
+                    value={customFrom}
+                    onChange={(e) => updateParams({ from: e.target.value || null, page: null })}
+                    className={dense.input}
+                  />
+                </Field>
+                <Field className="w-44">
+                  <Label className="text-xs text-fg-muted">{t('workOrders.dates.to')}</Label>
+                  <Input
+                    type="date"
+                    value={customTo}
+                    onChange={(e) => updateParams({ to: e.target.value || null, page: null })}
+                    className={dense.input}
+                  />
+                </Field>
+              </div>
+            )}
+        </div>
+
+        {/* Lifecycle / progress tabs */}
+        <ViewTabs
+          className="mb-3"
+          value={tabId}
+          onChange={(id) => updateParams({ tab: id === DEFAULT_TAB ? null : id, page: null })}
+          tabs={viewTabs}
+        />
+
+        {isLoading && (
+          <Card>
+            <CardBody>
+              <p className="text-[12.5px] text-fg-muted text-center">
+                {t('common.actions.loading', { entities: getName('work_order', true) })}
+              </p>
+            </CardBody>
+          </Card>
+        )}
+
+        {error && (
+          <Card className="border-danger-500/40 bg-danger-100/40">
+            <CardBody>
+              <p className="text-[12.5px] text-danger-500">
+                {t('common.actions.errorLoading', { entities: getName('work_order', true) })}: {(error as Error).message}
+              </p>
+            </CardBody>
+          </Card>
+        )}
+
+        {pageData && workOrders.length === 0 && activeChips.length === 0 && tabId === DEFAULT_TAB && (
+          <Card>
+            <CardBody>
+              <p className="text-[12.5px] text-fg-muted">
+                {t('common.actions.notFound', { entities: getName('work_order', true) })}
+              </p>
+              <Button color="accent" className="mt-2" onClick={handleAdd}>
+                {t('common.actions.createFirst', { entity: getName('work_order') })}
+              </Button>
+            </CardBody>
+          </Card>
+        )}
+
+        {pageData && workOrders.length === 0 && (activeChips.length > 0 || tabId !== DEFAULT_TAB) && (
+          <Card>
+            <CardBody>
+              <p className="text-[12.5px] text-fg-muted">
+                {t('common.actions.noMatchSearch', { entities: getName('work_order', true) })}
+              </p>
+              {activeChips.length > 0 && (
+                <Button plain className="mt-2" onClick={clearAllFilters}>
+                  {t('workOrders.filters.clearAll')}
+                </Button>
+              )}
+            </CardBody>
+          </Card>
+        )}
+
+        {workOrders.length > 0 && (
+          <Card>
+            <CardBody flush>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{t('workOrders.table.id')}</th>
+                    <th>{getName('service_location')}</th>
+                    <th>{t('workOrders.table.work')}</th>
+                    <th>{t('workOrders.table.type')}</th>
+                    <th>{t('workOrders.table.statusHeader')}</th>
+                    <th>{t('workOrders.table.priority')}</th>
+                    <th>{t('workOrders.table.scheduled')}</th>
+                    <th></th>
+                  </tr>
+                </DenseTHead>
+                <tbody>
+                  {workOrders.map((workOrder) => {
+                    const cancelled = isCancelled(workOrder);
+                    const archived = !!workOrder.archivedAt;
+                    const completed = workOrder.progressCategory === 'COMPLETED';
+                    const dimmed = cancelled || archived;
+                    return (
+                      <DenseRow key={workOrder.id} className={dimmed ? 'opacity-60' : undefined}>
+                        <td>
+                          <CellStack>
+                            <CellTop>
+                              <RouterLink
+                                to={`/work-orders/${workOrder.id}`}
+                                className="id-mono text-fg-muted hover:text-accent-500 hover:underline"
+                              >
+                                {workOrder.workOrderNumber || `#${workOrder.id.substring(0, 8)}`}
+                              </RouterLink>
+                            </CellTop>
+                            {archived && (
+                              <CellSub>{t('workOrders.actions.archived')}</CellSub>
                             )}
-                            <DropdownItem onClick={() => handleArchiveToggle(workOrder)}>
-                              <DropdownLabel>
-                                {archived ? t('workOrders.actions.unarchive') : t('workOrders.actions.archive')}
-                              </DropdownLabel>
-                            </DropdownItem>
-                            <DropdownDivider />
-                            <DropdownItem onClick={() => handleDelete(workOrder)}>
-                              <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </Dropdown>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+                          </CellStack>
+                        </td>
+                        <td>
+                          <CellStack>
+                            <CellTop>
+                              {workOrder.serviceLocation?.locationName || workOrder.customer?.name || '-'}
+                            </CellTop>
+                            <CellSub>
+                              {(() => {
+                                const a = workOrder.serviceLocation?.address;
+                                if (!a) return '';
+                                // US convention: "Street, City, ST ZIP" — single
+                                // space between state and ZIP, not a comma.
+                                const stateZip = [a.state, a.zipCode].filter(Boolean).join(' ');
+                                return [
+                                  titleCaseAddress(a.streetAddress),
+                                  titleCaseAddress(a.city),
+                                  stateZip,
+                                ].filter(Boolean).join(', ');
+                              })()}
+                            </CellSub>
+                          </CellStack>
+                        </td>
+                        <td>
+                          <WorkItemsCell
+                            items={workOrder.workItems}
+                            totalCount={workOrder.workItemCount}
+                          />
+                        </td>
+                        <td>
+                          {activeTypes.find((tp) => tp.id === workOrder.workOrderTypeId)?.name ?? '—'}
+                        </td>
+                        <td>
+                          {cancelled ? (
+                            <CellStack>
+                              <CellTop><Pill tone="neutral">{t('workOrders.actions.cancelledBadge')}</Pill></CellTop>
+                              {workOrder.cancelledAt && (
+                                <CellSub>
+                                  {t('workOrders.table.cancelledOn', { date: formatDate(workOrder.cancelledAt) })}
+                                </CellSub>
+                              )}
+                            </CellStack>
+                          ) : (
+                            <Pill tone={PROGRESS_TONES[workOrder.progressCategory]} dot>
+                              {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[workOrder.progressCategory]}`)}
+                            </Pill>
+                          )}
+                        </td>
+                        <td>
+                          <Pill tone={PRIORITY_TONES[workOrder.priority ?? 'NORMAL']}>
+                            {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[workOrder.priority ?? 'NORMAL']}`)}
+                          </Pill>
+                        </td>
+                        <td>
+                          {formatDate(workOrder.scheduledDate)}
+                        </td>
+                        <td>
+                          <Dropdown>
+                            <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                              <EllipsisVerticalIcon className="size-4" />
+                            </DropdownButton>
+                            <DropdownMenu anchor="bottom end">
+                              <DropdownItem onClick={() => handleEdit(workOrder)}>
+                                <DropdownLabel>{cancelled ? t('common.view') : t('common.edit')}</DropdownLabel>
+                              </DropdownItem>
+                              {!cancelled && !completed && (
+                                <DropdownItem onClick={() => handleCancel(workOrder)}>
+                                  <DropdownLabel>{t('workOrders.actions.cancel', { entity: getName('work_order') })}</DropdownLabel>
+                                </DropdownItem>
+                              )}
+                              <DropdownItem onClick={() => handleArchiveToggle(workOrder)}>
+                                <DropdownLabel>
+                                  {archived ? t('workOrders.actions.unarchive') : t('workOrders.actions.archive')}
+                                </DropdownLabel>
+                              </DropdownItem>
+                              <DropdownDivider />
+                              <DropdownItem onClick={() => handleDelete(workOrder)}>
+                                <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        </td>
+                      </DenseRow>
+                    );
+                  })}
+                </tbody>
+              </DenseTable>
 
-      {/* Pagination — Catalyst hrefs preserve all current filter params */}
-      {totalPages > 1 && (
-        <Pagination className="mt-4">
-          <PaginationPrevious href={pageNumber > 1 ? pageHref(pageNumber - 1) : null} />
-          <PaginationList>
-            {(() => {
-              const pages: (number | 'gap')[] = [];
-              if (totalPages <= 7) {
-                for (let i = 1; i <= totalPages; i++) pages.push(i);
-              } else {
-                pages.push(1);
-                if (pageNumber > 3) pages.push('gap');
-                const start = Math.max(2, pageNumber - 1);
-                const end = Math.min(totalPages - 1, pageNumber + 1);
-                for (let i = start; i <= end; i++) pages.push(i);
-                if (pageNumber < totalPages - 2) pages.push('gap');
-                pages.push(totalPages);
-              }
-              return pages.map((p, idx) =>
-                p === 'gap' ? (
-                  <PaginationGap key={`gap-${idx}`} />
-                ) : (
-                  <PaginationPage
-                    key={p}
-                    href={pageHref(p)}
-                    current={p === pageNumber}
-                  >
-                    {p}
-                  </PaginationPage>
-                )
-              );
-            })()}
-          </PaginationList>
-          <PaginationNext href={pageNumber < totalPages ? pageHref(pageNumber + 1) : null} />
-        </Pagination>
-      )}
+              <ListFooter
+                page={pageNumber}
+                totalPages={totalPages}
+                pageHref={pageHref}
+                left={t('common.pagination.showing', {
+                  start: showingStart,
+                  end: showingEnd,
+                  total: totalElements.toLocaleString(),
+                })}
+              />
+            </CardBody>
+          </Card>
+        )}
 
-      <WorkOrderFormDialog
-        isOpen={isFormOpen}
-        onClose={handleCloseForm}
-        workOrder={selectedWorkOrder}
-      />
+        <WorkOrderFormDialog
+          isOpen={isFormOpen}
+          onClose={handleCloseForm}
+          workOrder={selectedWorkOrder}
+        />
 
-      <CancelWorkOrderDialog
-        isOpen={isCancelOpen}
-        onClose={handleCloseCancel}
-        workOrder={selectedWorkOrder}
-      />
+        <CancelWorkOrderDialog
+          isOpen={isCancelOpen}
+          onClose={handleCloseCancel}
+          workOrder={selectedWorkOrder}
+        />
+      </div>
     </AppLayout>
   );
 }

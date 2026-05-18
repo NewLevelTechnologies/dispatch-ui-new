@@ -79,7 +79,7 @@ describe('TerminologyPanel', () => {
     const workOrderSingular = screen.getByPlaceholderText('Work Order');
     await user.type(workOrderSingular, 'Job');
 
-    await user.click(screen.getByRole('button', { name: /update/i }));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => {
       expect(apiClient.put).toHaveBeenCalledWith(
@@ -93,7 +93,7 @@ describe('TerminologyPanel', () => {
     });
   });
 
-  it('reset-to-default button clears the customization', async () => {
+  it('reset-to-defaults button clears all customizations', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.put).mockResolvedValue({ data: mockSettings });
 
@@ -103,18 +103,13 @@ describe('TerminologyPanel', () => {
 
     await user.click(screen.getByRole('button', { name: /edit/i }));
 
-    // The customer entity already has a customization (Client/Clients), so the reset icon
-    // appears in the customer row. Clicking it clears the customization.
-    const resetButtons = screen.getAllByRole('button', { name: /reset/i });
-    expect(resetButtons.length).toBeGreaterThan(0);
-    await user.click(resetButtons[0]);
+    // The page-level "Reset to defaults" secondary clears every customization.
+    await user.click(screen.getByRole('button', { name: /reset to defaults/i }));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
 
-    await user.click(screen.getByRole('button', { name: /update/i }));
-
-    // After reset, the glossary submitted should not include the customer entity
     await waitFor(() => {
       const callArg = vi.mocked(apiClient.put).mock.calls[0][1] as { glossary?: Record<string, unknown> };
-      expect(callArg.glossary).not.toHaveProperty('customer');
+      expect(callArg.glossary).toEqual({});
     });
   });
 

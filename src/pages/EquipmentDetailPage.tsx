@@ -53,6 +53,7 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from '../components/catalyst/dropdown';
+import IconButton from '../components/IconButton';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -574,13 +575,17 @@ export default function EquipmentDetailPage() {
           {/* Header action group. Edit opens the full form dialog; the
               overflow menu carries the destructive Delete. */}
           <div className="flex items-center gap-1">
-            <Button outline onClick={() => setIsEditDialogOpen(true)}>
-              <PencilIcon className="size-4" />
+            <Button
+              outline
+              onClick={() => setIsEditDialogOpen(true)}
+              className="border-border text-fg-strong hover:bg-bg-hover dark:border-border dark:text-fg-strong dark:hover:bg-bg-hover"
+            >
+              <PencilIcon data-slot="icon" />
               {t('common.edit')}
             </Button>
             <Dropdown>
-              <DropdownButton plain aria-label={t('common.moreOptions')}>
-                <EllipsisVerticalIcon className="size-5" />
+              <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                <EllipsisVerticalIcon className="size-4" />
               </DropdownButton>
               <DropdownMenu anchor="bottom end">
                 <DropdownItem onClick={handleDeleteEquipment}>
@@ -1028,8 +1033,8 @@ export default function EquipmentDetailPage() {
                           <TableCell>
                             <div className="-mx-3 -my-1.5 sm:-mx-2.5">
                               <Dropdown>
-                                <DropdownButton plain aria-label={t('common.moreOptions')}>
-                                  <EllipsisVerticalIcon className="size-5" />
+                                <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                                  <EllipsisVerticalIcon className="size-4" />
                                 </DropdownButton>
                                 <DropdownMenu anchor="bottom end">
                                   <DropdownItem onClick={() => openEditFilter(f)}>

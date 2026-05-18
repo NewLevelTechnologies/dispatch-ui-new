@@ -1,0 +1,138 @@
+/* ───────────────────────────────────────────────────────────────────
+   Coolfront / Admin Dashboard — Design tokens
+   ───────────────────────────────────────────────────────────────────
+
+   Drop this file into your project and import once at the app root,
+   BEFORE Tailwind's preflight. e.g. in main.tsx / layout.tsx:
+
+       import './tokens.css';
+       import './globals.css';   // your existing Tailwind entry
+
+   Apply the theme classes on <html> via ThemeProvider (see handoff).
+   Sidebar tokens are intentionally dark in both light & dark modes —
+   they don't follow the theme, by design (matches Linear, Vercel,
+   ServiceTitan).
+
+   Tokens are oklch() so they're perceptually uniform — interpolation
+   between accent shades stays visually balanced.
+   ─────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Type ─────────────────────────────────────────────────────────── */
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Radii ────────────────────────────────────────────────────────── */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+
+  /* Accent — default "warm trade orange". Override via .accent-cool */
+  --accent-50:  oklch(97% 0.02 55);
+  --accent-100: oklch(94% 0.05 55);
+  --accent-200: oklch(88% 0.10 55);
+  --accent-300: oklch(80% 0.14 55);
+  --accent-400: oklch(74% 0.17 55);
+  --accent-500: oklch(68% 0.185 50);
+  --accent-600: oklch(60% 0.19 45);
+  --accent-700: oklch(52% 0.17 42);
+
+  /* Semantic tones ───────────────────────────────────────────────── */
+  --info-500:    oklch(62% 0.16 235);
+  --info-100:    oklch(94% 0.04 235);
+  --success-500: oklch(60% 0.15 152);
+  --success-100: oklch(94% 0.05 152);
+  --warning-500: oklch(74% 0.16 78);
+  --warning-100: oklch(95% 0.06 78);
+  --danger-500:  oklch(58% 0.21 27);
+  --danger-100:  oklch(94% 0.06 27);
+  --violet-500:  oklch(58% 0.18 295);
+  --violet-100:  oklch(94% 0.05 295);
+}
+
+/* Cool accent — steel teal. Apply by adding `accent-cool` class to <html> */
+.accent-cool {
+  --accent-50:  oklch(97% 0.015 215);
+  --accent-100: oklch(93% 0.035 215);
+  --accent-200: oklch(86% 0.06 215);
+  --accent-300: oklch(76% 0.09 215);
+  --accent-400: oklch(66% 0.115 215);
+  --accent-500: oklch(56% 0.125 215);
+  --accent-600: oklch(48% 0.115 215);
+  --accent-700: oklch(40% 0.10 215);
+}
+
+/* ── Light theme ─────────────────────────────────────────────────── */
+.theme-light {
+  --bg:           oklch(98.4% 0.004 80);   /* subtly warm paper */
+  --bg-sunken:    oklch(96.2% 0.005 80);   /* canvas behind cards */
+  --bg-elev:      oklch(100% 0 0);         /* card surface */
+  --bg-elev-2:    oklch(99% 0.003 80);     /* nested card / table header */
+  --bg-hover:     oklch(95.5% 0.006 80);
+  --bg-active:    oklch(93% 0.008 80);
+
+  --sidebar-bg:    oklch(20% 0.008 255);
+  --sidebar-bg-2:  oklch(24% 0.01 255);
+  --sidebar-fg:    oklch(85% 0.008 255);
+  --sidebar-fg-dim:oklch(60% 0.01 255);
+  --sidebar-border:oklch(28% 0.01 255);
+
+  --fg:        oklch(22% 0.012 80);
+  --fg-strong: oklch(15% 0.012 80);
+  --fg-muted:  oklch(50% 0.012 80);
+  --fg-dim:    oklch(64% 0.01 80);
+
+  --border:        oklch(91% 0.008 80);
+  --border-strong: oklch(86% 0.01 80);
+  --border-soft:   oklch(94% 0.006 80);
+
+  --shadow-sm: 0 1px 2px 0 oklch(20% 0.02 80 / 0.05);
+  --shadow-md: 0 1px 3px 0 oklch(20% 0.02 80 / 0.06), 0 1px 2px -1px oklch(20% 0.02 80 / 0.06);
+  --shadow-lg: 0 4px 14px -2px oklch(20% 0.02 80 / 0.08), 0 2px 6px -3px oklch(20% 0.02 80 / 0.06);
+}
+
+/* ── Dark theme ──────────────────────────────────────────────────── */
+.theme-dark {
+  --bg:                 oklch(17% 0.008 250);
+  --bg-sunken:          oklch(14% 0.008 250);
+  --bg-elev:            oklch(21% 0.01 250);
+  --bg-elev-2:          oklch(24% 0.011 250);
+  --bg-hover:           oklch(26% 0.012 250);
+  --bg-active:          oklch(29% 0.014 250);
+
+  --sidebar-bg:         oklch(13% 0.008 255);
+  --sidebar-bg-2:       oklch(17% 0.01 255);
+  --sidebar-fg:         oklch(88% 0.008 255);
+  --sidebar-fg-dim:     oklch(66% 0.01 255);
+  --sidebar-border:     oklch(22% 0.011 255);
+
+  --fg:                 oklch(92% 0.008 250);
+  --fg-strong:          oklch(98% 0.004 250);
+  --fg-muted:           oklch(75% 0.012 250);
+  --fg-dim:             oklch(66% 0.012 250);
+
+  --border:             oklch(28% 0.013 250);
+  --border-strong:      oklch(35% 0.015 250);
+  --border-soft:        oklch(24% 0.011 250);
+
+  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.4);
+  --shadow-md: 0 1px 3px 0 rgba(0,0,0,0.5), 0 1px 2px -1px rgba(0,0,0,0.4);
+  --shadow-lg: 0 4px 14px -2px rgba(0,0,0,0.5), 0 2px 6px -3px rgba(0,0,0,0.4);
+}
+
+/* ── Base body smoothing ─────────────────────────────────────────── */
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-sunken);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+.font-mono, .id-mono { font-family: var(--font-mono); font-feature-settings: 'tnum'; }
+.tnum { font-variant-numeric: tabular-nums; }

@@ -17,6 +17,7 @@ import { Button } from '../../../components/catalyst/button';
 import IconButton from '../../../components/IconButton';
 import { Badge } from '../../../components/catalyst/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/catalyst/table';
+import { Card, CardBody } from '../../../components/ui/Card';
 import { Dialog, DialogActions, DialogBody, DialogTitle } from '../../../components/catalyst/dialog';
 import { Field, FieldGroup, Label, Description } from '../../../components/catalyst/fieldset';
 import { Select } from '../../../components/catalyst/select';
@@ -180,7 +181,7 @@ export default function StatusWorkflowsPanel() {
           </Text>
         </div>
         {canEdit && (
-          <Button onClick={() => setIsDialogOpen(true)} disabled={!statuses || statuses.length < 2}>
+          <Button color="accent" onClick={() => setIsDialogOpen(true)} disabled={!statuses || statuses.length < 2}>
             {t('settings.statusWorkflows.addRule')}
           </Button>
         )}
@@ -195,38 +196,40 @@ export default function StatusWorkflowsPanel() {
       )}
 
       {rules && rules.length > 0 && (
-        <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-          <TableHead>
-            <TableRow>
-              <TableHeader>{t('settings.statusWorkflows.from')}</TableHeader>
-              <TableHeader></TableHeader>
-              <TableHeader>{t('settings.statusWorkflows.to')}</TableHeader>
-              <TableHeader>Approval</TableHeader>
-              <TableHeader></TableHeader>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rules.map((rule) => (
-              <TableRow key={rule.id}>
-                <TableCell className="font-medium">{lookupStatusName(rule.fromStatusId)}</TableCell>
-                <TableCell className="text-zinc-400 w-8 text-center">
-                  <ArrowRightIcon className="h-4 w-4 inline" />
-                </TableCell>
-                <TableCell className="font-medium">{lookupStatusName(rule.toStatusId)}</TableCell>
-                <TableCell>
-                  {rule.requiresApproval ? (
-                    <Badge color="amber">
-                      {rule.approvalRole ? `Requires ${rule.approvalRole}` : 'Requires approval'}
-                    </Badge>
-                  ) : (
-                    <span className="text-zinc-400">—</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="-mx-3 -my-1.5 sm:-mx-2.5 flex items-center justify-end">
-                    {canEdit && (
-                      <IconButton
-                        onClick={() => handleDelete(rule)}
+        <Card>
+          <CardBody flush>
+            <Table dense className="[--gutter:theme(spacing.1)] text-sm">
+              <TableHead>
+                <TableRow>
+                  <TableHeader>{t('settings.statusWorkflows.from')}</TableHeader>
+                  <TableHeader></TableHeader>
+                  <TableHeader>{t('settings.statusWorkflows.to')}</TableHeader>
+                  <TableHeader>Approval</TableHeader>
+                  <TableHeader></TableHeader>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {rules.map((rule) => (
+                  <TableRow key={rule.id}>
+                    <TableCell className="font-medium">{lookupStatusName(rule.fromStatusId)}</TableCell>
+                    <TableCell className="text-zinc-400 w-8 text-center">
+                      <ArrowRightIcon className="h-4 w-4 inline" />
+                    </TableCell>
+                    <TableCell className="font-medium">{lookupStatusName(rule.toStatusId)}</TableCell>
+                    <TableCell>
+                      {rule.requiresApproval ? (
+                        <Badge color="amber">
+                          {rule.approvalRole ? `Requires ${rule.approvalRole}` : 'Requires approval'}
+                        </Badge>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="-mx-3 -my-1.5 sm:-mx-2.5 flex items-center justify-end">
+                        {canEdit && (
+                          <IconButton
+                            onClick={() => handleDelete(rule)}
                         title={t('common.delete')}
                         aria-label={t('common.delete')}
                       >
@@ -237,8 +240,10 @@ export default function StatusWorkflowsPanel() {
                 </TableCell>
               </TableRow>
             ))}
-          </TableBody>
-        </Table>
+              </TableBody>
+            </Table>
+          </CardBody>
+        </Card>
       )}
 
       {statuses && (

@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from './catalyst/badge';
 import { Text } from './catalyst/text';
 import { Subheading } from './catalyst/heading';
-import { Select } from './catalyst/select';
+import { FilterChipListbox, ChipListboxOption } from './ui/FilterChipListbox';
 import { Button } from './catalyst/button';
 import { EnvelopeIcon, DevicePhoneMobileIcon, BellIcon } from '@heroicons/react/24/outline';
 
@@ -110,36 +110,54 @@ export default function NotificationLogsList({
       <div className="flex items-center justify-between mb-2">
         <Subheading>{t('notifications.logs.title')}</Subheading>
         <div className="flex gap-2">
-          <Select
-            name="statusFilter"
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as NotificationStatus | '');
+          <FilterChipListbox
+            label={t('notifications.logs.table.status')}
+            ariaLabel={t('notifications.logs.table.status')}
+            value={statusFilter || null}
+            displayValue={statusFilter ? t(`notifications.logs.status.${statusFilter.toLowerCase()}`) : null}
+            resetLabel={t('notifications.logs.filters.allStatuses')}
+            onChange={(value) => {
+              setStatusFilter((value ?? '') as NotificationStatus | '');
               setPage(0);
             }}
-            className="w-40"
-          >
-            <option value="">{t('notifications.logs.filters.allStatuses')}</option>
-            <option value={NotificationStatus.DELIVERED}>{t('notifications.logs.status.delivered')}</option>
-            <option value={NotificationStatus.SENT}>{t('notifications.logs.status.sent')}</option>
-            <option value={NotificationStatus.PENDING}>{t('notifications.logs.status.pending')}</option>
-            <option value={NotificationStatus.BOUNCED}>{t('notifications.logs.status.bounced')}</option>
-            <option value={NotificationStatus.FAILED}>{t('notifications.logs.status.failed')}</option>
-          </Select>
-          <Select
-            name="channelFilter"
-            value={channelFilter}
-            onChange={(e) => {
-              setChannelFilter(e.target.value as NotificationChannel | '');
+            onClear={() => {
+              setStatusFilter('');
               setPage(0);
             }}
-            className="w-40"
           >
-            <option value="">{t('notifications.logs.filters.allChannels')}</option>
-            <option value={NotificationChannel.EMAIL}>{t('notifications.preferences.channelEmail')}</option>
-            <option value={NotificationChannel.SMS}>{t('notifications.preferences.channelSms')}</option>
-            <option value={NotificationChannel.PUSH}>{t('notifications.preferences.channelPush')}</option>
-          </Select>
+            <ChipListboxOption value={NotificationStatus.DELIVERED}>{t('notifications.logs.status.delivered')}</ChipListboxOption>
+            <ChipListboxOption value={NotificationStatus.SENT}>{t('notifications.logs.status.sent')}</ChipListboxOption>
+            <ChipListboxOption value={NotificationStatus.PENDING}>{t('notifications.logs.status.pending')}</ChipListboxOption>
+            <ChipListboxOption value={NotificationStatus.BOUNCED}>{t('notifications.logs.status.bounced')}</ChipListboxOption>
+            <ChipListboxOption value={NotificationStatus.FAILED}>{t('notifications.logs.status.failed')}</ChipListboxOption>
+          </FilterChipListbox>
+          <FilterChipListbox
+            label={t('notifications.logs.table.channel')}
+            ariaLabel={t('notifications.logs.table.channel')}
+            value={channelFilter || null}
+            displayValue={
+              channelFilter === NotificationChannel.EMAIL
+                ? t('notifications.preferences.channelEmail')
+                : channelFilter === NotificationChannel.SMS
+                  ? t('notifications.preferences.channelSms')
+                  : channelFilter === NotificationChannel.PUSH
+                    ? t('notifications.preferences.channelPush')
+                    : null
+            }
+            onChange={(value) => {
+              setChannelFilter((value ?? '') as NotificationChannel | '');
+              setPage(0);
+            }}
+            onClear={() => {
+              setChannelFilter('');
+              setPage(0);
+            }}
+            resetLabel={t('notifications.logs.filters.allChannels')}
+          >
+            <ChipListboxOption value={NotificationChannel.EMAIL}>{t('notifications.preferences.channelEmail')}</ChipListboxOption>
+            <ChipListboxOption value={NotificationChannel.SMS}>{t('notifications.preferences.channelSms')}</ChipListboxOption>
+            <ChipListboxOption value={NotificationChannel.PUSH}>{t('notifications.preferences.channelPush')}</ChipListboxOption>
+          </FilterChipListbox>
         </div>
       </div>
 
@@ -220,26 +238,18 @@ export default function NotificationLogsList({
             </TableBody>
           </Table>
 
-          {/* Pagination */}
+          {/* Pagination — visually matches the list-page footer band,
+              but uses local state (no router) since this component renders
+              embedded inside tabs/drawers, not as a standalone page. */}
           {totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between">
-              <div className="flex gap-4 text-sm text-zinc-600 dark:text-zinc-400">
-                <span>{t('common.pagination.showing', { start: page * 20 + 1, end: Math.min((page + 1) * 20, totalElements), total: totalElements })}</span>
-                <span>{t('common.pagination.pageOf', { page: currentPage, total: totalPages })}</span>
-              </div>
+            <div className="mt-3 flex items-center justify-between rounded-md border border-border-soft bg-bg-elev-2 px-3 py-2 text-[11.5px] text-fg-muted">
+              <span>{t('common.pagination.showing', { start: page * 20 + 1, end: Math.min((page + 1) * 20, totalElements), total: totalElements })}</span>
               <div className="flex gap-2">
-                <Button
-                  plain
-                  disabled={page === 0}
-                  onClick={() => setPage(page - 1)}
-                >
+                <Button plain disabled={page === 0} onClick={() => setPage(page - 1)}>
                   {t('common.pagination.previous')}
                 </Button>
-                <Button
-                  plain
-                  disabled={page === totalPages - 1}
-                  onClick={() => setPage(page + 1)}
-                >
+                <span>{t('common.pagination.pageOf', { page: currentPage, total: totalPages })}</span>
+                <Button plain disabled={page === totalPages - 1} onClick={() => setPage(page + 1)}>
                   {t('common.pagination.next')}
                 </Button>
               </div>

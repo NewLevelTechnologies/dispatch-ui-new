@@ -11,10 +11,13 @@ import { useHasCapability } from '../../hooks/useCurrentUser';
 import { Heading } from '../catalyst/heading';
 import { Text } from '../catalyst/text';
 import { Button } from '../catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../catalyst/table';
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from '../catalyst/dropdown';
-import { ChevronUpIcon, ChevronDownIcon, EllipsisVerticalIcon } from '@heroicons/react/16/solid';
+import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import IconButton from '../IconButton';
+import { Card, CardBody } from '../ui/Card';
+import { DenseTable, DenseTHead, DenseRow } from '../ui/DenseTable';
+import { SettingsListFooter } from './SettingsListFooter';
+import { DragHandle } from './DragHandle';
 import TaxonomyFormDialog from './TaxonomyFormDialog';
 
 interface TaxonomyApi {
@@ -48,6 +51,8 @@ export default function TaxonomyManager({
 
   const [selectedItem, setSelectedItem] = useState<TaxonomyItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const { data: items, isLoading, error } = useQuery({
     queryKey,
@@ -58,7 +63,7 @@ export default function TaxonomyManager({
     mutationFn: (id: string) => api.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey }),
     onError: (error: unknown) => {
-      alert(getApiErrorMessage(error) || `Failed to delete ${entityLabel.toLowerCase()}`);
+      alert(getApiErrorMessage(error) || t('settings.taxonomy.errorDelete', { entity: entityLabel.toLowerCase() }));
     },
   });
 
@@ -66,7 +71,7 @@ export default function TaxonomyManager({
     mutationFn: (orderedIds: string[]) => api.reorder(orderedIds),
     onSuccess: (updated) => queryClient.setQueryData(queryKey, updated),
     onError: (error: unknown) => {
-      alert(getApiErrorMessage(error) || `Failed to reorder ${entityLabel.toLowerCase()}`);
+      alert(getApiErrorMessage(error) || t('settings.taxonomy.errorReorder', { entity: entityLabel.toLowerCase() }));
       queryClient.invalidateQueries({ queryKey });
     },
   });
@@ -95,17 +100,11 @@ export default function TaxonomyManager({
     ? Math.max(...sorted.map((i) => i.sortOrder)) + 1
     : 0;
 
-  const moveUp = (index: number) => {
-    if (index <= 0) return;
+  const performReorder = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= sorted.length || to >= sorted.length) return;
     const reordered = [...sorted];
-    [reordered[index], reordered[index - 1]] = [reordered[index - 1], reordered[index]];
-    reorderMutation.mutate(reordered.map((i) => i.id));
-  };
-
-  const moveDown = (index: number) => {
-    if (index >= sorted.length - 1) return;
-    const reordered = [...sorted];
-    [reordered[index], reordered[index + 1]] = [reordered[index + 1], reordered[index]];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
     reorderMutation.mutate(reordered.map((i) => i.id));
   };
 
@@ -114,10 +113,10 @@ export default function TaxonomyManager({
       <div className="flex items-start justify-between mb-4">
         <div>
           <Heading>{title}</Heading>
-          <Text className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{description}</Text>
+          <Text className="text-sm text-fg-muted mt-1">{description}</Text>
         </div>
         {canEdit && (
-          <Button onClick={handleAdd}>
+          <Button color="accent" onClick={handleAdd}>
             {t('common.actions.add', { entity: entityLabel })}
           </Button>
         )}
@@ -125,7 +124,7 @@ export default function TaxonomyManager({
 
       {isLoading && <Text>{t('common.actions.loading', { entities: entityLabelPlural })}</Text>}
       {error && (
-        <Text className="text-red-600">
+        <Text className="text-danger-500">
           {getApiErrorMessage(error) || t('common.actions.errorLoading', { entities: entityLabelPlural })}
         </Text>
       )}
@@ -134,86 +133,98 @@ export default function TaxonomyManager({
       )}
 
       {sorted.length > 0 && (
-        <div>
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('common.form.name')}</TableHeader>
-                <TableHeader>{t('common.form.code')}</TableHeader>
-                <TableHeader className="w-24"></TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sorted.map((item, index) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="inline-block h-3 w-3 rounded-full border border-zinc-200 dark:border-zinc-700 shrink-0"
-                        style={{ backgroundColor: item.color || 'transparent' }}
-                      />
-                      <span>{item.name}</span>
-                    </div>
-                    {item.description && (
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400 font-normal mt-0.5 ml-5">
-                        {item.description}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-zinc-500 font-mono text-xs">{item.code}</TableCell>
-                  <TableCell>
-                    {canEdit && (
-                      <div className="flex items-center gap-0.5">
-                        <IconButton
-                          onClick={() => moveUp(index)}
-                          disabled={index === 0 || reorderMutation.isPending}
-                          title={t('common.moveUp')}
-                          aria-label={t('common.moveUp')}
-                        >
-                          <ChevronUpIcon className="h-4 w-4" />
-                        </IconButton>
-                        <IconButton
-                          onClick={() => moveDown(index)}
-                          disabled={index === sorted.length - 1 || reorderMutation.isPending}
-                          title={t('common.moveDown')}
-                          aria-label={t('common.moveDown')}
-                        >
-                          <ChevronDownIcon className="h-4 w-4" />
-                        </IconButton>
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5 flex items-center justify-end">
-                      {canEdit && (
-                        <Dropdown>
-                          <DropdownButton plain aria-label={t('common.moreOptions')}>
-                            <EllipsisVerticalIcon />
-                          </DropdownButton>
-                          <DropdownMenu anchor="bottom end">
-                            <DropdownItem onClick={() => handleEdit(item)}>
-                              {t('common.edit')}
-                            </DropdownItem>
-                            <DropdownItem onClick={() => handleDelete(item)}>
-                              {t('common.delete')}
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </Dropdown>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          <div className="mt-2 text-sm">
-            <Text>
-              {t('common.show')} {sorted.length} {entityLabelPlural.toLowerCase()}
-            </Text>
-          </div>
-        </div>
+        <Card>
+          <CardBody flush>
+            <DenseTable>
+              <DenseTHead>
+                <tr>
+                  <th style={{ width: 32 }}></th>
+                  <th>{t('common.form.name')}</th>
+                  <th>{t('common.form.code')}</th>
+                  <th style={{ width: 40 }}></th>
+                </tr>
+              </DenseTHead>
+              <tbody>
+                {sorted.map((item, index) => {
+                  const isDragging = dragIndex === index;
+                  const isDragOver = dragOverIndex === index && dragIndex !== null && dragIndex !== index;
+                  return (
+                    <DenseRow
+                      key={item.id}
+                      draggable={canEdit}
+                      onDragStart={(e: React.DragEvent) => {
+                        if (!canEdit) return;
+                        setDragIndex(index);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragOver={(e: React.DragEvent) => {
+                        if (dragIndex === null) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        if (dragOverIndex !== index) setDragOverIndex(index);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverIndex === index) setDragOverIndex(null);
+                      }}
+                      onDrop={(e: React.DragEvent) => {
+                        e.preventDefault();
+                        if (dragIndex !== null) performReorder(dragIndex, index);
+                        setDragIndex(null);
+                        setDragOverIndex(null);
+                      }}
+                      onDragEnd={() => {
+                        setDragIndex(null);
+                        setDragOverIndex(null);
+                      }}
+                      className={
+                        [
+                          isDragging && 'opacity-50',
+                          isDragOver && 'outline outline-2 outline-accent-500/40 outline-offset-[-2px]',
+                        ].filter(Boolean).join(' ')
+                      }
+                    >
+                      <td>{canEdit && <DragHandle />}</td>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          {item.color && (
+                            <span
+                              aria-hidden
+                              className="inline-block h-2.5 w-2.5 rounded-full border border-border shrink-0"
+                              style={{ backgroundColor: item.color }}
+                            />
+                          )}
+                          <span className="strong">{item.name}</span>
+                        </div>
+                        {item.description && (
+                          <div className="muted mt-0.5">{item.description}</div>
+                        )}
+                      </td>
+                      <td><span className="font-mono text-fg-muted">{item.code}</span></td>
+                      <td className="right">
+                        {canEdit && (
+                          <Dropdown>
+                            <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                              <EllipsisVerticalIcon className="size-4" />
+                            </DropdownButton>
+                            <DropdownMenu anchor="bottom end">
+                              <DropdownItem onClick={() => handleEdit(item)}>
+                                {t('common.edit')}
+                              </DropdownItem>
+                              <DropdownItem onClick={() => handleDelete(item)}>
+                                {t('common.delete')}
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        )}
+                      </td>
+                    </DenseRow>
+                  );
+                })}
+              </tbody>
+            </DenseTable>
+          </CardBody>
+          <SettingsListFooter count={sorted.length} noun={entityLabelPlural.toLowerCase()} />
+        </Card>
       )}
 
       <TaxonomyFormDialog

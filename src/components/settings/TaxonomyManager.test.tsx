@@ -208,50 +208,45 @@ describe('TaxonomyManager', () => {
     confirmSpy.mockRestore();
   });
 
-  it('moves an item up via the up arrow', async () => {
-    const user = userEvent.setup();
+  it('reorders rows via drag-and-drop, posting the new id order', async () => {
     const api = makeMockApi();
     renderWithProviders(<TaxonomyManager {...defaultProps} api={api} />);
 
     await waitFor(() => expect(screen.getByText('Installation')).toBeInTheDocument());
 
-    // Click "Move up" on the second row (Installation), should swap with first (Service Call)
+    // Drag the second row (Installation, id-2) onto the first row (Service Call, id-1)
+    // — expect the new order to be [id-2, id-1, id-3].
     const installationRow = screen.getByText('Installation').closest('tr')!;
-    const moveUpButton = within(installationRow).getByRole('button', { name: /move up/i });
-    await user.click(moveUpButton);
+    const serviceCallRow = screen.getByText('Service Call').closest('tr')!;
+
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: vi.fn(),
+      getData: vi.fn(),
+      types: [],
+      files: [],
+      items: [],
+    };
+
+    fireEvent.dragStart(installationRow, { dataTransfer });
+    fireEvent.dragOver(serviceCallRow, { dataTransfer });
+    fireEvent.drop(serviceCallRow, { dataTransfer });
 
     await waitFor(() => {
       expect(api.reorder).toHaveBeenCalledWith(['id-2', 'id-1', 'id-3']);
     });
   });
 
-  it('moves an item down via the down arrow', async () => {
-    const user = userEvent.setup();
+  it('renders a drag handle in each row so users know rows are reorderable', async () => {
     const api = makeMockApi();
     renderWithProviders(<TaxonomyManager {...defaultProps} api={api} />);
 
     await waitFor(() => expect(screen.getByText('Service Call')).toBeInTheDocument());
 
-    const firstRow = screen.getByText('Service Call').closest('tr')!;
-    const moveDownButton = within(firstRow).getByRole('button', { name: /move down/i });
-    await user.click(moveDownButton);
-
-    await waitFor(() => {
-      expect(api.reorder).toHaveBeenCalledWith(['id-2', 'id-1', 'id-3']);
-    });
-  });
-
-  it('disables move-up on the first row and move-down on the last', async () => {
-    const api = makeMockApi();
-    renderWithProviders(<TaxonomyManager {...defaultProps} api={api} />);
-
-    await waitFor(() => expect(screen.getByText('Service Call')).toBeInTheDocument());
-
-    const firstRow = screen.getByText('Service Call').closest('tr')!;
-    expect(within(firstRow).getByRole('button', { name: /move up/i })).toBeDisabled();
-
-    const lastRow = screen.getByText('Maintenance').closest('tr')!;
-    expect(within(lastRow).getByRole('button', { name: /move down/i })).toBeDisabled();
+    // Three rows, three drag handles.
+    const handles = screen.getAllByRole('img', { name: /drag to reorder/i });
+    expect(handles).toHaveLength(3);
   });
 
   it('exercises every dialog field on create (color picker + text + description)', async () => {
