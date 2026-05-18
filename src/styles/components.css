@@ -125,6 +125,15 @@
 }
 
 /* ── Dense table — much tighter than Catalyst default ───────────── */
+/* Responsive strategy:
+   - ≥640px: standard dense table. If columns exceed the card width, the
+     scroll-shell (`.card-body.flush`) below scrolls horizontally rather
+     than pushing the page wider. Desktop CSRs see all 8–10 columns at
+     once on their large monitors; tablet users get a clean scroll.
+   - <640px: each row collapses into a stacked card. The <thead> goes
+     away (column labels are dropped — cell content is self-identifying
+     thanks to CellStack / Pill / mono ID treatment). One row per
+     stacked card with a soft divider between rows. */
 .dense-table {
   width: 100%;
   border-collapse: separate;
@@ -143,12 +152,33 @@
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
+  z-index: 2;
+  white-space: nowrap;
 }
 .dense-table tbody td {
   padding: 9px 12px;
   border-bottom: 1px solid var(--border-soft);
   color: var(--fg);
   vertical-align: middle;
+  background: var(--bg-elev);
+}
+
+/* Sticky-left first column when the card scrolls horizontally. Carries
+   the row's primary identifier so the user always knows which row
+   they're on even when scrolled past the right-edge columns. The thead
+   corner cell needs a higher z-index than the body sticky cells so it
+   wins both axes when the user scrolls both ways. */
+.dense-table thead th:first-child,
+.dense-table tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: inset -1px 0 0 var(--border-soft);
+}
+.dense-table thead th:first-child { z-index: 3; }
+.dense-table tbody tr:hover td:first-child { background: var(--bg-hover); }
+.dense-table tbody tr.urgent td:first-child {
+  background: color-mix(in oklch, var(--danger-500) 5%, var(--bg-elev));
 }
 .dense-table tbody tr:hover td { background: var(--bg-hover); }
 .dense-table tbody tr.urgent td { background: color-mix(in oklch, var(--danger-500) 5%, var(--bg-elev)); }
@@ -160,6 +190,84 @@
 .dense-table .cell-stack { display: flex; flex-direction: column; gap: 1px; }
 .dense-table .cell-stack .top { color: var(--fg-strong); font-weight: 600; font-size: 13px; }
 .dense-table .cell-stack .bot { color: var(--fg-muted); font-size: 12px; font-weight: 400; }
+
+/* When a flush card body wraps a dense table, let the table scroll
+   horizontally if it's wider than the card. Without this, the table
+   pushes the page out and breaks the layout. */
+.card-body.flush:has(> .dense-table),
+.card-body.flush:has(> table.dense-table) {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Mobile: row-as-card layout ──────────────────────────────────── */
+@media (max-width: 639px) {
+  .dense-table { display: block; }
+  .dense-table thead { display: none; }
+  .dense-table tbody { display: block; }
+
+  .dense-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 10px;
+    row-gap: 4px;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .dense-table tbody tr:last-child { border-bottom: 0; }
+
+  .dense-table tbody td {
+    display: block;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+    background: transparent;
+  }
+
+  /* Reset sticky behavior — the stacked layout doesn't need it, and
+     position: sticky on grid items renders inconsistently. */
+  .dense-table tbody td:first-child {
+    position: static;
+    box-shadow: none;
+  }
+
+  /* The first cell carries the row's primary identifier (mono ID, name,
+     or CellStack). Span both columns and let the right-edge action cell
+     float up next to it. */
+  .dense-table tbody td:first-child {
+    grid-column: 1 / 2;
+    font-weight: 600;
+  }
+
+  /* Empty action cells (just a dropdown trigger) sit top-right. We can't
+     reliably detect "is this the actions cell" so we treat the LAST cell
+     as the action slot — every list page in this repo follows that
+     convention (header has empty <th></th> and body has the kebab
+     dropdown). */
+  .dense-table tbody td:last-child {
+    grid-column: 2 / 3;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  /* Middle cells stack as label-less metadata under the title. */
+  .dense-table tbody td:not(:first-child):not(:last-child) {
+    grid-column: 1 / -1;
+    color: var(--fg-muted);
+    font-size: 12px;
+  }
+
+  /* Right-aligned numeric cells (currency, balances) stay right-aligned
+     even in the stacked layout. */
+  .dense-table tbody td.right { text-align: left; }
+
+  /* The two-line cell pattern already pairs primary + secondary text;
+     no extra styling needed in mobile — it just renders as a tighter
+     stack inside the title slot. */
+  .dense-table tbody tr:hover td { background: transparent; }
+  .dense-table tbody tr:active { background: var(--bg-hover); }
+}
 
 /* ── Buttons ────────────────────────────────────────────────────── */
 .btn {
