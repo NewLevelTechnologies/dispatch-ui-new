@@ -11,7 +11,6 @@ import { showError, showSuccess, extractApiError } from '../lib/toast';
 import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
-import { Callout } from '../components/ui/Callout';
 import { Checkbox } from '../components/catalyst/checkbox';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Input } from '../components/catalyst/input';
@@ -350,12 +349,6 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                 selected={formData.dispatchRegionIds}
                 onToggle={toggleRegion}
               />
-              {formData.dispatchRegionIds.length === 0 && (
-                <Callout kind="warning" className="mt-2.5">
-                  No regions selected — this user won't see any records until you assign at
-                  least one.
-                </Callout>
-              )}
             </Card>
 
             {isInvite && (

@@ -1371,7 +1371,6 @@
       "noRolesMatch": "No roles match \"{{query}}\".",
       "phone": "Phone",
       "pickAtLeastOneRole": "Pick at least one role. The user can't sign in with zero roles.",
-      "regionWarning": "⚠ No regions selected — this user won't see any records until you assign at least one.",
       "regions": "Regions",
       "regionsHelper": "Where in the world this user works. Limits which records they see.",
       "roleChangesNote": "Role changes take effect on next sign-in.",
