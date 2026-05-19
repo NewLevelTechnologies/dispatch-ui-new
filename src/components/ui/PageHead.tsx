@@ -11,6 +11,8 @@
 //   />
 // ─────────────────────────────────────────────────────────────────
 import type { ReactNode } from 'react';
+import { Heading } from '../catalyst/heading';
+import { Text } from '../catalyst/text';
 
 export function PageHead({
   title, sub, actions,
@@ -22,8 +24,8 @@ export function PageHead({
   return (
     <div className="flex items-end justify-between gap-3 mb-4">
       <div>
-        <h1 className="text-[22px] font-bold text-fg-strong tracking-[-0.02em] m-0">{title}</h1>
-        {sub && <div className="text-[12.5px] text-fg-muted mt-0.5">{sub}</div>}
+        <Heading level={1} size="page-lg" className="m-0">{title}</Heading>
+        {sub && <Text size="sm" tone="muted" className="mt-0.5">{sub}</Text>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>
