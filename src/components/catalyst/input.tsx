@@ -22,14 +22,29 @@ export function InputGroup({ children }: React.ComponentPropsWithoutRef<'span'>)
 const dateTypes = ['date', 'datetime-local', 'month', 'time', 'week']
 type DateType = (typeof dateTypes)[number]
 
+// Sizing variants. `md` is the stock Catalyst sizing (responsive). `xs` is the
+// v1.5 dense variant — 32px tall, 12.5px text, fixed (no responsive shift).
+const sizes = {
+  md: [
+    'px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)]',
+    'text-base/6 sm:text-sm/6',
+  ],
+  xs: [
+    'px-[calc(--spacing(2.5)-1px)] py-[calc(--spacing(1.5)-1px)]',
+    'text-[12.5px]/[18px]',
+  ],
+}
+
 export const Input = forwardRef(function Input(
   {
     className,
+    size,
     ...props
   }: {
     className?: string
+    size?: keyof typeof sizes
     type?: 'email' | 'number' | 'password' | 'search' | 'tel' | 'text' | 'url' | DateType
-  } & Omit<Headless.InputProps, 'as' | 'className'>,
+  } & Omit<Headless.InputProps, 'as' | 'className' | 'size'>,
   ref: React.ForwardedRef<HTMLInputElement>
 ) {
   return (
@@ -43,8 +58,8 @@ export const Input = forwardRef(function Input(
         'before:absolute before:inset-px before:rounded-[calc(var(--radius-lg)-1px)] before:bg-white before:shadow-sm',
         // Background color is moved to control and shadow is removed in dark mode so hide `before` pseudo
         'dark:before:hidden',
-        // Focus ring
-        'after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-transparent after:ring-inset sm:focus-within:after:ring-2 sm:focus-within:after:ring-blue-500',
+        // Focus ring — uses the warm/cool accent token, not Catalyst's hardcoded blue.
+        'after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-transparent after:ring-inset sm:focus-within:after:ring-2 sm:focus-within:after:ring-accent-500',
         // Disabled state
         'has-data-disabled:opacity-50 has-data-disabled:before:bg-bg-active has-data-disabled:before:shadow-none',
       ])}
@@ -70,9 +85,11 @@ export const Input = forwardRef(function Input(
               '[&::-webkit-datetime-edit-meridiem-field]:p-0',
             ],
           // Basic layout
-          'relative block w-full appearance-none rounded-lg px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)]',
+          'relative block w-full appearance-none rounded-lg',
+          // Size (padding + text)
+          sizes[size ?? 'md'],
           // Typography
-          'text-base/6 text-fg-strong placeholder:text-fg-dim sm:text-sm/6',
+          'text-fg-strong placeholder:text-fg-dim',
           // Border
           'border border-border data-hover:border-border-strong',
           // Background color

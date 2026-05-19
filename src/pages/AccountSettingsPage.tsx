@@ -1,11 +1,17 @@
-/* eslint-disable i18next/no-literal-string -- dense v1.5 visual surface; key strings (titles, CTAs, errors) are wrapped via t() while inline labels and glyphs are kept as literals for readability — same convention as UserFormPage */
+/* eslint-disable i18next/no-literal-string -- dense v1.5 visual surface; key strings (titles, CTAs, errors) are wrapped via t() while inline labels and glyphs are kept as literals — same convention as UserFormPage */
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { fetchMFAPreference, updateMFAPreference } from 'aws-amplify/auth';
-import { ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { CheckIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
 import { Button } from '../components/catalyst/button';
+import { Card } from '../components/catalyst/card';
+import { DataRow } from '../components/catalyst/data-row';
+import { ErrorMessage, Field, Label } from '../components/catalyst/fieldset';
+import { Heading } from '../components/catalyst/heading';
+import { Input } from '../components/catalyst/input';
+import { Text } from '../components/catalyst/text';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../components/ThemeProvider';
 import { userApi, type User } from '../api';
@@ -27,18 +33,12 @@ export default function AccountSettingsPage() {
     <AppLayout>
       <div className="mx-auto max-w-[760px] px-1 pb-16">
         <div className="mb-5">
-          <h1 className="text-[22px] font-bold tracking-[-0.025em] text-fg-strong">
-            {t('account.settings')}
-          </h1>
-          <div className="mt-1 text-[12.5px] text-fg-muted">
-            {t('account.description')}
-          </div>
+          <Heading>{t('account.settings')}</Heading>
+          <Text className="mt-1">{t('account.description')}</Text>
         </div>
 
         {isLoading || !currentUser ? (
-          <div className="rounded-[10px] border border-border bg-bg-elev p-6 text-[12.5px] text-fg-muted">
-            {t('common.loading')}
-          </div>
+          <Card>{t('common.loading')}</Card>
         ) : (
           <>
             <ProfileCard user={currentUser} />
@@ -52,45 +52,6 @@ export default function AccountSettingsPage() {
         )}
       </div>
     </AppLayout>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────────
-// Card / row primitives — tuned to match the design tokens used by
-// the User Detail Security card so the two surfaces feel consistent.
-// ──────────────────────────────────────────────────────────────────
-function ACard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-[10px] border border-border bg-bg-elev">
-      <div className="border-b border-border-soft px-4 py-2.5">
-        <div className="text-[13px] font-semibold text-fg-strong">{title}</div>
-      </div>
-      <div className="p-4">{children}</div>
-    </div>
-  );
-}
-
-function ARow({
-  label,
-  children,
-  right,
-  last,
-}: {
-  label: string;
-  children: React.ReactNode;
-  right?: React.ReactNode;
-  last?: boolean;
-}) {
-  return (
-    <div
-      className={`grid grid-cols-[140px_1fr_auto] items-center gap-3.5 py-2.5 ${
-        last ? '' : 'border-b border-border-soft'
-      }`}
-    >
-      <div className="text-[11.5px] font-medium text-fg-muted">{label}</div>
-      <div className="min-w-0">{children}</div>
-      <div>{right}</div>
-    </div>
   );
 }
 
@@ -154,8 +115,12 @@ function ProfileCard({ user }: { user: User }) {
   };
 
   return (
-    <ACard title="Profile">
+    <Card title={t('account.profile.title')}>
       <div className="mb-4 flex items-center gap-4">
+        {/* TODO(design-system): replace this tinted-initials block with a
+            Catalyst `<Avatar>` extension that supports a deterministic
+            tinted background (currently Avatar takes a src; we need a
+            colored-initials variant). */}
         <div
           className="grid size-14 shrink-0 place-items-center rounded-full text-[19px] font-semibold text-white"
           style={{
@@ -173,31 +138,37 @@ function ProfileCard({ user }: { user: User }) {
       </div>
 
       <div className="grid grid-cols-2 gap-3 border-t border-border-soft pt-3.5">
-        <AField label="First name">
-          <ACInput value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-        </AField>
-        <AField label="Last name">
-          <ACInput value={lastName} onChange={(e) => setLastName(e.target.value)} />
-        </AField>
-        <AField label="Phone">
-          <ACInput
+        <Field size="xs">
+          <Label size="xs">First name</Label>
+          <Input size="xs" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+        </Field>
+        <Field size="xs">
+          <Label size="xs">Last name</Label>
+          <Input size="xs" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+        </Field>
+        <Field size="xs">
+          <Label size="xs">Phone</Label>
+          <Input
+            size="xs"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="(555) 555-5555"
           />
-        </AField>
-        <AField label="Email" hint="contact your admin to change">
-          <ACInput value={user.email} disabled />
-        </AField>
-        <AField label="Time zone" hint="detected from your browser">
-          <ACInput value={browserTz} disabled />
-        </AField>
+        </Field>
+        <Field size="xs">
+          <Label size="xs" hint="contact your admin to change">Email</Label>
+          <Input size="xs" value={user.email} disabled />
+        </Field>
+        <Field size="xs">
+          <Label size="xs" hint="detected from your browser">Time zone</Label>
+          <Input size="xs" value={browserTz} disabled />
+        </Field>
       </div>
 
       {saveError && (
-        <div className="mt-3 rounded-md border border-danger-500/30 bg-danger-500/8 px-3 py-2 text-[12px] text-danger-500">
-          {saveError}
-        </div>
+        <Field size="xs" className="mt-3">
+          <ErrorMessage size="xs">{saveError}</ErrorMessage>
+        </Field>
       )}
 
       <div className="mt-3.5 flex justify-end gap-2">
@@ -208,28 +179,7 @@ function ProfileCard({ user }: { user: User }) {
           {saveMutation.isPending ? t('common.saving') : t('account.profile.save')}
         </Button>
       </div>
-    </ACard>
-  );
-}
-
-function AField({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="mb-1 flex items-baseline gap-1.5">
-        <span className="text-[11px] font-semibold text-fg-strong">{label}</span>
-        {hint && <span className="text-[10.5px] text-fg-dim">· {hint}</span>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function ACInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      {...props}
-      className={`h-8 w-full rounded-md border border-border bg-bg-elev px-2.5 text-[12.5px] text-fg-strong outline-none focus:border-accent-500 focus:ring-3 focus:ring-accent-500/20 disabled:bg-bg-elev-2 disabled:text-fg-muted ${props.className ?? ''}`}
-    />
+    </Card>
   );
 }
 
@@ -282,11 +232,11 @@ function SecurityCard({ user }: { user: User }) {
 
   return (
     <>
-      <ACard title={t('account.security.title')}>
+      <Card title={t('account.security.title')}>
         {/* Password */}
-        <ARow
+        <DataRow
           label={t('account.security.passwordLabel')}
-          right={
+          action={
             <Button outline size="xs" type="button" onClick={() => setPwOpen(true)}>
               {t('account.security.passwordChange')}
             </Button>
@@ -296,19 +246,22 @@ function SecurityCard({ user }: { user: User }) {
           <div className="mt-0.5 text-[11px] text-fg-dim">
             {t('account.security.passwordHint')}
           </div>
-        </ARow>
+        </DataRow>
 
         {/* 2FA */}
         {isOn ? (
-          <ARow
+          <DataRow
             label={t('account.security.twofaRowLabel')}
-            right={
+            action={
               <Button outline size="xs" type="button" onClick={() => setDisableOpen(true)}>
                 {t('account.security.disableLabel')}
               </Button>
             }
           >
             <div className="flex items-center gap-2">
+              {/* TODO(design-system): replace inline "ON" pill with
+                  `<Badge color="green" size="xs">` once Badge gains an
+                  xs size variant. */}
               <span className="inline-flex items-center rounded-[4px] bg-success-500/14 px-2 py-0.5 text-[11px] font-bold tracking-wider text-success-500">
                 <span className="mr-1">●</span>
                 {t('account.security.twofaOnPill')}
@@ -318,8 +271,12 @@ function SecurityCard({ user }: { user: User }) {
             <div className="mt-0.5 text-[11px] text-fg-dim">
               {t('account.security.twofaOnHint')}
             </div>
-          </ARow>
+          </DataRow>
         ) : (
+          // TODO(design-system): the 2FA-OFF call-to-action should become a
+          // `<Callout kind="info" icon={ShieldCheckIcon} title="…" action={…}>`
+          // once Callout lands — same shape will host the future email-warning
+          // and recovery-codes "save these somewhere safe" notices.
           <div className="my-2">
             <div className="grid grid-cols-[36px_1fr_auto] items-center gap-3.5 rounded-lg border border-accent-500/22 bg-accent-500/5 px-4 py-3.5">
               <div className="grid size-9 place-items-center rounded-lg bg-accent-500 text-white">
@@ -341,10 +298,10 @@ function SecurityCard({ user }: { user: User }) {
         )}
 
         {/* Sessions */}
-        <ARow
+        <DataRow
           label={t('account.security.sessionsLabel')}
           last
-          right={
+          action={
             <Button
               outline
               size="xs"
@@ -362,8 +319,8 @@ function SecurityCard({ user }: { user: User }) {
           <div className="mt-0.5 text-[11px] text-fg-dim">
             {t('account.security.sessionsHint')}
           </div>
-        </ARow>
-      </ACard>
+        </DataRow>
+      </Card>
 
       <ChangePasswordDialog isOpen={pwOpen} onClose={() => setPwOpen(false)} />
       <TwoFactorSetupDialog
@@ -408,75 +365,99 @@ function PreferencesCard() {
   const { mode, accent, setMode, setAccent } = useTheme();
 
   return (
-    <ACard title={t('account.preferences.title')}>
-      <ARow label={t('account.preferences.theme')}>
+    <Card title={t('account.preferences.title')}>
+      <DataRow label={t('account.preferences.theme')}>
         <div className="flex flex-wrap gap-1.5">
-          <PrefChip
+          <ThemeChip
             active={mode === 'light'}
             onClick={() => setMode('light')}
             label={t('account.preferences.themeLight')}
             glyph="☀"
           />
-          <PrefChip
+          <ThemeChip
             active={mode === 'dark'}
             onClick={() => setMode('dark')}
             label={t('account.preferences.themeDark')}
             glyph="☾"
           />
         </div>
-      </ARow>
-      <ARow label={t('account.preferences.accent')} last>
+      </DataRow>
+      <DataRow label={t('account.preferences.accent')} last>
         <div className="flex flex-wrap gap-1.5">
-          <PrefChip
+          <AccentChip
             active={accent === 'warm'}
             onClick={() => setAccent('warm')}
             label={t('account.preferences.accentWarm')}
             swatch="oklch(68% 0.185 50)"
           />
-          <PrefChip
+          <AccentChip
             active={accent === 'cool'}
             onClick={() => setAccent('cool')}
             label={t('account.preferences.accentCool')}
             swatch="oklch(56% 0.125 215)"
           />
         </div>
-      </ARow>
-    </ACard>
+      </DataRow>
+    </Card>
   );
 }
 
-function PrefChip({
+function ThemeChip({
   active,
   onClick,
   label,
   glyph,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  glyph: string;
+}) {
+  return active ? (
+    <Button color="accent-soft" size="xs" type="button" aria-pressed onClick={onClick}>
+      <CheckIcon data-slot="icon" />
+      <span aria-hidden="true">{glyph}</span>
+      {label}
+    </Button>
+  ) : (
+    <Button outline size="xs" type="button" aria-pressed={false} onClick={onClick}>
+      <span aria-hidden="true">{glyph}</span>
+      {label}
+    </Button>
+  );
+}
+
+function AccentChip({
+  active,
+  onClick,
+  label,
   swatch,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
-  glyph?: string;
-  swatch?: string;
+  swatch: string;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border-[1.5px] px-3 py-1.5 text-[12px] transition-colors ${
-        active
-          ? 'border-accent-500 bg-accent-500/10 font-semibold text-fg-strong'
-          : 'border-border bg-bg-elev-2 text-fg-muted hover:bg-bg-hover'
-      }`}
-    >
-      {swatch ? (
-        <span
-          className="inline-block size-2.5 rounded-full ring-1 ring-black/10"
-          style={{ background: swatch }}
-        />
-      ) : (
-        glyph && <span aria-hidden="true">{glyph}</span>
-      )}
-      <span>{label}</span>
-    </button>
+  // Color swatch dot is a brand-specific decoration that doesn't generalize as
+  // an icon slot on Catalyst Button — keep it as inline content for this
+  // narrow surface. Lifting it into a design-system primitive would be
+  // overfit; ThemeChip and AccentChip are the only callers.
+  const dot = (
+    <span
+      className="inline-block size-2.5 rounded-full ring-1 ring-black/10"
+      style={{ background: swatch }}
+      aria-hidden="true"
+    />
+  );
+  return active ? (
+    <Button color="accent-soft" size="xs" type="button" aria-pressed onClick={onClick}>
+      {dot}
+      {label}
+    </Button>
+  ) : (
+    <Button outline size="xs" type="button" aria-pressed={false} onClick={onClick}>
+      {dot}
+      {label}
+    </Button>
   );
 }

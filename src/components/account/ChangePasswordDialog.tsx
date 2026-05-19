@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { updatePassword } from 'aws-amplify/auth';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../catalyst/dialog';
 import { Button } from '../catalyst/button';
-import { Field, FieldGroup, Label } from '../catalyst/fieldset';
+import { ErrorMessage, Field, FieldGroup, Label } from '../catalyst/fieldset';
 import { Input } from '../catalyst/input';
 
 interface Props {
@@ -97,9 +97,9 @@ export default function ChangePasswordDialog({ isOpen, onClose }: Props) {
             </Field>
           </FieldGroup>
           {error && (
-            <div className="mt-3 rounded-md border border-danger-500/30 bg-danger-500/8 px-3 py-2 text-[12px] text-danger-500">
-              {error}
-            </div>
+            <Field className="mt-3">
+              <ErrorMessage>{error}</ErrorMessage>
+            </Field>
           )}
         </DialogBody>
         <DialogActions>

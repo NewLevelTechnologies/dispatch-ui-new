@@ -5,11 +5,21 @@ import { setUpTOTP, updateMFAPreference, verifyTOTPSetup } from 'aws-amplify/aut
 import { QRCodeSVG } from 'qrcode.react';
 import { Dialog } from '../catalyst/dialog';
 import { Button } from '../catalyst/button';
+import { ErrorMessage } from '../catalyst/fieldset';
 import { ShieldCheckIcon } from '@heroicons/react/24/outline';
 
 // Phase 1: TOTP-only wizard, Amplify-direct. When backend ships
 // /auth/2fa/* endpoints, we add a step 1 method picker (TOTP/SMS/Email)
 // in front of this, plus a step 3 for server-issued recovery codes.
+//
+// TODO(design-system): pull three primitives out of this file once they exist:
+//   · `<WizardHeader title icon step totalSteps />` for the step-pip header.
+//   · `<OtpInput value onChange length={6} />` for the verify-code boxes —
+//     also reused on Amplify's MFA challenge and the future SMS / Email /
+//     recovery-code-signin flows.
+//   · `<Callout kind="info">` for the manual-secret card here, the future
+//     Email-warning card, and the recovery-codes "save these somewhere safe"
+//     notice.
 
 type Step = 'qr' | 'verify';
 
@@ -126,8 +136,8 @@ export default function TwoFactorSetupDialog({ isOpen, onClose, onEnabled, email
   const stepIndex = step === 'qr' ? 1 : 2;
 
   return (
-    <Dialog open={isOpen} onClose={onClose} size="md" className="!p-0">
-      <div className="overflow-hidden rounded-2xl">
+    <Dialog open={isOpen} onClose={onClose} size="md" padding="none">
+      <div>
         {/* Header with step pips */}
         <div className="flex items-center justify-between border-b border-border-soft bg-bg-elev-2 px-5 py-3">
           <div className="flex items-center gap-2">
@@ -191,6 +201,7 @@ export default function TwoFactorSetupDialog({ isOpen, onClose, onEnabled, email
                 </code>
                 <Button
                   outline
+                  size="xs"
                   type="button"
                   onClick={() => secret && navigator.clipboard.writeText(secret).catch(() => {})}
                   disabled={!secret}
@@ -201,9 +212,9 @@ export default function TwoFactorSetupDialog({ isOpen, onClose, onEnabled, email
             </div>
 
             {setupError && (
-              <div className="mt-3 rounded-md border border-danger-500/30 bg-danger-500/8 px-3 py-2 text-[12px] text-danger-500">
+              <ErrorMessage size="xs" className="mt-3">
                 {setupError}
-              </div>
+              </ErrorMessage>
             )}
           </div>
         ) : (
@@ -215,6 +226,9 @@ export default function TwoFactorSetupDialog({ isOpen, onClose, onEnabled, email
               {t('account.twoFactorSetup.verifyDescription')}
             </p>
 
+            {/* TODO(design-system): extract into `<OtpInput value onChange
+                length={6} />` — same component will back the SMS/Email verify
+                steps and the Amplify MFA challenge "use recovery code" path. */}
             <div className="mt-5 flex justify-center">
               <div className="flex gap-1.5">
                 {code.map((d, i) => (
@@ -236,9 +250,9 @@ export default function TwoFactorSetupDialog({ isOpen, onClose, onEnabled, email
             </div>
 
             {verifyError && (
-              <div className="mt-4 rounded-md border border-danger-500/30 bg-danger-500/8 px-3 py-2 text-center text-[12px] text-danger-500">
+              <ErrorMessage size="xs" className="mt-4 text-center">
                 {verifyError}
-              </div>
+              </ErrorMessage>
             )}
           </div>
         )}

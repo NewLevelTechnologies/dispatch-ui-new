@@ -197,6 +197,17 @@ const styles = {
       'before:bg-gradient-to-b before:from-accent-500 before:to-accent-600',
       '[--btn-icon:var(--color-accent-200)] data-active:[--btn-icon:var(--color-accent-100)] data-hover:[--btn-icon:var(--color-accent-100)]',
     ],
+    // Multi-select chip / toggle-pressed surface. Subtle accent wash + accent
+    // text — semantically signals "selected", not "primary action". Pair with
+    // `outline` for the unselected state. Use a `CheckIcon` child (via
+    // `data-slot="icon"`) for an explicit indicator.
+    'accent-soft': [
+      'text-accent-700 [--btn-bg:color-mix(in_oklch,var(--color-accent-500)_10%,transparent)] [--btn-border:color-mix(in_oklch,var(--color-accent-500)_30%,transparent)] [--btn-hover-overlay:color-mix(in_oklch,var(--color-accent-500)_15%,transparent)]',
+      'dark:text-accent-300 dark:[--btn-bg:color-mix(in_oklch,var(--color-accent-500)_18%,transparent)] dark:[--btn-border:color-mix(in_oklch,var(--color-accent-500)_40%,transparent)]',
+      // Flat look — kill the solid base's inset shadow + highlight.
+      'before:shadow-none after:shadow-none',
+      '[--btn-icon:var(--color-accent-700)] dark:[--btn-icon:var(--color-accent-300)]',
+    ],
   },
 }
 
