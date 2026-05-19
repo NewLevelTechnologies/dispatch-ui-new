@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string -- dense v1.5 visual surface; key strings (titles, CTAs, errors) are wrapped via t() while inline labels and glyphs are kept as literals — same convention as UserFormPage */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { fetchMFAPreference } from 'aws-amplify/auth';
@@ -62,13 +62,33 @@ export default function AccountSettingsPage() {
 // ──────────────────────────────────────────────────────────────────
 // Profile card
 // ──────────────────────────────────────────────────────────────────
+// Server enforces the same limits, but we pre-check client-side so the
+// user gets feedback before paying the upload cost.
+const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+const PHOTO_MIME_TYPES = ['image/png', 'image/jpeg'];
+
+// Map the backend's photo-upload error messages onto the friendly copy the
+// designer specified. Falls back to the raw API message if we don't have a
+// canonical translation for the failure mode.
+function mapPhotoError(err: unknown, t: (key: string) => string): string | undefined {
+  const raw = extractApiError(err);
+  if (!raw) return undefined;
+  if (/file too large/i.test(raw)) return t('account.profile.photoErrorSize');
+  if (/invalid file type/i.test(raw)) return t('account.profile.photoErrorType');
+  if (/unable to read image/i.test(raw)) return t('account.profile.photoErrorCorrupted');
+  return raw;
+}
+
 function ProfileCard({ user }: { user: User }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [firstName, setFirstName] = useState(user.firstName);
   const [lastName, setLastName] = useState(user.lastName);
-  const [phone, setPhone] = useState(user.phoneNumber ?? '');
+  // Initial render formats the phone — backend stores raw digits, but the
+  // canonical national format is what we want the user to see on load.
+  const [phone, setPhone] = useState(formatPhone(user.phoneNumber) || (user.phoneNumber ?? ''));
   const [saveError, setSaveError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fullName = `${user.firstName} ${user.lastName}`.trim() || user.email;
   const initials = (() => {
@@ -78,14 +98,21 @@ function ProfileCard({ user }: { user: User }) {
   })();
   const avatarBg = roleColor(fullName);
 
+  // Phone is shown formatted on load — treat the raw and formatted forms
+  // as equivalent for dirty detection so opening the page doesn't immediately
+  // enable Save.
+  const phoneTrimmed = phone.trim();
+  const phoneUnchanged =
+    phoneTrimmed === (user.phoneNumber ?? '') ||
+    phoneTrimmed === (formatPhone(user.phoneNumber) || '');
   const dirty =
     firstName !== user.firstName ||
     lastName !== user.lastName ||
-    (phone || '') !== (user.phoneNumber ?? '');
+    !phoneUnchanged;
 
   const saveMutation = useMutation({
     mutationFn: () =>
-      userApi.updateProfile(user.id, {
+      userApi.updateMyProfile({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         phoneNumber: phone.trim() || null,
@@ -93,17 +120,39 @@ function ProfileCard({ user }: { user: User }) {
     onSuccess: (updated) => {
       queryClient.setQueryData(['currentUser'], updated);
       setSaveError('');
-      showSuccess('Profile updated');
+      showSuccess(t('account.profile.saveSuccess'));
     },
     onError: (err: unknown) => {
       setSaveError(extractApiError(err) || t('account.profile.errorGeneric'));
     },
   });
 
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => userApi.uploadMyPhoto(file),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['currentUser'], updated);
+      showSuccess(t('account.profile.photoUploadSuccess'));
+    },
+    onError: (err: unknown) => {
+      showError(t('account.profile.photoUploadError'), mapPhotoError(err, t));
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: () => userApi.deleteMyPhoto(),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['currentUser'], updated);
+      showSuccess(t('account.profile.photoRemoveSuccess'));
+    },
+    onError: (err: unknown) => {
+      showError(t('account.profile.photoRemoveError'), extractApiError(err));
+    },
+  });
+
   const handleReset = () => {
     setFirstName(user.firstName);
     setLastName(user.lastName);
-    setPhone(user.phoneNumber ?? '');
+    setPhone(formatPhone(user.phoneNumber) || (user.phoneNumber ?? ''));
     setSaveError('');
   };
 
@@ -115,6 +164,26 @@ function ProfileCard({ user }: { user: User }) {
     if (formatted) setPhone(formatted);
   };
 
+  const handlePickPhoto = () => fileInputRef.current?.click();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset the input so picking the same file twice still fires onChange.
+    e.target.value = '';
+    if (!file) return;
+    if (!PHOTO_MIME_TYPES.includes(file.type)) {
+      showError(t('account.profile.photoUploadError'), t('account.profile.photoErrorType'));
+      return;
+    }
+    if (file.size > PHOTO_MAX_BYTES) {
+      showError(t('account.profile.photoUploadError'), t('account.profile.photoErrorSize'));
+      return;
+    }
+    uploadMutation.mutate(file);
+  };
+
+  const photoBusy = uploadMutation.isPending || removeMutation.isPending;
+
   return (
     <Card title={t('account.profile.title')}>
       <div className="mb-4 flex items-center gap-4">
@@ -122,16 +191,25 @@ function ProfileCard({ user }: { user: User }) {
             Catalyst `<Avatar>` extension that supports a deterministic
             tinted background (currently Avatar takes a src; we need a
             colored-initials variant). */}
-        <div
-          className="grid size-14 shrink-0 place-items-center rounded-full text-[19px] font-semibold text-white"
-          style={{
-            background: avatarBg,
-            border: `1px solid color-mix(in oklch, ${avatarBg} 70%, black)`,
-          }}
-          aria-hidden="true"
-        >
-          {initials}
-        </div>
+        {user.photoUrl ? (
+          <img
+            src={user.photoUrl}
+            alt=""
+            className="size-14 shrink-0 rounded-full object-cover ring-1 ring-border-soft"
+            aria-hidden="true"
+          />
+        ) : (
+          <div
+            className="grid size-14 shrink-0 place-items-center rounded-full text-[19px] font-semibold text-white"
+            style={{
+              background: avatarBg,
+              border: `1px solid color-mix(in oklch, ${avatarBg} 70%, black)`,
+            }}
+            aria-hidden="true"
+          >
+            {initials}
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14px] font-semibold text-fg-strong">{fullName}</div>
           <div className="mt-0.5 flex items-baseline gap-1.5 truncate text-[11.5px] text-fg-muted">
@@ -139,11 +217,33 @@ function ProfileCard({ user }: { user: User }) {
             <span className="text-[10.5px] text-fg-dim">· {t('account.profile.emailHint')}</span>
           </div>
         </div>
-        {/* Upload endpoint isn't shipped yet — placeholder so the layout is
-            right; we'll wire it when BE adds the route. */}
-        <Button outline size="xs" type="button" disabled>
-          {t('account.profile.changePhoto')}
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={PHOTO_MIME_TYPES.join(',')}
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <Button outline size="xs" type="button" onClick={handlePickPhoto} disabled={photoBusy}>
+            {uploadMutation.isPending
+              ? t('account.profile.photoUploading')
+              : t('account.profile.changePhoto')}
+          </Button>
+          {user.photoUrl && (
+            <Button
+              plain
+              size="xs"
+              type="button"
+              onClick={() => removeMutation.mutate()}
+              disabled={photoBusy}
+            >
+              {removeMutation.isPending
+                ? t('account.profile.photoRemoving')
+                : t('account.profile.removePhoto')}
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 border-t border-border-soft pt-3.5 sm:grid-cols-2">
