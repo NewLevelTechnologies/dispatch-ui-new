@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, UsersIcon } from '@heroicons/react/24/outline';
 import IconButton from '../components/IconButton';
 import { userApi, type User, type Role } from '../api';
 import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
@@ -19,6 +19,9 @@ import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '.
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { LoadingState } from '../components/ui/LoadingState';
+import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
 
 // Seniority order — when a user has multiple roles, the higher-rank role
 // shows first. Anything not in this map sorts after, alphabetically. Match
@@ -68,7 +71,7 @@ export default function UsersPage() {
   const canDeleteUsers = useHasCapability('DELETE_USERS');
   const { data: currentUser } = useCurrentUser();
 
-  const { data: users, isLoading, error } = useQuery({
+  const { data: users, isLoading, error, refetch } = useQuery({
     queryKey: ['users'],
     queryFn: () => userApi.getAll(),
   });
@@ -116,6 +119,13 @@ export default function UsersPage() {
   const handleDisable = (user: User) => setPendingAction({ kind: 'disable', user });
   const handleEnable = (user: User) => setPendingAction({ kind: 'enable', user });
   const handleDelete = (user: User) => setPendingAction({ kind: 'delete', user });
+
+  const hasFilters = Boolean(searchQuery || roleFilter || statusFilter);
+  const clearFilters = () => {
+    setSearchQuery('');
+    setRoleFilter('');
+    setStatusFilter('');
+  };
 
   const confirmPendingAction = () => {
     if (!pendingAction) return;
@@ -240,36 +250,52 @@ export default function UsersPage() {
         </ListToolbar>
       )}
 
-      {isLoading && (
-        <div className="mt-4 text-center">
-          <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.users') })}</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="mt-4 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-          <p className="text-sm text-red-800 dark:text-red-400">
-            {t('common.actions.errorLoading', { entities: t('entities.users') })}: {(error as Error).message}
-          </p>
-        </div>
-      )}
-
-      {users && users.length === 0 && (
-        <div className="mt-4 text-center">
-          <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('entities.users') })}</p>
-          {canInviteUsers && (
-            <Button className="mt-4" onClick={handleAdd}>
-              {t('common.actions.addFirst', { entity: t('entities.user') })}
-            </Button>
-          )}
-        </div>
-      )}
-
-      {filteredUsers && filteredUsers.length > 0 && (
-        <div className="mt-4">
-          <Card>
-            <CardBody flush>
-              <DenseTable>
+      <div className="mt-4">
+        <Card>
+          <CardBody flush>
+            {isLoading ? (
+              <LoadingState
+                label={t('common.actions.loading', { entities: t('entities.users') })}
+              />
+            ) : error ? (
+              <ErrorState
+                title={t('common.actions.couldNotLoad', { entities: t('entities.users') })}
+                description={extractApiError(error) ?? (error as Error).message}
+                action={
+                  <Button outline onClick={() => refetch()}>
+                    {t('common.actions.tryAgain')}
+                  </Button>
+                }
+              />
+            ) : !filteredUsers || filteredUsers.length === 0 ? (
+              hasFilters ? (
+                <EmptyState
+                  icon={<UsersIcon className="size-10 text-fg-dim" />}
+                  title={t('common.actions.noMatchFilters', { entities: t('entities.users') })}
+                  description={t('common.actions.tryAdjustingFilters')}
+                  action={
+                    <Button outline onClick={clearFilters}>
+                      {t('users.filter.clearFilters')}
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  icon={<UsersIcon className="size-10 text-fg-dim" />}
+                  title={t('common.actions.noEntitiesYet', { entities: t('entities.users') })}
+                  description={t('users.empty.noUsersDescription')}
+                  action={
+                    canInviteUsers ? (
+                      <Button color="accent" onClick={handleAdd}>
+                        {t('common.actions.add', { entity: t('entities.user') })}
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              )
+            ) : (
+              <>
+                <DenseTable>
                 <DenseTHead>
                   <tr>
                     <th>{t('common.form.name')}</th>
@@ -381,34 +407,27 @@ export default function UsersPage() {
                   })}
                 </tbody>
               </DenseTable>
-              <ListFooter
-                page={1}
-                totalPages={1}
-                pageHref={() => '#'}
-                left={
-                  <>
-                    {t('settings.showingCount', {
-                      count: displayedCount,
-                      noun: t('entities.users').toLowerCase(),
-                    })}
-                    {disabledCount > 0 && (
-                      <> · {t('users.breakdown.disabled', { count: disabledCount })}</>
-                    )}
-                  </>
-                }
-              />
-            </CardBody>
-          </Card>
-
-          {filteredUsers.length === 0 && searchQuery && (
-            <div className="mt-4 text-center">
-              <p className="text-fg-muted">
-                {t('users.search.noMatch', { query: searchQuery })}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+                <ListFooter
+                  page={1}
+                  totalPages={1}
+                  pageHref={() => '#'}
+                  left={
+                    <>
+                      {t('settings.showingCount', {
+                        count: displayedCount,
+                        noun: t('entities.users').toLowerCase(),
+                      })}
+                      {disabledCount > 0 && (
+                        <> · {t('users.breakdown.disabled', { count: disabledCount })}</>
+                      )}
+                    </>
+                  }
+                />
+              </>
+            )}
+          </CardBody>
+        </Card>
+      </div>
 
       <ConfirmDialog
         isOpen={pendingAction !== null}

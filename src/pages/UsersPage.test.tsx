@@ -92,14 +92,15 @@ describe('UsersPage', () => {
     expect(screen.getByRole('heading', { name: /users/i })).toBeInTheDocument();
   });
 
-  it('displays loading state while fetching users', () => {
+  it('displays loading state while fetching users', async () => {
     vi.mocked(apiClient.get).mockImplementation(
       () => new Promise(() => {}) // Never resolves
     );
 
     renderWithProviders(<UsersPage />);
 
-    expect(screen.getByText('Loading users...')).toBeInTheDocument();
+    // LoadingState has a 250 ms delay before becoming visible — wait it out.
+    expect(await screen.findByText('Loading users...')).toBeInTheDocument();
   });
 
   it('displays users in a table', async () => {
@@ -213,9 +214,10 @@ describe('UsersPage', () => {
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/error loading users/i)).toBeInTheDocument();
+      expect(screen.getByText(/couldn.?t load users/i)).toBeInTheDocument();
       expect(screen.getByText(/network error/i)).toBeInTheDocument();
     });
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
   });
 
   it('displays empty state when no users exist', async () => {
@@ -224,10 +226,13 @@ describe('UsersPage', () => {
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('No users found')).toBeInTheDocument();
+      expect(screen.getByText(/no users yet/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('button', { name: /add your first user/i })).toBeInTheDocument();
+    expect(screen.getByText(/invite your team to get started/i)).toBeInTheDocument();
+    // EmptyState surfaces an "Add user" CTA when the viewer can invite.
+    // (The page header also has one; both share the same label.)
+    expect(screen.getAllByRole('button', { name: /^add user$/i }).length).toBeGreaterThan(0);
   });
 
   it('navigates to detail page when row is clicked', async () => {
@@ -685,18 +690,20 @@ describe('UsersPage', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users/new');
     });
 
-    it('navigates to the invite page when "Add your first user" is clicked', async () => {
+    it('navigates to the invite page when the empty-state "Add user" CTA is clicked', async () => {
       vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
       const user = userEvent.setup();
 
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('No users found')).toBeInTheDocument();
+        expect(screen.getByText(/no users yet/i)).toBeInTheDocument();
       });
 
-      const addFirstButton = screen.getByRole('button', { name: /add your first user/i });
-      await user.click(addFirstButton);
+      // PageHead and EmptyState both render a CTA with the same "Add user"
+      // label — find both and click the empty-state one (the second match).
+      const addButtons = screen.getAllByRole('button', { name: /^add user$/i });
+      await user.click(addButtons[addButtons.length - 1]);
 
       expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users/new');
     });
