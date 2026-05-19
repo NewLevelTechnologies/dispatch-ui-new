@@ -232,7 +232,7 @@ function SecurityCard({ user }: { user: User }) {
 
   return (
     <>
-      <Card title={t('account.security.title')}>
+      <Card title={t('account.security.title')} padding="none">
         {/* Password */}
         <DataRow
           label={t('account.security.passwordLabel')}
@@ -275,9 +275,10 @@ function SecurityCard({ user }: { user: User }) {
         ) : (
           // TODO(design-system): the 2FA-OFF call-to-action should become a
           // `<Callout kind="info" icon={ShieldCheckIcon} title="…" action={…}>`
-          // once Callout lands — same shape will host the future email-warning
-          // and recovery-codes "save these somewhere safe" notices.
-          <div className="my-2">
+          // once Callout lands — same shape will host the future email-warning,
+          // the recovery-codes "save these somewhere safe" notice, and the
+          // UserDetail LifecycleFooter.
+          <div className="my-2 px-3.5">
             <div className="grid grid-cols-[36px_1fr_auto] items-center gap-3.5 rounded-lg border border-accent-500/22 bg-accent-500/5 px-4 py-3.5">
               <div className="grid size-9 place-items-center rounded-lg bg-accent-500 text-white">
                 <ShieldCheckIcon className="size-[18px]" />
@@ -365,7 +366,7 @@ function PreferencesCard() {
   const { mode, accent, setMode, setAccent } = useTheme();
 
   return (
-    <Card title={t('account.preferences.title')}>
+    <Card title={t('account.preferences.title')} padding="none">
       <DataRow label={t('account.preferences.theme')}>
         <div className="flex flex-wrap gap-1.5">
           <ThemeChip

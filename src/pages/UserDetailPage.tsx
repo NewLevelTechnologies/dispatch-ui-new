@@ -11,7 +11,10 @@ import { auditApi, type AccountActivityEvent } from '../api/auditApi';
 import { formatPhone } from '../utils/formatPhone';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { Avatar } from '../components/ui/Avatar';
+import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
+import { Card } from '../components/catalyst/card';
+import { DataRow } from '../components/catalyst/data-row';
 
 function formatDateShort(d: string | Date | undefined): string {
   if (!d) return '—';
@@ -280,12 +283,9 @@ function RoleStack({ roles, max = 3 }: { roles: Role[]; max?: number }) {
         <RoleChip key={r.id} name={r.name} />
       ))}
       {more > 0 && (
-        <span
-          title={roles.slice(max).map((r) => r.name).join(', ')}
-          className="inline-flex items-center rounded-full bg-bg-active px-2 py-[2px] text-[11px] font-semibold text-fg-muted"
-        >
+        <Badge title={roles.slice(max).map((r) => r.name).join(', ')}>
           +{more} more
-        </span>
+        </Badge>
       )}
     </div>
   );
@@ -311,68 +311,57 @@ function RolesAndRegionsCard({
   const capCount = user.capabilities?.length ?? 0;
 
   return (
-    <div className="rounded-[10px] border border-border bg-bg-elev">
-      <div className="px-3.5 py-3">
-        {/* Row: Roles */}
-        <div className="grid grid-cols-[90px_1fr_auto] items-center gap-3">
-          <div className="text-[11px] font-medium text-fg-muted">Roles</div>
-          <div className="flex flex-wrap gap-1">
-            {(user.roles ?? []).length > 0 ? (
-              user.roles!.map((r) => <RoleChip key={r.id} name={r.name} />)
-            ) : (
-              <span className="text-[11.5px] italic text-fg-dim">No roles assigned</span>
-            )}
-          </div>
-          {onEditAccess && (
-            <Button outline size="xxs" onClick={onEditAccess}>
-              Edit access
-            </Button>
+    <Card footer={open && capCount > 0 ? <CapabilityDetail user={user} /> : null}>
+      {/* Row: Roles */}
+      <div className="grid grid-cols-[90px_1fr_auto] items-center gap-3">
+        <div className="text-[11px] font-medium text-fg-muted">Roles</div>
+        <div className="flex flex-wrap gap-1">
+          {(user.roles ?? []).length > 0 ? (
+            user.roles!.map((r) => <RoleChip key={r.id} name={r.name} />)
+          ) : (
+            <span className="text-[11.5px] italic text-fg-dim">No roles assigned</span>
           )}
         </div>
-
-        {/* Row: Regions */}
-        <div className="mt-2.5 grid grid-cols-[90px_1fr] items-center gap-3">
-          <div className="text-[11px] font-medium text-fg-muted">Regions</div>
-          <div className="flex flex-wrap gap-1">
-            {userRegions.length === 0 ? (
-              <span className="text-[11.5px] italic text-fg-muted">
-                {t('users.detail.noRegionsAssigned')}
-              </span>
-            ) : (
-              userRegions.map((r) => (
-                <span
-                  key={r.id}
-                  className="rounded bg-bg-active px-2 py-[2px] text-[11.5px] text-fg-strong"
-                >
-                  {r.name}
-                </span>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Capability count + view-detail trigger */}
-        {capCount > 0 && (
-          <div className="mt-2.5 flex items-center gap-2.5 border-t border-border-soft pt-2.5 text-[11px] text-fg-muted">
-            <span>
-              <span className="font-mono font-semibold tabular-nums text-fg-strong">
-                {capCount}
-              </span>{' '}
-              capabilities granted
-            </span>
-            <span className="text-fg-dim">·</span>
-            <button
-              onClick={() => setOpen(!open)}
-              className="font-medium text-accent-700 hover:underline"
-            >
-              {open ? 'Hide details' : 'View detailed permissions'}
-            </button>
-          </div>
+        {onEditAccess && (
+          <Button outline size="xxs" onClick={onEditAccess}>
+            Edit access
+          </Button>
         )}
       </div>
 
-      {open && capCount > 0 && <CapabilityDetail user={user} />}
-    </div>
+      {/* Row: Regions */}
+      <div className="mt-2.5 grid grid-cols-[90px_1fr] items-center gap-3">
+        <div className="text-[11px] font-medium text-fg-muted">Regions</div>
+        <div className="flex flex-wrap gap-1">
+          {userRegions.length === 0 ? (
+            <span className="text-[11.5px] italic text-fg-muted">
+              {t('users.detail.noRegionsAssigned')}
+            </span>
+          ) : (
+            userRegions.map((r) => <Badge key={r.id}>{r.name}</Badge>)
+          )}
+        </div>
+      </div>
+
+      {/* Capability count + view-detail trigger */}
+      {capCount > 0 && (
+        <div className="mt-2.5 flex items-center gap-2.5 border-t border-border-soft pt-2.5 text-[11px] text-fg-muted">
+          <span>
+            <span className="font-mono font-semibold tabular-nums text-fg-strong">
+              {capCount}
+            </span>{' '}
+            capabilities granted
+          </span>
+          <span className="text-fg-dim">·</span>
+          <button
+            onClick={() => setOpen(!open)}
+            className="font-medium text-accent-700 hover:underline"
+          >
+            {open ? 'Hide details' : 'View detailed permissions'}
+          </button>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -421,6 +410,10 @@ function CapabilityDetail({ user }: { user: User }) {
             }`}
           >
             <div className="text-[11.5px] font-semibold text-fg-strong">{g.area}</div>
+            {/* TODO(design-system): replace these accent-tinted capability
+                tags with `<Badge color="accent" size="xs">` once Badge gains
+                an accent color variant + size="xs". Same TODO as
+                UserFormPage's capability preview. */}
             <div className="flex flex-wrap gap-1">
               {g.granted.map((c) => {
                 const sources = sourceRoles.filter((sr) => sr.caps.has(c.name));
@@ -552,25 +545,14 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
   };
 
   return (
-    <div className="rounded-[10px] border border-border bg-bg-elev">
-      <div className="border-b border-border-soft px-3.5 py-2.5">
-        <div className="text-[13px] font-semibold text-fg-strong">Security</div>
-      </div>
-      <div>
-        {items.map((it, i) => (
-          <div
-            key={it.k}
-            className={`grid grid-cols-[110px_1fr_auto] items-center gap-3.5 px-3.5 py-2.5 ${
-              i < items.length - 1 ? 'border-b border-border-soft' : ''
-            }`}
-          >
-            <div className="text-[11.5px] font-medium text-fg-muted">{it.k}</div>
-            <div>
-              <div className="text-[12.5px] text-fg-strong">{it.v}</div>
-              {it.hint && (
-                <div className="mt-0.5 text-[10.5px] leading-snug text-fg-dim">{it.hint}</div>
-              )}
-            </div>
+    <Card title="Security" padding="none">
+      {items.map((it, i) => (
+        <DataRow
+          key={it.k}
+          label={it.k}
+          labelWidth={110}
+          last={i === items.length - 1}
+          action={
             <Button
               outline
               size="xxs"
@@ -579,10 +561,15 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
             >
               {it.actionLabel}
             </Button>
-          </div>
-        ))}
-      </div>
-    </div>
+          }
+        >
+          <div className="text-[12.5px] text-fg-strong">{it.v}</div>
+          {it.hint && (
+            <div className="mt-0.5 text-[10.5px] leading-snug text-fg-dim">{it.hint}</div>
+          )}
+        </DataRow>
+      ))}
+    </Card>
   );
 }
 
@@ -750,23 +737,18 @@ function AccountActivityCard({ userId }: { userId: string }) {
   const entries = data ?? [];
 
   return (
-    <div className="rounded-[10px] border border-border bg-bg-elev">
-      <div className="flex items-center justify-between gap-2.5 border-b border-border-soft px-3.5 py-2.5">
-        <div>
-          <div className="text-[13px] font-semibold text-fg-strong">Account activity</div>
-          <div className="mt-0.5 text-[11px] text-fg-muted">
-            Sign-ins, access changes, security events. Record edits appear on each record.
-          </div>
-        </div>
-      </div>
-      <div>
-        {isLoading && (
-          <div className="px-3.5 py-3 text-[11.5px] text-fg-muted">Loading activity…</div>
-        )}
-        {!isLoading && entries.length === 0 && (
-          <div className="px-3.5 py-3 text-[11.5px] text-fg-muted">No activity recorded yet.</div>
-        )}
-        {entries.map((e, i) => {
+    <Card
+      title="Account activity"
+      subtitle="Sign-ins, access changes, security events. Record edits appear on each record."
+      padding="none"
+    >
+      {isLoading && (
+        <div className="px-3.5 py-3 text-[11.5px] text-fg-muted">Loading activity…</div>
+      )}
+      {!isLoading && entries.length === 0 && (
+        <div className="px-3.5 py-3 text-[11.5px] text-fg-muted">No activity recorded yet.</div>
+      )}
+      {entries.map((e, i) => {
           const cls = classifyEvent(e);
           const s = KIND_STYLES[cls.kind];
           // Per-event meta wins over the actor line. For sign-in runs the
@@ -796,13 +778,17 @@ function AccountActivityCard({ userId }: { userId: string }) {
             </div>
           );
         })}
-      </div>
-    </div>
+    </Card>
   );
 }
 
 // ──────────────────────────────────────────────────────────────────
 // Lifecycle footer — Deactivate / Activate
+//
+// TODO(design-system): this title + description + action shape is the same
+// pattern as the AccountSettings 2FA-OFF call-to-action card. Both should
+// become `<Callout kind="action" title=... description=... action={...}>`
+// once the Callout primitive lands. Today they're hand-rolled in parallel.
 // ──────────────────────────────────────────────────────────────────
 function LifecycleFooter({
   user,

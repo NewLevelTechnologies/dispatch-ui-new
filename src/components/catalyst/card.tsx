@@ -4,16 +4,29 @@ import type React from 'react'
 // Surfaced card primitive used across the redesigned v1.5 pages — replaces the
 // `FormCard` / `ACard` shadows that lived inside UserFormPage and
 // AccountSettingsPage. Dimensions match the dense look (13px title, p-3.5
-// body); the optional `subtitle` slot is the long-form helper line some
-// sections use under the title.
+// body).
+//
+//   <Card title="Profile">                  ← form fields inside, default padding
+//   <Card title="Security" padding="none">  ← row-based body (DataRow handles px)
+//   <Card footer={<CapabilityDetail/>}>     ← extra section below the body
+//     with its own border-top divider (CapabilityDetail provides it)
 export function Card({
   title,
   subtitle,
+  footer,
+  padding = 'default',
   className,
   children,
 }: {
   title?: React.ReactNode
   subtitle?: React.ReactNode
+  // Rendered below the body without padding — consumer brings its own
+  // divider/background. Used for expandable detail panels that need to span
+  // edge-to-edge inside the card border.
+  footer?: React.ReactNode
+  // `'none'` removes body padding for row-based bodies (DataRow, feed rows)
+  // that manage their own px so dividers reach the card edges.
+  padding?: 'default' | 'none'
   className?: string
   children: React.ReactNode
 }) {
@@ -26,7 +39,8 @@ export function Card({
           {subtitle && <div className="mt-0.5 text-[11px] text-fg-muted">{subtitle}</div>}
         </div>
       )}
-      <div className="p-3.5">{children}</div>
+      <div className={padding === 'none' ? undefined : 'p-3.5'}>{children}</div>
+      {footer}
     </div>
   )
 }
