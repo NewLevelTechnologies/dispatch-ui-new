@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { CheckIcon, ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { userApi, dispatchRegionApi, type Role } from '../api';
 import { roleColor } from '../utils/roleColor';
 import { Button } from '../components/catalyst/button';
@@ -675,33 +675,39 @@ function RegionMultiSelect({
     );
   }
 
+  // 3-col checkbox grid — same shape as RoleMultiSelect. The selectable
+  // multi-select pattern lives in one place on this page; a separate chip
+  // language for regions was confusing alongside the role grid. The third
+  // column is reserved for an optional per-region count (e.g. "# of WOs")
+  // when we have one to surface; today it stays empty.
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="grid grid-cols-3 gap-1.5">
       {regions.map((r) => {
         const on = selected.includes(r.id);
-        return on ? (
-          <Button
+        return (
+          <label
             key={r.id}
-            color="accent-soft"
-            size="xs"
-            type="button"
-            aria-pressed
-            onClick={() => onToggle(r.id)}
+            className="grid cursor-pointer grid-cols-[16px_1fr_auto] items-center gap-2 rounded-md border px-2.5 py-1.5"
+            style={{
+              background: on
+                ? 'color-mix(in oklch, var(--accent-500) 7%, var(--bg-elev-2))'
+                : 'var(--bg-elev-2)',
+              borderColor: on
+                ? 'color-mix(in oklch, var(--accent-500) 25%, var(--border))'
+                : 'var(--border-soft)',
+            }}
           >
-            <CheckIcon data-slot="icon" />
-            {r.name}
-          </Button>
-        ) : (
-          <Button
-            key={r.id}
-            outline
-            size="xs"
-            type="button"
-            aria-pressed={false}
-            onClick={() => onToggle(r.id)}
-          >
-            {r.name}
-          </Button>
+            <Checkbox
+              color="accent"
+              checked={on}
+              onChange={() => onToggle(r.id)}
+            />
+            <span
+              className={`truncate text-[12px] text-fg-strong ${on ? 'font-semibold' : 'font-medium'}`}
+            >
+              {r.name}
+            </span>
+          </label>
         );
       })}
     </div>

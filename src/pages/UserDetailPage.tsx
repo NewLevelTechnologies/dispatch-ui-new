@@ -225,9 +225,9 @@ function Header({
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-fg-muted">
           {user.enabled ? (
-            <Pill tone="success" dot live>Active</Pill>
+            <Pill tone="success" dot live inline>Active</Pill>
           ) : (
-            <Pill tone="neutral" dot>Disabled</Pill>
+            <Pill tone="neutral" dot inline>Disabled</Pill>
           )}
           <span className="text-fg-dim">·</span>
           <span className="break-all">{user.email}</span>

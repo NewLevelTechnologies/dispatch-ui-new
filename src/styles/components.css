@@ -114,6 +114,21 @@
 .pill.violet   { background: color-mix(in oklch, var(--violet-500) 12%, var(--bg-elev)); color: var(--violet-500); }
 .pill.neutral  { background: var(--bg-active); color: var(--fg-muted); }
 
+/* `inline` strips the background/padding/border so the pill renders as
+   "dot + label + optional glow" only — for status indicators that live
+   inside a metadata line where a full pill bg would over-weight. Text and
+   dot still pick up the tone color. Font shrinks to inherit so the indicator
+   blends with the surrounding line. */
+.pill.inline {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+  font-weight: 500;
+  letter-spacing: normal;
+}
+
 /* Square tag — for monospace codes in table cells */
 .tag {
   display: inline-flex;
