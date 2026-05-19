@@ -28,7 +28,7 @@ import Disable2FADialog from '../components/account/Disable2FADialog';
 // Personal Account Settings — separate from company-wide Settings. The
 // sidebar user popup links here. Phase 1 ships the visual redesign and
 // keeps 2FA on Amplify-direct TOTP. SMS/email methods + server-issued
-// recovery codes + code-gated disable land when backend's /auth/2fa/*
+// recovery codes + code-gated disable land when backend's /users/me/2fa/*
 // endpoints are ready.
 export default function AccountSettingsPage() {
   const { t } = useTranslation();
@@ -295,7 +295,7 @@ function ProfileCard({ user }: { user: User }) {
 // ──────────────────────────────────────────────────────────────────
 // Security card — Password / 2FA / Sessions
 //
-// 2FA enroll + disable both go through /auth/2fa/* (twoFactorApi). The
+// 2FA enroll + disable both go through /users/me/2fa/* (twoFactorApi). The
 // server enforces the "one primary method" guarantee — verifying a new
 // method automatically disables the prior one — so the FE doesn't need a
 // switch-method UX. Status detection still reads Amplify's MFA

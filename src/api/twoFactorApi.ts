@@ -1,6 +1,6 @@
 // Two-Factor Auth API Client
 //
-// Wraps the backend's /auth/2fa/* endpoints. The backend enforces the
+// Wraps the backend's /users/me/2fa/* endpoints. The backend enforces the
 // "one primary method" guarantee server-side: whichever method the user
 // verifies last becomes their preferred factor and the others are disabled.
 // The frontend doesn't need switch-method UX — re-enrolling just works.
@@ -41,36 +41,36 @@ export interface DisableRequest {
 export const twoFactorApi = {
   // TOTP (authenticator app)
   totpSetup: async (): Promise<TotpSetupResponse> => {
-    const response = await apiClient.post<TotpSetupResponse>('/auth/2fa/totp/setup');
+    const response = await apiClient.post<TotpSetupResponse>('/users/me/2fa/totp/setup');
     return response.data;
   },
   totpVerify: async (code: string): Promise<void> => {
-    await apiClient.post('/auth/2fa/totp/verify', { code } satisfies VerifyCodeRequest);
+    await apiClient.post('/users/me/2fa/totp/verify', { code } satisfies VerifyCodeRequest);
   },
 
   // SMS
   smsSetup: async (phoneNumber: string): Promise<void> => {
-    await apiClient.post('/auth/2fa/sms/setup', { phoneNumber } satisfies SmsSetupRequest);
+    await apiClient.post('/users/me/2fa/sms/setup', { phoneNumber } satisfies SmsSetupRequest);
   },
   smsVerify: async (code: string): Promise<void> => {
-    await apiClient.post('/auth/2fa/sms/verify', { code } satisfies VerifyCodeRequest);
+    await apiClient.post('/users/me/2fa/sms/verify', { code } satisfies VerifyCodeRequest);
   },
 
   // Email
   emailSetup: async (): Promise<void> => {
-    await apiClient.post('/auth/2fa/email/setup');
+    await apiClient.post('/users/me/2fa/email/setup');
   },
   emailVerify: async (code: string): Promise<void> => {
-    await apiClient.post('/auth/2fa/email/verify', { code } satisfies VerifyCodeRequest);
+    await apiClient.post('/users/me/2fa/email/verify', { code } satisfies VerifyCodeRequest);
   },
 
   // Disable — two-step fresh-MFA-proof flow
   confirmRequest: async (): Promise<ConfirmRequestResponse> => {
-    const response = await apiClient.post<ConfirmRequestResponse>('/auth/2fa/confirm/request');
+    const response = await apiClient.post<ConfirmRequestResponse>('/users/me/2fa/confirm/request');
     return response.data;
   },
   disable: async (confirmationCode: string): Promise<void> => {
-    await apiClient.post('/auth/2fa/disable', { confirmationCode } satisfies DisableRequest);
+    await apiClient.post('/users/me/2fa/disable', { confirmationCode } satisfies DisableRequest);
   },
 };
 
