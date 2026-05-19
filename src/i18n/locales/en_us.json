@@ -108,6 +108,7 @@
       "zipCode": "Zip Code"
     },
     "dismiss": "Dismiss",
+    "helpSupport": "Help & Support",
     "moreOptions": "More options",
     "next": "Next",
     "none": "None",
@@ -1869,6 +1870,7 @@
     }
   },
   "account": {
+    "menu": "Open account menu",
     "settings": "Account Settings",
     "settingsDescription": "Manage your personal account preferences and security settings",
     "changePassword": "Change Password",
