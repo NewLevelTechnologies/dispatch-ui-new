@@ -709,6 +709,14 @@ function classifyEvent(event: AccountActivityEvent): {
       return { kind: 'security', text: 'Password reset link sent' };
     case 'MFA_RESET':
       return { kind: 'security', text: '2FA reset' };
+    case 'TWO_FA_ENABLED': {
+      const p = (event.payload ?? {}) as { method?: unknown };
+      const method = typeof p.method === 'string' ? p.method : null;
+      return {
+        kind: 'security',
+        text: method ? `2FA enabled (${method})` : '2FA enabled',
+      };
+    }
     case 'GLOBAL_SIGNOUT':
       return { kind: 'security', text: 'Signed out of all sessions' };
     case 'SIGN_IN_SUCCESS': {
