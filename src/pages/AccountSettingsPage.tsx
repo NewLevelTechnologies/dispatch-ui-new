@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { fetchMFAPreference } from 'aws-amplify/auth';
 import { ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { PatternFormat } from 'react-number-format';
 import AppLayout from '../components/AppLayout';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
@@ -16,7 +17,6 @@ import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../components/ThemeProvider';
 import { userApi, type User } from '../api';
 import { roleColor } from '../utils/roleColor';
-import { formatPhone } from '../utils/formatPhone';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 import { Callout } from '../components/ui/Callout';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
@@ -67,6 +67,12 @@ export default function AccountSettingsPage() {
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 const PHOTO_MIME_TYPES = ['image/png', 'image/jpeg'];
 
+// Strip everything except digits — PatternFormat works in raw digits and
+// legacy "(XXX) XXX-XXXX" rows need to normalize before comparison.
+function stripPhoneDigits(value: string | null | undefined): string {
+  return (value ?? '').replace(/\D/g, '');
+}
+
 // Map the backend's photo-upload error messages onto the friendly copy the
 // designer specified. Falls back to the raw API message if we don't have a
 // canonical translation for the failure mode.
@@ -84,9 +90,10 @@ function ProfileCard({ user }: { user: User }) {
   const queryClient = useQueryClient();
   const [firstName, setFirstName] = useState(user.firstName);
   const [lastName, setLastName] = useState(user.lastName);
-  // Initial render formats the phone — backend stores raw digits, but the
-  // canonical national format is what we want the user to see on load.
-  const [phone, setPhone] = useState(formatPhone(user.phoneNumber) || (user.phoneNumber ?? ''));
+  // Phone state holds raw digits; PatternFormat handles the (XXX) XXX-XXXX
+  // display. Legacy rows with formatted strings in storage normalize to
+  // digits on next save, which is the documented backfill path.
+  const [phone, setPhone] = useState(stripPhoneDigits(user.phoneNumber));
   const [saveError, setSaveError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -98,24 +105,19 @@ function ProfileCard({ user }: { user: User }) {
   })();
   const avatarBg = roleColor(fullName);
 
-  // Phone is shown formatted on load — treat the raw and formatted forms
-  // as equivalent for dirty detection so opening the page doesn't immediately
-  // enable Save.
-  const phoneTrimmed = phone.trim();
-  const phoneUnchanged =
-    phoneTrimmed === (user.phoneNumber ?? '') ||
-    phoneTrimmed === (formatPhone(user.phoneNumber) || '');
+  // State holds raw digits, but legacy rows might still carry "(XXX) XXX-XXXX"
+  // — normalize both sides before comparing.
   const dirty =
     firstName !== user.firstName ||
     lastName !== user.lastName ||
-    !phoneUnchanged;
+    phone !== stripPhoneDigits(user.phoneNumber);
 
   const saveMutation = useMutation({
     mutationFn: () =>
       userApi.updateMyProfile({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        phoneNumber: phone.trim() || null,
+        phoneNumber: phone || null,
       }),
     onSuccess: (updated) => {
       queryClient.setQueryData(['currentUser'], updated);
@@ -152,16 +154,8 @@ function ProfileCard({ user }: { user: User }) {
   const handleReset = () => {
     setFirstName(user.firstName);
     setLastName(user.lastName);
-    setPhone(formatPhone(user.phoneNumber) || (user.phoneNumber ?? ''));
+    setPhone(stripPhoneDigits(user.phoneNumber));
     setSaveError('');
-  };
-
-  // Format the phone for display only when the field isn't focused — while
-  // editing we want raw input. We re-format on blur so the user sees the
-  // canonical national format after they stop typing.
-  const handlePhoneBlur = () => {
-    const formatted = formatPhone(phone);
-    if (formatted) setPhone(formatted);
   };
 
   const handlePickPhoto = () => fileInputRef.current?.click();
@@ -257,12 +251,15 @@ function ProfileCard({ user }: { user: User }) {
         </Field>
         <Field size="xs">
           <Label size="xs">{t('account.profile.phone')}</Label>
-          <Input
+          <PatternFormat
+            format="(###) ###-####"
+            mask="_"
+            customInput={Input}
             size="xs"
             type="tel"
+            name="phone"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            onBlur={handlePhoneBlur}
+            onValueChange={(values) => setPhone(values.value)}
             placeholder={t('account.profile.phonePlaceholder')}
           />
         </Field>
