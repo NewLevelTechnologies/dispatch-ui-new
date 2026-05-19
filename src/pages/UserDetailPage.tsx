@@ -11,6 +11,7 @@ import { auditApi, type AccountActivityEvent } from '../api/auditApi';
 import { formatPhone } from '../utils/formatPhone';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { Avatar } from '../components/ui/Avatar';
+import { Callout } from '../components/ui/Callout';
 import { Pill } from '../components/ui/Pill';
 import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
@@ -136,10 +137,10 @@ export default function UserDetailPage() {
   if (error || !user) {
     return (
       <div className="p-8">
-        <div className="rounded-lg border border-danger-500/30 bg-danger-500/5 p-4 text-[12.5px] text-danger-500">
+        <Callout kind="danger">
           {t('common.actions.errorLoading', { entities: t('entities.user') })}
           {error && `: ${(error as Error).message}`}
-        </div>
+        </Callout>
         <Button className="mt-4" onClick={() => navigate('/settings/access/users')}>
           <ArrowLeftIcon className="size-4" />
           {t('common.actions.back')}
@@ -406,23 +407,11 @@ function CapabilityDetail({ user }: { user: User }) {
             }`}
           >
             <div className="text-[11.5px] font-semibold text-fg-strong">{g.area}</div>
-            {/* TODO(design-system): replace these accent-tinted capability
-                tags with `<Badge color="accent" size="xs">` once Badge gains
-                an accent color variant + size="xs". Same TODO as
-                UserFormPage's capability preview. */}
             <div className="flex flex-wrap gap-1">
               {g.granted.map((c) => {
                 const sources = sourceRoles.filter((sr) => sr.caps.has(c.name));
                 return (
-                  <span
-                    key={c.name}
-                    className="inline-flex items-center gap-1 rounded border px-1.5 py-[2px] text-[10.5px] text-fg-strong"
-                    style={{
-                      background: 'color-mix(in oklch, var(--accent-500) 8%, var(--bg-elev-2))',
-                      borderColor: 'color-mix(in oklch, var(--accent-500) 20%, var(--border))',
-                    }}
-                    title={c.description}
-                  >
+                  <Badge key={c.name} color="accent" size="xs" title={c.description}>
                     {c.displayName}
                     {sources.length > 0 && sources.length < (user.roles?.length ?? 0) && (
                       <span
@@ -435,7 +424,7 @@ function CapabilityDetail({ user }: { user: User }) {
                           .join('')}
                       </span>
                     )}
-                  </span>
+                  </Badge>
                 );
               })}
             </div>
@@ -778,14 +767,6 @@ function AccountActivityCard({ userId }: { userId: string }) {
   );
 }
 
-// ──────────────────────────────────────────────────────────────────
-// Lifecycle footer — Deactivate / Activate
-//
-// TODO(design-system): this title + description + action shape is the same
-// pattern as the AccountSettings 2FA-OFF call-to-action card. Both should
-// become `<Callout kind="action" title=... description=... action={...}>`
-// once the Callout primitive lands. Today they're hand-rolled in parallel.
-// ──────────────────────────────────────────────────────────────────
 function LifecycleFooter({
   user,
   onDeactivate,
@@ -799,19 +780,12 @@ function LifecycleFooter({
 }) {
   const first = user.firstName;
   return (
-    <div className="flex items-center gap-3.5 rounded-[10px] border border-border bg-bg-elev px-4 py-3">
-      <div className="min-w-0 flex-1">
-        <div className="text-[12.5px] font-semibold text-fg-strong">
-          {user.enabled ? `Deactivate ${first}` : `Reactivate ${first}`}
-        </div>
-        <div className="mt-0.5 text-[11.5px] leading-snug text-fg-muted">
-          {user.enabled
-            ? 'Revokes sign-in immediately. Audit history is preserved.'
-            : 'Restores sign-in access. Existing roles and regions are kept as-is.'}
-        </div>
-      </div>
-      <div>
-        {user.enabled ? (
+    <Callout
+      kind="neutral"
+      icon={null}
+      title={user.enabled ? `Deactivate ${first}` : `Reactivate ${first}`}
+      action={
+        user.enabled ? (
           <Button outline="red" size="xxs" onClick={onDeactivate} disabled={pending}>
             Deactivate
           </Button>
@@ -819,8 +793,12 @@ function LifecycleFooter({
           <Button outline size="xxs" onClick={onActivate} disabled={pending}>
             Reactivate
           </Button>
-        )}
-      </div>
-    </div>
+        )
+      }
+    >
+      {user.enabled
+        ? 'Revokes sign-in immediately. Audit history is preserved.'
+        : 'Restores sign-in access. Existing roles and regions are kept as-is.'}
+    </Callout>
   );
 }

@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { fetchMFAPreference, updateMFAPreference } from 'aws-amplify/auth';
-import { CheckIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { ShieldCheckIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
@@ -11,11 +11,12 @@ import { DataRow } from '../components/catalyst/data-row';
 import { ErrorMessage, Field, Label } from '../components/catalyst/fieldset';
 import { Heading } from '../components/catalyst/heading';
 import { Input } from '../components/catalyst/input';
-import { Text } from '../components/catalyst/text';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../components/ThemeProvider';
 import { userApi, type User } from '../api';
 import { roleColor } from '../utils/roleColor';
+import { Callout } from '../components/ui/Callout';
+import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ChangePasswordDialog from '../components/account/ChangePasswordDialog';
 import TwoFactorSetupDialog from '../components/account/TwoFactorSetupDialog';
@@ -34,7 +35,6 @@ export default function AccountSettingsPage() {
       <div className="mx-auto max-w-[760px] px-1 pb-16">
         <div className="mb-5">
           <Heading>{t('account.settings')}</Heading>
-          <Text className="mt-1">{t('account.description')}</Text>
         </div>
 
         {isLoading || !currentUser ? (
@@ -273,28 +273,23 @@ function SecurityCard({ user }: { user: User }) {
             </div>
           </DataRow>
         ) : (
-          // TODO(design-system): the 2FA-OFF call-to-action should become a
-          // `<Callout kind="info" icon={ShieldCheckIcon} title="…" action={…}>`
-          // once Callout lands — same shape will host the future email-warning,
-          // the recovery-codes "save these somewhere safe" notice, and the
-          // UserDetail LifecycleFooter.
           <div className="my-2 px-3.5">
-            <div className="grid grid-cols-[36px_1fr_auto] items-center gap-3.5 rounded-lg border border-accent-500/22 bg-accent-500/5 px-4 py-3.5">
-              <div className="grid size-9 place-items-center rounded-lg bg-accent-500 text-white">
-                <ShieldCheckIcon className="size-[18px]" />
-              </div>
-              <div>
-                <div className="text-[13px] font-semibold text-fg-strong">
-                  {t('account.security.twofaCtaTitle')}
+            <Callout
+              kind="accent"
+              icon={
+                <div className="grid size-9 place-items-center rounded-lg bg-accent-500 text-white">
+                  <ShieldCheckIcon className="size-[18px]" />
                 </div>
-                <div className="mt-0.5 text-[11.5px] leading-relaxed text-fg-muted">
-                  {t('account.security.twofaCtaDescription')}
-                </div>
-              </div>
-              <Button size="xs" type="button" onClick={() => setSetupOpen(true)}>
-                {t('account.security.enable')}
-              </Button>
-            </div>
+              }
+              title={t('account.security.twofaCtaTitle')}
+              action={
+                <Button size="xs" type="button" onClick={() => setSetupOpen(true)}>
+                  {t('account.security.enable')}
+                </Button>
+              }
+            >
+              {t('account.security.twofaCtaDescription')}
+            </Callout>
           </div>
         )}
 
@@ -368,97 +363,39 @@ function PreferencesCard() {
   return (
     <Card title={t('account.preferences.title')} padding="none">
       <DataRow label={t('account.preferences.theme')}>
-        <div className="flex flex-wrap gap-1.5">
-          <ThemeChip
-            active={mode === 'light'}
-            onClick={() => setMode('light')}
-            label={t('account.preferences.themeLight')}
-            glyph="☀"
-          />
-          <ThemeChip
-            active={mode === 'dark'}
-            onClick={() => setMode('dark')}
-            label={t('account.preferences.themeDark')}
-            glyph="☾"
-          />
-        </div>
+        <ToggleGroup value={mode} onChange={setMode} aria-label={t('account.preferences.theme')}>
+          <ToggleGroupOption value="light">
+            <span aria-hidden="true">☀</span>
+            {t('account.preferences.themeLight')}
+          </ToggleGroupOption>
+          <ToggleGroupOption value="dark">
+            <span aria-hidden="true">☾</span>
+            {t('account.preferences.themeDark')}
+          </ToggleGroupOption>
+        </ToggleGroup>
       </DataRow>
       <DataRow label={t('account.preferences.accent')} last>
-        <div className="flex flex-wrap gap-1.5">
-          <AccentChip
-            active={accent === 'warm'}
-            onClick={() => setAccent('warm')}
-            label={t('account.preferences.accentWarm')}
-            swatch="oklch(68% 0.185 50)"
-          />
-          <AccentChip
-            active={accent === 'cool'}
-            onClick={() => setAccent('cool')}
-            label={t('account.preferences.accentCool')}
-            swatch="oklch(56% 0.125 215)"
-          />
-        </div>
+        <ToggleGroup value={accent} onChange={setAccent} aria-label={t('account.preferences.accent')}>
+          <ToggleGroupOption value="warm">
+            <Swatch color="oklch(68% 0.185 50)" />
+            {t('account.preferences.accentWarm')}
+          </ToggleGroupOption>
+          <ToggleGroupOption value="cool">
+            <Swatch color="oklch(56% 0.125 215)" />
+            {t('account.preferences.accentCool')}
+          </ToggleGroupOption>
+        </ToggleGroup>
       </DataRow>
     </Card>
   );
 }
 
-function ThemeChip({
-  active,
-  onClick,
-  label,
-  glyph,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  glyph: string;
-}) {
-  return active ? (
-    <Button color="accent-soft" size="xs" type="button" aria-pressed onClick={onClick}>
-      <CheckIcon data-slot="icon" />
-      <span aria-hidden="true">{glyph}</span>
-      {label}
-    </Button>
-  ) : (
-    <Button outline size="xs" type="button" aria-pressed={false} onClick={onClick}>
-      <span aria-hidden="true">{glyph}</span>
-      {label}
-    </Button>
-  );
-}
-
-function AccentChip({
-  active,
-  onClick,
-  label,
-  swatch,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  swatch: string;
-}) {
-  // Color swatch dot is a brand-specific decoration that doesn't generalize as
-  // an icon slot on Catalyst Button — keep it as inline content for this
-  // narrow surface. Lifting it into a design-system primitive would be
-  // overfit; ThemeChip and AccentChip are the only callers.
-  const dot = (
+function Swatch({ color }: { color: string }) {
+  return (
     <span
       className="inline-block size-2.5 rounded-full ring-1 ring-black/10"
-      style={{ background: swatch }}
+      style={{ background: color }}
       aria-hidden="true"
     />
-  );
-  return active ? (
-    <Button color="accent-soft" size="xs" type="button" aria-pressed onClick={onClick}>
-      {dot}
-      {label}
-    </Button>
-  ) : (
-    <Button outline size="xs" type="button" aria-pressed={false} onClick={onClick}>
-      {dot}
-      {label}
-    </Button>
   );
 }

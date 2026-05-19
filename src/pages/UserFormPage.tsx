@@ -4,10 +4,13 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { PatternFormat } from 'react-number-format';
 import { userApi, dispatchRegionApi, type Role } from '../api';
 import { roleColor } from '../utils/roleColor';
+import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
+import { Callout } from '../components/ui/Callout';
 import { Checkbox } from '../components/catalyst/checkbox';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Input } from '../components/catalyst/input';
@@ -283,16 +286,16 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
               <div className="mt-2.5 grid grid-cols-[1fr_1.4fr] gap-2.5">
                 <Field size="xs">
                   <Label size="xs">Phone</Label>
-                  {/* TODO: phone field is a plain `<Input type="tel">` — no
-                      input mask. Customer / ServiceLocation forms use
-                      `PatternFormat` for the `(XXX) XXX-XXXX` mask; mirror
-                      that here, or extend Catalyst Input with a masked variant
-                      so admin-tool forms get the same affordance. */}
-                  <Input
+                  <PatternFormat
+                    format="(###) ###-####"
+                    mask="_"
+                    customInput={Input}
                     size="xs"
                     type="tel"
                     value={formData.phoneNumber}
-                    onChange={(e) => setFormData((p) => ({ ...p, phoneNumber: e.target.value }))}
+                    onValueChange={(values) =>
+                      setFormData((p) => ({ ...p, phoneNumber: values.value }))
+                    }
                     placeholder="(555) 123-4567"
                   />
                 </Field>
@@ -339,21 +342,10 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                 onToggle={toggleRegion}
               />
               {formData.dispatchRegionIds.length === 0 && (
-                // TODO(design-system): replace inline warning callout with a
-                // `<Callout kind="warning">` component once the Callout
-                // primitive lands.
-                <div
-                  className="mt-2.5 rounded-md border px-2.5 py-1.5 text-[11.5px]"
-                  style={{
-                    background: 'color-mix(in oklch, var(--warning-500) 8%, transparent)',
-                    borderColor:
-                      'color-mix(in oklch, var(--warning-500) 25%, var(--border))',
-                    color: 'oklch(50% 0.16 78)',
-                  }}
-                >
-                  ⚠ No regions selected — this user won't see any records until you assign at
+                <Callout kind="warning" className="mt-2.5">
+                  No regions selected — this user won't see any records until you assign at
                   least one.
-                </div>
+                </Callout>
               )}
             </Card>
 
@@ -620,23 +612,11 @@ function CapabilityPreview({
                 <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-fg-muted">
                   {g.area} · {g.caps.length}
                 </div>
-                {/* TODO(design-system): replace these inline capability tags
-                    with `<Badge size="xs" color="accent">` once Badge gains an
-                    xs size variant. */}
                 <div className="flex flex-wrap gap-1">
                   {g.caps.map((c) => (
-                    <span
-                      key={c.name}
-                      title={c.description}
-                      className="rounded border px-1.5 py-[2px] text-[10.5px] text-fg-strong"
-                      style={{
-                        background: 'color-mix(in oklch, var(--accent-500) 8%, var(--bg-elev))',
-                        borderColor:
-                          'color-mix(in oklch, var(--accent-500) 20%, var(--border))',
-                      }}
-                    >
+                    <Badge key={c.name} color="accent" size="xs" title={c.description}>
                       {c.displayName}
-                    </span>
+                    </Badge>
                   ))}
                 </div>
               </div>

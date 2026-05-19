@@ -30,6 +30,7 @@ import { SidebarLayout } from './catalyst/sidebar-layout';
 import { Navbar } from './catalyst/navbar';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
 import { useTheme } from './ThemeProvider';
+import { ToggleGroup, ToggleGroupOption } from './ui/ToggleGroup';
 import { useCurrentUser, useHasAnyCapability } from '../hooks/useCurrentUser';
 import { roleColor } from '../utils/roleColor';
 
@@ -270,63 +271,39 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
               <DropdownMenu className="min-w-64" anchor="top start">
                 <div className="px-3 py-2">
                   <div className="mb-2 text-sm font-medium text-fg-strong">{t('common.theme')}</div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setMode('light')}
-                      className={`flex flex-1 items-center justify-center rounded-md px-3 py-2 text-sm transition-colors ${
-                        mode === 'light'
-                          ? 'bg-accent-500 text-white'
-                          : 'bg-bg-hover text-fg hover:bg-bg-active'
-                      }`}
-                      aria-label="Light mode"
-                    >
+                  <ToggleGroup value={mode} onChange={setMode} aria-label={t('common.theme')} className="w-full">
+                    <ToggleGroupOption value="light" aria-label="Light mode" className="flex-1 justify-center">
                       <SunIcon className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => setMode('dark')}
-                      className={`flex flex-1 items-center justify-center rounded-md px-3 py-2 text-sm transition-colors ${
-                        mode === 'dark'
-                          ? 'bg-accent-500 text-white'
-                          : 'bg-bg-hover text-fg hover:bg-bg-active'
-                      }`}
-                      aria-label="Dark mode"
-                    >
+                    </ToggleGroupOption>
+                    <ToggleGroupOption value="dark" aria-label="Dark mode" className="flex-1 justify-center">
                       <MoonIcon className="h-4 w-4" />
-                    </button>
-                  </div>
+                    </ToggleGroupOption>
+                  </ToggleGroup>
                   <div className="mt-3 mb-2 text-sm font-medium text-fg-strong">{t('common.themeAccent')}</div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setAccent('warm')}
-                      className={`flex items-center justify-center rounded-md px-3 py-2 transition-colors ${
-                        accent === 'warm'
-                          ? 'bg-accent-500'
-                          : 'bg-bg-hover hover:bg-bg-active'
-                      }`}
+                  <ToggleGroup value={accent} onChange={setAccent} aria-label={t('common.themeAccent')} className="w-full">
+                    <ToggleGroupOption
+                      value="warm"
                       aria-label={t('common.themeAccentWarm')}
                       title={t('common.themeAccentWarm')}
+                      className="flex-1 justify-center"
                     >
                       <span
                         className="size-4 rounded-full ring-1 ring-black/10"
                         style={{ background: 'oklch(68% 0.185 50)' }}
                       />
-                    </button>
-                    <button
-                      onClick={() => setAccent('cool')}
-                      className={`flex items-center justify-center rounded-md px-3 py-2 transition-colors ${
-                        accent === 'cool'
-                          ? 'bg-accent-500'
-                          : 'bg-bg-hover hover:bg-bg-active'
-                      }`}
+                    </ToggleGroupOption>
+                    <ToggleGroupOption
+                      value="cool"
                       aria-label={t('common.themeAccentCool')}
                       title={t('common.themeAccentCool')}
+                      className="flex-1 justify-center"
                     >
                       <span
                         className="size-4 rounded-full ring-1 ring-black/10"
                         style={{ background: 'oklch(56% 0.125 215)' }}
                       />
-                    </button>
-                  </div>
+                    </ToggleGroupOption>
+                  </ToggleGroup>
                 </div>
                 <DropdownDivider />
                 <DropdownItem href="/account/settings">
