@@ -1,6 +1,9 @@
-import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
+import { Alert, AlertActions, AlertDescription, AlertTitle } from './catalyst/alert';
 import { Button } from './catalyst/button';
 
+// Shared destructive-confirmation surface. Renders Catalyst <Alert> under the
+// hood so every confirm in the app reads the same way (see
+// handoff/design-system-reference.md §5).
 interface ConfirmDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -10,6 +13,7 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   isDestructive?: boolean;
+  isPending?: boolean;
 }
 
 export default function ConfirmDialog({
@@ -21,6 +25,7 @@ export default function ConfirmDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   isDestructive = false,
+  isPending = false,
 }: ConfirmDialogProps) {
   const handleConfirm = () => {
     onConfirm();
@@ -28,18 +33,21 @@ export default function ConfirmDialog({
   };
 
   return (
-    <Dialog open={isOpen} onClose={onClose}>
-      <DialogTitle>{title}</DialogTitle>
-      <DialogDescription>{message}</DialogDescription>
-      <DialogBody />
-      <DialogActions>
-        <Button plain onClick={onClose}>
+    <Alert open={isOpen} onClose={onClose}>
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>{message}</AlertDescription>
+      <AlertActions>
+        <Button plain onClick={onClose} disabled={isPending}>
           {cancelLabel}
         </Button>
-        <Button color={isDestructive ? 'red' : 'dark'} onClick={handleConfirm}>
+        <Button
+          color={isDestructive ? 'red' : 'dark'}
+          onClick={handleConfirm}
+          disabled={isPending}
+        >
           {confirmLabel}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </AlertActions>
+    </Alert>
   );
 }

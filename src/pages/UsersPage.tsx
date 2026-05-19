@@ -9,7 +9,8 @@ import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
 import { PageHead } from '../components/ui/PageHead';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
-import { Alert, AlertActions, AlertDescription, AlertTitle } from '../components/catalyst/alert';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { showError, showSuccess, extractApiError } from '../lib/toast';
 import { Avatar } from '../components/ui/Avatar';
 import { Pill } from '../components/ui/Pill';
 import { RoleChip } from '../components/RoleChip';
@@ -54,8 +55,12 @@ export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  // One pending-confirmation slot for any of delete/disable/enable — only
+  // one can be open at a time, so a single state machine is cleaner than
+  // three open/target pairs.
+  const [pendingAction, setPendingAction] = useState<
+    { kind: 'delete' | 'disable' | 'enable'; user: User } | null
+  >(null);
 
   // Permission checks
   const canInviteUsers = useHasCapability('INVITE_USERS');
@@ -74,26 +79,30 @@ export default function UsersPage() {
   });
 
   const disableMutation = useMutation({
-    mutationFn: (id: string) => userApi.disable(id),
-    onSuccess: () => {
+    mutationFn: (user: User) => userApi.disable(user.id),
+    onSuccess: (_, user) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      showSuccess(`${user.firstName} ${user.lastName} disabled`);
     },
+    onError: (err) => showError("Couldn't disable user", extractApiError(err)),
   });
 
   const enableMutation = useMutation({
-    mutationFn: (id: string) => userApi.enable(id),
-    onSuccess: () => {
+    mutationFn: (user: User) => userApi.enable(user.id),
+    onSuccess: (_, user) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      showSuccess(`${user.firstName} ${user.lastName} enabled`);
     },
+    onError: (err) => showError("Couldn't enable user", extractApiError(err)),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => userApi.delete(id),
-    onSuccess: () => {
+    mutationFn: (user: User) => userApi.delete(user.id),
+    onSuccess: (_, user) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      setIsDeleteAlertOpen(false);
-      setUserToDelete(null);
+      showSuccess(`${user.firstName} ${user.lastName} deleted`);
     },
+    onError: (err) => showError("Couldn't delete user", extractApiError(err)),
   });
 
   const handleAdd = () => {
@@ -104,30 +113,24 @@ export default function UsersPage() {
     navigate(`/settings/access/users/${user.id}/edit`);
   };
 
-  const handleDisable = (user: User) => {
-    const message = t('users.actions.disableConfirm', { name: `${user.firstName} ${user.lastName}` });
-    if (window.confirm(message)) {
-      disableMutation.mutate(user.id);
-    }
+  const handleDisable = (user: User) => setPendingAction({ kind: 'disable', user });
+  const handleEnable = (user: User) => setPendingAction({ kind: 'enable', user });
+  const handleDelete = (user: User) => setPendingAction({ kind: 'delete', user });
+
+  const confirmPendingAction = () => {
+    if (!pendingAction) return;
+    if (pendingAction.kind === 'delete') deleteMutation.mutate(pendingAction.user);
+    else if (pendingAction.kind === 'disable') disableMutation.mutate(pendingAction.user);
+    else enableMutation.mutate(pendingAction.user);
   };
 
-  const handleEnable = (user: User) => {
-    const message = t('users.actions.enableConfirm', { name: `${user.firstName} ${user.lastName}` });
-    if (window.confirm(message)) {
-      enableMutation.mutate(user.id);
-    }
-  };
-
-  const handleDelete = (user: User) => {
-    setUserToDelete(user);
-    setIsDeleteAlertOpen(true);
-  };
-
-  const confirmDelete = () => {
-    if (userToDelete) {
-      deleteMutation.mutate(userToDelete.id);
-    }
-  };
+  const pendingName = pendingAction
+    ? `${pendingAction.user.firstName} ${pendingAction.user.lastName}`
+    : '';
+  const confirmPending =
+    deleteMutation.isPending ||
+    disableMutation.isPending ||
+    enableMutation.isPending;
 
   // Filter users based on search query, role, and status
   const filteredUsers = useMemo(() => {
@@ -407,20 +410,36 @@ export default function UsersPage() {
         </div>
       )}
 
-      <Alert open={isDeleteAlertOpen} onClose={() => setIsDeleteAlertOpen(false)}>
-        <AlertTitle>{t('common.actions.deleteConfirm', { name: userToDelete ? `${userToDelete.firstName} ${userToDelete.lastName}` : '' })}</AlertTitle>
-        <AlertDescription>
-          {t('users.actions.deleteWarning')}
-        </AlertDescription>
-        <AlertActions>
-          <Button plain onClick={() => setIsDeleteAlertOpen(false)}>
-            {t('common.cancel')}
-          </Button>
-          <Button color="red" onClick={confirmDelete} disabled={deleteMutation.isPending}>
-            {deleteMutation.isPending ? t('common.deleting') : t('common.delete')}
-          </Button>
-        </AlertActions>
-      </Alert>
+      <ConfirmDialog
+        isOpen={pendingAction !== null}
+        onClose={() => setPendingAction(null)}
+        onConfirm={confirmPendingAction}
+        title={
+          pendingAction?.kind === 'delete'
+            ? t('common.actions.deleteConfirm', { name: pendingName })
+            : pendingAction?.kind === 'disable'
+              ? t('users.actions.disableConfirm', { name: pendingName })
+              : t('users.actions.enableConfirm', { name: pendingName })
+        }
+        message={
+          pendingAction?.kind === 'delete'
+            ? t('users.actions.deleteWarning')
+            : pendingAction?.kind === 'disable'
+              ? t('users.actions.disableWarning')
+              : t('users.actions.enableWarning')
+        }
+        confirmLabel={
+          pendingAction?.kind === 'delete'
+            ? confirmPending
+              ? t('common.deleting')
+              : t('common.delete')
+            : pendingAction?.kind === 'disable'
+              ? t('users.table.disable')
+              : t('users.table.enable')
+        }
+        isDestructive={pendingAction?.kind !== 'enable'}
+        isPending={confirmPending}
+      />
     </>
   );
 }

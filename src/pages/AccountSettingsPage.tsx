@@ -15,6 +15,7 @@ import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../components/ThemeProvider';
 import { userApi, type User } from '../api';
 import { roleColor } from '../utils/roleColor';
+import { showError, showSuccess, extractApiError } from '../lib/toast';
 import { Callout } from '../components/ui/Callout';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -97,13 +98,10 @@ function ProfileCard({ user }: { user: User }) {
     onSuccess: (updated) => {
       queryClient.setQueryData(['currentUser'], updated);
       setSaveError('');
+      showSuccess('Profile updated');
     },
     onError: (err: unknown) => {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setSaveError(msg || t('account.profile.errorGeneric'));
+      setSaveError(extractApiError(err) || t('account.profile.errorGeneric'));
     },
   });
 
@@ -213,21 +211,22 @@ function SecurityCard({ user }: { user: User }) {
 
   const disableMutation = useMutation({
     mutationFn: () => updateMFAPreference({ totp: 'DISABLED' }),
-    onSuccess: () => refetch(),
+    onSuccess: () => {
+      refetch();
+      showSuccess('Two-factor disabled');
+    },
+    onError: (err: unknown) =>
+      showError("Couldn't disable two-factor", extractApiError(err)),
   });
 
   const signOutMutation = useMutation({
     mutationFn: () => userApi.signOutEverywhere(user.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['account-activity', user.id] });
+      showSuccess('Signed out of all sessions');
     },
-    onError: (err: unknown) => {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      window.alert(msg || t('account.security.sessionsSignOutError'));
-    },
+    onError: (err: unknown) =>
+      showError(t('account.security.sessionsSignOutError'), extractApiError(err)),
   });
 
   return (

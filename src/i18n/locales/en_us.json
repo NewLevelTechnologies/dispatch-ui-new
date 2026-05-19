@@ -1247,8 +1247,10 @@
   "users": {
     "actions": {
       "deleteWarning": "This action cannot be undone. All user data and history will be permanently removed.",
-      "disableConfirm": "Are you sure you want to disable {{name}}? They will no longer be able to log in.",
-      "enableConfirm": "Are you sure you want to enable {{name}}?"
+      "disableConfirm": "Disable {{name}}?",
+      "disableWarning": "They will no longer be able to sign in. Audit history is preserved.",
+      "enableConfirm": "Enable {{name}}?",
+      "enableWarning": "They'll regain sign-in access immediately. Roles and regions are kept as-is."
     },
     "breakdown": {
       "disabled": "{{count}} disabled"

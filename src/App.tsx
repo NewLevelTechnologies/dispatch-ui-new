@@ -2,8 +2,10 @@ import { useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
 import { tenantSettingsApi, auditApi } from './api';
 import { GlossaryProvider } from './contexts/GlossaryContext';
+import { useTheme } from './components/ThemeProvider';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import CustomersPage from './pages/CustomersPage';
@@ -63,6 +65,10 @@ const LegacyRolesRedirect = () => {
 function App() {
   const { authStatus } = useAuthenticator((context) => [context.authStatus]);
   const queryClient = useQueryClient();
+  // Sonner's `theme="system"` reads `prefers-color-scheme`, not our
+  // `.theme-dark` class. Pass the resolved mode explicitly so toasts
+  // re-tint immediately when the user toggles theme in Account settings.
+  const { mode } = useTheme();
 
   // Clear React Query cache on logout to prevent showing old tenant's data
   useEffect(() => {
@@ -120,6 +126,22 @@ function App() {
 
   return (
     <GlossaryProvider glossary={tenantSettings?.glossary}>
+      <Toaster
+        position="bottom-right"
+        theme={mode === 'dark' ? 'dark' : 'light'}
+        duration={4000}
+        toastOptions={{
+          classNames: {
+            toast:
+              'border border-border bg-bg-elev text-fg-strong shadow-md',
+            title: 'text-fg-strong text-[13px] font-semibold',
+            description: 'text-fg-muted text-[12px]',
+            success: '!border-success-500/30',
+            error: '!border-danger-500/30',
+            info: '!border-info-500/30',
+          },
+        }}
+      />
       <Routes>
       {/* Customer-facing share-link pages — outside ProtectedRoute (no auth
           required, the share token IS the auth) and intentionally ignore

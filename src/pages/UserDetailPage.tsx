@@ -17,6 +17,8 @@ import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
 import { DataRow } from '../components/catalyst/data-row';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { showError, showSuccess, extractApiError } from '../lib/toast';
 
 function formatDateShort(d: string | Date | undefined): string {
   if (!d) return '—';
@@ -65,7 +67,9 @@ export default function UserDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', id] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      showSuccess('User deactivated');
     },
+    onError: (err) => showError("Couldn't deactivate user", extractApiError(err)),
   });
 
   const enableMutation = useMutation({
@@ -73,7 +77,9 @@ export default function UserDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', id] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      showSuccess('User reactivated');
     },
+    onError: (err) => showError("Couldn't reactivate user", extractApiError(err)),
   });
 
   // Resend Invitation — only meaningful while the user is in INVITED or
@@ -88,23 +94,21 @@ export default function UserDetailPage() {
         queryClient.invalidateQueries({ queryKey: ['account-activity', id] });
       }, 2000);
       queryClient.invalidateQueries({ queryKey: ['users', id] });
+      showSuccess('Invitation resent');
     },
     onError: (err: unknown) => {
       const status =
         err instanceof Error && 'response' in err
           ? (err as { response?: { status?: number } }).response?.status
           : undefined;
-      const message =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
+      const message = extractApiError(err);
       if (status === 409) {
-        window.alert(message || 'This user is no longer in an invitable state.');
+        showError(message || 'This user is no longer in an invitable state.');
         // Refetch so the button drops away on the next render.
         queryClient.invalidateQueries({ queryKey: ['users', id] });
         return;
       }
-      window.alert(message || 'Failed to resend invitation.');
+      showError(message || 'Failed to resend invitation.');
     },
   });
 
@@ -114,16 +118,12 @@ export default function UserDetailPage() {
 
   const handleResendInvitation = () => resendInvitationMutation.mutate();
 
-  const handleDeactivate = () => {
-    if (!user) return;
-    const message = t('users.actions.disableConfirm', { name: `${user.firstName} ${user.lastName}` });
-    if (window.confirm(message)) disableMutation.mutate();
-  };
-
-  const handleActivate = () => {
-    if (!user) return;
-    const message = t('users.actions.enableConfirm', { name: `${user.firstName} ${user.lastName}` });
-    if (window.confirm(message)) enableMutation.mutate();
+  const [lifecycleConfirm, setLifecycleConfirm] = useState<'deactivate' | 'activate' | null>(null);
+  const handleDeactivate = () => setLifecycleConfirm('deactivate');
+  const handleActivate = () => setLifecycleConfirm('activate');
+  const confirmLifecycle = () => {
+    if (lifecycleConfirm === 'deactivate') disableMutation.mutate();
+    else if (lifecycleConfirm === 'activate') enableMutation.mutate();
   };
 
   if (isLoading) {
@@ -189,6 +189,25 @@ export default function UserDetailPage() {
           />
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={lifecycleConfirm !== null}
+        onClose={() => setLifecycleConfirm(null)}
+        onConfirm={confirmLifecycle}
+        title={
+          lifecycleConfirm === 'deactivate'
+            ? t('users.actions.disableConfirm', { name: `${user.firstName} ${user.lastName}` })
+            : t('users.actions.enableConfirm', { name: `${user.firstName} ${user.lastName}` })
+        }
+        message={
+          lifecycleConfirm === 'deactivate'
+            ? t('users.actions.disableWarning')
+            : t('users.actions.enableWarning')
+        }
+        confirmLabel={lifecycleConfirm === 'deactivate' ? 'Deactivate' : 'Reactivate'}
+        isDestructive={lifecycleConfirm === 'deactivate'}
+        isPending={disableMutation.isPending || enableMutation.isPending}
+      />
     </div>
   );
 }
@@ -461,31 +480,60 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
     }, 2000);
   };
 
-  const errorAlert = (action: string) => (err: unknown) => {
-    const message =
-      err instanceof Error && 'response' in err
-        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-        : undefined;
-    window.alert(message || `${action} failed. Please try again.`);
-  };
+  const onErrorToast = (action: string) => (err: unknown) =>
+    showError(`${action} failed`, extractApiError(err));
 
   const resetPasswordMutation = useMutation({
     mutationFn: () => userApi.sendPasswordResetLink(userId),
-    onSuccess: refetchActivitySoon,
-    onError: errorAlert('Send reset link'),
+    onSuccess: () => {
+      refetchActivitySoon();
+      showSuccess('Password reset link sent');
+    },
+    onError: onErrorToast('Send reset link'),
   });
 
   const resetMfaMutation = useMutation({
     mutationFn: () => userApi.resetMfa(userId),
-    onSuccess: refetchActivitySoon,
-    onError: errorAlert('Reset 2FA'),
+    onSuccess: () => {
+      refetchActivitySoon();
+      showSuccess('2FA reset', 'User has been signed out of all sessions.');
+    },
+    onError: onErrorToast('Reset 2FA'),
   });
 
   const signOutMutation = useMutation({
     mutationFn: () => userApi.signOutEverywhere(userId),
-    onSuccess: refetchActivitySoon,
-    onError: errorAlert('Sign out everywhere'),
+    onSuccess: () => {
+      refetchActivitySoon();
+      showSuccess('Signed out of all sessions');
+    },
+    onError: onErrorToast('Sign out everywhere'),
   });
+
+  // Confirm dialogs for the two destructive rows (2FA reset, global sign-out).
+  // Password reset link is non-destructive — fires immediately, no confirm.
+  type ConfirmKind = 'resetMfa' | 'signOut';
+  const [pendingConfirm, setPendingConfirm] = useState<ConfirmKind | null>(null);
+
+  const confirmCopy: Record<ConfirmKind, { title: string; message: string; confirmLabel: string }> = {
+    resetMfa: {
+      title: 'Reset 2FA?',
+      message:
+        'This also signs the user out of all sessions — they will need to re-enroll an authenticator on next sign-in.',
+      confirmLabel: 'Reset 2FA',
+    },
+    signOut: {
+      title: 'Sign this user out of all sessions?',
+      message:
+        'Refresh tokens are revoked immediately. Access tokens may keep working for up to 15 minutes (TTL).',
+      confirmLabel: 'Sign out everywhere',
+    },
+  };
+
+  const runPendingConfirm = () => {
+    if (pendingConfirm === 'resetMfa') resetMfaMutation.mutate();
+    else if (pendingConfirm === 'signOut') signOutMutation.mutate();
+  };
 
   const items: {
     k: string;
@@ -494,7 +542,7 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
     actionLabel: string;
     pending: boolean;
     onAction: () => void;
-    confirm?: string;
+    confirm?: ConfirmKind;
   }[] = [
     {
       k: 'Password',
@@ -510,7 +558,7 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
       pending: resetMfaMutation.isPending,
       // 2FA reset cascades into GLOBAL_SIGNOUT — flag that in the confirm
       // so admins don't reset MFA expecting sessions to keep working.
-      confirm: 'Reset 2FA? This signs the user out of all sessions.',
+      confirm: 'resetMfa',
       onAction: () => resetMfaMutation.mutate(),
     },
     {
@@ -519,14 +567,14 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
       hint: 'Existing sessions end within 15 min (access-token TTL). Refresh is revoked immediately.',
       actionLabel: signOutMutation.isPending ? 'Signing out…' : 'Sign out everywhere',
       pending: signOutMutation.isPending,
-      confirm: 'Sign this user out of all sessions?',
+      confirm: 'signOut',
       onAction: () => signOutMutation.mutate(),
     },
   ];
 
   const handleClick = (it: typeof items[number]) => {
-    if (it.confirm && !window.confirm(it.confirm)) return;
-    it.onAction();
+    if (it.confirm) setPendingConfirm(it.confirm);
+    else it.onAction();
   };
 
   return (
@@ -554,6 +602,16 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
           )}
         </DataRow>
       ))}
+      <ConfirmDialog
+        isOpen={pendingConfirm !== null}
+        onClose={() => setPendingConfirm(null)}
+        onConfirm={runPendingConfirm}
+        title={pendingConfirm ? confirmCopy[pendingConfirm].title : ''}
+        message={pendingConfirm ? confirmCopy[pendingConfirm].message : ''}
+        confirmLabel={pendingConfirm ? confirmCopy[pendingConfirm].confirmLabel : 'Confirm'}
+        isDestructive
+        isPending={resetMfaMutation.isPending || signOutMutation.isPending}
+      />
     </Card>
   );
 }
