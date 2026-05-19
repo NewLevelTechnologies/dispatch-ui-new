@@ -319,7 +319,6 @@ describe('UsersPage', () => {
       }
       return Promise.reject(new Error('Unknown URL'));
     });
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     const user = userEvent.setup();
 
     renderWithProviders(<UsersPage />);
@@ -332,12 +331,14 @@ describe('UsersPage', () => {
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
 
-    // Click disable option
-    const disableButton = screen.getByRole('menuitem', { name: /disable/i });
-    await user.click(disableButton);
+    // Click disable option in the dropdown
+    const disableMenuItem = screen.getByRole('menuitem', { name: /disable/i });
+    await user.click(disableMenuItem);
 
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('John Doe'));
-    confirmSpy.mockRestore();
+    // ConfirmDialog (Alert) renders with the user's name in the title
+    await waitFor(() => {
+      expect(screen.getByText(/disable john doe/i)).toBeInTheDocument();
+    });
   });
 
   it('opens enable confirmation for disabled users', async () => {
@@ -350,7 +351,6 @@ describe('UsersPage', () => {
       }
       return Promise.reject(new Error('Unknown URL'));
     });
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     const user = userEvent.setup();
 
     renderWithProviders(<UsersPage />);
@@ -363,12 +363,13 @@ describe('UsersPage', () => {
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[1]);
 
-    // Click enable option
-    const enableButton = screen.getByRole('menuitem', { name: /enable/i });
-    await user.click(enableButton);
+    // Click enable option in the dropdown
+    const enableMenuItem = screen.getByRole('menuitem', { name: /enable/i });
+    await user.click(enableMenuItem);
 
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Jane Smith'));
-    confirmSpy.mockRestore();
+    await waitFor(() => {
+      expect(screen.getByText(/enable jane smith/i)).toBeInTheDocument();
+    });
   });
 
   it('calls disable mutation when confirmed', async () => {
@@ -382,7 +383,6 @@ describe('UsersPage', () => {
       return Promise.reject(new Error('Unknown URL'));
     });
     vi.mocked(apiClient.post).mockResolvedValue({ data: { ...mockUsers[0], enabled: false } });
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
 
     renderWithProviders(<UsersPage />);
@@ -391,13 +391,15 @@ describe('UsersPage', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    // Click the dropdown button
+    // Open dropdown → click Disable in the menu
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
+    const disableMenuItem = screen.getByRole('menuitem', { name: /disable/i });
+    await user.click(disableMenuItem);
 
-    // Click disable option
-    const disableButton = screen.getByRole('menuitem', { name: /disable/i });
-    await user.click(disableButton);
+    // Confirm in the dialog
+    const confirmButton = await screen.findByRole('button', { name: /^disable$/i });
+    await user.click(confirmButton);
 
     await waitFor(() => {
       // PUT /users/{id} no longer takes an `enabled` field; activation
@@ -405,8 +407,6 @@ describe('UsersPage', () => {
       // activity-feed event server-side.
       expect(apiClient.post).toHaveBeenCalledWith('/users/user-1/deactivate');
     });
-
-    confirmSpy.mockRestore();
   });
 
   it('opens delete alert when delete button is clicked', async () => {
@@ -1049,7 +1049,6 @@ describe('UsersPage', () => {
         return Promise.reject(new Error('Unknown URL'));
       });
       vi.mocked(apiClient.post).mockResolvedValue({ data: { ...mockUsers[1], enabled: true } });
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
       const user = userEvent.setup();
 
       renderWithProviders(<UsersPage />);
@@ -1058,20 +1057,20 @@ describe('UsersPage', () => {
         expect(screen.getByText('Jane Smith')).toBeInTheDocument();
       });
 
-      // Click the dropdown button for disabled user
+      // Open dropdown for disabled user, click Enable menu item
       const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
       await user.click(dropdownButtons[1]);
+      const enableMenuItem = screen.getByRole('menuitem', { name: /enable/i });
+      await user.click(enableMenuItem);
 
-      // Click enable option
-      const enableButton = screen.getByRole('menuitem', { name: /enable/i });
-      await user.click(enableButton);
+      // Confirm in the dialog
+      const confirmButton = await screen.findByRole('button', { name: /^enable$/i });
+      await user.click(confirmButton);
 
       await waitFor(() => {
         // Same migration as deactivate — see the disable test above.
         expect(apiClient.post).toHaveBeenCalledWith('/users/user-2/activate');
       });
-
-      confirmSpy.mockRestore();
     });
   });
 
@@ -1104,49 +1103,10 @@ describe('UsersPage', () => {
     });
   });
 
-  describe('Displaying deleting state', () => {
-    it('displays deleting state during deletion', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
-
-      // Make delete take time
-      vi.mocked(apiClient.delete).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ data: {} }), 100))
-      );
-
-      const user = userEvent.setup();
-
-      renderWithProviders(<UsersPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-      });
-
-      // Open delete dialog
-      const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
-      await user.click(dropdownButtons[0]);
-      const deleteButton = screen.getByRole('menuitem', { name: /delete/i });
-      await user.click(deleteButton);
-
-      // Confirm delete
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /^delete$/i })).toBeInTheDocument();
-      });
-
-      const confirmButton = screen.getByRole('button', { name: /^delete$/i });
-      await user.click(confirmButton);
-
-      // Should show deleting state briefly
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /deleting/i })).toBeInTheDocument();
-      });
-    });
-  });
+  // Previously tested a "Deleting…" button label flip inside the open Alert
+  // while the mutation was in flight. The unified ConfirmDialog auto-closes
+  // on confirm — pending state is no longer user-visible inside the dialog
+  // (we surface success via a toast instead). The flip is therefore
+  // unobservable; the test would be asserting on a behavior that no longer
+  // exists by design.
 });

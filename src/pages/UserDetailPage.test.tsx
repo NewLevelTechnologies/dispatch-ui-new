@@ -310,8 +310,6 @@ describe('UserDetailPage', () => {
   });
 
   it('deactivates user when deactivate button is clicked with confirmation', async () => {
-    // Mock window.confirm to return true BEFORE rendering
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     setupStandardMocks({});
 
     // Backend dropped `enabled` from PUT /users/{id} — activate/deactivate
@@ -335,22 +333,21 @@ describe('UserDetailPage', () => {
     const disableButton = screen.getByRole('button', { name: /^deactivate$/i });
     await user.click(disableButton);
 
-    // Confirm was called
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('John Doe'));
+    // ConfirmDialog opens with the user's name
+    const confirmButton = await screen.findByRole('button', { name: /^deactivate$/i });
+    // Two "Deactivate" buttons can transiently coexist (the trigger in the
+    // page + the confirm in the dialog). Click the one inside the dialog —
+    // the dialog renders after the trigger, so the *last* match is it.
+    const buttons = screen.getAllByRole('button', { name: /^deactivate$/i });
+    await user.click(buttons[buttons.length - 1] ?? confirmButton);
 
-    // API was called
     await waitFor(() => {
       expect(postSpy).toHaveBeenCalledWith('/users/user-123/deactivate');
     });
-
-    confirmSpy.mockRestore();
   });
 
   it('does not deactivate user when confirmation is cancelled', async () => {
     setupStandardMocks({}); // Audit log
-
-    // Mock window.confirm to return false
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
 
     const user = userEvent.setup();
 
@@ -366,20 +363,16 @@ describe('UserDetailPage', () => {
     const disableButton = screen.getByRole('button', { name: /^deactivate$/i });
     await user.click(disableButton);
 
-    // Confirm was called
-    expect(confirmSpy).toHaveBeenCalled();
+    // Cancel in the ConfirmDialog
+    const cancelButton = await screen.findByRole('button', { name: /^cancel$/i });
+    await user.click(cancelButton);
 
     // API was NOT called
     expect(apiClient.post).not.toHaveBeenCalled();
-
-    confirmSpy.mockRestore();
   });
 
   it('reactivates disabled user when reactivate button is clicked with confirmation', async () => {
     const disabledUser = { ...mockUser, enabled: false };
-
-    // Mock window.confirm to return true BEFORE rendering
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     setupStandardMocks({ user: disabledUser });
 
     const postSpy = vi.mocked(apiClient.post).mockResolvedValue({ data: { ...disabledUser, enabled: true } });
@@ -404,17 +397,15 @@ describe('UserDetailPage', () => {
     const reactivateButton = screen.getByRole('button', { name: /^reactivate$/i });
     await user.click(reactivateButton);
 
-    // Confirm was called
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('John Doe'));
+    // Confirm in the dialog — page button + dialog button can both match;
+    // dialog renders second.
+    await screen.findByRole('button', { name: /^reactivate$/i });
+    const buttons = screen.getAllByRole('button', { name: /^reactivate$/i });
+    await user.click(buttons[buttons.length - 1]);
 
-    // API was called
     await waitFor(() => {
-      expect(postSpy).toHaveBeenCalled();
+      expect(postSpy).toHaveBeenCalledWith('/users/user-123/activate');
     }, { timeout: 5000 });
-
-    expect(postSpy).toHaveBeenCalledWith('/users/user-123/activate');
-
-    confirmSpy.mockRestore();
   });
 
   it('renders an "all users" back link on the success state', async () => {
@@ -563,7 +554,6 @@ describe('UserDetailPage', () => {
 
   it('does not call deactivate when confirmation is cancelled', async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     setupStandardMocks({}); // Audit log
 
     renderWithProviders(<UserDetailPage />, {
@@ -578,13 +568,14 @@ describe('UserDetailPage', () => {
     const disableButton = screen.getByRole('button', { name: /^deactivate$/i });
     await user.click(disableButton);
 
-    expect(confirmSpy).toHaveBeenCalled();
+    // Cancel in the ConfirmDialog
+    const cancelButton = await screen.findByRole('button', { name: /^cancel$/i });
+    await user.click(cancelButton);
+
     // Should not have called the activate/deactivate endpoint since
     // confirmation was cancelled. (Activate/deactivate moved from PUT
     // + body to dedicated POST endpoints.)
     expect(apiClient.post).not.toHaveBeenCalled();
-
-    confirmSpy.mockRestore();
   });
 
   it('displays activity feed events with classified labels', async () => {
@@ -820,7 +811,6 @@ describe('UserDetailPage', () => {
 
   it('does not call reactivate when confirmation is cancelled', async () => {
     const disabledUser = { ...mockUser, enabled: false };
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     setupStandardMocks({ user: disabledUser });
 
     const user = userEvent.setup();
@@ -837,13 +827,13 @@ describe('UserDetailPage', () => {
     const reactivateButton = screen.getByRole('button', { name: /^reactivate$/i });
     await user.click(reactivateButton);
 
-    expect(confirmSpy).toHaveBeenCalled();
+    const cancelButton = await screen.findByRole('button', { name: /^cancel$/i });
+    await user.click(cancelButton);
+
     // Should not have called the activate/deactivate endpoint since
     // confirmation was cancelled. (Activate/deactivate moved from PUT
     // + body to dedicated POST endpoints.)
     expect(apiClient.post).not.toHaveBeenCalled();
-
-    confirmSpy.mockRestore();
   });
 
 });

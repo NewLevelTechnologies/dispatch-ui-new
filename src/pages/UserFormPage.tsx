@@ -7,6 +7,7 @@ import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outli
 import { PatternFormat } from 'react-number-format';
 import { userApi, dispatchRegionApi, type Role } from '../api';
 import { roleColor } from '../utils/roleColor';
+import { showError, showSuccess, extractApiError } from '../lib/toast';
 import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
@@ -103,14 +104,19 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       }),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      showSuccess(
+        sendInvite ? 'Invitation sent' : 'User created',
+        sendInvite
+          ? `Email sent to ${created.email}. Link is valid 7 days.`
+          : undefined
+      );
       navigate(`/settings/access/users/${created.id}`);
     },
     onError: (error: unknown) => {
-      const errorMessage =
-        error instanceof Error && 'response' in error
-          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(errorMessage || t('common.form.errorCreate', { entity: t('entities.user') }));
+      showError(
+        t('common.form.errorCreate', { entity: t('entities.user') }),
+        extractApiError(error)
+      );
     },
   });
 
@@ -122,23 +128,22 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
         phoneNumber: formData.phoneNumber.trim() || null,
       }),
     onError: (error: unknown) => {
-      const errorMessage =
-        error instanceof Error && 'response' in error
-          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(errorMessage || t('common.form.errorUpdate', { entity: t('entities.user') }));
+      showError(
+        t('common.form.errorUpdate', { entity: t('entities.user') }),
+        extractApiError(error)
+      );
     },
   });
 
   const updateRolesMutation = useMutation({
     mutationFn: () => userApi.updateRoles(id!, { roleIds: formData.roleIds }),
-    onError: () => alert('Failed to update user roles'),
+    onError: (err) => showError("Couldn't update roles", extractApiError(err)),
   });
 
   const updateRegionsMutation = useMutation({
     mutationFn: () =>
       userApi.updateRegions(id!, { dispatchRegionIds: formData.dispatchRegionIds }),
-    onError: () => alert('Failed to update user dispatch regions'),
+    onError: (err) => showError("Couldn't update regions", extractApiError(err)),
   });
 
   const submitting =
@@ -151,7 +156,10 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
     e.preventDefault();
 
     if (formData.roleIds.length === 0) {
-      alert(t('users.form.roleRequired'));
+      // The CapabilityPreview also surfaces this inline; the toast is the
+      // submit-time safety net for the edit flow (where the submit button
+      // isn't disabled on zero roles).
+      showError(t('users.form.roleRequired'));
       return;
     }
 
@@ -170,9 +178,10 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       // that should appear in the detail page's activity feed without a
       // hard refresh.
       queryClient.invalidateQueries({ queryKey: ['account-activity', id] });
+      showSuccess('Changes saved');
       navigate(`/settings/access/users/${id}`);
     } catch {
-      // mutation onError handlers already alerted
+      // mutation onError handlers already showed toasts
     }
   };
 
