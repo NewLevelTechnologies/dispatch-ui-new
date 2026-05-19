@@ -334,15 +334,9 @@ export default function UsersPage() {
                         <td className="muted">{formatDate(user.updatedAt)}</td>
                         <td>
                           {user.enabled ? (
-                            <span className="inline-flex items-center gap-1.5">
-                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-success-500" />
-                              <span>{t('common.active')}</span>
-                            </span>
+                            <Pill tone="success" dot live>{t('common.active')}</Pill>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 text-fg-muted">
-                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-fg-dim" />
-                              <span>{t('common.disabled')}</span>
-                            </span>
+                            <Pill tone="neutral" dot>{t('common.disabled')}</Pill>
                           )}
                         </td>
                         <td className="right">

@@ -197,6 +197,24 @@ const styles = {
       'before:bg-gradient-to-b before:from-accent-500 before:to-accent-600',
       '[--btn-icon:var(--color-accent-200)] data-active:[--btn-icon:var(--color-accent-100)] data-hover:[--btn-icon:var(--color-accent-100)]',
     ],
+    // Multi-select chip / toggle-pressed surface. Accent wash + dark accent
+    // text — semantically signals "selected", not "primary action". Pair with
+    // `outline` for the unselected state. Use a `CheckIcon` child (via
+    // `data-slot="icon"`) for an explicit indicator.
+    //
+    // Tuning notes:
+    //  · Light bg @20% accent-500 (not 10%) so warm/orange chips read as
+    //    confident "selected" rather than washed-out peach. Cool/teal still
+    //    reads crisp at the higher fill thanks to its lower chroma.
+    //  · Text + icon at accent-700 (deep) for weight against the tinted bg.
+    //  · Dark mode unchanged — already crisp at 18% fill.
+    'accent-soft': [
+      'text-accent-700 [--btn-bg:color-mix(in_oklch,var(--color-accent-500)_20%,transparent)] [--btn-border:color-mix(in_oklch,var(--color-accent-500)_30%,transparent)] [--btn-hover-overlay:color-mix(in_oklch,var(--color-accent-500)_25%,transparent)]',
+      'dark:text-accent-300 dark:[--btn-bg:color-mix(in_oklch,var(--color-accent-500)_18%,transparent)] dark:[--btn-border:color-mix(in_oklch,var(--color-accent-500)_40%,transparent)]',
+      // Flat look — kill the solid base's inset shadow + highlight.
+      'before:shadow-none after:shadow-none',
+      '[--btn-icon:var(--color-accent-700)] dark:[--btn-icon:var(--color-accent-300)]',
+    ],
   },
 }
 

@@ -7,6 +7,10 @@ import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outli
 import { userApi, dispatchRegionApi, type Role } from '../api';
 import { roleColor } from '../utils/roleColor';
 import { Button } from '../components/catalyst/button';
+import { Card } from '../components/catalyst/card';
+import { Checkbox } from '../components/catalyst/checkbox';
+import { Field, Label } from '../components/catalyst/fieldset';
+import { Input } from '../components/catalyst/input';
 
 // Above this many roles, the role grid switches on a search field and
 // pins selected roles to the top so they don't scroll out of view.
@@ -233,54 +237,69 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
               )}
             </div>
 
-            <FormCard title="Identity">
+            <Card title="Identity" className="mb-3">
               <div className="grid grid-cols-2 gap-2.5">
-                <FieldLabel label="First name" required>
+                <Field size="xs">
+                  <Label size="xs" required>First name</Label>
                   <Input
+                    size="xs"
                     value={formData.firstName}
-                    onChange={(v) => setFormData((p) => ({ ...p, firstName: v }))}
+                    onChange={(e) => setFormData((p) => ({ ...p, firstName: e.target.value }))}
                     placeholder="Maria"
                     required
                   />
-                </FieldLabel>
-                <FieldLabel label="Last name" required>
+                </Field>
+                <Field size="xs">
+                  <Label size="xs" required>Last name</Label>
                   <Input
+                    size="xs"
                     value={formData.lastName}
-                    onChange={(v) => setFormData((p) => ({ ...p, lastName: v }))}
+                    onChange={(e) => setFormData((p) => ({ ...p, lastName: e.target.value }))}
                     placeholder="Chen"
                     required
                   />
-                </FieldLabel>
+                </Field>
               </div>
               <div className="mt-2.5">
-                <FieldLabel
-                  label="Email"
-                  required
-                  hint={!isInvite ? 'sign-in · cannot change' : undefined}
-                >
+                <Field size="xs">
+                  <Label
+                    size="xs"
+                    required
+                    hint={!isInvite ? 'sign-in · cannot change' : undefined}
+                  >
+                    Email
+                  </Label>
                   <Input
+                    size="xs"
                     type="email"
                     value={formData.email}
-                    onChange={(v) => setFormData((p) => ({ ...p, email: v }))}
+                    onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
                     placeholder="maria@yourcompany.com"
                     disabled={!isInvite}
                     required
                   />
-                </FieldLabel>
+                </Field>
               </div>
               <div className="mt-2.5 grid grid-cols-[1fr_1.4fr] gap-2.5">
-                <FieldLabel label="Phone">
+                <Field size="xs">
+                  <Label size="xs">Phone</Label>
+                  {/* TODO: phone field is a plain `<Input type="tel">` — no
+                      input mask. Customer / ServiceLocation forms use
+                      `PatternFormat` for the `(XXX) XXX-XXXX` mask; mirror
+                      that here, or extend Catalyst Input with a masked variant
+                      so admin-tool forms get the same affordance. */}
                   <Input
+                    size="xs"
                     type="tel"
                     value={formData.phoneNumber}
-                    onChange={(v) => setFormData((p) => ({ ...p, phoneNumber: v }))}
+                    onChange={(e) => setFormData((p) => ({ ...p, phoneNumber: e.target.value }))}
                     placeholder="(555) 123-4567"
                   />
-                </FieldLabel>
+                </Field>
               </div>
-            </FormCard>
+            </Card>
 
-            <FormCard
+            <Card
               title="Roles"
               subtitle={
                 <>
@@ -293,6 +312,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                   </Link>
                 </>
               }
+              className="mb-3"
             >
               <RoleMultiSelect
                 roles={roles}
@@ -306,11 +326,12 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                 effective={effective}
                 selectedCount={formData.roleIds.length}
               />
-            </FormCard>
+            </Card>
 
-            <FormCard
+            <Card
               title="Regions"
               subtitle="Where in the world this user works. Limits which records they see."
+              className="mb-3"
             >
               <RegionMultiSelect
                 regions={activeRegions}
@@ -318,6 +339,9 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                 onToggle={toggleRegion}
               />
               {formData.dispatchRegionIds.length === 0 && (
+                // TODO(design-system): replace inline warning callout with a
+                // `<Callout kind="warning">` component once the Callout
+                // primitive lands.
                 <div
                   className="mt-2.5 rounded-md border px-2.5 py-1.5 text-[11.5px]"
                   style={{
@@ -331,15 +355,14 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                   least one.
                 </div>
               )}
-            </FormCard>
+            </Card>
 
             {isInvite && (
               <label className="mt-2 flex items-center gap-2 px-1 text-[11.5px] text-fg-muted">
-                <input
-                  type="checkbox"
+                <Checkbox
+                  color="accent"
                   checked={sendInvite}
-                  onChange={(e) => setSendInvite(e.target.checked)}
-                  className="size-3.5 accent-[var(--accent-500)]"
+                  onChange={setSendInvite}
                 />
                 <span>
                   Send invitation email to{' '}
@@ -391,88 +414,10 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// Local primitives — kept inline to keep the v1.5 visual exactly as
-// the design (compact card headers, thin field labels, dense grid)
-// without dragging the rest of the app's Field/Label/Input toward
-// these tighter dimensions.
-// ──────────────────────────────────────────────────────────────────
-
-function FormCard({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mb-3 rounded-[10px] border border-border bg-bg-elev">
-      <div className="flex items-center justify-between gap-2.5 border-b border-border-soft px-3.5 py-2.5">
-        <div>
-          <div className="text-[12.5px] font-semibold text-fg-strong">{title}</div>
-          {subtitle && <div className="mt-0.5 text-[11px] text-fg-muted">{subtitle}</div>}
-        </div>
-      </div>
-      <div className="p-3.5">{children}</div>
-    </div>
-  );
-}
-
-function FieldLabel({
-  label,
-  required,
-  hint,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="mb-1 flex items-baseline gap-1.5">
-        <span className="text-[11px] font-semibold text-fg-strong">{label}</span>
-        {required && <span className="text-[11px] text-danger-500">*</span>}
-        {hint && <span className="text-[10.5px] text-fg-dim">· {hint}</span>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Input({
-  value,
-  onChange,
-  type = 'text',
-  placeholder,
-  required,
-  disabled,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  placeholder?: string;
-  required?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      required={required}
-      disabled={disabled}
-      className="block h-8 w-full rounded-md border border-border bg-bg-elev px-2.5 text-[12.5px] text-fg-strong outline-none placeholder:text-fg-dim focus:border-accent-500 focus:ring-[3px] focus:ring-accent-500/20 disabled:cursor-not-allowed disabled:bg-bg-elev-2 disabled:text-fg-muted"
-    />
-  );
-}
-
-// ──────────────────────────────────────────────────────────────────
-// RoleMultiSelect — 3-col checkbox grid. Search appears only when
-// roles.length > 10; below that, the grid is the summary.
+// RoleMultiSelect — 3-col grid of role rows. Search appears only when
+// roles.length > 10; below that, the grid is the summary. The per-row
+// `<label>` wraps a Catalyst Checkbox; native label semantics forward
+// clicks anywhere in the row to the checkbox.
 // ──────────────────────────────────────────────────────────────────
 function RoleMultiSelect({
   roles,
@@ -539,6 +484,9 @@ function RoleMultiSelect({
             const capCount = role.capabilities?.length ?? 0;
             const color = roleColor(role.name);
             return (
+              // Native <label> wrapping a Catalyst Checkbox — the browser
+              // forwards clicks anywhere inside the label to the nested
+              // button-role checkbox, so the whole row stays clickable.
               <label
                 key={role.id}
                 className="grid cursor-pointer grid-cols-[16px_1fr_auto] items-center gap-2 rounded-md border px-2.5 py-1.5"
@@ -551,11 +499,10 @@ function RoleMultiSelect({
                     : 'var(--border-soft)',
                 }}
               >
-                <input
-                  type="checkbox"
+                <Checkbox
+                  color="accent"
                   checked={on}
                   onChange={() => onToggle(role.id)}
-                  className="size-3.5 accent-[var(--accent-500)]"
                 />
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span
@@ -604,10 +551,12 @@ function CapabilityPreview({
   selectedCount: number;
 }) {
   const [open, setOpen] = useState(false);
+  // Fetch eagerly: we need the area count for the always-visible summary
+  // line ("65 across 8 areas"). Lazy-loading it gated the count behind the
+  // disclosure expand, which left users seeing "65 across — areas".
   const { data: groupedData } = useQuery({
     queryKey: ['capabilities', 'grouped'],
     queryFn: () => userApi.getGroupedCapabilities(),
-    enabled: open,
   });
 
   if (selectedCount === 0) {
@@ -625,9 +574,11 @@ function CapabilityPreview({
     );
   }
 
-  // Group capabilities by area when expanded.
+  // Group capabilities by area. Computed whenever groupedData is loaded —
+  // the summary line ("N across M areas") needs M up-front, even while the
+  // disclosure is collapsed.
   const byArea =
-    open && groupedData
+    groupedData
       ? groupedData.groups
           .map((g) => ({
             area: g.displayName,
@@ -669,6 +620,9 @@ function CapabilityPreview({
                 <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-fg-muted">
                   {g.area} · {g.caps.length}
                 </div>
+                {/* TODO(design-system): replace these inline capability tags
+                    with `<Badge size="xs" color="accent">` once Badge gains an
+                    xs size variant. */}
                 <div className="flex flex-wrap gap-1">
                   {g.caps.map((c) => (
                     <span
@@ -721,37 +675,39 @@ function RegionMultiSelect({
     );
   }
 
+  // 3-col checkbox grid — same shape as RoleMultiSelect. The selectable
+  // multi-select pattern lives in one place on this page; a separate chip
+  // language for regions was confusing alongside the role grid. The third
+  // column is reserved for an optional per-region count (e.g. "# of WOs")
+  // when we have one to surface; today it stays empty.
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="grid grid-cols-3 gap-1.5">
       {regions.map((r) => {
         const on = selected.includes(r.id);
         return (
-          <button
+          <label
             key={r.id}
-            type="button"
-            onClick={() => onToggle(r.id)}
-            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium"
+            className="grid cursor-pointer grid-cols-[16px_1fr_auto] items-center gap-2 rounded-md border px-2.5 py-1.5"
             style={{
               background: on
-                ? 'color-mix(in oklch, var(--accent-500) 12%, var(--bg-elev))'
+                ? 'color-mix(in oklch, var(--accent-500) 7%, var(--bg-elev-2))'
                 : 'var(--bg-elev-2)',
-              color: on ? 'var(--fg-strong)' : 'var(--fg-muted)',
-              border: `1px solid ${
-                on ? 'color-mix(in oklch, var(--accent-500) 30%, var(--border))' : 'var(--border)'
-              }`,
+              borderColor: on
+                ? 'color-mix(in oklch, var(--accent-500) 25%, var(--border))'
+                : 'var(--border-soft)',
             }}
           >
+            <Checkbox
+              color="accent"
+              checked={on}
+              onChange={() => onToggle(r.id)}
+            />
             <span
-              className="inline-flex size-3 items-center justify-center rounded-[3px] text-[9px] font-bold text-white"
-              style={{
-                background: on ? 'var(--accent-500)' : 'transparent',
-                border: `1.2px solid ${on ? 'var(--accent-500)' : 'var(--border-strong)'}`,
-              }}
+              className={`truncate text-[12px] text-fg-strong ${on ? 'font-semibold' : 'font-medium'}`}
             >
-              {on && '✓'}
+              {r.name}
             </span>
-            {r.name}
-          </button>
+          </label>
         );
       })}
     </div>

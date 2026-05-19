@@ -15,15 +15,21 @@ const sizes = {
   '5xl': 'sm:max-w-5xl',
 }
 
+// `padding="none"` lets full-bleed wizard/edge-rendered content opt out of the
+// default gutter so the consumer renders its own header/body/footer with custom
+// padding. Replaces ad-hoc `className="!p-0"` overrides.
 export function Dialog({
   size = 'lg',
+  padding = 'default',
   className,
   children,
   ...props
-}: { size?: keyof typeof sizes; className?: string; children: React.ReactNode } & Omit<
-  Headless.DialogProps,
-  'as' | 'className'
->) {
+}: {
+  size?: keyof typeof sizes
+  padding?: 'default' | 'none'
+  className?: string
+  children: React.ReactNode
+} & Omit<Headless.DialogProps, 'as' | 'className'>) {
   return (
     <Headless.Dialog {...props}>
       <Headless.DialogBackdrop
@@ -38,7 +44,10 @@ export function Dialog({
             className={clsx(
               className,
               sizes[size],
-              'row-start-2 w-full min-w-0 rounded-t-3xl bg-white p-(--gutter) shadow-lg ring-1 ring-zinc-950/10 [--gutter:--spacing(8)] sm:mb-auto sm:rounded-2xl dark:bg-zinc-900 dark:ring-white/10 forced-colors:outline',
+              'row-start-2 w-full min-w-0 rounded-t-3xl bg-white shadow-lg ring-1 ring-zinc-950/10 sm:mb-auto sm:rounded-2xl dark:bg-zinc-900 dark:ring-white/10 forced-colors:outline',
+              padding === 'none'
+                ? 'overflow-hidden'
+                : 'p-(--gutter) [--gutter:--spacing(8)]',
               'transition duration-100 will-change-transform data-closed:translate-y-12 data-closed:opacity-0 data-enter:ease-out data-leave:ease-in sm:data-closed:translate-y-0 sm:data-closed:data-enter:scale-95'
             )}
           >

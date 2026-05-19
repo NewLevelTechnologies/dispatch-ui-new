@@ -110,6 +110,9 @@ const colors = {
     '[--checkbox-check:var(--color-white)] [--checkbox-checked-bg:var(--color-fuchsia-500)] [--checkbox-checked-border:var(--color-fuchsia-600)]/90',
   pink: '[--checkbox-check:var(--color-white)] [--checkbox-checked-bg:var(--color-pink-500)] [--checkbox-checked-border:var(--color-pink-600)]/90',
   rose: '[--checkbox-check:var(--color-white)] [--checkbox-checked-bg:var(--color-rose-500)] [--checkbox-checked-border:var(--color-rose-600)]/90',
+  // Brand checkbox — follows the warm/cool accent token at runtime.
+  accent:
+    '[--checkbox-check:var(--color-white)] [--checkbox-checked-bg:var(--color-accent-500)] [--checkbox-checked-border:var(--color-accent-700)]/90',
 }
 
 type Color = keyof typeof colors

@@ -98,6 +98,12 @@
   border: 1px solid transparent;
 }
 .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+/* `live` opts the dot into a glow ring — signals "live state, not just label."
+   Glow color follows currentColor (i.e. the pill's tone) so success/info/etc
+   each get their own halo without per-tone overrides. */
+.pill.live .dot {
+  box-shadow: 0 0 0 2.5px color-mix(in oklch, currentColor 22%, transparent);
+}
 .pill.info     { background: color-mix(in oklch, var(--info-500) 12%, var(--bg-elev)); color: var(--info-500); }
 .pill.success  { background: color-mix(in oklch, var(--success-500) 12%, var(--bg-elev)); color: var(--success-500); }
 .pill.warning  { background: color-mix(in oklch, var(--warning-500) 14%, var(--bg-elev)); color: oklch(50% 0.16 78); }
@@ -107,6 +113,21 @@
 .theme-dark .pill.accent { color: var(--accent-300); }
 .pill.violet   { background: color-mix(in oklch, var(--violet-500) 12%, var(--bg-elev)); color: var(--violet-500); }
 .pill.neutral  { background: var(--bg-active); color: var(--fg-muted); }
+
+/* `inline` strips the background/padding/border so the pill renders as
+   "dot + label + optional glow" only — for status indicators that live
+   inside a metadata line where a full pill bg would over-weight. Text and
+   dot still pick up the tone color. Font shrinks to inherit so the indicator
+   blends with the surrounding line. */
+.pill.inline {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+  font-weight: 500;
+  letter-spacing: normal;
+}
 
 /* Square tag — for monospace codes in table cells */
 .tag {
