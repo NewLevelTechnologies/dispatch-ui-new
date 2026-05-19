@@ -73,7 +73,8 @@ export {
   type CreateRoleRequest,
   type UpdateRoleRequest,
   type RestoreAllDefaultsResponse,
-  type AuditLogEntry
+  type AuditLogEntry,
+  type TwoFactorStatus
 } from './userApi';
 
 // Work Order API

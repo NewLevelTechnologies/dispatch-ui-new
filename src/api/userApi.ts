@@ -106,6 +106,15 @@ export interface RestoreAllDefaultsResponse {
   preservedCustomRoles: Role[];
 }
 
+// Admin-facing 2FA status for the User Detail Security card. Mirrors the
+// shape of Amplify's fetchMFAPreference (self-user) so the rendering code
+// can be reused. Pulled on demand — the BE pays the Cognito call only
+// when this endpoint is hit.
+export interface TwoFactorStatus {
+  enabled: ('TOTP' | 'SMS' | 'EMAIL')[];
+  preferred: 'TOTP' | 'SMS' | 'EMAIL' | null;
+}
+
 export interface AuditLogEntry {
   id: string;
   entityType: string;
@@ -206,6 +215,11 @@ export const userApi = {
 
   resetMfa: async (id: string): Promise<void> => {
     await apiClient.post(`/users/${id}/mfa-reset`);
+  },
+
+  get2faStatus: async (id: string): Promise<TwoFactorStatus> => {
+    const response = await apiClient.get<TwoFactorStatus>(`/users/${id}/2fa/status`);
+    return response.data;
   },
 
   signOutEverywhere: async (id: string): Promise<void> => {
