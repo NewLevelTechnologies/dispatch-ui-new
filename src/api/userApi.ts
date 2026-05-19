@@ -16,6 +16,10 @@ export interface User {
   firstName: string;
   lastName: string;
   phoneNumber: string | null;
+  // Versioned CloudFront URL; cache-immutable. null when the user hasn't
+  // uploaded a photo — UI falls back to an initials avatar. Optional so the
+  // type stays compatible with older endpoints that don't include it yet.
+  photoUrl?: string | null;
   enabled: boolean;
   invitationStatus?: InvitationStatus;
   roles?: Role[];
@@ -145,6 +149,28 @@ export const userApi = {
 
   updateProfile: async (id: string, request: UpdateUserProfileRequest): Promise<User> => {
     const response = await apiClient.put<User>(`/users/${id}`, request);
+    return response.data;
+  },
+
+  // Self-service variants. /users/me derives the user from the JWT
+  // server-side, so call sites don't need to thread the current user id
+  // through. Returns the full updated User — swap directly into cache.
+  updateMyProfile: async (request: UpdateUserProfileRequest): Promise<User> => {
+    const response = await apiClient.put<User>('/users/me', request);
+    return response.data;
+  },
+
+  uploadMyPhoto: async (file: File): Promise<User> => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await apiClient.post<User>('/users/me/photo', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  deleteMyPhoto: async (): Promise<User> => {
+    const response = await apiClient.delete<User>('/users/me/photo');
     return response.data;
   },
 
