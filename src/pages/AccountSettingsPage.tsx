@@ -189,38 +189,43 @@ function ProfileCard({ user }: { user: User }) {
 
   return (
     <Card title={t('account.profile.title')}>
-      <div className="mb-4 flex items-center gap-4">
-        {/* TODO(design-system): replace this tinted-initials block with a
-            Catalyst `<Avatar>` extension that supports a deterministic
-            tinted background (currently Avatar takes a src; we need a
-            colored-initials variant). */}
-        {user.photoUrl ? (
-          <img
-            src={user.photoUrl}
-            alt=""
-            className="size-14 shrink-0 rounded-full object-cover ring-1 ring-border-soft"
-            aria-hidden="true"
-          />
-        ) : (
-          <div
-            className="grid size-14 shrink-0 place-items-center rounded-full text-[19px] font-semibold text-white"
-            style={{
-              background: avatarBg,
-              border: `1px solid color-mix(in oklch, ${avatarBg} 70%, black)`,
-            }}
-            aria-hidden="true"
-          >
-            {initials}
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-semibold text-fg-strong">{fullName}</div>
-          <div className="mt-0.5 flex items-baseline gap-1.5 truncate text-[11.5px] text-fg-muted">
-            <span className="truncate">{user.email}</span>
-            <span className="text-[10.5px] text-fg-dim">· {t('account.profile.emailHint')}</span>
+      {/* Mobile: avatar + identity stack on row 1, photo actions on row 2
+          aligned to the right so they don't crash into the name. ≥sm reverts
+          to a single horizontal row. */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="flex min-w-0 items-center gap-4">
+          {/* TODO(design-system): replace this tinted-initials block with a
+              Catalyst `<Avatar>` extension that supports a deterministic
+              tinted background (currently Avatar takes a src; we need a
+              colored-initials variant). */}
+          {user.photoUrl ? (
+            <img
+              src={user.photoUrl}
+              alt=""
+              className="size-14 shrink-0 rounded-full object-cover ring-1 ring-border-soft"
+              aria-hidden="true"
+            />
+          ) : (
+            <div
+              className="grid size-14 shrink-0 place-items-center rounded-full text-[19px] font-semibold text-white"
+              style={{
+                background: avatarBg,
+                border: `1px solid color-mix(in oklch, ${avatarBg} 70%, black)`,
+              }}
+              aria-hidden="true"
+            >
+              {initials}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[14px] font-semibold text-fg-strong">{fullName}</div>
+            <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-[11.5px] text-fg-muted">
+              <span className="truncate">{user.email}</span>
+              <span className="text-[10.5px] text-fg-dim">· {t('account.profile.emailHint')}</span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 self-end sm:self-auto">
           <input
             ref={fileInputRef}
             type="file"
