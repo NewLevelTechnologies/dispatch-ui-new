@@ -11,6 +11,7 @@ import { DataRow } from '../components/catalyst/data-row';
 import { ErrorMessage, Field, Label } from '../components/catalyst/fieldset';
 import { Heading } from '../components/catalyst/heading';
 import { Input } from '../components/catalyst/input';
+import { Text } from '../components/catalyst/text';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../components/ThemeProvider';
 import { userApi, type User } from '../api';
@@ -241,10 +242,10 @@ function SecurityCard({ user }: { user: User }) {
             </Button>
           }
         >
-          <div className="text-[12.5px] text-fg-strong">{t('account.security.passwordValue')}</div>
-          <div className="mt-0.5 text-[11px] text-fg-dim">
+          <Text as="div" size="sm" tone="strong">{t('account.security.passwordValue')}</Text>
+          <Text as="div" size="xs" tone="dim" className="mt-0.5">
             {t('account.security.passwordHint')}
-          </div>
+          </Text>
         </DataRow>
 
         {/* 2FA */}
@@ -265,11 +266,11 @@ function SecurityCard({ user }: { user: User }) {
                 <span className="mr-1">●</span>
                 {t('account.security.twofaOnPill')}
               </span>
-              <span className="text-[12.5px] text-fg-strong">{t('account.security.twofaOnMethod')}</span>
+              <Text as="span" size="sm" tone="strong">{t('account.security.twofaOnMethod')}</Text>
             </div>
-            <div className="mt-0.5 text-[11px] text-fg-dim">
+            <Text as="div" size="xs" tone="dim" className="mt-0.5">
               {t('account.security.twofaOnHint')}
-            </div>
+            </Text>
           </DataRow>
         ) : (
           <div className="my-2 px-3.5">
@@ -310,10 +311,10 @@ function SecurityCard({ user }: { user: User }) {
             </Button>
           }
         >
-          <div className="text-[12.5px] text-fg-strong">{t('account.security.sessionsValue')}</div>
-          <div className="mt-0.5 text-[11px] text-fg-dim">
+          <Text as="div" size="sm" tone="strong">{t('account.security.sessionsValue')}</Text>
+          <Text as="div" size="xs" tone="dim" className="mt-0.5">
             {t('account.security.sessionsHint')}
-          </div>
+          </Text>
         </DataRow>
       </Card>
 

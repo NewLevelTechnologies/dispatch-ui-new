@@ -17,6 +17,8 @@ import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
 import { DataRow } from '../components/catalyst/data-row';
+import { Heading } from '../components/catalyst/heading';
+import { Text } from '../components/catalyst/text';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 
@@ -128,9 +130,9 @@ export default function UserDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="p-8 text-center text-[12.5px] text-fg-muted">
+      <Text as="div" size="sm" tone="muted" className="p-8 text-center">
         {t('common.actions.loading', { entities: t('entities.user') })}
-      </div>
+      </Text>
     );
   }
 
@@ -238,9 +240,9 @@ function Header({
       <Avatar name={fullName} size="xl" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2.5">
-          <h1 className="m-0 text-[18px] leading-tight font-bold tracking-[-0.02em] text-fg-strong">
+          <Heading level={1} size="page-sm" className="m-0">
             {fullName}
-          </h1>
+          </Heading>
           <RoleStack roles={user.roles ?? []} />
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-fg-muted">
@@ -596,7 +598,7 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
             </Button>
           }
         >
-          <div className="text-[12.5px] text-fg-strong">{it.v}</div>
+          <Text as="div" size="sm" tone="strong">{it.v}</Text>
           {it.hint && (
             <div className="mt-0.5 text-[10.5px] leading-snug text-fg-dim">{it.hint}</div>
           )}
@@ -805,7 +807,7 @@ function AccountActivityCard({ userId }: { userId: string }) {
                 i < entries.length - 1 ? 'border-b border-border-soft' : ''
               }`}
             >
-              <div className="text-[11px] text-fg-dim">{relTime(e.occurredAt)}</div>
+              <Text as="div" size="xs" tone="dim">{relTime(e.occurredAt)}</Text>
               <div
                 className="flex size-[18px] items-center justify-center rounded text-[11px] font-bold"
                 style={{ background: s.bg, color: s.fg }}
@@ -813,7 +815,7 @@ function AccountActivityCard({ userId }: { userId: string }) {
                 {s.glyph}
               </div>
               <div className="flex flex-wrap items-baseline gap-2">
-                <span className="text-[12.5px] text-fg-strong">{cls.text}</span>
+                <Text as="span" size="sm" tone="strong">{cls.text}</Text>
                 {subLine && (
                   <span className="text-[10.5px] text-fg-dim">· {subLine}</span>
                 )}

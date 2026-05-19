@@ -13,7 +13,9 @@ import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
 import { Checkbox } from '../components/catalyst/checkbox';
 import { Field, Label } from '../components/catalyst/fieldset';
+import { Heading } from '../components/catalyst/heading';
 import { Input } from '../components/catalyst/input';
+import { Text } from '../components/catalyst/text';
 
 // Above this many roles, the role grid switches on a search field and
 // pins selected roles to the top so they don't scroll out of view.
@@ -207,7 +209,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
     : `/settings/access/users/${id}`;
 
   if (!isInvite && loadingUser) {
-    return <div className="p-8 text-[12.5px] text-fg-muted">Loading…</div>;
+    return <Text as="div" size="sm" tone="muted" className="p-8">Loading…</Text>;
   }
 
   const headerName = isInvite
@@ -238,13 +240,13 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
             </Link>
 
             <div className="mb-3.5">
-              <h1 className="m-0 text-[20px] font-bold tracking-[-0.022em] text-fg-strong">
+              <Heading level={1} size="page-md" className="m-0">
                 {headerName}
-              </h1>
+              </Heading>
               {isInvite && (
-                <div className="mt-0.5 text-[12px] text-fg-muted">
+                <Text size="sm" tone="muted" className="mt-0.5">
                   An invitation email goes out on save. Link is valid 7 days.
-                </div>
+                </Text>
               )}
             </div>
 
