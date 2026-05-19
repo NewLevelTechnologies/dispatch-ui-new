@@ -35,7 +35,7 @@ export function Text({
     <As
       data-slot="text"
       {...props}
-      className={clsx(SIZE_CLASSES[size], TONE_CLASSES[tone], className)}
+      className={clsx('m-0', SIZE_CLASSES[size], TONE_CLASSES[tone], className)}
     />
   )
 }
