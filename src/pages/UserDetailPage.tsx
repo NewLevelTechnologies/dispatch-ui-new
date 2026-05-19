@@ -11,6 +11,7 @@ import { auditApi, type AccountActivityEvent } from '../api/auditApi';
 import { formatPhone } from '../utils/formatPhone';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { Avatar } from '../components/ui/Avatar';
+import { Pill } from '../components/ui/Pill';
 import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
@@ -223,16 +224,11 @@ function Header({
           <RoleStack roles={user.roles ?? []} />
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-fg-muted">
-          <span className="inline-flex items-center gap-1.5">
-            <span
-              className={
-                user.enabled
-                  ? 'inline-block size-[7px] rounded-full bg-success-500 shadow-[0_0_0_2.5px_color-mix(in_oklch,var(--success-500)_22%,transparent)]'
-                  : 'inline-block size-[7px] rounded-full bg-fg-dim'
-              }
-            />
-            <span className="font-medium text-fg-strong">{user.enabled ? 'Active' : 'Disabled'}</span>
-          </span>
+          {user.enabled ? (
+            <Pill tone="success" dot live>Active</Pill>
+          ) : (
+            <Pill tone="neutral" dot>Disabled</Pill>
+          )}
           <span className="text-fg-dim">·</span>
           <span className="break-all">{user.email}</span>
           {user.phoneNumber && (

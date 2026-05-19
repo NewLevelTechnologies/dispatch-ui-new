@@ -1,12 +1,13 @@
 // ─────────────────────────────────────────────────────────────────
 // Pill.tsx — status badges with optional dot.
 //
-// Pick a `tone` for color. Add `dot` for the status circle.
-// Use this for: "In progress", "Urgent", "Silver member", "On site",
-// "$2,840 LTV", etc. Replaces Catalyst <Badge> where you need tones.
+// Pick a `tone` for color. Add `dot` for the status circle. Add `live`
+// to the dot to signal "live state, not just label" — renders a soft
+// glow ring around the dot in the tone color.
 //
 //   <Pill tone="info" dot>Scheduled</Pill>
-//   <Pill tone="danger" dot>Urgent</Pill>
+//   <Pill tone="success" dot live>Active</Pill>
+//   <Pill tone="neutral" dot>Disabled</Pill>
 //   <Pill tone="success">Paid</Pill>
 //
 // Tag is the same idea but rectangular, monospace — for codes like
@@ -20,12 +21,13 @@ type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | '
 export function Pill({
   tone = 'neutral',
   dot,
+  live,
   className,
   children,
   ...p
-}: HTMLAttributes<HTMLSpanElement> & { tone?: Tone; dot?: boolean }) {
+}: HTMLAttributes<HTMLSpanElement> & { tone?: Tone; dot?: boolean; live?: boolean }) {
   return (
-    <span className={clsx('pill', tone, className)} {...p}>
+    <span className={clsx('pill', tone, live && 'live', className)} {...p}>
       {dot && <span className="dot" />}
       {children}
     </span>
