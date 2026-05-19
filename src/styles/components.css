@@ -220,7 +220,7 @@
 .callout-title {
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.2;
   color: var(--fg-strong);
 }
 .callout-text {
@@ -228,7 +228,6 @@
   line-height: 1.5;
   color: var(--fg-muted);
 }
-.callout-title + .callout-text { margin-top: 2px; }
 .callout-action { flex-shrink: 0; }
 
 .callout.info    { background: color-mix(in oklch, var(--info-500)    7%, var(--bg-elev)); border-color: color-mix(in oklch, var(--info-500)    25%, var(--border)); }
