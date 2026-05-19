@@ -65,9 +65,10 @@ export default function ChangePasswordDialog({ isOpen, onClose }: Props) {
       <form onSubmit={submit}>
         <DialogBody>
           <FieldGroup>
-            <Field>
-              <Label>{t('account.changePasswordDialog.currentPassword')}</Label>
+            <Field size="xs">
+              <Label size="xs" required>{t('account.changePasswordDialog.currentPassword')}</Label>
               <Input
+                size="xs"
                 type="password"
                 autoComplete="current-password"
                 value={oldPassword}
@@ -75,9 +76,10 @@ export default function ChangePasswordDialog({ isOpen, onClose }: Props) {
                 required
               />
             </Field>
-            <Field>
-              <Label>{t('account.changePasswordDialog.newPassword')}</Label>
+            <Field size="xs">
+              <Label size="xs" required>{t('account.changePasswordDialog.newPassword')}</Label>
               <Input
+                size="xs"
                 type="password"
                 autoComplete="new-password"
                 value={newPassword}
@@ -85,9 +87,10 @@ export default function ChangePasswordDialog({ isOpen, onClose }: Props) {
                 required
               />
             </Field>
-            <Field>
-              <Label>{t('account.changePasswordDialog.confirmPassword')}</Label>
+            <Field size="xs">
+              <Label size="xs" required>{t('account.changePasswordDialog.confirmPassword')}</Label>
               <Input
+                size="xs"
                 type="password"
                 autoComplete="new-password"
                 value={confirm}
@@ -97,8 +100,8 @@ export default function ChangePasswordDialog({ isOpen, onClose }: Props) {
             </Field>
           </FieldGroup>
           {error && (
-            <Field className="mt-3">
-              <ErrorMessage>{error}</ErrorMessage>
+            <Field size="xs" className="mt-3">
+              <ErrorMessage size="xs">{error}</ErrorMessage>
             </Field>
           )}
         </DialogBody>
