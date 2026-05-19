@@ -225,7 +225,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
         onSubmit={handleSubmit}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <div className="flex-1 overflow-y-auto px-7 pb-6 pt-5">
+        <div className="flex-1 overflow-y-auto px-7 pb-6 pt-5 max-lg:px-4">
           <div className="mx-auto max-w-[720px]">
             <Link
               to={cancelHref}
@@ -251,7 +251,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
             </div>
 
             <Card title="Identity" className="mb-3">
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <Field size="xs">
                   <Label size="xs" required>First name</Label>
                   <Input
@@ -293,7 +293,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                   />
                 </Field>
               </div>
-              <div className="mt-2.5 grid grid-cols-[1fr_1.4fr] gap-2.5">
+              <div className="mt-2.5">
                 <Field size="xs">
                   <Label size="xs">Phone</Label>
                   <PatternFormat
@@ -372,8 +372,12 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
           </div>
         </div>
 
-        <div className="flex flex-shrink-0 items-center gap-2 border-t border-border bg-bg-elev px-7 py-3 max-lg:px-4">
-          <div className="text-[11.5px] text-fg-muted">
+        {/* Mobile (<640px) reflow: meta line takes a full row above the
+            buttons (basis-full + flex-wrap) so a long summary like
+            "Creates 3 roles · 4 regions · 87 capabilities" doesn't push
+            Cancel/Save off-screen. */}
+        <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-t border-border bg-bg-elev px-7 py-3 max-lg:px-4">
+          <div className="text-[11.5px] text-fg-muted max-sm:basis-full">
             {isInvite ? (
               <>
                 Creates{' '}
@@ -471,7 +475,7 @@ function RoleMultiSelect({
         </div>
       ) : (
         <div
-          className={`grid grid-cols-3 gap-1.5 ${
+          className={`grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3 ${
             needsSearch ? 'max-h-[240px] overflow-y-auto p-0.5' : ''
           }`}
         >
@@ -665,7 +669,7 @@ function RegionMultiSelect({
   // column is reserved for an optional per-region count (e.g. "# of WOs")
   // when we have one to surface; today it stays empty.
   return (
-    <div className="grid grid-cols-3 gap-1.5">
+    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
       {regions.map((r) => {
         const on = selected.includes(r.id);
         return (

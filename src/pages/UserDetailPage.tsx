@@ -236,39 +236,44 @@ function Header({
     !!onResendInvitation &&
     (user.invitationStatus === 'INVITED' || user.invitationStatus === 'INVITATION_EXPIRED');
   return (
-    <div className="flex items-center gap-3.5 rounded-[10px] border border-border bg-bg-elev px-4 py-3.5">
-      <Avatar name={fullName} size="xl" />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Heading level={1} size="page-sm" className="m-0">
-            {fullName}
-          </Heading>
-          <RoleStack roles={user.roles ?? []} />
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-fg-muted">
-          {user.enabled ? (
-            <Pill tone="success" dot live inline>Active</Pill>
-          ) : (
-            <Pill tone="neutral" dot inline>Disabled</Pill>
-          )}
-          <span className="text-fg-dim">·</span>
-          <span className="break-all">{user.email}</span>
-          {user.phoneNumber && (
-            <>
-              <span className="text-fg-dim">·</span>
-              <a
-                href={`tel:${user.phoneNumber.replace(/\D/g, '')}`}
-                className="font-mono hover:text-fg-strong hover:underline"
-              >
-                {formatPhone(user.phoneNumber)}
-              </a>
-            </>
-          )}
-          <span className="text-fg-dim">·</span>
-          <span>Joined {formatDateShort(user.createdAt)}</span>
+    <div className="flex flex-col gap-3 rounded-[10px] border border-border bg-bg-elev px-4 py-3.5 sm:flex-row sm:items-center sm:gap-3.5">
+      <div className="flex min-w-0 flex-1 items-center gap-3.5">
+        <Avatar name={fullName} size="xl" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Heading level={1} size="page-sm" className="m-0">
+              {fullName}
+            </Heading>
+            <RoleStack roles={user.roles ?? []} />
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-fg-muted">
+            {user.enabled ? (
+              <Pill tone="success" dot live inline>Active</Pill>
+            ) : (
+              <Pill tone="neutral" dot inline>Disabled</Pill>
+            )}
+            <span className="text-fg-dim">·</span>
+            <span className="break-all">{user.email}</span>
+            {user.phoneNumber && (
+              <>
+                <span className="text-fg-dim">·</span>
+                <a
+                  href={`tel:${user.phoneNumber.replace(/\D/g, '')}`}
+                  className="font-mono hover:text-fg-strong hover:underline"
+                >
+                  {formatPhone(user.phoneNumber)}
+                </a>
+              </>
+            )}
+            <span className="text-fg-dim">·</span>
+            <span>Joined {formatDateShort(user.createdAt)}</span>
+          </div>
         </div>
       </div>
-      <div className="flex flex-shrink-0 gap-1.5">
+      {/* Mobile (<640px) reflow: actions drop to a full-width row below
+          the identity block, with each button claiming an equal share. At
+          ≥640px the actions sit trailing on the same row as the avatar. */}
+      <div className="flex gap-1.5 max-sm:w-full max-sm:[&>*]:flex-1 sm:flex-shrink-0">
         {canResendInvitation && (
           <Button
             outline
@@ -329,10 +334,18 @@ function RolesAndRegionsCard({
   const capCount = user.capabilities?.length ?? 0;
 
   return (
-    <Card footer={open && capCount > 0 ? <CapabilityDetail user={user} /> : null}>
-      {/* Row: Roles */}
-      <div className="grid grid-cols-[90px_1fr_auto] items-center gap-3">
-        <div className="text-[11px] font-medium text-fg-muted">Roles</div>
+    <Card padding="none" footer={open && capCount > 0 ? <CapabilityDetail user={user} /> : null}>
+      <DataRow
+        label="Roles"
+        labelWidth={90}
+        action={
+          onEditAccess ? (
+            <Button outline size="xxs" onClick={onEditAccess}>
+              Edit access
+            </Button>
+          ) : undefined
+        }
+      >
         <div className="flex flex-wrap gap-1">
           {(user.roles ?? []).length > 0 ? (
             user.roles!.map((r) => <RoleChip key={r.id} name={r.name} />)
@@ -340,16 +353,8 @@ function RolesAndRegionsCard({
             <span className="text-[11.5px] italic text-fg-dim">No roles assigned</span>
           )}
         </div>
-        {onEditAccess && (
-          <Button outline size="xxs" onClick={onEditAccess}>
-            Edit access
-          </Button>
-        )}
-      </div>
-
-      {/* Row: Regions */}
-      <div className="mt-2.5 grid grid-cols-[90px_1fr] items-center gap-3">
-        <div className="text-[11px] font-medium text-fg-muted">Regions</div>
+      </DataRow>
+      <DataRow label="Regions" labelWidth={90} last={capCount === 0}>
         <div className="flex flex-wrap gap-1">
           {userRegions.length === 0 ? (
             <span className="text-[11.5px] italic text-fg-muted">
@@ -359,11 +364,10 @@ function RolesAndRegionsCard({
             userRegions.map((r) => <Badge key={r.id}>{r.name}</Badge>)
           )}
         </div>
-      </div>
+      </DataRow>
 
-      {/* Capability count + view-detail trigger */}
       {capCount > 0 && (
-        <div className="mt-2.5 flex items-center gap-2.5 border-t border-border-soft pt-2.5 text-[11px] text-fg-muted">
+        <div className="flex items-center gap-2.5 px-3.5 py-2.5 text-[11px] text-fg-muted">
           <span>
             <span className="font-mono font-semibold tabular-nums text-fg-strong">
               {capCount}
@@ -421,13 +425,17 @@ function CapabilityDetail({ user }: { user: User }) {
       </div>
       <div>
         {groups.map((g, i) => (
-          <div
+          <DataRow
             key={g.area}
-            className={`grid grid-cols-[180px_1fr_50px] items-start gap-2.5 px-3.5 py-2 ${
-              i < groups.length - 1 ? 'border-b border-border-soft' : ''
-            }`}
+            label={g.area}
+            labelWidth={180}
+            last={i === groups.length - 1}
+            action={
+              <div className="text-right font-mono text-[10px] font-medium text-fg-dim">
+                {g.granted.length}/{g.total}
+              </div>
+            }
           >
-            <div className="text-[11.5px] font-semibold text-fg-strong">{g.area}</div>
             <div className="flex flex-wrap gap-1">
               {g.granted.map((c) => {
                 const sources = sourceRoles.filter((sr) => sr.caps.has(c.name));
@@ -449,10 +457,7 @@ function CapabilityDetail({ user }: { user: User }) {
                 );
               })}
             </div>
-            <div className="text-right font-mono text-[10px] font-medium text-fg-dim">
-              {g.granted.length}/{g.total}
-            </div>
-          </div>
+          </DataRow>
         ))}
       </div>
     </div>
