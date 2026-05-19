@@ -8,6 +8,7 @@ import { userApi, dispatchRegionApi, type Role } from '../api';
 import { roleColor } from '../utils/roleColor';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
+import { Checkbox } from '../components/catalyst/checkbox';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Input } from '../components/catalyst/input';
 
@@ -358,11 +359,10 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
 
             {isInvite && (
               <label className="mt-2 flex items-center gap-2 px-1 text-[11.5px] text-fg-muted">
-                <input
-                  type="checkbox"
+                <Checkbox
+                  color="accent"
                   checked={sendInvite}
-                  onChange={(e) => setSendInvite(e.target.checked)}
-                  className="size-3.5 accent-[var(--accent-500)]"
+                  onChange={setSendInvite}
                 />
                 <span>
                   Send invitation email to{' '}
@@ -414,13 +414,10 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// RoleMultiSelect — 3-col checkbox grid. Search appears only when
-// roles.length > 10; below that, the grid is the summary.
-//
-// TODO(design-system): the per-role row uses a raw `<input type="checkbox">`
-// inside a styled `<label>`. Move to Catalyst `CheckboxField`/`Checkbox` once
-// a dense size variant exists (current Catalyst Checkbox is too large for
-// this 3-col grid).
+// RoleMultiSelect — 3-col grid of role rows. Search appears only when
+// roles.length > 10; below that, the grid is the summary. The per-row
+// `<label>` wraps a Catalyst Checkbox; native label semantics forward
+// clicks anywhere in the row to the checkbox.
 // ──────────────────────────────────────────────────────────────────
 function RoleMultiSelect({
   roles,
@@ -487,6 +484,9 @@ function RoleMultiSelect({
             const capCount = role.capabilities?.length ?? 0;
             const color = roleColor(role.name);
             return (
+              // Native <label> wrapping a Catalyst Checkbox — the browser
+              // forwards clicks anywhere inside the label to the nested
+              // button-role checkbox, so the whole row stays clickable.
               <label
                 key={role.id}
                 className="grid cursor-pointer grid-cols-[16px_1fr_auto] items-center gap-2 rounded-md border px-2.5 py-1.5"
@@ -499,11 +499,10 @@ function RoleMultiSelect({
                     : 'var(--border-soft)',
                 }}
               >
-                <input
-                  type="checkbox"
+                <Checkbox
+                  color="accent"
                   checked={on}
                   onChange={() => onToggle(role.id)}
-                  className="size-3.5 accent-[var(--accent-500)]"
                 />
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span
