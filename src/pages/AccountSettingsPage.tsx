@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { fetchMFAPreference, updateMFAPreference } from 'aws-amplify/auth';
+import { fetchMFAPreference } from 'aws-amplify/auth';
 import { ShieldCheckIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
 import { Button } from '../components/catalyst/button';
@@ -16,12 +16,14 @@ import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../components/ThemeProvider';
 import { userApi, type User } from '../api';
 import { roleColor } from '../utils/roleColor';
+import { formatPhone } from '../utils/formatPhone';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 import { Callout } from '../components/ui/Callout';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ChangePasswordDialog from '../components/account/ChangePasswordDialog';
 import TwoFactorSetupDialog from '../components/account/TwoFactorSetupDialog';
+import Disable2FADialog from '../components/account/Disable2FADialog';
 
 // Personal Account Settings — separate from company-wide Settings. The
 // sidebar user popup links here. Phase 1 ships the visual redesign and
@@ -36,7 +38,7 @@ export default function AccountSettingsPage() {
     <AppLayout>
       <div className="mx-auto max-w-[760px] px-1 pb-16">
         <div className="mb-5">
-          <Heading size="page-lg">{t('account.settings')}</Heading>
+          <Heading size="page-lg">{t('account.settingsHeading')}</Heading>
         </div>
 
         {isLoading || !currentUser ? (
@@ -67,14 +69,6 @@ function ProfileCard({ user }: { user: User }) {
   const [lastName, setLastName] = useState(user.lastName);
   const [phone, setPhone] = useState(user.phoneNumber ?? '');
   const [saveError, setSaveError] = useState('');
-
-  // Browser-detected timezone — we don't store a per-user timezone yet,
-  // so this is informational. Date/time displays already use the
-  // browser's locale and zone, so this matches reality.
-  const browserTz = useMemo(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'Unknown',
-    []
-  );
 
   const fullName = `${user.firstName} ${user.lastName}`.trim() || user.email;
   const initials = (() => {
@@ -113,6 +107,14 @@ function ProfileCard({ user }: { user: User }) {
     setSaveError('');
   };
 
+  // Format the phone for display only when the field isn't focused — while
+  // editing we want raw input. We re-format on blur so the user sees the
+  // canonical national format after they stop typing.
+  const handlePhoneBlur = () => {
+    const formatted = formatPhone(phone);
+    if (formatted) setPhone(formatted);
+  };
+
   return (
     <Card title={t('account.profile.title')}>
       <div className="mb-4 flex items-center gap-4">
@@ -132,35 +134,37 @@ function ProfileCard({ user }: { user: User }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14px] font-semibold text-fg-strong">{fullName}</div>
-          <div className="mt-0.5 truncate text-[11.5px] text-fg-muted">{user.email}</div>
+          <div className="mt-0.5 flex items-baseline gap-1.5 truncate text-[11.5px] text-fg-muted">
+            <span className="truncate">{user.email}</span>
+            <span className="text-[10.5px] text-fg-dim">· {t('account.profile.emailHint')}</span>
+          </div>
         </div>
+        {/* Upload endpoint isn't shipped yet — placeholder so the layout is
+            right; we'll wire it when BE adds the route. */}
+        <Button outline size="xs" type="button" disabled>
+          {t('account.profile.changePhoto')}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-3 border-t border-border-soft pt-3.5 sm:grid-cols-2">
         <Field size="xs">
-          <Label size="xs">First name</Label>
+          <Label size="xs">{t('account.profile.firstName')}</Label>
           <Input size="xs" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
         </Field>
         <Field size="xs">
-          <Label size="xs">Last name</Label>
+          <Label size="xs">{t('account.profile.lastName')}</Label>
           <Input size="xs" value={lastName} onChange={(e) => setLastName(e.target.value)} />
         </Field>
         <Field size="xs">
-          <Label size="xs">Phone</Label>
+          <Label size="xs">{t('account.profile.phone')}</Label>
           <Input
             size="xs"
+            type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="(555) 555-5555"
+            onBlur={handlePhoneBlur}
+            placeholder={t('account.profile.phonePlaceholder')}
           />
-        </Field>
-        <Field size="xs">
-          <Label size="xs" hint="contact your admin to change">Email</Label>
-          <Input size="xs" value={user.email} disabled />
-        </Field>
-        <Field size="xs">
-          <Label size="xs" hint="detected from your browser">Time zone</Label>
-          <Input size="xs" value={browserTz} disabled />
         </Field>
       </div>
 
@@ -170,11 +174,11 @@ function ProfileCard({ user }: { user: User }) {
         </Field>
       )}
 
-      <div className="mt-3.5 flex justify-end gap-2">
-        <Button outline size="xs" type="button" disabled={!dirty || saveMutation.isPending} onClick={handleReset}>
+      <div className="mt-3.5 flex justify-end gap-1.5 border-t border-border-soft pt-3">
+        <Button plain size="xs" type="button" disabled={!dirty || saveMutation.isPending} onClick={handleReset}>
           {t('account.profile.reset')}
         </Button>
-        <Button size="xs" type="button" disabled={!dirty || saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+        <Button color="accent" size="xs" type="button" disabled={!dirty || saveMutation.isPending} onClick={() => saveMutation.mutate()}>
           {saveMutation.isPending ? t('common.saving') : t('account.profile.save')}
         </Button>
       </div>
@@ -185,12 +189,12 @@ function ProfileCard({ user }: { user: User }) {
 // ──────────────────────────────────────────────────────────────────
 // Security card — Password / 2FA / Sessions
 //
-// 2FA flows go through Amplify directly for now (TOTP only). When the
-// backend ships /auth/2fa/{totp,sms,email} we replace the wizard with
-// the method-picker + server-issued recovery codes flow. The Disable
-// row uses a plain confirm — the design wants a fresh-code gate, but
-// that requires the backend endpoint to validate the code; until then
-// we'd be lying about what the check buys us.
+// 2FA enroll + disable both go through /auth/2fa/* (twoFactorApi). The
+// server enforces the "one primary method" guarantee — verifying a new
+// method automatically disables the prior one — so the FE doesn't need a
+// switch-method UX. Status detection still reads Amplify's MFA
+// preference (Cognito-native list of enabled types) until a dedicated
+// GET endpoint ships.
 // ──────────────────────────────────────────────────────────────────
 function SecurityCard({ user }: { user: User }) {
   const { t } = useTranslation();
@@ -205,20 +209,24 @@ function SecurityCard({ user }: { user: User }) {
     queryFn: fetchMFAPreference,
   });
 
-  const isOn = useMemo(() => {
-    if (!mfa) return false;
-    return mfa.enabled?.includes('TOTP') || mfa.preferred === 'TOTP';
+  // Amplify reports enabled MFA types as 'TOTP' / 'SMS' / 'EMAIL'. We
+  // accept any of them as "on" and label the row accordingly.
+  const activeMethod: 'TOTP' | 'SMS' | 'EMAIL' | null = useMemo(() => {
+    if (!mfa) return null;
+    const enabled = (mfa.enabled ?? []) as string[];
+    const preferred = mfa.preferred as string | undefined;
+    const pick = (m: string) => enabled.includes(m) || preferred === m;
+    if (pick('TOTP')) return 'TOTP';
+    if (pick('SMS')) return 'SMS';
+    if (pick('EMAIL')) return 'EMAIL';
+    return null;
   }, [mfa]);
-
-  const disableMutation = useMutation({
-    mutationFn: () => updateMFAPreference({ totp: 'DISABLED' }),
-    onSuccess: () => {
-      refetch();
-      showSuccess('Two-factor disabled');
-    },
-    onError: (err: unknown) =>
-      showError("Couldn't disable two-factor", extractApiError(err)),
-  });
+  const isOn = activeMethod !== null;
+  const activeMethodLabel = (() => {
+    if (activeMethod === 'SMS') return t('account.security.twofaOnMethodSms');
+    if (activeMethod === 'EMAIL') return t('account.security.twofaOnMethodEmail');
+    return t('account.security.twofaOnMethod');
+  })();
 
   const signOutMutation = useMutation({
     mutationFn: () => userApi.signOutEverywhere(user.id),
@@ -266,7 +274,7 @@ function SecurityCard({ user }: { user: User }) {
                 <span className="mr-1">●</span>
                 {t('account.security.twofaOnPill')}
               </span>
-              <Text as="span" size="sm" tone="strong">{t('account.security.twofaOnMethod')}</Text>
+              <Text as="span" size="sm" tone="strong">{activeMethodLabel}</Text>
             </div>
             <Text as="div" size="xs" tone="dim" className="mt-0.5">
               {t('account.security.twofaOnHint')}
@@ -283,7 +291,7 @@ function SecurityCard({ user }: { user: User }) {
               }
               title={t('account.security.twofaCtaTitle')}
               action={
-                <Button size="xs" type="button" onClick={() => setSetupOpen(true)}>
+                <Button color="accent" size="xs" type="button" onClick={() => setSetupOpen(true)}>
                   {t('account.security.enable')}
                 </Button>
               }
@@ -325,14 +333,13 @@ function SecurityCard({ user }: { user: User }) {
         onEnabled={() => refetch()}
         email={user.email}
       />
-      <ConfirmDialog
+      <Disable2FADialog
         isOpen={disableOpen}
         onClose={() => setDisableOpen(false)}
-        onConfirm={() => disableMutation.mutate()}
-        title={t('account.security.disableConfirmTitle')}
-        message={t('account.security.disableConfirmMessage')}
-        confirmLabel={t('account.security.disableSubmit')}
-        isDestructive
+        onDisabled={() => {
+          refetch();
+          showSuccess(t('account.security.disableSuccess'));
+        }}
       />
       <ConfirmDialog
         isOpen={signOutOpen}
@@ -352,9 +359,8 @@ function SecurityCard({ user }: { user: User }) {
 // popup. The popup keeps them for fast access; this surface is the
 // canonical place if a user goes looking for it.
 //
-// ThemeProvider exposes 'light' | 'dark' only. The design includes a
-// "System" chip; we'll wire it up once the provider gains a follow-system
-// mode. Until then, two chips is honest.
+// `system` follows the OS color-scheme preference live; ThemeProvider
+// subscribes to the prefers-color-scheme media query while in that mode.
 // ──────────────────────────────────────────────────────────────────
 function PreferencesCard() {
   const { t } = useTranslation();
@@ -371,6 +377,10 @@ function PreferencesCard() {
           <ToggleGroupOption value="dark">
             <span aria-hidden="true">☾</span>
             {t('account.preferences.themeDark')}
+          </ToggleGroupOption>
+          <ToggleGroupOption value="system">
+            <span aria-hidden="true">⊙</span>
+            {t('account.preferences.themeSystem')}
           </ToggleGroupOption>
         </ToggleGroup>
       </DataRow>

@@ -109,7 +109,7 @@ export default function ChangePasswordDialog({ isOpen, onClose }: Props) {
           <Button plain type="button" onClick={handleClose}>
             {t('common.cancel')}
           </Button>
-          <Button type="submit" disabled={mutation.isPending}>
+          <Button color="accent" type="submit" disabled={mutation.isPending}>
             {mutation.isPending ? t('common.saving') : t('account.changePasswordDialog.submit')}
           </Button>
         </DialogActions>

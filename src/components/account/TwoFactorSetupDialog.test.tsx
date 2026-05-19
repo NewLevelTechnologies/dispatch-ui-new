@@ -2,13 +2,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../test/utils';
 import TwoFactorSetupDialog from './TwoFactorSetupDialog';
-import { setUpTOTP, updateMFAPreference, verifyTOTPSetup } from 'aws-amplify/auth';
+import { twoFactorApi } from '../../api';
 
-vi.mock('aws-amplify/auth', () => ({
-  setUpTOTP: vi.fn(),
-  updateMFAPreference: vi.fn(),
-  verifyTOTPSetup: vi.fn(),
-}));
+vi.mock('../../api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../api')>();
+  return {
+    ...actual,
+    twoFactorApi: {
+      totpSetup: vi.fn(),
+      totpVerify: vi.fn(),
+      smsSetup: vi.fn(),
+      smsVerify: vi.fn(),
+      emailSetup: vi.fn(),
+      emailVerify: vi.fn(),
+      confirmRequest: vi.fn(),
+      disable: vi.fn(),
+    },
+  };
+});
 
 // qrcode.react reads canvas APIs jsdom doesn't ship — render a placeholder.
 vi.mock('qrcode.react', () => ({
@@ -18,10 +29,9 @@ vi.mock('qrcode.react', () => ({
 }));
 
 // The global react-i18next mock in src/test/setup.ts hands back a brand-new
-// `t` function on every render, which makes any useEffect that lists `t` in
-// its dependency array re-run forever. TwoFactorSetupDialog resets `step` in
-// such an effect, so without a stable `t` the wizard snaps back to step 1
-// after every state change. Override the mock with a stable `t` here.
+// `t` function on every render, which can re-fire useEffects that include
+// `t` in their deps. Use a stable t() here so the wizard's state machine
+// doesn't reset between renders.
 vi.mock('react-i18next', () => {
   const t = (key: string, params?: Record<string, unknown>) => {
     if (!params) return key;
@@ -40,11 +50,10 @@ vi.mock('react-i18next', () => {
   };
 });
 
-function makeSetupResult(secret = 'JBSWY3DPEHPK3PXP') {
-  return {
-    sharedSecret: secret,
-    getSetupUri: vi.fn(() => new URL(`otpauth://totp/Dispatch:test@example.com?secret=${secret}`)),
-  };
+const QR_URI = 'otpauth://totp/Dispatch:test@example.com?secret=JBSWY3DPEHPK3PXP';
+
+async function advanceFromPicker(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.continue/i }));
 }
 
 describe('TwoFactorSetupDialog', () => {
@@ -55,9 +64,7 @@ describe('TwoFactorSetupDialog', () => {
     vi.clearAllMocks();
   });
 
-  it('fetches the TOTP setup URI on open and renders the QR code', async () => {
-    vi.mocked(setUpTOTP).mockResolvedValue(makeSetupResult() as never);
-
+  it('opens to the method picker with TOTP recommended and Passkey disabled', () => {
     renderWithProviders(
       <TwoFactorSetupDialog
         isOpen={true}
@@ -67,56 +74,48 @@ describe('TwoFactorSetupDialog', () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(setUpTOTP).toHaveBeenCalled();
+    expect(screen.getByText('account.twoFactorSetup.methodTitle')).toBeInTheDocument();
+
+    expect(screen.getByRole('radio', { name: /methodTotpLabel/i })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByRole('radio', { name: /methodSmsLabel/i })).not.toBeDisabled();
+    expect(screen.getByRole('radio', { name: /methodEmailLabel/i })).not.toBeDisabled();
+    expect(screen.getByRole('radio', { name: /methodPasskeyLabel/i })).toBeDisabled();
+    expect(twoFactorApi.totpSetup).not.toHaveBeenCalled();
+  });
+
+  // ── TOTP path ──────────────────────────────────────────────────
+  it('TOTP: fetches setup payload on entering setup and renders the QR + secret', async () => {
+    vi.mocked(twoFactorApi.totpSetup).mockResolvedValue({
+      secretCode: 'JBSWY3DPEHPK3PXP',
+      qrCodeUri: QR_URI,
     });
+
+    const user = userEvent.setup();
+    renderWithProviders(
+      <TwoFactorSetupDialog
+        isOpen={true}
+        onClose={onClose}
+        onEnabled={onEnabled}
+        email="test@example.com"
+      />,
+    );
+
+    await advanceFromPicker(user);
+
+    await waitFor(() => expect(twoFactorApi.totpSetup).toHaveBeenCalled());
     expect(await screen.findByTestId('qr-svg')).toBeInTheDocument();
     expect(screen.getByText('JBSWY3DPEHPK3PXP')).toBeInTheDocument();
   });
 
-  it('shows an error message when the TOTP setup call fails', async () => {
-    vi.mocked(setUpTOTP).mockRejectedValue(new Error('boom'));
-
-    renderWithProviders(
-      <TwoFactorSetupDialog
-        isOpen={true}
-        onClose={onClose}
-        onEnabled={onEnabled}
-        email="test@example.com"
-      />,
-    );
-
-    const matches = await screen.findAllByText('boom');
-    expect(matches.length).toBeGreaterThan(0);
-  });
-
-  it('copies the secret to the clipboard when the copy button is clicked', async () => {
-    vi.mocked(setUpTOTP).mockResolvedValue(makeSetupResult() as never);
-
-    // userEvent.setup() installs its own clipboard mock — override it after.
-    const user = userEvent.setup();
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText },
-      configurable: true,
-      writable: true,
+  it('TOTP: verifies the code and notifies the parent on success', async () => {
+    vi.mocked(twoFactorApi.totpSetup).mockResolvedValue({
+      secretCode: 'JBSWY3DPEHPK3PXP',
+      qrCodeUri: QR_URI,
     });
-    renderWithProviders(
-      <TwoFactorSetupDialog
-        isOpen={true}
-        onClose={onClose}
-        onEnabled={onEnabled}
-        email="test@example.com"
-      />,
-    );
-
-    await screen.findByTestId('qr-svg');
-    await user.click(screen.getByRole('button', { name: /copy/i }));
-    expect(writeText).toHaveBeenCalledWith('JBSWY3DPEHPK3PXP');
-  });
-
-  it('advances to the verify step when continue is clicked, then back returns to qr', async () => {
-    vi.mocked(setUpTOTP).mockResolvedValue(makeSetupResult() as never);
+    vi.mocked(twoFactorApi.totpVerify).mockResolvedValue(undefined);
 
     const user = userEvent.setup();
     renderWithProviders(
@@ -128,51 +127,27 @@ describe('TwoFactorSetupDialog', () => {
       />,
     );
 
+    await advanceFromPicker(user);
     await screen.findByTestId('qr-svg');
-    await user.click(screen.getByRole('button', { name: /continue/i }));
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.next/i }));
 
-    expect(screen.getByRole('group', { name: /verifyTitle/i })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /back/i }));
-    expect(await screen.findByTestId('qr-svg')).toBeInTheDocument();
-  });
-
-  it('verifies the code, enables MFA, and notifies the parent on success', async () => {
-    vi.mocked(setUpTOTP).mockResolvedValue(makeSetupResult() as never);
-    vi.mocked(verifyTOTPSetup).mockResolvedValue(undefined);
-    vi.mocked(updateMFAPreference).mockResolvedValue(undefined as never);
-
-    const user = userEvent.setup();
-    renderWithProviders(
-      <TwoFactorSetupDialog
-        isOpen={true}
-        onClose={onClose}
-        onEnabled={onEnabled}
-        email="test@example.com"
-      />,
-    );
-
-    await screen.findByTestId('qr-svg');
-    await user.click(screen.getByRole('button', { name: /continue/i }));
-
-    // OtpInput emits onComplete when the 6 digits land — paste fills all boxes.
     const inputs = screen.getAllByRole('textbox') as HTMLInputElement[];
     await user.click(inputs[0]);
     await user.paste('123456');
 
-    await waitFor(() => {
-      expect(verifyTOTPSetup).toHaveBeenCalledWith({ code: '123456' });
-    });
-    await waitFor(() => {
-      expect(updateMFAPreference).toHaveBeenCalledWith({ totp: 'PREFERRED' });
-    });
+    await waitFor(() => expect(twoFactorApi.totpVerify).toHaveBeenCalledWith('123456'));
     expect(onEnabled).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('shows a verify error and keeps the dialog open when the code is wrong', async () => {
-    vi.mocked(setUpTOTP).mockResolvedValue(makeSetupResult() as never);
-    vi.mocked(verifyTOTPSetup).mockRejectedValue(new Error('Invalid code'));
+  it('TOTP: surfaces an error when verify fails and clears the code', async () => {
+    vi.mocked(twoFactorApi.totpSetup).mockResolvedValue({
+      secretCode: 'JBSWY3DPEHPK3PXP',
+      qrCodeUri: QR_URI,
+    });
+    vi.mocked(twoFactorApi.totpVerify).mockRejectedValue(
+      Object.assign(new Error('Invalid code'), { response: { status: 400 } }),
+    );
 
     const user = userEvent.setup();
     renderWithProviders(
@@ -184,8 +159,9 @@ describe('TwoFactorSetupDialog', () => {
       />,
     );
 
+    await advanceFromPicker(user);
     await screen.findByTestId('qr-svg');
-    await user.click(screen.getByRole('button', { name: /continue/i }));
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.next/i }));
 
     const inputs = screen.getAllByRole('textbox') as HTMLInputElement[];
     await user.click(inputs[0]);
@@ -193,11 +169,35 @@ describe('TwoFactorSetupDialog', () => {
 
     expect(await screen.findByText('Invalid code')).toBeInTheDocument();
     expect(onEnabled).not.toHaveBeenCalled();
-    expect(updateMFAPreference).not.toHaveBeenCalled();
   });
 
-  it('cancels from the qr step via the cancel button', async () => {
-    vi.mocked(setUpTOTP).mockResolvedValue(makeSetupResult() as never);
+  // ── SMS path ───────────────────────────────────────────────────
+  it('SMS: requires E.164 format before /sms/setup fires', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <TwoFactorSetupDialog
+        isOpen={true}
+        onClose={onClose}
+        onEnabled={onEnabled}
+        email="test@example.com"
+      />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: /methodSmsLabel/i }));
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.continue/i }));
+
+    // Bad input
+    const phoneInput = screen.getByRole('textbox', { name: /smsLabel/i });
+    await user.type(phoneInput, '6785551234');
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.sendCode/i }));
+
+    expect(twoFactorApi.smsSetup).not.toHaveBeenCalled();
+    expect(await screen.findByText(/phoneInvalid/i)).toBeInTheDocument();
+  });
+
+  it('SMS: posts /sms/setup with E.164, advances to verify, then /sms/verify succeeds', async () => {
+    vi.mocked(twoFactorApi.smsSetup).mockResolvedValue(undefined);
+    vi.mocked(twoFactorApi.smsVerify).mockResolvedValue(undefined);
 
     const user = userEvent.setup();
     renderWithProviders(
@@ -209,8 +209,150 @@ describe('TwoFactorSetupDialog', () => {
       />,
     );
 
-    await screen.findByTestId('qr-svg');
-    await user.click(screen.getByRole('button', { name: /cancel/i }));
+    await user.click(screen.getByRole('radio', { name: /methodSmsLabel/i }));
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.continue/i }));
+
+    const phoneInput = screen.getByRole('textbox', { name: /smsLabel/i });
+    await user.type(phoneInput, '+16785551234');
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.sendCode/i }));
+
+    await waitFor(() => expect(twoFactorApi.smsSetup).toHaveBeenCalledWith('+16785551234'));
+
+    // Verify step now visible
+    const inputs = await screen.findAllByRole('textbox');
+    // First textbox is the phone field on /setup; on /verify all 6 are OTP boxes.
+    expect(inputs.length).toBe(6);
+    await user.click(inputs[0]);
+    await user.paste('445566');
+
+    await waitFor(() => expect(twoFactorApi.smsVerify).toHaveBeenCalledWith('445566'));
+    expect(onEnabled).toHaveBeenCalled();
+  });
+
+  it('SMS: surfaces backend error when /sms/setup fails and stays on setup step', async () => {
+    vi.mocked(twoFactorApi.smsSetup).mockRejectedValue(
+      Object.assign(new Error('Carrier unavailable'), {
+        response: { status: 503, data: { message: 'Carrier unavailable' } },
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderWithProviders(
+      <TwoFactorSetupDialog
+        isOpen={true}
+        onClose={onClose}
+        onEnabled={onEnabled}
+        email="test@example.com"
+      />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: /methodSmsLabel/i }));
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.continue/i }));
+
+    const phoneInput = screen.getByRole('textbox', { name: /smsLabel/i });
+    await user.type(phoneInput, '+16785551234');
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.sendCode/i }));
+
+    expect(await screen.findByText('Carrier unavailable')).toBeInTheDocument();
+    // Still on setup (no OTP boxes yet)
+    expect(screen.queryAllByRole('textbox').filter((el) => el.getAttribute('maxlength') === '1')).toHaveLength(0);
+  });
+
+  it('SMS: resend on the verify step re-fires /sms/setup with the same phone', async () => {
+    vi.mocked(twoFactorApi.smsSetup).mockResolvedValue(undefined);
+
+    const user = userEvent.setup();
+    renderWithProviders(
+      <TwoFactorSetupDialog
+        isOpen={true}
+        onClose={onClose}
+        onEnabled={onEnabled}
+        email="test@example.com"
+      />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: /methodSmsLabel/i }));
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.continue/i }));
+    await user.type(screen.getByRole('textbox', { name: /smsLabel/i }), '+16785551234');
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.sendCode/i }));
+
+    // On verify step now — click resend
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.resend/i }));
+    await waitFor(() => expect(twoFactorApi.smsSetup).toHaveBeenCalledTimes(2));
+    expect(twoFactorApi.smsSetup).toHaveBeenLastCalledWith('+16785551234');
+  });
+
+  // ── Email path ─────────────────────────────────────────────────
+  it('Email: auto-fires /email/setup on step entry, then /email/verify succeeds', async () => {
+    vi.mocked(twoFactorApi.emailSetup).mockResolvedValue(undefined);
+    vi.mocked(twoFactorApi.emailVerify).mockResolvedValue(undefined);
+
+    const user = userEvent.setup();
+    renderWithProviders(
+      <TwoFactorSetupDialog
+        isOpen={true}
+        onClose={onClose}
+        onEnabled={onEnabled}
+        email="test@example.com"
+      />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: /methodEmailLabel/i }));
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.continue/i }));
+
+    await waitFor(() => expect(twoFactorApi.emailSetup).toHaveBeenCalled());
+    // Email confirmation screen shows the user's address
+    expect(screen.getByText('test@example.com')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.next/i }));
+
+    const inputs = await screen.findAllByRole('textbox');
+    expect(inputs.length).toBe(6);
+    await user.click(inputs[0]);
+    await user.paste('778899');
+
+    await waitFor(() => expect(twoFactorApi.emailVerify).toHaveBeenCalledWith('778899'));
+    expect(onEnabled).toHaveBeenCalled();
+  });
+
+  it('Email: surfaces error when /email/setup fails on step entry', async () => {
+    vi.mocked(twoFactorApi.emailSetup).mockRejectedValue(
+      Object.assign(new Error('SES failure'), {
+        response: { status: 503, data: { message: 'SES failure' } },
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderWithProviders(
+      <TwoFactorSetupDialog
+        isOpen={true}
+        onClose={onClose}
+        onEnabled={onEnabled}
+        email="test@example.com"
+      />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: /methodEmailLabel/i }));
+    await user.click(screen.getByRole('button', { name: /account\.twoFactorSetup\.continue/i }));
+
+    expect(await screen.findByText('SES failure')).toBeInTheDocument();
+    // Next is disabled — emailSetup didn't succeed
+    expect(screen.getByRole('button', { name: /account\.twoFactorSetup\.next/i })).toBeDisabled();
+  });
+
+  // ── Shared ────────────────────────────────────────────────────
+  it('cancels from the picker via the cancel button', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <TwoFactorSetupDialog
+        isOpen={true}
+        onClose={onClose}
+        onEnabled={onEnabled}
+        email="test@example.com"
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /common\.cancel/i }));
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -223,6 +365,6 @@ describe('TwoFactorSetupDialog', () => {
         email="test@example.com"
       />,
     );
-    expect(setUpTOTP).not.toHaveBeenCalled();
+    expect(twoFactorApi.totpSetup).not.toHaveBeenCalled();
   });
 });

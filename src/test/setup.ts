@@ -166,6 +166,7 @@ vi.mock('react-i18next', () => {
     'common.form.required': '{{field}} is required',
     'account.menu': 'Open account menu',
     'account.settings': 'Account Settings',
+    'account.settingsHeading': 'Account settings',
     'common.dismiss': 'Dismiss',
     'common.helpSupport': 'Help & Support',
     'common.moreOptions': 'More options',

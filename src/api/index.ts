@@ -268,6 +268,14 @@ export {
   type UpdateDispatchRegionRequest,
 } from './dispatchRegionApi';
 
+// Two-Factor Auth API
+export {
+  twoFactorApi,
+  type TwoFactorMethod,
+  type TotpSetupResponse,
+  type ConfirmRequestResponse,
+} from './twoFactorApi';
+
 // Work Order Config API (Phase 4)
 export {
   workOrderTypesApi,
