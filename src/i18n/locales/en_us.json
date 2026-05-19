@@ -23,18 +23,22 @@
       "deleteConfirm": "Are you sure you want to delete {{name}}?",
       "deleteConfirmGeneric": "Are you sure you want to delete this {{entity, lowercase}}?",
       "edit": "Edit {{entity}}",
+      "couldNotLoad": "Couldn't load {{entities, lowercase}}",
       "errorLoading": "Error loading {{entities, lowercase}}",
       "errorLoadingEntity": "Error loading {{entity, lowercase}}",
       "loading": "Loading {{entities, lowercase}}...",
       "loadingEntity": "Loading {{entity, lowercase}}...",
       "new": "New {{entity}}",
       "noEntitiesYet": "No {{entities, lowercase}} yet",
+      "noMatchFilters": "No {{entities, lowercase}} match your filters",
       "noMatchSearch": "No {{entities, lowercase}} match your search.",
       "notFound": "No {{entities, lowercase}} found",
       "open": "Open {{entities}}",
       "removeFilter": "Remove {{name}} filter",
       "rowsPerPage": "Rows per page",
-      "title": "Actions"
+      "title": "Actions",
+      "tryAdjustingFilters": "Try clearing or adjusting filters.",
+      "tryAgain": "Try again"
     },
     "active": "Active",
     "add": "Add",
@@ -1256,6 +1260,9 @@
       "disabled": "{{count}} disabled"
     },
     "description": "People who can sign in to the app. Assign each user a role — roles determine which screens and actions they can access. Manage role permissions under Access › Roles.",
+    "empty": {
+      "noUsersDescription": "Invite your team to get started."
+    },
     "detail": {
       "accountActivity": "Account activity",
       "accountActivityHelper": "Sign-ins, access changes, security events. Record edits appear on each record.",
@@ -1364,7 +1371,6 @@
       "noRolesMatch": "No roles match \"{{query}}\".",
       "phone": "Phone",
       "pickAtLeastOneRole": "Pick at least one role. The user can't sign in with zero roles.",
-      "regionWarning": "⚠ No regions selected — this user won't see any records until you assign at least one.",
       "regions": "Regions",
       "regionsHelper": "Where in the world this user works. Limits which records they see.",
       "roleChangesNote": "Role changes take effect on next sign-in.",
