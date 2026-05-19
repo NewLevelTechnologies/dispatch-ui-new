@@ -28,7 +28,7 @@ import Disable2FADialog from '../components/account/Disable2FADialog';
 // Personal Account Settings — separate from company-wide Settings. The
 // sidebar user popup links here. Phase 1 ships the visual redesign and
 // keeps 2FA on Amplify-direct TOTP. SMS/email methods + server-issued
-// recovery codes + code-gated disable land when backend's /auth/2fa/*
+// recovery codes + code-gated disable land when backend's /users/me/2fa/*
 // endpoints are ready.
 export default function AccountSettingsPage() {
   const { t } = useTranslation();
@@ -112,6 +112,15 @@ function ProfileCard({ user }: { user: User }) {
     lastName !== user.lastName ||
     phone !== stripPhoneDigits(user.phoneNumber);
 
+  // Every self-update returns the full User — push it into the currentUser
+  // cache and invalidate the user list/detail queries so the sidebar,
+  // Users page, and User detail page all repaint with the new identity
+  // (name, phone, photo) without a manual refresh.
+  const onSelfUserUpdated = (updated: User) => {
+    queryClient.setQueryData(['currentUser'], updated);
+    queryClient.invalidateQueries({ queryKey: ['users'] });
+  };
+
   const saveMutation = useMutation({
     mutationFn: () =>
       userApi.updateMyProfile({
@@ -120,7 +129,7 @@ function ProfileCard({ user }: { user: User }) {
         phoneNumber: phone || null,
       }),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['currentUser'], updated);
+      onSelfUserUpdated(updated);
       setSaveError('');
       showSuccess(t('account.profile.saveSuccess'));
     },
@@ -132,7 +141,7 @@ function ProfileCard({ user }: { user: User }) {
   const uploadMutation = useMutation({
     mutationFn: (file: File) => userApi.uploadMyPhoto(file),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['currentUser'], updated);
+      onSelfUserUpdated(updated);
       showSuccess(t('account.profile.photoUploadSuccess'));
     },
     onError: (err: unknown) => {
@@ -143,7 +152,7 @@ function ProfileCard({ user }: { user: User }) {
   const removeMutation = useMutation({
     mutationFn: () => userApi.deleteMyPhoto(),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['currentUser'], updated);
+      onSelfUserUpdated(updated);
       showSuccess(t('account.profile.photoRemoveSuccess'));
     },
     onError: (err: unknown) => {
@@ -286,7 +295,7 @@ function ProfileCard({ user }: { user: User }) {
 // ──────────────────────────────────────────────────────────────────
 // Security card — Password / 2FA / Sessions
 //
-// 2FA enroll + disable both go through /auth/2fa/* (twoFactorApi). The
+// 2FA enroll + disable both go through /users/me/2fa/* (twoFactorApi). The
 // server enforces the "one primary method" guarantee — verifying a new
 // method automatically disables the prior one — so the FE doesn't need a
 // switch-method UX. Status detection still reads Amplify's MFA

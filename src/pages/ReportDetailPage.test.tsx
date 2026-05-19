@@ -26,11 +26,17 @@ const renderAt = (slug: string) =>
 describe('ReportDetailPage', () => {
   it('renders the report component when the slug is registered', async () => {
     renderAt('filter-pull-list');
-    await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: /filter pull list/i }),
-      ).toBeInTheDocument();
-    });
+    // CI runners can take several seconds to render the report's
+    // PageHead behind two cold-cache React Query taxonomy fetches.
+    // Bump the default 1s waitFor so this test stops flaking under load.
+    await waitFor(
+      () => {
+        expect(
+          screen.getByRole('heading', { name: /filter pull list/i }),
+        ).toBeInTheDocument();
+      },
+      { timeout: 8000 },
+    );
   });
 
   it('renders the not-found surface when the slug is unknown', () => {

@@ -10,88 +10,88 @@ describe('twoFactorApi', () => {
   });
 
   // ── TOTP ──────────────────────────────────────────────────────
-  it('totpSetup POSTs /auth/2fa/totp/setup and returns the secret + QR URI', async () => {
+  it('totpSetup POSTs /users/me/2fa/totp/setup and returns the secret + QR URI', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({
       data: { secretCode: 'JBSWY3DPEHPK3PXP', qrCodeUri: 'otpauth://totp/x' },
     });
 
     const result = await twoFactorApi.totpSetup();
 
-    expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/totp/setup');
+    expect(apiClient.post).toHaveBeenCalledWith('/users/me/2fa/totp/setup');
     expect(result).toEqual({
       secretCode: 'JBSWY3DPEHPK3PXP',
       qrCodeUri: 'otpauth://totp/x',
     });
   });
 
-  it('totpVerify POSTs /auth/2fa/totp/verify with the code', async () => {
+  it('totpVerify POSTs /users/me/2fa/totp/verify with the code', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: undefined });
 
     await twoFactorApi.totpVerify('123456');
 
-    expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/totp/verify', {
+    expect(apiClient.post).toHaveBeenCalledWith('/users/me/2fa/totp/verify', {
       code: '123456',
     });
   });
 
   // ── SMS ───────────────────────────────────────────────────────
-  it('smsSetup POSTs /auth/2fa/sms/setup with the E.164 phoneNumber', async () => {
+  it('smsSetup POSTs /users/me/2fa/sms/setup with the E.164 phoneNumber', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: undefined });
 
     await twoFactorApi.smsSetup('+16785551234');
 
-    expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/sms/setup', {
+    expect(apiClient.post).toHaveBeenCalledWith('/users/me/2fa/sms/setup', {
       phoneNumber: '+16785551234',
     });
   });
 
-  it('smsVerify POSTs /auth/2fa/sms/verify with the code', async () => {
+  it('smsVerify POSTs /users/me/2fa/sms/verify with the code', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: undefined });
 
     await twoFactorApi.smsVerify('445566');
 
-    expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/sms/verify', {
+    expect(apiClient.post).toHaveBeenCalledWith('/users/me/2fa/sms/verify', {
       code: '445566',
     });
   });
 
   // ── Email ─────────────────────────────────────────────────────
-  it('emailSetup POSTs /auth/2fa/email/setup with no body', async () => {
+  it('emailSetup POSTs /users/me/2fa/email/setup with no body', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: undefined });
 
     await twoFactorApi.emailSetup();
 
-    expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/email/setup');
+    expect(apiClient.post).toHaveBeenCalledWith('/users/me/2fa/email/setup');
   });
 
-  it('emailVerify POSTs /auth/2fa/email/verify with the code', async () => {
+  it('emailVerify POSTs /users/me/2fa/email/verify with the code', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: undefined });
 
     await twoFactorApi.emailVerify('778899');
 
-    expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/email/verify', {
+    expect(apiClient.post).toHaveBeenCalledWith('/users/me/2fa/email/verify', {
       code: '778899',
     });
   });
 
   // ── Disable two-step ──────────────────────────────────────────
-  it('confirmRequest POSTs /auth/2fa/confirm/request and returns method + masked dest', async () => {
+  it('confirmRequest POSTs /users/me/2fa/confirm/request and returns method + masked dest', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({
       data: { method: 'SMS', maskedDestination: '+1******1234' },
     });
 
     const result = await twoFactorApi.confirmRequest();
 
-    expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/confirm/request');
+    expect(apiClient.post).toHaveBeenCalledWith('/users/me/2fa/confirm/request');
     expect(result).toEqual({ method: 'SMS', maskedDestination: '+1******1234' });
   });
 
-  it('disable POSTs /auth/2fa/disable with the confirmation code', async () => {
+  it('disable POSTs /users/me/2fa/disable with the confirmation code', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: undefined });
 
     await twoFactorApi.disable('999999');
 
-    expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/disable', {
+    expect(apiClient.post).toHaveBeenCalledWith('/users/me/2fa/disable', {
       confirmationCode: '999999',
     });
   });

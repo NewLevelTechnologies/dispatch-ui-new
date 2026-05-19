@@ -238,7 +238,7 @@ function Header({
   return (
     <div className="flex flex-col gap-3 rounded-[10px] border border-border bg-bg-elev px-4 py-3.5 sm:flex-row sm:items-center sm:gap-3.5">
       <div className="flex min-w-0 flex-1 items-center gap-3.5">
-        <Avatar name={fullName} size="xl" />
+        <Avatar name={fullName} src={user.photoUrl ?? undefined} size="xl" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2.5">
             <Heading level={1} size="page-sm" className="m-0">
