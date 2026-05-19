@@ -112,6 +112,15 @@ function ProfileCard({ user }: { user: User }) {
     lastName !== user.lastName ||
     phone !== stripPhoneDigits(user.phoneNumber);
 
+  // Every self-update returns the full User — push it into the currentUser
+  // cache and invalidate the user list/detail queries so the sidebar,
+  // Users page, and User detail page all repaint with the new identity
+  // (name, phone, photo) without a manual refresh.
+  const onSelfUserUpdated = (updated: User) => {
+    queryClient.setQueryData(['currentUser'], updated);
+    queryClient.invalidateQueries({ queryKey: ['users'] });
+  };
+
   const saveMutation = useMutation({
     mutationFn: () =>
       userApi.updateMyProfile({
@@ -120,7 +129,7 @@ function ProfileCard({ user }: { user: User }) {
         phoneNumber: phone || null,
       }),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['currentUser'], updated);
+      onSelfUserUpdated(updated);
       setSaveError('');
       showSuccess(t('account.profile.saveSuccess'));
     },
@@ -132,7 +141,7 @@ function ProfileCard({ user }: { user: User }) {
   const uploadMutation = useMutation({
     mutationFn: (file: File) => userApi.uploadMyPhoto(file),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['currentUser'], updated);
+      onSelfUserUpdated(updated);
       showSuccess(t('account.profile.photoUploadSuccess'));
     },
     onError: (err: unknown) => {
@@ -143,7 +152,7 @@ function ProfileCard({ user }: { user: User }) {
   const removeMutation = useMutation({
     mutationFn: () => userApi.deleteMyPhoto(),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['currentUser'], updated);
+      onSelfUserUpdated(updated);
       showSuccess(t('account.profile.photoRemoveSuccess'));
     },
     onError: (err: unknown) => {

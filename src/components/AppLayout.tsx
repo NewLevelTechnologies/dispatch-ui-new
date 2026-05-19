@@ -242,15 +242,24 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                 className="flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-left text-sidebar-fg hover:bg-sidebar-bg-2 focus:outline-none data-active:bg-sidebar-bg-2"
                 aria-label={t('account.menu')}
               >
-                <span
-                  className="relative grid size-[30px] shrink-0 place-items-center rounded-full text-[11px] font-semibold text-white"
-                  style={{
-                    background: avatarBg,
-                    border: `1px solid color-mix(in oklch, ${avatarBg} 70%, black)`,
-                  }}
-                  aria-hidden="true"
-                >
-                  {avatarInitials}
+                <span className="relative grid size-[30px] shrink-0 place-items-center" aria-hidden="true">
+                  {currentUser?.photoUrl ? (
+                    <img
+                      src={currentUser.photoUrl}
+                      alt=""
+                      className="size-[30px] rounded-full object-cover ring-1 ring-sidebar-bg-2"
+                    />
+                  ) : (
+                    <span
+                      className="grid size-[30px] place-items-center rounded-full text-[11px] font-semibold text-white"
+                      style={{
+                        background: avatarBg,
+                        border: `1px solid color-mix(in oklch, ${avatarBg} 70%, black)`,
+                      }}
+                    >
+                      {avatarInitials}
+                    </span>
+                  )}
                   <span
                     className="absolute right-0 bottom-0 size-2 rounded-full ring-2 ring-sidebar-bg"
                     style={{ background: 'oklch(70% 0.18 145)' }}

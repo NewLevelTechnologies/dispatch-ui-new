@@ -323,7 +323,7 @@ export default function UsersPage() {
                       >
                         <td>
                           <div className="flex items-center gap-2.5">
-                            <Avatar name={fullName} size="sm" />
+                            <Avatar name={fullName} src={user.photoUrl ?? undefined} size="sm" />
                             <CellStack>
                               <CellTop>
                                 {fullName}
