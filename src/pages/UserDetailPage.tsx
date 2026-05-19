@@ -499,10 +499,38 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
     onError: onErrorToast('Send reset link'),
   });
 
+  // 2FA status from /users/:id/2fa/status — same shape as Amplify's
+  // fetchMFAPreference (self-user). Backend pays the Cognito call lazily
+  // when this endpoint is hit. Activity-feed refetch after a reset
+  // separately invalidates this so the row flips ON → OFF.
+  const { data: mfa } = useQuery({
+    queryKey: ['user-2fa-status', userId],
+    queryFn: () => userApi.get2faStatus(userId),
+  });
+  const activeMethod: 'TOTP' | 'SMS' | 'EMAIL' | null = (() => {
+    if (!mfa) return null;
+    const enabled = mfa.enabled ?? [];
+    const preferred = mfa.preferred;
+    const pick = (m: 'TOTP' | 'SMS' | 'EMAIL') =>
+      enabled.includes(m) || preferred === m;
+    if (pick('TOTP')) return 'TOTP';
+    if (pick('SMS')) return 'SMS';
+    if (pick('EMAIL')) return 'EMAIL';
+    return null;
+  })();
+  const twofaOn = activeMethod !== null;
+  const twofaMethodLabel = (() => {
+    if (activeMethod === 'SMS') return 'Text message';
+    if (activeMethod === 'EMAIL') return 'Email';
+    if (activeMethod === 'TOTP') return 'Authenticator app';
+    return null;
+  })();
+
   const resetMfaMutation = useMutation({
     mutationFn: () => userApi.resetMfa(userId),
     onSuccess: () => {
       refetchActivitySoon();
+      queryClient.invalidateQueries({ queryKey: ['user-2fa-status', userId] });
       showSuccess('2FA reset', 'User has been signed out of all sessions.');
     },
     onError: onErrorToast('Reset 2FA'),
@@ -542,73 +570,83 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
     else if (pendingConfirm === 'signOut') signOutMutation.mutate();
   };
 
-  const items: {
-    k: string;
-    v: string;
-    hint?: string;
-    actionLabel: string;
-    pending: boolean;
-    onAction: () => void;
-    confirm?: ConfirmKind;
-  }[] = [
-    {
-      k: 'Password',
-      v: 'Managed via reset link',
-      actionLabel: resetPasswordMutation.isPending ? 'Sending…' : 'Send reset link',
-      pending: resetPasswordMutation.isPending,
-      onAction: () => resetPasswordMutation.mutate(),
-    },
-    {
-      k: 'Two-factor',
-      v: 'Managed in Cognito',
-      actionLabel: resetMfaMutation.isPending ? 'Resetting…' : 'Reset 2FA',
-      pending: resetMfaMutation.isPending,
-      // 2FA reset cascades into GLOBAL_SIGNOUT — flag that in the confirm
-      // so admins don't reset MFA expecting sessions to keep working.
-      confirm: 'resetMfa',
-      onAction: () => resetMfaMutation.mutate(),
-    },
-    {
-      k: 'Sign-in',
-      v: 'Email + password',
-      hint: 'Existing sessions end within 15 min (access-token TTL). Refresh is revoked immediately.',
-      actionLabel: signOutMutation.isPending ? 'Signing out…' : 'Sign out everywhere',
-      pending: signOutMutation.isPending,
-      confirm: 'signOut',
-      onAction: () => signOutMutation.mutate(),
-    },
-  ];
-
-  const handleClick = (it: typeof items[number]) => {
-    if (it.confirm) setPendingConfirm(it.confirm);
-    else it.onAction();
-  };
-
   return (
     <Card title="Security" padding="none">
-      {items.map((it, i) => (
-        <DataRow
-          key={it.k}
-          label={it.k}
-          labelWidth={110}
-          last={i === items.length - 1}
-          action={
+      <DataRow
+        label="Password"
+        labelWidth={110}
+        action={
+          <Button
+            outline
+            size="xxs"
+            onClick={() => resetPasswordMutation.mutate()}
+            disabled={!canEdit || resetPasswordMutation.isPending}
+          >
+            {resetPasswordMutation.isPending ? 'Sending…' : 'Send reset link'}
+          </Button>
+        }
+      >
+        <Text as="div" size="sm" tone="strong">Managed via reset link</Text>
+      </DataRow>
+
+      {/* Two-factor — status pulled from /users/:id/2fa/status. ON shows
+          the green pill + method label and keeps the Reset 2FA action;
+          OFF shows dim "Not enrolled" and hides the action (nothing to
+          reset). Mirrors AccountSettingsPage's self-user 2FA-on row. */}
+      <DataRow
+        label="Two-factor"
+        labelWidth={110}
+        action={
+          twofaOn ? (
             <Button
               outline
               size="xxs"
-              onClick={() => handleClick(it)}
-              disabled={!canEdit || it.pending}
+              onClick={() => setPendingConfirm('resetMfa')}
+              disabled={!canEdit || resetMfaMutation.isPending}
             >
-              {it.actionLabel}
+              {resetMfaMutation.isPending ? 'Resetting…' : 'Reset 2FA'}
             </Button>
-          }
-        >
-          <Text as="div" size="sm" tone="strong">{it.v}</Text>
-          {it.hint && (
-            <div className="mt-0.5 text-[10.5px] leading-snug text-fg-dim">{it.hint}</div>
-          )}
-        </DataRow>
-      ))}
+          ) : null
+        }
+      >
+        {twofaOn ? (
+          <div className="flex items-center gap-2">
+            {/* TODO(design-system): replace inline "ON" pill with
+                `<Badge color="green" size="xs">` once Badge gains an
+                xs size variant. Mirrors AccountSettingsPage. */}
+            <span className="inline-flex items-center rounded-[4px] bg-success-500/14 px-2 py-0.5 text-[11px] font-bold tracking-wider text-success-500">
+              <span className="mr-1">●</span>
+              ON
+            </span>
+            {twofaMethodLabel && (
+              <Text as="span" size="sm" tone="strong">{twofaMethodLabel}</Text>
+            )}
+          </div>
+        ) : (
+          <Text as="div" size="sm" tone="muted">Not enrolled</Text>
+        )}
+      </DataRow>
+
+      <DataRow
+        label="Sign-in"
+        labelWidth={110}
+        last
+        action={
+          <Button
+            outline
+            size="xxs"
+            onClick={() => setPendingConfirm('signOut')}
+            disabled={!canEdit || signOutMutation.isPending}
+          >
+            {signOutMutation.isPending ? 'Signing out…' : 'Sign out everywhere'}
+          </Button>
+        }
+      >
+        <Text as="div" size="sm" tone="strong">Email + password</Text>
+        <div className="mt-0.5 text-[10.5px] leading-snug text-fg-dim">
+          Existing sessions end within 15 min (access-token TTL). Refresh is revoked immediately.
+        </div>
+      </DataRow>
       <ConfirmDialog
         isOpen={pendingConfirm !== null}
         onClose={() => setPendingConfirm(null)}
@@ -709,6 +747,14 @@ function classifyEvent(event: AccountActivityEvent): {
       return { kind: 'security', text: 'Password reset link sent' };
     case 'MFA_RESET':
       return { kind: 'security', text: '2FA reset' };
+    case 'TWO_FA_ENABLED': {
+      const p = (event.payload ?? {}) as { method?: unknown };
+      const method = typeof p.method === 'string' ? p.method : null;
+      return {
+        kind: 'security',
+        text: method ? `2FA enabled (${method})` : '2FA enabled',
+      };
+    }
     case 'GLOBAL_SIGNOUT':
       return { kind: 'security', text: 'Signed out of all sessions' };
     case 'SIGN_IN_SUCCESS': {
