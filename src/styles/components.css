@@ -129,6 +129,122 @@
   letter-spacing: normal;
 }
 
+/* ── ToggleGroup — segmented single-choice control ───────────────
+   For preference rows (Theme / Accent / display density) and any other
+   "pick one of N" surface where a `<select>` would feel heavy and a
+   bare `<Button color="accent-soft">` toggle reads too loud. Built on
+   Headless `<RadioGroup>` so keyboard nav and aria are handled.
+   Active option uses a raised inner pill (`--bg-elev` over the
+   recessed `--bg-elev-2` container) — explicitly NOT a saturated
+   accent fill, which is the original mistake we're walking back. */
+.toggle-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border-soft);
+}
+.toggle-group-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-muted);
+  cursor: pointer;
+  border: 1px solid transparent;
+  user-select: none;
+  transition: background 80ms ease, color 80ms ease, border-color 80ms ease;
+}
+.toggle-group-option:hover { background: var(--bg-hover); color: var(--fg); }
+.toggle-group-option[data-checked] {
+  background: var(--bg-elev);
+  color: var(--fg-strong);
+  border-color: var(--border);
+  box-shadow: 0 1px 2px color-mix(in oklch, var(--fg-strong) 8%, transparent);
+}
+.toggle-group-option[data-checked]:hover { background: var(--bg-elev); }
+.toggle-group-option:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 1px;
+}
+
+/* ── Badge — accent variant ──────────────────────────────────────
+   The Catalyst Badge ships with a flat Tailwind-token palette. Our
+   accent variant follows the same color-mix tint convention as
+   `.pill.accent` and `.callout.accent` so brand-tinted surfaces stay
+   visually consistent across primitives and re-tint per tenant
+   (warm orange in the default theme, cool teal in the dark theme).
+
+   Font-weight drops to 400 here — at size="xs" with dozens of
+   capability chips on screen, font-medium adds too much visual
+   weight. */
+.badge-accent {
+  background: color-mix(in oklch, var(--accent-500) 8%, var(--bg-elev-2));
+  border: 1px solid color-mix(in oklch, var(--accent-500) 22%, var(--border));
+  color: var(--fg-strong);
+  font-weight: 400;
+}
+.badge-accent:hover {
+  background: color-mix(in oklch, var(--accent-500) 14%, var(--bg-elev-2));
+}
+
+/* ── Callout — highlighted info block ────────────────────────────
+   Container shape used wherever we surface a "tinted box with optional
+   icon + title + body + action": region warnings, page error states,
+   the 2FA-OFF CTA, LifecycleFooter, manual-secret card in the 2FA
+   wizard. Same tint-percentage convention as `.pill` (~7% bg, ~25%
+   border) so the two primitives stay visually consistent when adjacent
+   on a page. */
+.callout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  font-size: 12px;
+}
+.callout-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--fg-muted);
+}
+.callout-body { min-width: 0; flex: 1; }
+.callout-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--fg-strong);
+}
+.callout-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fg-muted);
+}
+.callout-title + .callout-text { margin-top: 2px; }
+.callout-action { flex-shrink: 0; }
+
+.callout.info    { background: color-mix(in oklch, var(--info-500)    7%, var(--bg-elev)); border-color: color-mix(in oklch, var(--info-500)    25%, var(--border)); }
+.callout.info    .callout-icon { color: var(--info-500); }
+.callout.success { background: color-mix(in oklch, var(--success-500) 7%, var(--bg-elev)); border-color: color-mix(in oklch, var(--success-500) 25%, var(--border)); }
+.callout.success .callout-icon { color: var(--success-500); }
+.callout.warning { background: color-mix(in oklch, var(--warning-500) 8%, var(--bg-elev)); border-color: color-mix(in oklch, var(--warning-500) 28%, var(--border)); }
+.callout.warning .callout-icon { color: oklch(50% 0.16 78); }
+.theme-dark .callout.warning .callout-icon { color: var(--warning-500); }
+.callout.danger  { background: color-mix(in oklch, var(--danger-500)  6%, var(--bg-elev)); border-color: color-mix(in oklch, var(--danger-500)  25%, var(--border)); }
+.callout.danger  .callout-icon { color: var(--danger-500); }
+.callout.danger  .callout-title { color: var(--danger-500); }
+.callout.accent  { background: color-mix(in oklch, var(--accent-500)  6%, var(--bg-elev)); border-color: color-mix(in oklch, var(--accent-500)  22%, var(--border)); }
+.callout.accent  .callout-icon { color: var(--accent-500); }
+/* neutral keeps the base tokens — same look as bg-elev cards on the page. */
+
 /* Square tag — for monospace codes in table cells */
 .tag {
   display: inline-flex;

@@ -4,6 +4,12 @@ import React, { forwardRef } from 'react'
 import { TouchTarget } from './button'
 import { Link } from './link'
 
+// `accent` follows the app's brand accent CSS variable (warm orange in the
+// default theme, cool teal in the dark theme, re-tintable per tenant).
+// Styles live in components.css as `.badge-accent` — arbitrary
+// color-mix values in className strings don't survive Tailwind's
+// scanner reliably, and `.pill.accent` / `.callout.accent` already use
+// the CSS-class convention so this stays consistent.
 const colors = {
   red: 'bg-red-500/15 text-red-700 group-data-hover:bg-red-500/25 dark:bg-red-500/10 dark:text-red-400 dark:group-data-hover:bg-red-500/20',
   orange:
@@ -32,17 +38,37 @@ const colors = {
   pink: 'bg-pink-400/15 text-pink-700 group-data-hover:bg-pink-400/25 dark:bg-pink-400/10 dark:text-pink-400 dark:group-data-hover:bg-pink-400/20',
   rose: 'bg-rose-400/15 text-rose-700 group-data-hover:bg-rose-400/25 dark:bg-rose-400/10 dark:text-rose-400 dark:group-data-hover:bg-rose-400/20',
   zinc: 'bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10',
+  accent: 'badge-accent',
 }
 
-type BadgeProps = { color?: keyof typeof colors }
+type BadgeColor = keyof typeof colors
+type BadgeSize = 'xs' | 'sm'
 
-export function Badge({ color = 'zinc', className, ...props }: BadgeProps & React.ComponentPropsWithoutRef<'span'>) {
+const sizes: Record<BadgeSize, string> = {
+  // Default size — `text-sm/5 ... sm:text-xs/5` to match the original Catalyst Badge.
+  sm: 'gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5',
+  // xs — tighter type/padding/radius for high-density rows like capability tags.
+  // No font-medium: at this scale with 30–60+ chips on screen, the bolder
+  // weight from sm would over-weight the page. Callers that need it can
+  // pass a `font-medium` className override.
+  xs: 'gap-x-1 rounded-[4px] px-[7px] py-[2px] text-[10.5px] leading-[1.5]',
+}
+
+type BadgeProps = { color?: BadgeColor; size?: BadgeSize }
+
+export function Badge({
+  color = 'zinc',
+  size = 'sm',
+  className,
+  ...props
+}: BadgeProps & React.ComponentPropsWithoutRef<'span'>) {
   return (
     <span
       {...props}
       className={clsx(
         className,
-        'inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline',
+        'inline-flex items-center forced-colors:outline',
+        sizes[size],
         colors[color]
       )}
     />
@@ -52,6 +78,7 @@ export function Badge({ color = 'zinc', className, ...props }: BadgeProps & Reac
 export const BadgeButton = forwardRef(function BadgeButton(
   {
     color = 'zinc',
+    size = 'sm',
     className,
     children,
     ...props
@@ -69,13 +96,13 @@ export const BadgeButton = forwardRef(function BadgeButton(
   return typeof props.href === 'string' ? (
     <Link {...props} className={classes} ref={ref as React.ForwardedRef<HTMLAnchorElement>}>
       <TouchTarget>
-        <Badge color={color}>{children}</Badge>
+        <Badge color={color} size={size}>{children}</Badge>
       </TouchTarget>
     </Link>
   ) : (
     <Headless.Button {...props} className={classes} ref={ref}>
       <TouchTarget>
-        <Badge color={color}>{children}</Badge>
+        <Badge color={color} size={size}>{children}</Badge>
       </TouchTarget>
     </Headless.Button>
   )

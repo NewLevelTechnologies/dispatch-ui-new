@@ -14,7 +14,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { Pill } from '../components/ui/Pill';
 import { RoleChip } from '../components/RoleChip';
 import { Card, CardBody } from '../components/ui/Card';
-import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
+import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../components/ui/DenseTable';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
@@ -295,17 +295,17 @@ export default function UsersPage() {
                         <td>
                           <div className="flex items-center gap-2.5">
                             <Avatar name={fullName} size="sm" />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="strong truncate">{fullName}</span>
+                            <CellStack>
+                              <CellTop>
+                                {fullName}
                                 {isMe && (
-                                  <span className="inline-flex items-center rounded bg-bg-active px-1 py-[1px] text-[9px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
+                                  <span className="ml-1.5 inline-flex items-center rounded bg-bg-active px-1 py-[1px] align-middle text-[9px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
                                     {t('users.table.you')}
                                   </span>
                                 )}
-                              </div>
-                              <div className="muted truncate">{user.email}</div>
-                            </div>
+                              </CellTop>
+                              <CellSub>{user.email}</CellSub>
+                            </CellStack>
                           </div>
                         </td>
                         <td>

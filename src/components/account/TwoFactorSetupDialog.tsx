@@ -6,20 +6,14 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Dialog } from '../catalyst/dialog';
 import { Button } from '../catalyst/button';
 import { ErrorMessage } from '../catalyst/fieldset';
+import { Callout } from '../ui/Callout';
+import { OtpInput, type OtpInputHandle } from '../ui/OtpInput';
+import { WizardHeader } from '../ui/WizardHeader';
 import { ShieldCheckIcon } from '@heroicons/react/24/outline';
 
 // Phase 1: TOTP-only wizard, Amplify-direct. When backend ships
 // /auth/2fa/* endpoints, we add a step 1 method picker (TOTP/SMS/Email)
 // in front of this, plus a step 3 for server-issued recovery codes.
-//
-// TODO(design-system): pull three primitives out of this file once they exist:
-//   · `<WizardHeader title icon step totalSteps />` for the step-pip header.
-//   · `<OtpInput value onChange length={6} />` for the verify-code boxes —
-//     also reused on Amplify's MFA challenge and the future SMS / Email /
-//     recovery-code-signin flows.
-//   · `<Callout kind="info">` for the manual-secret card here, the future
-//     Email-warning card, and the recovery-codes "save these somewhere safe"
-//     notice.
 
 type Step = 'qr' | 'verify';
 
@@ -35,11 +29,11 @@ export default function TwoFactorSetupDialog({ isOpen, onClose, onEnabled, email
   const [step, setStep] = useState<Step>('qr');
   const [setupUri, setSetupUri] = useState<string>('');
   const [secret, setSecret] = useState<string>('');
-  const [code, setCode] = useState<string[]>(['', '', '', '', '', '']);
+  const [code, setCode] = useState<string>('');
   const [verifyError, setVerifyError] = useState<string>('');
   const [setupError, setSetupError] = useState<string>('');
 
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const otpRef = useRef<OtpInputHandle>(null);
 
   // Kick off Amplify TOTP setup when the dialog opens. setUpTOTP returns
   // a sharedSecret + a getSetupUri helper that produces the otpauth:// URI
@@ -51,7 +45,7 @@ export default function TwoFactorSetupDialog({ isOpen, onClose, onEnabled, email
     if (!isOpen) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStep('qr');
-    setCode(['', '', '', '', '', '']);
+    setCode('');
     setVerifyError('');
     setSetupError('');
     setSetupUri('');
@@ -87,47 +81,17 @@ export default function TwoFactorSetupDialog({ isOpen, onClose, onEnabled, email
     },
     onError: (err: Error) => {
       setVerifyError(err.message || t('account.twoFactorSetup.errorVerify'));
-      setCode(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
+      setCode('');
+      otpRef.current?.focus();
     },
   });
 
-  const handleDigit = (idx: number, value: string) => {
-    // Paste of full code into first box: split it across the boxes.
-    if (value.length > 1) {
-      const digits = value.replace(/\D/g, '').slice(0, 6).split('');
-      const next = [...code];
-      for (let i = 0; i < 6; i++) next[i] = digits[i] ?? '';
-      setCode(next);
-      const lastFilled = Math.min(digits.length, 6) - 1;
-      if (lastFilled >= 0 && lastFilled < 5) inputRefs.current[lastFilled + 1]?.focus();
-      else inputRefs.current[5]?.blur();
-      return;
-    }
-    const digit = value.replace(/\D/g, '').slice(0, 1);
-    const next = [...code];
-    next[idx] = digit;
-    setCode(next);
-    if (digit && idx < 5) inputRefs.current[idx + 1]?.focus();
-  };
-
-  const handleKeyDown = (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !code[idx] && idx > 0) {
-      inputRefs.current[idx - 1]?.focus();
-    } else if (e.key === 'ArrowLeft' && idx > 0) {
-      inputRefs.current[idx - 1]?.focus();
-    } else if (e.key === 'ArrowRight' && idx < 5) {
-      inputRefs.current[idx + 1]?.focus();
-    }
-  };
-
-  const fullCode = code.join('');
-  const codeReady = fullCode.length === 6;
+  const codeReady = code.length === 6;
 
   const submitCode = () => {
     if (!codeReady || enableMutation.isPending) return;
     setVerifyError('');
-    enableMutation.mutate(fullCode);
+    enableMutation.mutate(code);
   };
 
   // Step-pip indicator. 2 steps for now; expands when method picker +
@@ -138,36 +102,12 @@ export default function TwoFactorSetupDialog({ isOpen, onClose, onEnabled, email
   return (
     <Dialog open={isOpen} onClose={onClose} size="md" padding="none">
       <div>
-        {/* Header with step pips */}
-        <div className="flex items-center justify-between border-b border-border-soft bg-bg-elev-2 px-5 py-3">
-          <div className="flex items-center gap-2">
-            <span className="grid size-[22px] place-items-center rounded-[5px] bg-accent-500 text-white">
-              <ShieldCheckIcon className="size-3" />
-            </span>
-            <span className="text-[12.5px] font-semibold text-fg-strong">
-              {t('account.twoFactorSetup.title')}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: totalSteps }).map((_, i) => {
-              const pos = i + 1;
-              const active = pos === stepIndex;
-              const done = pos < stepIndex;
-              return (
-                <span
-                  key={i}
-                  className={`h-[6px] rounded-[3px] transition-[width] duration-200 ${
-                    active || done ? 'bg-accent-500' : 'bg-bg-active'
-                  }`}
-                  style={{ width: active ? 18 : 6 }}
-                />
-              );
-            })}
-            <span className="ml-2 text-[10.5px] text-fg-dim">
-              {stepIndex}/{totalSteps}
-            </span>
-          </div>
-        </div>
+        <WizardHeader
+          title={t('account.twoFactorSetup.title')}
+          icon={<ShieldCheckIcon className="size-3" />}
+          step={stepIndex}
+          totalSteps={totalSteps}
+        />
 
         {/* Body */}
         {step === 'qr' ? (
@@ -191,14 +131,16 @@ export default function TwoFactorSetupDialog({ isOpen, onClose, onEnabled, email
               </div>
             </div>
 
-            <div className="mt-4 rounded-md border border-border-soft bg-bg-elev-2 px-3 py-2.5">
-              <div className="mb-1 text-[10.5px] font-semibold text-fg-muted">
-                {t('account.twoFactorSetup.manualLabel')}
-              </div>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 truncate font-mono text-[12px] tracking-wider text-fg-strong">
-                  {secret || '••••••••••••••••'}
-                </code>
+            <Callout
+              kind="neutral"
+              icon={null}
+              className="mt-4"
+              title={
+                <span className="text-[10.5px] font-semibold tracking-wider text-fg-muted uppercase">
+                  {t('account.twoFactorSetup.manualLabel')}
+                </span>
+              }
+              action={
                 <Button
                   outline
                   size="xs"
@@ -208,8 +150,12 @@ export default function TwoFactorSetupDialog({ isOpen, onClose, onEnabled, email
                 >
                   {t('account.twoFactorSetup.copy')}
                 </Button>
-              </div>
-            </div>
+              }
+            >
+              <code className="block truncate font-mono text-[12px] tracking-wider text-fg-strong">
+                {secret || '••••••••••••••••'}
+              </code>
+            </Callout>
 
             {setupError && (
               <ErrorMessage size="xs" className="mt-3">
@@ -226,27 +172,21 @@ export default function TwoFactorSetupDialog({ isOpen, onClose, onEnabled, email
               {t('account.twoFactorSetup.verifyDescription')}
             </p>
 
-            {/* TODO(design-system): extract into `<OtpInput value onChange
-                length={6} />` — same component will back the SMS/Email verify
-                steps and the Amplify MFA challenge "use recovery code" path. */}
             <div className="mt-5 flex justify-center">
-              <div className="flex gap-1.5">
-                {code.map((d, i) => (
-                  <input
-                    key={i}
-                    ref={(el) => {
-                      inputRefs.current[i] = el;
-                    }}
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={i === 0 ? 6 : 1}
-                    value={d}
-                    onChange={(e) => handleDigit(i, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(i, e)}
-                    className="h-[50px] w-[42px] rounded-md border-[1.5px] border-border bg-bg-elev text-center font-mono text-[22px] font-semibold text-fg-strong outline-none focus:border-accent-500 focus:ring-3 focus:ring-accent-500/20"
-                  />
-                ))}
-              </div>
+              <OtpInput
+                ref={otpRef}
+                length={6}
+                value={code}
+                onChange={setCode}
+                onComplete={(v) => {
+                  if (!enableMutation.isPending) {
+                    setVerifyError('');
+                    enableMutation.mutate(v);
+                  }
+                }}
+                autoFocus
+                ariaLabel={t('account.twoFactorSetup.verifyTitle')}
+              />
             </div>
 
             {verifyError && (
