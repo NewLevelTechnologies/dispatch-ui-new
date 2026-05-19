@@ -193,7 +193,7 @@ function ProfileCard({ user }: { user: User }) {
           aligned to the right so they don't crash into the name. ≥sm reverts
           to a single horizontal row. */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <div className="flex min-w-0 items-center gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-4">
           {/* TODO(design-system): replace this tinted-initials block with a
               Catalyst `<Avatar>` extension that supports a deterministic
               tinted background (currently Avatar takes a src; we need a
