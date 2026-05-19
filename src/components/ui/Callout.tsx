@@ -33,6 +33,11 @@
 //   The outer row is `align-items: center`, so the action button stays
 //   vertically centered with the full content block — not pinned to the
 //   title row when the body wraps to multiple lines.
+//
+// Responsive: at ≥640px renders as a single row with the action at the
+// trailing edge. Below 640px the action drops to its own full-width row
+// below the body, and the icon top-aligns with the title row so it
+// doesn't appear orphaned against the taller stacked content.
 // ─────────────────────────────────────────────────────────────────
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import clsx from 'clsx';

@@ -203,7 +203,7 @@ export default function UsersPage() {
         sub={userSubtitle}
         actions={
           canInviteUsers ? (
-            <Button color="accent" onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.user') })}</Button>
+            <Button color="accent" size="xs" onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.user') })}</Button>
           ) : null
         }
       />

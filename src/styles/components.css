@@ -202,6 +202,7 @@
    on a page. */
 .callout {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
@@ -230,6 +231,22 @@
 }
 .callout-title + .callout-text { margin-top: 2px; }
 .callout-action { flex-shrink: 0; }
+
+/* Mobile reflow: action drops below body as a full-width row; icon
+   top-aligns so it sits with the title row rather than centering against
+   the taller title+body+action stack (the "orphaned icon" symptom). */
+@media (max-width: 639.98px) {
+  .callout {
+    align-items: flex-start;
+    row-gap: 10px;
+  }
+  .callout-action {
+    flex-basis: 100%;
+  }
+  .callout-action > * {
+    width: 100%;
+  }
+}
 
 .callout.info    { background: color-mix(in oklch, var(--info-500)    7%, var(--bg-elev)); border-color: color-mix(in oklch, var(--info-500)    25%, var(--border)); }
 .callout.info    .callout-icon { color: var(--info-500); }

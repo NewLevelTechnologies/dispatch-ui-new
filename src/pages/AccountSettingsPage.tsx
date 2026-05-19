@@ -36,7 +36,7 @@ export default function AccountSettingsPage() {
     <AppLayout>
       <div className="mx-auto max-w-[760px] px-1 pb-16">
         <div className="mb-5">
-          <Heading>{t('account.settings')}</Heading>
+          <Heading size="page-lg">{t('account.settings')}</Heading>
         </div>
 
         {isLoading || !currentUser ? (
@@ -136,7 +136,7 @@ function ProfileCard({ user }: { user: User }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 border-t border-border-soft pt-3.5">
+      <div className="grid grid-cols-1 gap-3 border-t border-border-soft pt-3.5 sm:grid-cols-2">
         <Field size="xs">
           <Label size="xs">First name</Label>
           <Input size="xs" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
