@@ -29,6 +29,19 @@ export interface User {
   updatedAt: string;
 }
 
+// Reference to a role that owns a given accent id. Used by `colorsInUse`
+// maps on both the list and detail role responses. The form's color picker
+// reads this to dim/disable swatches already claimed by other roles.
+export interface AccentInUseRef {
+  roleId: string;
+  roleName: string;
+}
+
+// Map of accent id → owning role. Returned by both list and detail role
+// endpoints. On the detail response, the role being edited is included; the
+// FE filters it out client-side so the user can keep their existing color.
+export type ColorsInUseMap = Record<string, AccentInUseRef>;
+
 export interface Role {
   id: string;
   name: string;
@@ -37,8 +50,28 @@ export interface Role {
   isProtected?: boolean;
   isSystemRole?: boolean;
   systemRoleCode?: string;
+  // Persisted accent token id ("orange" | "amber" | "green" | "teal" | "blue"
+  // | "indigo" | "violet" | "pink" | "red" | "slate"). Resolves to an oklch
+  // value via `utils/roleColor.ts#roleAccent`. Optional because cloned roles
+  // may ship with `null` until the admin picks a color on the edit page.
+  accentId?: string | null;
+  // Present on the detail response (`GET /users/roles/{id}`). Absent on
+  // list-response role entries — fetch the list separately to get its map.
+  colorsInUse?: ColorsInUseMap;
   createdAt?: string;
   updatedAt?: string;
+}
+
+// Roles list response (`GET /users/roles`) — wrapped now that the BE ships
+// `totals` and `colorsInUse` alongside the roles array. Older call sites
+// that only need the array call `userApi.getRoles()` which unwraps.
+export interface RolesListResponse {
+  roles: Role[];
+  totals?: {
+    totalCapabilities?: number;
+    totalUsers?: number;
+  };
+  colorsInUse?: ColorsInUseMap;
 }
 
 export interface Capability {
@@ -89,11 +122,13 @@ export interface CreateRoleRequest {
   name: string;
   description?: string;
   capabilities: string[];
+  accentId?: string;
 }
 
 export interface UpdateRoleRequest {
   name: string;
   description?: string;
+  accentId?: string;
 }
 
 export interface UpdateRoleCapabilitiesRequest {
@@ -104,6 +139,22 @@ export interface RestoreAllDefaultsResponse {
   restoredRoles: Role[];
   recreatedRoles: Role[];
   preservedCustomRoles: Role[];
+}
+
+// Members of a role — surfaces on the role detail page Members card.
+// `title` is the user's primary role name (first entry in `User.roles`)
+// for now; the backend may add a dedicated job-title field later.
+export interface RoleMember {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  title: string;
+  photoUrl?: string | null;
+}
+
+export interface RoleMembersResponse {
+  users: RoleMember[];
 }
 
 // Admin-facing 2FA status for the User Detail Security card. Mirrors the
@@ -141,8 +192,23 @@ export const userApi = {
     return response.data;
   },
 
+  // Flat-array convenience reader for callers that only need the role list
+  // (UsersPage, RoleFormPage's Start-from chips, UserFormPage). Unwraps the
+  // new envelope. Use `listRoles()` instead when you also need `colorsInUse`
+  // or `totals`.
   getRoles: async (): Promise<Role[]> => {
-    const response = await apiClient.get<Role[]>('/users/roles');
+    const response = await apiClient.get<RolesListResponse | Role[]>('/users/roles');
+    // BE shipped the wrapped shape, but tolerate the legacy flat array in
+    // case a deployment lag puts us on an older server briefly.
+    if (Array.isArray(response.data)) return response.data;
+    return response.data.roles ?? [];
+  },
+
+  // Full envelope for callers that need `colorsInUse` (RoleFormPage color
+  // picker in add mode) or future `totals` (RolesPage summary strip).
+  listRoles: async (): Promise<RolesListResponse> => {
+    const response = await apiClient.get<RolesListResponse | Role[]>('/users/roles');
+    if (Array.isArray(response.data)) return { roles: response.data };
     return response.data;
   },
 
@@ -274,6 +340,15 @@ export const userApi = {
   restoreAllDefaults: async (): Promise<RestoreAllDefaultsResponse> => {
     const response = await apiClient.post<RestoreAllDefaultsResponse>('/users/roles/restore-all-defaults');
     return response.data;
+  },
+
+  // TODO: backend not built. Swap the body for
+  //   const r = await apiClient.get<RoleMembersResponse>(`/users/roles/${id}/members`);
+  //   return r.data;
+  // once GET /users/roles/{id}/members lands. UI renders the empty state in the meantime.
+  listRoleMembers: async (id: string): Promise<RoleMembersResponse> => {
+    void id;
+    return { users: [] };
   },
 
   // Audit log

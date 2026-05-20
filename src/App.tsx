@@ -32,6 +32,7 @@ import UserDetailPage from './pages/UserDetailPage';
 import { UserInvitePage, UserEditPage } from './pages/UserFormPage';
 import RolesPage from './pages/RolesPage';
 import RoleDetailPage from './pages/RoleDetailPage';
+import { RoleAddPage, RoleEditPage } from './pages/RoleFormPage';
 import SettingsLayout from './pages/settings/SettingsLayout';
 import CompanyProfilePanel from './pages/settings/CompanyProfilePanel';
 import BusinessDefaultsPanel from './pages/settings/BusinessDefaultsPanel';
@@ -204,7 +205,9 @@ function App() {
         <Route path="access/users/:id" element={<UserDetailPage />} />
         <Route path="access/users/:id/edit" element={<UserEditPage />} />
         <Route path="access/roles" element={<RolesPage />} />
+        <Route path="access/roles/new" element={<RoleAddPage />} />
         <Route path="access/roles/:id" element={<RoleDetailPage />} />
+        <Route path="access/roles/:id/edit" element={<RoleEditPage />} />
       </Route>
       <Route path="/account/settings" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AccountSettingsPage />} />} />
       <Route

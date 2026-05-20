@@ -13,6 +13,7 @@ import type React from 'react'
 export function Card({
   title,
   subtitle,
+  action,
   footer,
   padding = 'default',
   className,
@@ -20,6 +21,11 @@ export function Card({
 }: {
   title?: React.ReactNode
   subtitle?: React.ReactNode
+  // Trailing slot on the header row (right of title/subtitle). Used for the
+  // header-aligned filter input + "Clear all" on the Roles form's
+  // Capabilities card. Header layout becomes a flex row with the action
+  // pushed to the end. Omit when not needed — header is then a single block.
+  action?: React.ReactNode
   // Rendered below the body without padding — consumer brings its own
   // divider/background. Used for expandable detail panels that need to span
   // edge-to-edge inside the card border.
@@ -30,13 +36,16 @@ export function Card({
   className?: string
   children: React.ReactNode
 }) {
-  const hasHeader = title || subtitle
+  const hasHeader = title || subtitle || action
   return (
     <div className={clsx(className, 'rounded-[10px] border border-border bg-bg-elev')}>
       {hasHeader && (
-        <div className="border-b border-border-soft px-3.5 py-2.5">
-          {title && <div className="text-[13px] font-semibold text-fg-strong">{title}</div>}
-          {subtitle && <div className="mt-0.5 text-[11px] text-fg-muted">{subtitle}</div>}
+        <div className="flex items-start justify-between gap-2.5 border-b border-border-soft px-3.5 py-2.5">
+          <div className="min-w-0 flex-1">
+            {title && <div className="text-[13px] font-semibold text-fg-strong">{title}</div>}
+            {subtitle && <div className="mt-0.5 text-[11px] text-fg-muted">{subtitle}</div>}
+          </div>
+          {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
         </div>
       )}
       <div className={padding === 'none' ? undefined : 'p-3.5'}>{children}</div>

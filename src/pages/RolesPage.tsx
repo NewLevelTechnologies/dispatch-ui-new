@@ -1,47 +1,124 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, ArrowPathIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import IconButton from '../components/IconButton';
 import { userApi, type Role, type RestoreAllDefaultsResponse } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
-import RoleFormDialog from '../components/RoleFormDialog';
 import { Button } from '../components/catalyst/button';
-import { Input, InputGroup } from '../components/catalyst/input';
-import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownItem,
+  DropdownLabel,
+  DropdownMenu,
+} from '../components/catalyst/dropdown';
 import { Alert, AlertActions, AlertDescription, AlertTitle } from '../components/catalyst/alert';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { Pill } from '../components/ui/Pill';
 import { Card, CardBody } from '../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import { PageHead } from '../components/ui/PageHead';
-import { SettingsListFooter } from '../components/settings/SettingsListFooter';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { LoadingState } from '../components/ui/LoadingState';
+import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
+import { roleColor } from '../utils/roleColor';
+import { showError, showSuccess, extractApiError } from '../lib/toast';
+
+type TypeFilter = 'builtin' | 'custom' | '';
+type HasUsersFilter = 'yes' | 'no' | '';
+
+function formatDate(value?: string): string {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
 
 export default function RolesPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
-  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // URL-synced filters. Empty strings encode "no filter" so callers can compare
+  // cleanly without optional chaining on null.
+  const urlSearch = searchParams.get('search') ?? '';
+  const typeFilter = (searchParams.get('type') ?? '') as TypeFilter;
+  const hasUsersFilter = (searchParams.get('hasUsers') ?? '') as HasUsersFilter;
+
+  const [searchQuery, setSearchQuery] = useState(urlSearch);
+  useEffect(() => {
+    setSearchQuery(urlSearch);
+  }, [urlSearch]);
+
+  const updateFilters = (updates: {
+    search?: string;
+    type?: TypeFilter;
+    hasUsers?: HasUsersFilter;
+  }) => {
+    const next = new URLSearchParams(searchParams);
+    if (updates.search !== undefined) {
+      if (updates.search) next.set('search', updates.search);
+      else next.delete('search');
+    }
+    if (updates.type !== undefined) {
+      if (updates.type) next.set('type', updates.type);
+      else next.delete('type');
+    }
+    if (updates.hasUsers !== undefined) {
+      if (updates.hasUsers) next.set('hasUsers', updates.hasUsers);
+      else next.delete('hasUsers');
+    }
+    setSearchParams(next, { replace: updates.search !== undefined });
+  };
+
+  // Local state — pending action targets.
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
   const [isRestoreAllAlertOpen, setIsRestoreAllAlertOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
-  // Permission checks
+  // Permission gates. Spec calls for a single `MANAGE_ROLES`, but the backend
+  // currently splits them — keep the existing fine-grained checks.
   const canCreateRoles = useHasCapability('CREATE_ROLES');
   const canEditRoles = useHasCapability('EDIT_ROLES');
   const canDeleteRoles = useHasCapability('DELETE_ROLES');
+  const canManage = canCreateRoles || canEditRoles || canDeleteRoles;
 
-  const { data: roles, isLoading, error } = useQuery({
+  const {
+    data: roles,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ['roles'],
     queryFn: () => userApi.getRoles(),
   });
 
+  // Used for the per-row user count and the summary strip total.
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: () => userApi.getAll(),
   });
+
+  // Capability catalog drives the denominator for the per-row capability bar.
+  const { data: groupedCaps } = useQuery({
+    queryKey: ['capabilities', 'grouped'],
+    queryFn: () => userApi.getGroupedCapabilities(),
+  });
+
+  const totalCapabilities = useMemo(
+    () =>
+      (groupedCaps?.groups ?? []).reduce(
+        (sum, g) => sum + g.capabilities.length,
+        0
+      ),
+    [groupedCaps]
+  );
 
   const userCountByRole = useMemo(() => {
     const map: Record<string, number> = {};
@@ -53,19 +130,29 @@ export default function RolesPage() {
     return map;
   }, [users]);
 
+  // Mutations
   const deleteMutation = useMutation({
     mutationFn: (id: string) => userApi.deleteRole(id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
-      setIsDeleteAlertOpen(false);
+      const deleted = roles?.find((r) => r.id === id);
+      if (deleted) showSuccess(`${deleted.name} deleted`);
       setRoleToDelete(null);
     },
-    onError: (error: unknown) => {
-      const errorMessage = error instanceof Error && 'response' in error
-        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
-        : undefined;
-      alert(errorMessage || 'Failed to delete role');
+    onError: (err) =>
+      showError("Couldn't delete role", extractApiError(err) ?? (err as Error).message),
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: (role: Role) =>
+      userApi.cloneRole(role.id, { name: `${role.name} (copy)`, description: role.description }),
+    onSuccess: (newRole) => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      showSuccess(`${newRole.name} created`);
+      navigate(`/settings/access/roles/${newRole.id}/edit`);
     },
+    onError: (err) =>
+      showError("Couldn't duplicate role", extractApiError(err) ?? (err as Error).message),
   });
 
   const restoreAllMutation = useMutation({
@@ -78,107 +165,100 @@ export default function RolesPage() {
       const recreatedCount = result.recreatedRoles.length;
       const preservedCount = result.preservedCustomRoles.length;
 
-      const messages: string[] = [];
-      if (restoredCount > 0) {
-        messages.push(t('roles.restoreAllSummary.rolesReset', { count: restoredCount }));
-      }
-      if (recreatedCount > 0) {
-        messages.push(t('roles.restoreAllSummary.rolesRecreated', { count: recreatedCount }));
-      }
-      if (preservedCount > 0) {
-        messages.push(t('roles.restoreAllSummary.customRolesPreserved', { count: preservedCount }));
-      }
+      const summary: string[] = [];
+      if (restoredCount > 0)
+        summary.push(t('roles.restoreAllSummary.rolesReset', { count: restoredCount }));
+      if (recreatedCount > 0)
+        summary.push(t('roles.restoreAllSummary.rolesRecreated', { count: recreatedCount }));
+      if (preservedCount > 0)
+        summary.push(t('roles.restoreAllSummary.customRolesPreserved', { count: preservedCount }));
 
-      const summary = [
+      showSuccess(
         t('roles.actions.restoreAllDefaultsSuccess'),
-        '',
-        ...messages,
-        '',
-        t('roles.restoreAllSummary.userAssignmentsPreserved')
-      ].join('\n');
-
-      alert(summary);
+        summary.length ? summary.join(' · ') : undefined
+      );
     },
-    onError: (error: unknown) => {
-      const errorMessage = error instanceof Error && 'response' in error
-        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
-        : undefined;
-      alert(errorMessage || t('roles.actions.errorRestoreAll'));
-    },
+    onError: (err) =>
+      showError(
+        t('roles.actions.errorRestoreAll'),
+        extractApiError(err) ?? (err as Error).message
+      ),
   });
 
-  const handleAdd = () => {
-    setSelectedRole(null);
-    setIsDialogOpen(true);
-  };
-
-  const handleEdit = (role: Role) => {
-    setSelectedRole(role);
-    setIsDialogOpen(true);
-  };
-
-  const handleDelete = (role: Role) => {
-    setRoleToDelete(role);
-    setIsDeleteAlertOpen(true);
-  };
-
-  const confirmDelete = () => {
-    if (roleToDelete) {
-      deleteMutation.mutate(roleToDelete.id);
-    }
-  };
-
-  const handleRestoreAllDefaults = () => {
-    setIsRestoreAllAlertOpen(true);
-  };
-
-  const confirmRestoreAll = () => {
-    restoreAllMutation.mutate();
-  };
-
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
-    setSelectedRole(null);
-  };
-
-  // Filter roles based on search query
+  // Filter + sort. Roles come back small, all client-side.
   const filteredRoles = useMemo(() => {
     if (!roles) return [];
-    if (!searchQuery.trim()) return roles;
+    const q = searchQuery.trim().toLowerCase();
+    return roles
+      .filter((role) => {
+        if (q) {
+          const hay = `${role.name} ${role.description ?? ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        if (typeFilter === 'builtin' && !role.isProtected) return false;
+        if (typeFilter === 'custom' && role.isProtected) return false;
+        const userCount = userCountByRole[role.id] ?? 0;
+        if (hasUsersFilter === 'yes' && userCount === 0) return false;
+        if (hasUsersFilter === 'no' && userCount > 0) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const ua = userCountByRole[a.id] ?? 0;
+        const ub = userCountByRole[b.id] ?? 0;
+        if (ub !== ua) return ub - ua;
+        return a.name.localeCompare(b.name);
+      });
+  }, [roles, searchQuery, typeFilter, hasUsersFilter, userCountByRole]);
 
-    const query = searchQuery.toLowerCase();
-    return roles.filter(
-      (role) =>
-        role.name.toLowerCase().includes(query) ||
-        role.description?.toLowerCase().includes(query)
-    );
-  }, [roles, searchQuery]);
+  // Summary totals (5-cell strip).
+  const totals = useMemo(() => {
+    const all = roles ?? [];
+    const builtin = all.filter((r) => r.isProtected).length;
+    const custom = all.length - builtin;
+    const totalUsersAssigned = Object.values(userCountByRole).reduce((s, n) => s + n, 0);
+    return {
+      total: all.length,
+      builtin,
+      custom,
+      usersAssigned: totalUsersAssigned,
+      capabilities: totalCapabilities,
+    };
+  }, [roles, userCountByRole, totalCapabilities]);
 
-  const totalRoles = roles?.length ?? 0;
-  const displayedRoles = filteredRoles.length;
-  const roleSubtitle = totalRoles > 0
-    ? (displayedRoles === totalRoles
-        ? `${totalRoles.toLocaleString()} ${totalRoles === 1 ? t('entities.role').toLowerCase() : t('entities.roles').toLowerCase()}`
-        : `${displayedRoles} of ${totalRoles} ${t('entities.roles').toLowerCase()}`)
-    : null;
+  const hasFilters = Boolean(searchQuery || typeFilter || hasUsersFilter);
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSearchParams(new URLSearchParams(), { replace: false });
+  };
+
+  const builtinPresent = (roles ?? []).some((r) => r.isProtected);
 
   return (
     <div>
       <PageHead
         title={t('entities.roles')}
-        sub={roleSubtitle}
+        sub={t('roles.description')}
         actions={
-          (canCreateRoles || canEditRoles) ? (
+          canManage ? (
             <>
               {canEditRoles && (
-                <Button plain onClick={handleRestoreAllDefaults} className="whitespace-nowrap">
-                  <ArrowPathIcon data-slot="icon" />
+                <Button
+                  outline
+                  size="xs"
+                  disabled={!builtinPresent}
+                  onClick={() => setIsRestoreAllAlertOpen(true)}
+                  title={
+                    !builtinPresent
+                      ? 'All built-in roles are at their defaults'
+                      : undefined
+                  }
+                >
                   {t('roles.actions.restoreAllDefaults')}
                 </Button>
               )}
               {canCreateRoles && (
-                <Button color="accent" onClick={handleAdd}>
-                  {t('common.actions.add', { entity: t('entities.role') })}
+                <Button color="accent" size="xs" href="/settings/access/roles/new">
+                  {t('common.actions.add', { entity: t('entities.role').toLowerCase() })}
                 </Button>
               )}
             </>
@@ -186,189 +266,347 @@ export default function RolesPage() {
         }
       />
 
-      <div className="mb-3 flex items-center gap-4">
-        <InputGroup className="min-w-[260px] flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </InputGroup>
+      {/* Summary strip — 5 cells, soft dividers */}
+      <div className="mb-3 grid grid-cols-5 overflow-hidden rounded-[10px] border border-border bg-bg-elev">
+        <SummaryCell label={t('roles.summary.roles')} value={totals.total} />
+        <SummaryCell label={t('roles.summary.builtIn')} value={totals.builtin} />
+        <SummaryCell label={t('roles.summary.custom')} value={totals.custom} />
+        <SummaryCell label={t('roles.summary.usersAssigned')} value={totals.usersAssigned} />
+        <SummaryCell
+          label={t('roles.summary.totalCapabilities')}
+          value={totals.capabilities}
+          last
+        />
       </div>
 
-      {isLoading && (
-        <div className="mt-4 text-center">
-          <p className="text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.loading', { entities: t('entities.roles') })}
-          </p>
-        </div>
-      )}
+      {/* Toolbar */}
+      <ListToolbar
+        search={
+          <ListSearch
+            placeholder={t('roles.search.placeholder')}
+            value={searchQuery}
+            onChange={(value) => {
+              setSearchQuery(value);
+              updateFilters({ search: value });
+            }}
+          />
+        }
+      >
+        <FilterChipListbox
+          label={t('roles.filter.type')}
+          ariaLabel={t('roles.filter.type')}
+          value={typeFilter || null}
+          displayValue={
+            typeFilter === 'builtin'
+              ? t('roles.filter.builtIn')
+              : typeFilter === 'custom'
+                ? t('roles.filter.custom')
+                : null
+          }
+          resetLabel={t('roles.filter.all')}
+          onChange={(id) => updateFilters({ type: (id ?? '') as TypeFilter })}
+          onClear={() => updateFilters({ type: '' })}
+        >
+          <ChipListboxOption value="builtin">{t('roles.filter.builtIn')}</ChipListboxOption>
+          <ChipListboxOption value="custom">{t('roles.filter.custom')}</ChipListboxOption>
+        </FilterChipListbox>
 
-      {error && (
-        <div className="mt-4 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-          <p className="text-sm text-red-800 dark:text-red-400">
-            {t('common.actions.errorLoading', { entities: t('entities.roles') })}: {(error as Error).message}
-          </p>
-        </div>
-      )}
+        <FilterChipListbox
+          label={t('roles.filter.hasUsers')}
+          ariaLabel={t('roles.filter.hasUsers')}
+          value={hasUsersFilter || null}
+          displayValue={
+            hasUsersFilter === 'yes'
+              ? t('roles.filter.yes')
+              : hasUsersFilter === 'no'
+                ? t('roles.filter.no')
+                : null
+          }
+          resetLabel={t('roles.filter.any')}
+          onChange={(id) => updateFilters({ hasUsers: (id ?? '') as HasUsersFilter })}
+          onClear={() => updateFilters({ hasUsers: '' })}
+        >
+          <ChipListboxOption value="yes">{t('roles.filter.yes')}</ChipListboxOption>
+          <ChipListboxOption value="no">{t('roles.filter.no')}</ChipListboxOption>
+        </FilterChipListbox>
 
-      {roles && roles.length === 0 && (
-        <div className="mt-4 text-center">
-          <p className="text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.notFound', { entities: t('entities.roles') })}
-          </p>
-          {canCreateRoles && (
-            <Button className="mt-4" onClick={handleAdd}>
-              {t('common.actions.addFirst', { entity: t('entities.role') })}
-            </Button>
-          )}
+        <div className="ml-auto flex items-center text-[11px] text-fg-muted">
+          {t('roles.sort.label')}{' '}
+          <span className="ml-1 font-medium text-fg-strong">{t('roles.sort.users')}</span>
         </div>
-      )}
+      </ListToolbar>
 
-      {roles && roles.length > 0 && filteredRoles.length === 0 && (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.noMatchSearch', { entities: t('entities.roles') })}
-          </p>
-        </div>
-      )}
-
-      {roles && roles.length > 0 && filteredRoles.length > 0 && (
-        <div className="mt-4">
-          <Card>
-            <CardBody flush>
+      <Card>
+        <CardBody flush>
+          {isLoading ? (
+            <LoadingState
+              label={t('common.actions.loading', { entities: t('entities.roles') })}
+            />
+          ) : error ? (
+            <ErrorState
+              title={t('common.actions.errorLoading', { entities: t('entities.roles') })}
+              description={extractApiError(error) ?? (error as Error).message}
+              action={
+                <Button outline onClick={() => refetch()}>
+                  {t('common.actions.tryAgain')}
+                </Button>
+              }
+            />
+          ) : filteredRoles.length === 0 ? (
+            hasFilters ? (
+              <EmptyState
+                icon={<ShieldCheckIcon className="size-10 text-fg-dim" />}
+                title={t('common.actions.noMatchFilters', { entities: t('entities.roles') })}
+                description={t('common.actions.tryAdjustingFilters')}
+                action={
+                  <Button outline onClick={clearFilters}>
+                    {t('roles.filter.clearFilters')}
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={<ShieldCheckIcon className="size-10 text-fg-dim" />}
+                title={t('common.actions.notFound', { entities: t('entities.roles') })}
+                action={
+                  canCreateRoles ? (
+                    <Button color="accent" size="xs" href="/settings/access/roles/new">
+                      {t('common.actions.add', { entity: t('entities.role').toLowerCase() })}
+                    </Button>
+                  ) : undefined
+                }
+              />
+            )
+          ) : (
+            <>
               <DenseTable>
                 <DenseTHead>
                   <tr>
-                    <th>{t('common.form.name')}</th>
-                    <th>{t('common.form.description')}</th>
-                    <th className="right">{t('entities.users')}</th>
-                    <th>{t('roles.table.type')}</th>
+                    <th>{t('roles.table.role')}</th>
+                    <th>{t('roles.table.description')}</th>
+                    <th className="right" style={{ width: 90 }}>
+                      {t('entities.users')}
+                    </th>
+                    <th className="right" style={{ width: 130 }}>
+                      {t('roles.table.capabilities')}
+                    </th>
+                    <th style={{ width: 110 }}>{t('roles.table.type')}</th>
+                    <th style={{ width: 110 }}>{t('roles.table.lastModified')}</th>
                     <th style={{ width: 40 }}></th>
                   </tr>
                 </DenseTHead>
                 <tbody>
                   {filteredRoles.map((role) => {
                     const userCount = userCountByRole[role.id] ?? 0;
+                    const capCount = role.capabilities?.length ?? 0;
+                    const pct =
+                      totalCapabilities > 0
+                        ? Math.round((capCount / totalCapabilities) * 100)
+                        : 0;
+                    const accent = roleColor(role.name);
                     return (
                       <DenseRow
                         key={role.id}
                         onClick={(e: React.MouseEvent) => {
                           const target = e.target as HTMLElement;
-                          if (!target.closest('[role="menu"]') && !target.closest('button[aria-label]')) {
+                          if (
+                            !target.closest('[role="menu"]') &&
+                            !target.closest('button[aria-label]')
+                          ) {
                             navigate(`/settings/access/roles/${role.id}`);
                           }
                         }}
                         className="cursor-pointer"
                       >
-                        <td className="strong">{role.name}</td>
-                        <td className="muted">{role.description || '—'}</td>
-                        <td className="right num">
-                          <span className={userCount > 0 ? 'strong' : 'text-fg-dim'}>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="size-[9px] shrink-0 rounded-full"
+                              style={{
+                                background: accent,
+                                boxShadow: `0 0 0 2px color-mix(in oklch, ${accent} 20%, transparent)`,
+                              }}
+                            />
+                            <span className="text-[13px] font-semibold text-fg-strong">
+                              {role.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="line-clamp-1 text-[12px] text-fg-muted">
+                            {role.description || '—'}
+                          </span>
+                        </td>
+                        <td className="right">
+                          <span
+                            className={
+                              userCount > 0
+                                ? 'text-[12.5px] font-semibold text-fg-strong tabular-nums'
+                                : 'text-[12.5px] text-fg-dim tabular-nums'
+                            }
+                          >
                             {userCount}
                           </span>
+                        </td>
+                        <td className="right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span className="font-mono text-[11px] text-fg-dim tabular-nums">
+                              {pct}%
+                            </span>
+                            <div className="h-1 w-[50px] overflow-hidden rounded-[2px] bg-bg-active">
+                              <div
+                                className="h-full"
+                                style={{ width: `${pct}%`, background: accent }}
+                              />
+                            </div>
+                            <span className="min-w-[30px] text-right text-[12px] font-semibold text-fg-strong tabular-nums">
+                              {capCount}
+                            </span>
+                          </div>
                         </td>
                         <td>
                           {role.isProtected ? (
                             <Pill tone="neutral">{t('roles.table.builtIn')}</Pill>
                           ) : (
-                            <Pill tone="accent">{t('roles.table.custom')}</Pill>
+                            <Pill tone="accent" dot>
+                              {t('roles.table.custom')}
+                            </Pill>
                           )}
                         </td>
+                        <td>
+                          <span className="text-[11.5px] text-fg-muted">
+                            {formatDate(role.updatedAt)}
+                          </span>
+                        </td>
                         <td className="right">
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <Dropdown>
-                              <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
-                                <EllipsisVerticalIcon className="size-4" />
-                              </DropdownButton>
-                              <DropdownMenu anchor="bottom end">
-                                {canEditRoles && !role.isProtected && (
-                                  <DropdownItem onClick={() => handleEdit(role)}>
-                                    <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                                  </DropdownItem>
-                                )}
-                                <DropdownItem onClick={() => navigate(`/settings/access/roles/${role.id}`)}>
-                                  <DropdownLabel>{t('common.view')}</DropdownLabel>
-                                </DropdownItem>
-                                {canDeleteRoles && !role.isProtected && (
-                                  <DropdownItem onClick={() => handleDelete(role)}>
-                                    <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                                  </DropdownItem>
-                                )}
-                              </DropdownMenu>
-                            </Dropdown>
-                          </div>
+                          {canManage && (
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <Dropdown>
+                                <DropdownButton
+                                  as={IconButton}
+                                  aria-label={t('common.moreOptions')}
+                                >
+                                  <EllipsisVerticalIcon className="size-4" />
+                                </DropdownButton>
+                                <DropdownMenu anchor="bottom end">
+                                  {canEditRoles && (
+                                    <DropdownItem
+                                      href={`/settings/access/roles/${role.id}/edit`}
+                                    >
+                                      <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                                    </DropdownItem>
+                                  )}
+                                  {canCreateRoles && (
+                                    <DropdownItem
+                                      onClick={() => duplicateMutation.mutate(role)}
+                                    >
+                                      <DropdownLabel>
+                                        {t('roles.actions.duplicate')}
+                                      </DropdownLabel>
+                                    </DropdownItem>
+                                  )}
+                                  {canDeleteRoles && !role.isProtected && userCount === 0 && (
+                                    <DropdownItem onClick={() => setRoleToDelete(role)}>
+                                      <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                    </DropdownItem>
+                                  )}
+                                </DropdownMenu>
+                              </Dropdown>
+                            </div>
+                          )}
                         </td>
                       </DenseRow>
                     );
                   })}
                 </tbody>
               </DenseTable>
-            </CardBody>
-            <SettingsListFooter
-              count={filteredRoles.length}
-              noun={t('entities.roles').toLowerCase()}
-              extra={(() => {
-                const customCount = filteredRoles.filter((r) => !r.isProtected).length;
-                const builtInCount = filteredRoles.length - customCount;
-                if (customCount === 0 && builtInCount === 0) return null;
-                const parts: string[] = [];
-                if (builtInCount > 0) parts.push(t('roles.breakdown.builtIn', { count: builtInCount }));
-                if (customCount > 0) parts.push(t('roles.breakdown.custom', { count: customCount }));
-                return <span>{parts.join(' · ')}</span>;
-              })()}
-            />
-          </Card>
-        </div>
-      )}
+              <div className="flex items-center gap-2 border-t border-border-soft bg-bg-elev-2 px-4 py-2 text-[11.5px] text-fg-muted">
+                <span>
+                  {t('settings.showingCount', {
+                    count: filteredRoles.length,
+                    noun: t('entities.roles').toLowerCase(),
+                  })}{' '}
+                  ·{' '}
+                  {t('roles.breakdown.builtIn', {
+                    count: filteredRoles.filter((r) => r.isProtected).length,
+                  })}{' '}
+                  ·{' '}
+                  {t('roles.breakdown.custom', {
+                    count: filteredRoles.filter((r) => !r.isProtected).length,
+                  })}
+                </span>
+              </div>
+            </>
+          )}
+        </CardBody>
+      </Card>
 
-      <RoleFormDialog
-        isOpen={isDialogOpen}
-        onClose={handleCloseDialog}
-        role={selectedRole}
+      <ConfirmDialog
+        isOpen={roleToDelete !== null}
+        onClose={() => setRoleToDelete(null)}
+        onConfirm={() => roleToDelete && deleteMutation.mutate(roleToDelete.id)}
+        title={t('common.actions.deleteConfirm', { name: roleToDelete?.name ?? '' })}
+        message={t('roles.actions.deleteWarning')}
+        confirmLabel={
+          deleteMutation.isPending ? t('common.deleting') : t('common.delete')
+        }
+        isDestructive
+        isPending={deleteMutation.isPending}
       />
 
-      <Alert open={isDeleteAlertOpen} onClose={() => setIsDeleteAlertOpen(false)}>
-        <AlertTitle>
-          {t('common.actions.deleteConfirm', { name: roleToDelete?.name || '' })}
-        </AlertTitle>
-        <AlertDescription>
-          {t('roles.actions.deleteWarning')}
-        </AlertDescription>
-        <AlertActions>
-          <Button plain onClick={() => setIsDeleteAlertOpen(false)}>
-            {t('common.cancel')}
-          </Button>
-          <Button color="red" onClick={confirmDelete} disabled={deleteMutation.isPending}>
-            {deleteMutation.isPending ? t('common.deleting') : t('common.delete')}
-          </Button>
-        </AlertActions>
-      </Alert>
-
-      <Alert open={isRestoreAllAlertOpen} onClose={() => setIsRestoreAllAlertOpen(false)}>
-        <AlertTitle>
-          {t('roles.actions.restoreAllDefaultsConfirm')}
-        </AlertTitle>
+      <Alert
+        open={isRestoreAllAlertOpen}
+        onClose={() => setIsRestoreAllAlertOpen(false)}
+      >
+        <AlertTitle>{t('roles.actions.restoreAllDefaultsConfirm')}</AlertTitle>
         <AlertDescription>
           {t('roles.actions.restoreAllDefaultsDescription', {
-            count: 6
-          })}
-          {' '}
-          {t('roles.actions.restoreAllDefaultsDetails')}
-          {' '}
+            count: (roles ?? []).filter((r) => r.isProtected).length || 6,
+          })}{' '}
+          {t('roles.actions.restoreAllDefaultsDetails')}{' '}
           {t('roles.actions.restoreAllDefaultsWarning')}
         </AlertDescription>
         <AlertActions>
           <Button plain onClick={() => setIsRestoreAllAlertOpen(false)}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={confirmRestoreAll} disabled={restoreAllMutation.isPending}>
-            {restoreAllMutation.isPending ? t('common.restoring') : t('roles.actions.restoreAllDefaults')}
+          <Button
+            color="accent"
+            onClick={() => restoreAllMutation.mutate()}
+            disabled={restoreAllMutation.isPending}
+          >
+            {restoreAllMutation.isPending
+              ? t('common.restoring')
+              : t('roles.actions.restoreAllDefaults')}
           </Button>
         </AlertActions>
       </Alert>
+    </div>
+  );
+}
+
+function SummaryCell({
+  label,
+  value,
+  last,
+}: {
+  label: string;
+  value: number;
+  last?: boolean;
+}) {
+  return (
+    <div
+      className={
+        'px-4 py-[11px]' +
+        (last ? '' : ' border-r border-border-soft')
+      }
+    >
+      <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-fg-muted">
+        {label}
+      </div>
+      <div className="mt-0.5 text-[20px] font-bold leading-none tracking-[-0.02em] text-fg-strong tabular-nums">
+        {value}
+      </div>
     </div>
   );
 }
