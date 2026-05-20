@@ -114,6 +114,38 @@
 .pill.violet   { background: color-mix(in oklch, var(--violet-500) 12%, var(--bg-elev)); color: var(--violet-500); }
 .pill.neutral  { background: var(--bg-active); color: var(--fg-muted); }
 
+/* ── Role chip (dot + role name) ─────────────────────────────────
+   Driven by an inline `--chip-accent` CSS var so a single class can
+   render any persisted accentId. Low-chroma palettes (e.g. `slate`,
+   ~50% L 0.02 C) become unreadable in dark mode when used directly
+   as `color:` — they land too close in lightness to bg-elev (~21% L)
+   and the chip text dissolves. Lift the foreground toward a near-
+   white anchor in dark mode so it stays legible; vivid colors keep
+   most of their hue because the mix preserves chroma direction. */
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: color-mix(in oklch, var(--chip-accent) 14%, var(--bg-elev));
+  color: var(--chip-accent);
+  white-space: nowrap;
+}
+.theme-dark .role-chip {
+  background: color-mix(in oklch, var(--chip-accent) 22%, var(--bg-elev));
+  color: color-mix(in oklch, var(--chip-accent) 50%, oklch(95% 0.005 250));
+}
+.role-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--chip-accent);
+  flex-shrink: 0;
+}
+
 /* `inline` strips the background/padding/border so the pill renders as
    "dot + label + optional glow" only — for status indicators that live
    inside a metadata line where a full pill bg would over-weight. Text and
