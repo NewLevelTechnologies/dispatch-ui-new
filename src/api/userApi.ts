@@ -46,10 +46,15 @@ export interface Role {
   id: string;
   name: string;
   description?: string;
+  // Shipped on the detail response only. List rows omit this and ship
+  // `capabilityCount` instead to keep the payload bounded.
   capabilities?: string[];
   isProtected?: boolean;
   isSystemRole?: boolean;
   systemRoleCode?: string;
+  // Per-row counts on the list response. Absent on the detail response.
+  userCount?: number;
+  capabilityCount?: number;
   // Persisted accent token id ("orange" | "amber" | "green" | "teal" | "blue"
   // | "indigo" | "violet" | "pink" | "red" | "slate"). Resolves to an oklch
   // value via `utils/roleColor.ts#roleAccent`. Optional because cloned roles
@@ -68,8 +73,15 @@ export interface Role {
 export interface RolesListResponse {
   roles: Role[];
   totals?: {
+    // Distinct users with ≥1 role (not the sum of per-role userCounts —
+    // that would double-count users assigned to multiple roles).
+    usersAssigned?: number;
+    // Size of the platform Capability catalog — denominator for "X of Y
+    // granted" on the per-row capability chart.
     totalCapabilities?: number;
-    totalUsers?: number;
+    // Number of system roles where isModifiedFromDefault is true. Drives
+    // the enabled state of the "Restore all defaults" button.
+    builtinModifiedCount?: number;
   };
   colorsInUse?: ColorsInUseMap;
 }
