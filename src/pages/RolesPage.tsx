@@ -90,46 +90,22 @@ export default function RolesPage() {
   const canDeleteRoles = useHasCapability('DELETE_ROLES');
   const canManage = canCreateRoles || canEditRoles || canDeleteRoles;
 
+  // The list endpoint ships everything we need: per-row userCount and
+  // capabilityCount, plus an envelope with distinct usersAssigned and the
+  // catalog's totalCapabilities. Earlier versions of this page derived
+  // those client-side from a separate /users query (which double-counted
+  // users with multiple roles) and from /capabilities/grouped.
   const {
-    data: roles,
+    data: rolesData,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ['roles'],
-    queryFn: () => userApi.getRoles(),
+    queryKey: ['roles', 'envelope'],
+    queryFn: () => userApi.listRoles(),
   });
-
-  // Used for the per-row user count and the summary strip total.
-  const { data: users } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => userApi.getAll(),
-  });
-
-  // Capability catalog drives the denominator for the per-row capability bar.
-  const { data: groupedCaps } = useQuery({
-    queryKey: ['capabilities', 'grouped'],
-    queryFn: () => userApi.getGroupedCapabilities(),
-  });
-
-  const totalCapabilities = useMemo(
-    () =>
-      (groupedCaps?.groups ?? []).reduce(
-        (sum, g) => sum + g.capabilities.length,
-        0
-      ),
-    [groupedCaps]
-  );
-
-  const userCountByRole = useMemo(() => {
-    const map: Record<string, number> = {};
-    (users ?? []).forEach((u) => {
-      (u.roles ?? []).forEach((r) => {
-        map[r.id] = (map[r.id] ?? 0) + 1;
-      });
-    });
-    return map;
-  }, [users]);
+  const roles = rolesData?.roles;
+  const totalCapabilities = rolesData?.totals?.totalCapabilities ?? 0;
 
   // Mutations
   const deleteMutation = useMutation({
@@ -196,35 +172,40 @@ export default function RolesPage() {
           const hay = `${role.name} ${role.description ?? ''}`.toLowerCase();
           if (!hay.includes(q)) return false;
         }
-        if (typeFilter === 'builtin' && !role.isProtected) return false;
-        if (typeFilter === 'custom' && role.isProtected) return false;
-        const userCount = userCountByRole[role.id] ?? 0;
+        // "Built-in" = sourced from the system role catalog (isSystemRole).
+        // Not the same as isProtected, which only flags roles currently
+        // locked from edit/delete — a recreated system role ships as
+        // isSystemRole=true, isProtected=false.
+        if (typeFilter === 'builtin' && !role.isSystemRole) return false;
+        if (typeFilter === 'custom' && role.isSystemRole) return false;
+        const userCount = role.userCount ?? 0;
         if (hasUsersFilter === 'yes' && userCount === 0) return false;
         if (hasUsersFilter === 'no' && userCount > 0) return false;
         return true;
       })
       .sort((a, b) => {
-        const ua = userCountByRole[a.id] ?? 0;
-        const ub = userCountByRole[b.id] ?? 0;
+        const ua = a.userCount ?? 0;
+        const ub = b.userCount ?? 0;
         if (ub !== ua) return ub - ua;
         return a.name.localeCompare(b.name);
       });
-  }, [roles, searchQuery, typeFilter, hasUsersFilter, userCountByRole]);
+  }, [roles, searchQuery, typeFilter, hasUsersFilter]);
 
-  // Summary totals (5-cell strip).
+  // Summary totals (5-cell strip). usersAssigned comes from the envelope
+  // — it's the distinct user count from the BE, not a sum of per-row
+  // userCounts (which would double-count multi-role users).
   const totals = useMemo(() => {
     const all = roles ?? [];
-    const builtin = all.filter((r) => r.isProtected).length;
+    const builtin = all.filter((r) => r.isSystemRole).length;
     const custom = all.length - builtin;
-    const totalUsersAssigned = Object.values(userCountByRole).reduce((s, n) => s + n, 0);
     return {
       total: all.length,
       builtin,
       custom,
-      usersAssigned: totalUsersAssigned,
+      usersAssigned: rolesData?.totals?.usersAssigned ?? 0,
       capabilities: totalCapabilities,
     };
-  }, [roles, userCountByRole, totalCapabilities]);
+  }, [roles, rolesData, totalCapabilities]);
 
   const hasFilters = Boolean(searchQuery || typeFilter || hasUsersFilter);
   const clearFilters = () => {
@@ -232,7 +213,7 @@ export default function RolesPage() {
     setSearchParams(new URLSearchParams(), { replace: false });
   };
 
-  const builtinPresent = (roles ?? []).some((r) => r.isProtected);
+  const builtinPresent = (roles ?? []).some((r) => r.isSystemRole);
 
   return (
     <div>
@@ -398,8 +379,8 @@ export default function RolesPage() {
                 </DenseTHead>
                 <tbody>
                   {filteredRoles.map((role) => {
-                    const userCount = userCountByRole[role.id] ?? 0;
-                    const capCount = role.capabilities?.length ?? 0;
+                    const userCount = role.userCount ?? 0;
+                    const capCount = role.capabilityCount ?? 0;
                     const pct =
                       totalCapabilities > 0
                         ? Math.round((capCount / totalCapabilities) * 100)
@@ -466,7 +447,7 @@ export default function RolesPage() {
                           </div>
                         </td>
                         <td>
-                          {role.isProtected ? (
+                          {role.isSystemRole ? (
                             <Pill tone="neutral">{t('roles.table.builtIn')}</Pill>
                           ) : (
                             <Pill tone="accent" dot>
@@ -529,11 +510,11 @@ export default function RolesPage() {
                   })}{' '}
                   ·{' '}
                   {t('roles.breakdown.builtIn', {
-                    count: filteredRoles.filter((r) => r.isProtected).length,
+                    count: filteredRoles.filter((r) => r.isSystemRole).length,
                   })}{' '}
                   ·{' '}
                   {t('roles.breakdown.custom', {
-                    count: filteredRoles.filter((r) => !r.isProtected).length,
+                    count: filteredRoles.filter((r) => !r.isSystemRole).length,
                   })}
                 </span>
               </div>
@@ -562,7 +543,7 @@ export default function RolesPage() {
         <AlertTitle>{t('roles.actions.restoreAllDefaultsConfirm')}</AlertTitle>
         <AlertDescription>
           {t('roles.actions.restoreAllDefaultsDescription', {
-            count: (roles ?? []).filter((r) => r.isProtected).length || 6,
+            count: (roles ?? []).filter((r) => r.isSystemRole).length || 6,
           })}{' '}
           {t('roles.actions.restoreAllDefaultsDetails')}{' '}
           {t('roles.actions.restoreAllDefaultsWarning')}
