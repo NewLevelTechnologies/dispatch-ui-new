@@ -18,6 +18,7 @@ import {
   roleAccent,
   roleAccentFromRole,
 } from '../utils/roleColor';
+import { invalidateRoleConsumers } from '../utils/invalidateRoleConsumers';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 
 // Conflict shape returned from POST/PUT/clone role endpoints when accentId
@@ -227,8 +228,7 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
       return updated;
     },
     onSuccess: (role) => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
-      if (isEdit) queryClient.invalidateQueries({ queryKey: ['roles', role.id] });
+      invalidateRoleConsumers(queryClient, role.id);
       showSuccess(isEdit ? `${role.name} saved` : `${role.name} created`);
       navigate(`/settings/access/roles/${role.id}`);
     },

@@ -28,6 +28,7 @@ import {
 } from '../components/catalyst/dropdown';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { roleAccentFromRole } from '../utils/roleColor';
+import { invalidateRoleConsumers } from '../utils/invalidateRoleConsumers';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 
 function formatDateShort(value?: string): string {
@@ -93,7 +94,7 @@ export default function RoleDetailPage() {
   const deleteMutation = useMutation({
     mutationFn: () => userApi.deleteRole(id!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      invalidateRoleConsumers(queryClient, id);
       if (role) showSuccess(`${role.name} deleted`);
       navigate('/settings/access/roles');
     },
@@ -108,7 +109,7 @@ export default function RoleDetailPage() {
         description: role?.description,
       }),
     onSuccess: (newRole) => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      invalidateRoleConsumers(queryClient, newRole.id);
       showSuccess(`${newRole.name} created`);
       navigate(`/settings/access/roles/${newRole.id}/edit`);
     },
