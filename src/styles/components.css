@@ -80,7 +80,7 @@
 .kpi-delta { font-size: 11px; font-weight: 600; }
 .kpi-delta.up   { color: var(--success-500); }
 .kpi-delta.down { color: var(--danger-500); }
-.kpi-meta { font-size: 11px; color: var(--fg-dim); }
+.kpi-meta { font-size: 11px; color: var(--fg-muted); }
 
 /* ── Pills / status badges ──────────────────────────────────────── */
 .pill {
@@ -113,6 +113,44 @@
 .theme-dark .pill.accent { color: var(--accent-300); }
 .pill.violet   { background: color-mix(in oklch, var(--violet-500) 12%, var(--bg-elev)); color: var(--violet-500); }
 .pill.neutral  { background: var(--bg-active); color: var(--fg-muted); }
+
+/* Dark-mode pill contrast lift — heavier tint + brighter fg + visible border.
+   Scoped to .theme-dark only; light-mode rules above stay untouched. */
+.theme-dark .pill.success {
+  background: color-mix(in oklch, var(--success-500) 20%, var(--bg-elev));
+  color: oklch(82% 0.13 152);
+  border: 1px solid color-mix(in oklch, var(--success-500) 28%, var(--bg-elev));
+}
+.theme-dark .pill.danger {
+  background: color-mix(in oklch, var(--danger-500) 20%, var(--bg-elev));
+  color: oklch(80% 0.14 27);
+  border: 1px solid color-mix(in oklch, var(--danger-500) 28%, var(--bg-elev));
+}
+.theme-dark .pill.info {
+  background: color-mix(in oklch, var(--info-500) 20%, var(--bg-elev));
+  color: oklch(82% 0.13 235);
+  border: 1px solid color-mix(in oklch, var(--info-500) 28%, var(--bg-elev));
+}
+.theme-dark .pill.warning {
+  background: color-mix(in oklch, var(--warning-500) 22%, var(--bg-elev));
+  color: oklch(86% 0.14 78);
+  border: 1px solid color-mix(in oklch, var(--warning-500) 30%, var(--bg-elev));
+}
+.theme-dark .pill.violet {
+  background: color-mix(in oklch, var(--violet-500) 20%, var(--bg-elev));
+  color: oklch(82% 0.12 295);
+  border: 1px solid color-mix(in oklch, var(--violet-500) 28%, var(--bg-elev));
+}
+.theme-dark .pill.accent {
+  background: color-mix(in oklch, var(--accent-500) 22%, var(--bg-elev));
+  color: oklch(82% 0.10 215);
+  border: 1px solid color-mix(in oklch, var(--accent-500) 30%, var(--bg-elev));
+}
+.theme-dark .pill.neutral {
+  background: oklch(31% 0.012 250);
+  color: oklch(88% 0.008 250);
+  border: 1px solid oklch(38% 0.014 250);
+}
 
 /* ── Role chip (dot + role name) ─────────────────────────────────
    Driven by an inline `--chip-accent` CSS var so a single class can
