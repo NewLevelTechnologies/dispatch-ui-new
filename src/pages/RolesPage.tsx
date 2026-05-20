@@ -26,6 +26,7 @@ import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { roleAccentFromRole } from '../utils/roleColor';
+import { invalidateRoleConsumers } from '../utils/invalidateRoleConsumers';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 
 type TypeFilter = 'builtin' | 'custom' | '';
@@ -134,7 +135,7 @@ export default function RolesPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => userApi.deleteRole(id),
     onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      invalidateRoleConsumers(queryClient, id);
       const deleted = roles?.find((r) => r.id === id);
       if (deleted) showSuccess(`${deleted.name} deleted`);
       setRoleToDelete(null);
@@ -147,7 +148,7 @@ export default function RolesPage() {
     mutationFn: (role: Role) =>
       userApi.cloneRole(role.id, { name: `${role.name} (copy)`, description: role.description }),
     onSuccess: (newRole) => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      invalidateRoleConsumers(queryClient, newRole.id);
       showSuccess(`${newRole.name} created`);
       navigate(`/settings/access/roles/${newRole.id}/edit`);
     },
@@ -158,7 +159,7 @@ export default function RolesPage() {
   const restoreAllMutation = useMutation({
     mutationFn: () => userApi.restoreAllDefaults(),
     onSuccess: (result: RestoreAllDefaultsResponse) => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      invalidateRoleConsumers(queryClient);
       setIsRestoreAllAlertOpen(false);
 
       const restoredCount = result.restoredRoles.length;
