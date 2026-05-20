@@ -282,7 +282,7 @@ function RoleHeader({
           <h1 className="m-0 text-[18px] font-bold tracking-[-0.02em] text-fg-strong">
             {role.name}
           </h1>
-          {role.isProtected ? (
+          {role.isSystemRole ? (
             <Pill tone="neutral">{t('roles.table.builtIn')}</Pill>
           ) : (
             <Pill tone="accent" dot>
