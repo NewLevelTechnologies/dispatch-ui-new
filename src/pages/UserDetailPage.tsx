@@ -172,7 +172,7 @@ export default function UserDetailPage() {
       </div>
 
       <div className="mt-3">
-        <SecurityCard userId={user.id} canEdit={canEditUsers} />
+        <SecurityCard userId={user.id} email={user.email} canEdit={canEditUsers} />
       </div>
 
       {canViewAuditLogs && (
@@ -475,7 +475,7 @@ function CapabilityDetail({ user }: { user: User }) {
 // access tokens stay valid until expiry; only refresh is revoked
 // immediately. Don't drop it.
 // ──────────────────────────────────────────────────────────────────
-function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean }) {
+function SecurityCard({ userId, email, canEdit }: { userId: string; email: string; canEdit: boolean }) {
   const queryClient = useQueryClient();
 
   // Eventual-consistency tail: backend emits an activity row to SNS,
@@ -545,12 +545,20 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
     onError: onErrorToast('Sign out everywhere'),
   });
 
-  // Confirm dialogs for the two destructive rows (2FA reset, global sign-out).
-  // Password reset link is non-destructive — fires immediately, no confirm.
-  type ConfirmKind = 'resetMfa' | 'signOut';
+  // Confirm dialogs for all three Security-card actions. Send-reset-link is
+  // confirmed because Cognito flips the user into RESET_REQUIRED on success —
+  // if the email is wrong/unreachable, the user is locked out of sign-in
+  // until an admin manually sets a password via the Cognito console.
+  type ConfirmKind = 'resetPassword' | 'resetMfa' | 'signOut';
   const [pendingConfirm, setPendingConfirm] = useState<ConfirmKind | null>(null);
 
   const confirmCopy: Record<ConfirmKind, { title: string; message: string; confirmLabel: string }> = {
+    resetPassword: {
+      title: 'Send password reset link?',
+      message:
+        `A reset link will be emailed to ${email}. The user will not be able to sign in with their current password until they complete the reset.`,
+      confirmLabel: 'Send reset link',
+    },
     resetMfa: {
       title: 'Reset 2FA?',
       message:
@@ -566,7 +574,8 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
   };
 
   const runPendingConfirm = () => {
-    if (pendingConfirm === 'resetMfa') resetMfaMutation.mutate();
+    if (pendingConfirm === 'resetPassword') resetPasswordMutation.mutate();
+    else if (pendingConfirm === 'resetMfa') resetMfaMutation.mutate();
     else if (pendingConfirm === 'signOut') signOutMutation.mutate();
   };
 
@@ -579,7 +588,7 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
           <Button
             outline
             size="xxs"
-            onClick={() => resetPasswordMutation.mutate()}
+            onClick={() => setPendingConfirm('resetPassword')}
             disabled={!canEdit || resetPasswordMutation.isPending}
           >
             {resetPasswordMutation.isPending ? 'Sending…' : 'Send reset link'}
@@ -655,7 +664,7 @@ function SecurityCard({ userId, canEdit }: { userId: string; canEdit: boolean })
         message={pendingConfirm ? confirmCopy[pendingConfirm].message : ''}
         confirmLabel={pendingConfirm ? confirmCopy[pendingConfirm].confirmLabel : 'Confirm'}
         isDestructive
-        isPending={resetMfaMutation.isPending || signOutMutation.isPending}
+        isPending={resetPasswordMutation.isPending || resetMfaMutation.isPending || signOutMutation.isPending}
       />
     </Card>
   );
