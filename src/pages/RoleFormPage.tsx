@@ -65,7 +65,7 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
   // which is computed fresh per request and includes the role being edited
   // so the picker can show "taken by everyone but me" accurately.
   const { data: rolesResp } = useQuery({
-    queryKey: ['roles'],
+    queryKey: ['roles', 'envelope'],
     queryFn: () => userApi.listRoles(),
   });
   const allRoles = useMemo(() => rolesResp?.roles ?? [], [rolesResp]);
