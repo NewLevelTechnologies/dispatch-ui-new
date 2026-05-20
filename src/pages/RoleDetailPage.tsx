@@ -43,6 +43,18 @@ function memberFullName(m: RoleMember): string {
   return `${m.firstName} ${m.lastName}`.trim();
 }
 
+// Sub-line shown under the member's name on the Members card. We surface
+// the member's OTHER role names so the row carries useful context ("this
+// person is also a Field Supervisor") rather than just echoing the role
+// being viewed. If they only have the current role, fall back to that
+// name; if they have no roles at all (shouldn't happen — they're on this
+// list because they hold the role), render empty.
+function memberSubline(m: RoleMember, currentRoleId: string): string {
+  const others = m.roles.filter((r) => r.id !== currentRoleId);
+  if (others.length > 0) return others[0].name;
+  return m.roles[0]?.name ?? '';
+}
+
 export default function RoleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -649,7 +661,9 @@ function MembersCard({
                   <div className="text-[12.5px] font-medium text-fg-strong">
                     {fullName}
                   </div>
-                  <div className="mt-px text-[10.5px] text-fg-dim">{m.title}</div>
+                  <div className="mt-px text-[10.5px] text-fg-dim">
+                    {memberSubline(m, roleId)}
+                  </div>
                 </div>
                 <div className="text-[11.5px] text-fg-muted">{m.email}</div>
                 {canManage && (
