@@ -4,1208 +4,306 @@ import { renderWithProviders, userEvent } from '../test/utils';
 import RoleDetailPage from './RoleDetailPage';
 import apiClient from '../api/client';
 
-// Mock the API client
 vi.mock('../api/client');
 
-// Mock react-router-dom navigate
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
   return {
     ...actual,
     useNavigate: () => mockNavigate,
+    useParams: () => ({ id: 'role-123' }),
   };
 });
 
-const mockRole = {
+const customRole = {
   id: 'role-123',
-  name: 'Field Technician',
-  description: 'Handles field work and customer visits',
-  capabilities: ['customers:read', 'work_orders:read', 'work_orders:write'],
-  isProtected: false,
-  isSystemRole: true,
-  createdAt: '2024-01-01T10:30:00Z',
-  updatedAt: '2024-01-15T14:45:00Z',
-};
-
-const mockProtectedRole = {
-  id: 'role-456',
-  name: 'Admin',
-  description: 'Full system access',
-  capabilities: ['*:*'],
-  isProtected: true,
-  isSystemRole: true,
-  createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-01T00:00:00Z',
-};
-
-const mockCustomRole = {
-  id: 'role-789',
-  name: 'Custom Role',
-  description: 'A custom role',
-  capabilities: ['customers:read'],
+  name: 'Refund Approver',
+  description: 'Custom stack role',
+  capabilities: ['REFUND_INVOICES'],
   isProtected: false,
   isSystemRole: false,
-  createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-05-09T08:00:00Z',
 };
 
-const mockCapabilitiesData = {
+const builtInAdminRole = {
+  id: 'role-123',
+  name: 'Admin',
+  description: 'Full access',
+  capabilities: ['VIEW_WORK_ORDERS', 'EDIT_WORK_ORDERS', 'REFUND_INVOICES'],
+  isProtected: true,
+  isSystemRole: true,
+  systemRoleCode: 'ADMIN',
+  updatedAt: '2024-04-18T14:22:00Z',
+};
+
+const groupedCaps = {
   groups: [
     {
-      featureArea: 'CUSTOMERS',
-      displayName: 'Customers',
+      featureArea: 'WORK_ORDERS',
+      displayName: 'Work Orders',
       capabilities: [
-        { name: 'customers:read', displayName: 'View Customers', description: 'View customer list' },
+        { name: 'VIEW_WORK_ORDERS', displayName: 'View Work Orders', description: '' },
+        { name: 'EDIT_WORK_ORDERS', displayName: 'Edit Work Orders', description: '' },
+      ],
+    },
+    {
+      featureArea: 'BILLING',
+      displayName: 'Billing',
+      capabilities: [
+        { name: 'REFUND_INVOICES', displayName: 'Refund Invoices', description: '' },
+        { name: 'VOID_INVOICES', displayName: 'Void Invoices', description: '' },
       ],
     },
   ],
 };
 
+function mockGets(role: typeof customRole | typeof builtInAdminRole) {
+  vi.mocked(apiClient.get).mockImplementation((url: string) => {
+    if (url === `/users/roles/${role.id}`)
+      return Promise.resolve({ data: role });
+    if (url === '/users/capabilities/grouped')
+      return Promise.resolve({ data: groupedCaps });
+    return Promise.reject(new Error(`Unmocked URL: ${url}`));
+  });
+}
+
 describe('RoleDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockNavigate.mockClear();
+  });
 
-    // Default mock for capabilities API (used by CapabilitiesSection)
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error(`Unmocked URL: ${url}`));
+  describe('loading + error', () => {
+    it('shows loading state', async () => {
+      vi.mocked(apiClient.get).mockImplementation(() => new Promise(() => {}));
+      renderWithProviders(<RoleDetailPage />);
+      // LoadingState has a 250ms delay before becoming visible; page uses
+      // singular ("Loading role...") since the detail is about one role.
+      expect(await screen.findByText('Loading role...')).toBeInTheDocument();
+    });
+
+    it('shows error state with back button', async () => {
+      vi.mocked(apiClient.get).mockRejectedValue(new Error('network'));
+      renderWithProviders(<RoleDetailPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/error loading role/i)).toBeInTheDocument();
+      });
+      expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
     });
   });
 
-  it('displays loading state while fetching role', () => {
-    vi.mocked(apiClient.get).mockImplementation(
-      () => new Promise(() => {}) // Never resolves
-    );
+  describe('header', () => {
+    it('renders name, type pill, clone + edit buttons for custom roles', async () => {
+      mockGets(customRole);
+      renderWithProviders(<RoleDetailPage />);
 
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
+      await waitFor(() => {
+        expect(
+          screen.getByRole('heading', { name: /refund approver/i })
+        ).toBeInTheDocument();
+      });
+
+      // Type pill — "Custom" appears in the header (and likely the lifecycle
+      // footer surfaces). At least one Custom pill.
+      expect(screen.getAllByText('Custom').length).toBeGreaterThan(0);
+      expect(screen.getByRole('button', { name: /clone role/i })).toBeInTheDocument();
+
+      const editLink = screen.getByRole('link', { name: /edit capabilities/i });
+      expect(editLink).toHaveAttribute(
+        'href',
+        '/settings/access/roles/role-123/edit'
+      );
     });
 
-    expect(screen.getByText('Loading role...')).toBeInTheDocument();
-  });
+    it('shows Built-in pill for protected roles', async () => {
+      mockGets(builtInAdminRole);
+      renderWithProviders(<RoleDetailPage />);
 
-  it('displays error state when fetch fails', async () => {
-    vi.mocked(apiClient.get).mockRejectedValue(new Error('Network error'));
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText(/error loading role/i)).toBeInTheDocument();
-      expect(screen.getByText(/network error/i)).toBeInTheDocument();
-    });
-
-    expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
-  });
-
-  it('displays error state when role not found', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: null });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText(/error loading role/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Admin' })).toBeInTheDocument();
+      });
+      expect(screen.getAllByText('Built-in').length).toBeGreaterThan(0);
     });
   });
 
-  it('navigates back when back button is clicked from error state', async () => {
-    vi.mocked(apiClient.get).mockRejectedValue(new Error('Not found'));
-    const user = userEvent.setup();
+  describe('description card', () => {
+    it('locks Edit for Admin role', async () => {
+      mockGets(builtInAdminRole);
+      renderWithProviders(<RoleDetailPage />);
 
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Admin' })).toBeInTheDocument();
+      });
+
+      // Two edit affordances exist; the inline Description Edit is the one
+      // expected to be disabled for the Admin system role. There's no link
+      // role for a disabled button — assert by name + disabled state.
+      const editButtons = screen.getAllByRole('button', { name: /^edit$/i });
+      const disabled = editButtons.find((b) => b.hasAttribute('disabled'));
+      expect(disabled).toBeTruthy();
     });
 
-    await waitFor(() => {
-      expect(screen.getByText(/error loading role/i)).toBeInTheDocument();
-    });
+    it('keeps Edit enabled for non-Admin roles', async () => {
+      mockGets(customRole);
+      renderWithProviders(<RoleDetailPage />);
 
-    const backButton = screen.getByRole('button', { name: /back/i });
-    await user.click(backButton);
+      await waitFor(() => {
+        expect(
+          screen.getByRole('heading', { name: /refund approver/i })
+        ).toBeInTheDocument();
+      });
 
-    expect(mockNavigate).toHaveBeenCalledWith('/settings/access/roles');
-  });
-
-  it('renders role details with all information', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // Description appears in multiple places (header and description list)
-    const descriptions = screen.getAllByText('Handles field work and customer visits');
-    expect(descriptions.length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Field Technician').length).toBeGreaterThan(0);
-    expect(screen.getByText(/3.*capabilities/i)).toBeInTheDocument();
-    expect(screen.getByText('role-123')).toBeInTheDocument();
-  });
-
-  it('displays default text for missing description', async () => {
-    const roleWithoutDescription = {
-      ...mockRole,
-      description: undefined,
-    };
-
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: roleWithoutDescription });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('No description provided')).toBeInTheDocument();
+      // The Edit on the description card is rendered as an <a> link.
+      const editLinks = screen.getAllByRole('link', { name: /^edit$/i });
+      expect(editLinks.length).toBeGreaterThan(0);
+      expect(editLinks[0]).toHaveAttribute(
+        'href',
+        '/settings/access/roles/role-123/edit'
+      );
     });
   });
 
-  it('formats dates correctly', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
+  describe('capabilities grid', () => {
+    it('renders only granted capabilities by default', async () => {
+      mockGets(customRole);
+      renderWithProviders(<RoleDetailPage />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('heading', { name: /refund approver/i })
+        ).toBeInTheDocument();
+      });
+
+      // Granted-only mode: Refund Approver only has REFUND_INVOICES, so
+      // "Refund Invoices" shows, but "Void Invoices" and the work-orders
+      // capability labels do not.
+      expect(screen.getByText('Refund Invoices')).toBeInTheDocument();
+      expect(screen.queryByText('Void Invoices')).not.toBeInTheDocument();
+      expect(screen.queryByText('View Work Orders')).not.toBeInTheDocument();
     });
 
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
+    it('reveals all capabilities (including not-granted) in Show all mode', async () => {
+      mockGets(customRole);
+      const user = userEvent.setup();
+      renderWithProviders(<RoleDetailPage />);
 
-    await waitFor(() => {
-      // Check dates are formatted with month, day, year, and time (timezone may vary)
-      expect(screen.getByText(/jan 1, 2024,.*[ap]m/i)).toBeInTheDocument();
-      expect(screen.getByText(/jan 15, 2024,.*[ap]m/i)).toBeInTheDocument();
-    });
-  });
+      await waitFor(() => {
+        expect(
+          screen.getByRole('heading', { name: /refund approver/i })
+        ).toBeInTheDocument();
+      });
 
-  it('renders back button in header', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
+      await user.click(screen.getByRole('button', { name: /show all/i }));
 
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    const backButtons = screen.getAllByRole('button', { name: /back/i });
-    expect(backButtons.length).toBeGreaterThan(0);
-  });
-
-  it('navigates back when header back button is clicked', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    const backButtons = screen.getAllByRole('button', { name: /back/i });
-    await user.click(backButtons[0]);
-
-    expect(mockNavigate).toHaveBeenCalledWith('/settings/access/roles');
-  });
-
-  it('renders edit and delete buttons', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^delete$/i })).toBeInTheDocument();
-  });
-
-  it('opens edit dialog when edit button is clicked', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    const editButton = screen.getByRole('button', { name: /^edit$/i });
-    await user.click(editButton);
-
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByText('Edit Role')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('View Work Orders')).toBeInTheDocument();
+      });
+      expect(screen.getByText('Edit Work Orders')).toBeInTheDocument();
+      expect(screen.getByText('Void Invoices')).toBeInTheDocument();
     });
   });
 
-  it('opens delete confirmation when delete button is clicked', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    const user = userEvent.setup();
+  describe('members card', () => {
+    it('shows the empty state when the stub returns no members', async () => {
+      mockGets(customRole);
+      renderWithProviders(<RoleDetailPage />);
 
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
+      await waitFor(() => {
+        expect(
+          screen.getByText('No users have this role yet.')
+        ).toBeInTheDocument();
+      });
     });
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
+    it('navigates to Users when the empty-state Add user CTA is clicked', async () => {
+      mockGets(customRole);
+      const user = userEvent.setup();
+      renderWithProviders(<RoleDetailPage />);
 
-    const deleteButton = screen.getByRole('button', { name: /^delete$/i });
-    await user.click(deleteButton);
+      await waitFor(() => {
+        expect(
+          screen.getByText('No users have this role yet.')
+        ).toBeInTheDocument();
+      });
 
-    await waitFor(() => {
-      expect(screen.getByText(/delete field technician/i)).toBeInTheDocument();
-      expect(screen.getByText(/users assigned this role will lose associated capabilities/i)).toBeInTheDocument();
-    });
-  });
-
-  it('deletes role and navigates back on successful deletion', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // Open delete confirmation
-    const deleteButton = screen.getByRole('button', { name: /^delete$/i });
-    await user.click(deleteButton);
-
-    // Wait for alert dialog to appear
-    await waitFor(() => {
-      expect(screen.getByText(/delete field technician/i)).toBeInTheDocument();
-    });
-
-    // Find the confirm button within the alert dialog (last Delete button)
-    const allDeleteButtons = screen.getAllByRole('button', { name: /^delete$/i });
-    const confirmButton = allDeleteButtons[allDeleteButtons.length - 1];
-    await user.click(confirmButton);
-
-    await waitFor(() => {
-      expect(apiClient.delete).toHaveBeenCalledWith('/users/roles/role-123');
-      expect(mockNavigate).toHaveBeenCalledWith('/settings/access/roles');
+      const addBtn = screen.getByRole('button', { name: /add user/i });
+      await user.click(addBtn);
+      expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users');
     });
   });
 
-  it('cancels deletion when cancel button is clicked', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    const user = userEvent.setup();
+  describe('lifecycle footer', () => {
+    it('renders the built-in lock variant for protected roles', async () => {
+      mockGets(builtInAdminRole);
+      renderWithProviders(<RoleDetailPage />);
 
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
+      await waitFor(() => {
+        expect(screen.getByText('Built-in role')).toBeInTheDocument();
+      });
     });
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
+    it('renders the delete-role variant for custom roles', async () => {
+      mockGets(customRole);
+      renderWithProviders(<RoleDetailPage />);
+
+      // "Delete role" appears twice in this variant — title text + button
+      // label. getAllByText is the correct match.
+      await waitFor(() => {
+        expect(screen.getAllByText('Delete role').length).toBeGreaterThan(0);
+      });
+      const deleteButtons = screen.getAllByRole('button', { name: /delete role/i });
+      expect(deleteButtons.some((b) => !b.hasAttribute('disabled'))).toBe(true);
     });
 
-    // Open delete confirmation
-    const deleteButton = screen.getByRole('button', { name: /^delete$/i });
-    await user.click(deleteButton);
+    it('opens the delete confirm when Delete role is clicked', async () => {
+      mockGets(customRole);
+      const user = userEvent.setup();
+      renderWithProviders(<RoleDetailPage />);
 
-    // Cancel
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
-    });
+      await waitFor(() => {
+        expect(screen.getAllByText('Delete role').length).toBeGreaterThan(0);
+      });
 
-    const cancelButton = screen.getByRole('button', { name: /cancel/i });
-    await user.click(cancelButton);
+      const deleteButtons = screen.getAllByRole('button', { name: /delete role/i });
+      const enabled = deleteButtons.find((b) => !b.hasAttribute('disabled'))!;
+      await user.click(enabled);
 
-    expect(apiClient.delete).not.toHaveBeenCalled();
-    await waitFor(() => {
-      expect(screen.queryByText(/delete field technician/i)).not.toBeInTheDocument();
-    });
-  });
-
-  it('displays deleting state during deletion', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    vi.mocked(apiClient.delete).mockImplementation(
-      () => new Promise(() => {}) // Never resolves
-    );
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // Open delete confirmation
-    const deleteButton = screen.getByRole('button', { name: /^delete$/i });
-    await user.click(deleteButton);
-
-    // Wait for alert dialog to appear
-    await waitFor(() => {
-      expect(screen.getByText(/delete field technician/i)).toBeInTheDocument();
-    });
-
-    // Find the confirm button within the alert dialog (last Delete button)
-    const allDeleteButtons = screen.getAllByRole('button', { name: /^delete$/i });
-    const confirmButton = allDeleteButtons[allDeleteButtons.length - 1];
-    await user.click(confirmButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('Deleting...')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(
+          screen.getByText(/are you sure you want to delete refund approver/i)
+        ).toBeInTheDocument();
+      });
     });
   });
 
-  it('displays error message when deletion fails', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
+  describe('clone action', () => {
+    it('clones via the header Clone button and navigates to the new edit page', async () => {
+      mockGets(customRole);
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: { ...customRole, id: 'role-cloned' },
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<RoleDetailPage />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('heading', { name: /refund approver/i })
+        ).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /clone role/i }));
+
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/users/roles/role-123/clone',
+          expect.objectContaining({ name: 'Refund Approver (copy)' })
+        );
+      });
+      expect(mockNavigate).toHaveBeenCalledWith(
+        '/settings/access/roles/role-cloned/edit'
+      );
     });
-    const error = new Error('Cannot delete role in use');
-    // @ts-expect-error - Adding response property to Error for test
-    error.response = { data: { message: 'Cannot delete role in use' } };
-    vi.mocked(apiClient.delete).mockRejectedValue(error);
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // Open delete confirmation
-    const deleteButton = screen.getByRole('button', { name: /^delete$/i });
-    await user.click(deleteButton);
-
-    // Wait for alert dialog to appear
-    await waitFor(() => {
-      expect(screen.getByText(/delete field technician/i)).toBeInTheDocument();
-    });
-
-    // Find the confirm button within the alert dialog (last Delete button)
-    const allDeleteButtons = screen.getAllByRole('button', { name: /^delete$/i });
-    const confirmButton = allDeleteButtons[allDeleteButtons.length - 1];
-    await user.click(confirmButton);
-
-    await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith('Cannot delete role in use');
-    });
-
-    alertSpy.mockRestore();
-  });
-
-  it('renders role information section', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('Role Information')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText('Name')).toBeInTheDocument();
-    expect(screen.getByText('Description')).toBeInTheDocument();
-    expect(screen.getByText('Total Capabilities')).toBeInTheDocument();
-  });
-
-  it('renders system information section', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('System Information')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText('Role ID')).toBeInTheDocument();
-    expect(screen.getByText('Created')).toBeInTheDocument();
-    expect(screen.getByText('Last Updated')).toBeInTheDocument();
-  });
-
-  it('displays role ID as code', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      const codeElement = screen.getByText('role-123');
-      expect(codeElement.tagName).toBe('CODE');
-    });
-  });
-
-  it('displays dash for missing description in description list', async () => {
-    const roleWithoutDescription = {
-      ...mockRole,
-      description: undefined,
-    };
-
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: roleWithoutDescription });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // Check description in the list shows dash
-    const descriptionTerm = screen.getByText('Description');
-    const descriptionDetails = descriptionTerm.nextElementSibling;
-    expect(descriptionDetails).toHaveTextContent('-');
-  });
-
-  it('displays capabilities count as 0 when no capabilities', async () => {
-    const roleWithoutCapabilities = {
-      ...mockRole,
-      capabilities: undefined,
-    };
-
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: roleWithoutCapabilities });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText(/0.*capabilities/i)).toBeInTheDocument();
-    });
-  });
-
-  it('renders CapabilitiesSection component', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // CapabilitiesSection should be rendered with count badge
-    expect(screen.getByText('Capabilities')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
-  });
-
-  it('closes edit dialog after successful update', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    vi.mocked(apiClient.put).mockResolvedValue({ data: mockRole });
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // Open edit dialog
-    const editButton = screen.getByRole('button', { name: /^edit$/i });
-    await user.click(editButton);
-
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Update and submit
-    const nameInput = screen.getByDisplayValue('Field Technician');
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Senior Technician');
-
-    const submitButton = screen.getByRole('button', { name: /update/i });
-    await user.click(submitButton);
-
-    await waitFor(() => {
-      expect(apiClient.put).toHaveBeenCalled();
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    });
-  });
-
-  it('closes edit dialog when cancel is clicked', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // Open edit dialog
-    const editButton = screen.getByRole('button', { name: /^edit$/i });
-    await user.click(editButton);
-
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Cancel
-    const cancelButton = screen.getByRole('button', { name: /cancel/i });
-    await user.click(cancelButton);
-
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    });
-  });
-
-  it('closes clone dialog when cancel is clicked', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // Open clone dialog
-    const cloneButton = screen.getByRole('button', { name: /clone role/i });
-    await user.click(cloneButton);
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Clone Role' })).toBeInTheDocument();
-    });
-
-    // Cancel
-    const cancelButton = screen.getByRole('button', { name: /cancel/i });
-    await user.click(cancelButton);
-
-    await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: 'Clone Role' })).not.toBeInTheDocument();
-    });
-  });
-
-  it('displays description from header when no detailed description', async () => {
-    const roleWithoutDetailedDescription = {
-      ...mockRole,
-      description: undefined,
-    };
-
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: roleWithoutDetailedDescription });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // Should show default text in header
-    expect(screen.getByText('No description provided')).toBeInTheDocument();
-  });
-
-  it('uses correct query key for role fetch', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(apiClient.get).toHaveBeenCalledWith('/users/roles/role-123');
-    });
-  });
-
-  // Protected role tests
-  it('hides edit button for protected roles', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-456') {
-        return Promise.resolve({ data: mockProtectedRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-456'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Admin' })).toBeInTheDocument();
-    });
-
-    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
-  });
-
-  it('hides delete button for protected roles', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-456') {
-        return Promise.resolve({ data: mockProtectedRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-456'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Admin' })).toBeInTheDocument();
-    });
-
-    expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument();
-  });
-
-  it('shows clone button for all roles', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    expect(screen.getByRole('button', { name: /clone role/i })).toBeInTheDocument();
-  });
-
-  it('shows clone button for protected roles', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-456') {
-        return Promise.resolve({ data: mockProtectedRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-456'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Admin' })).toBeInTheDocument();
-    });
-
-    expect(screen.getByRole('button', { name: /clone role/i })).toBeInTheDocument();
-  });
-
-  it('shows restore defaults button for system roles', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    expect(screen.getByRole('button', { name: /restore defaults/i })).toBeInTheDocument();
-  });
-
-  it('hides restore defaults button for custom roles', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-789') {
-        return Promise.resolve({ data: mockCustomRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-789'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Custom Role' })).toBeInTheDocument();
-    });
-
-    expect(screen.queryByRole('button', { name: /restore defaults/i })).not.toBeInTheDocument();
-  });
-
-  it('opens clone dialog when clone button is clicked', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    const cloneButton = screen.getByRole('button', { name: /clone role/i });
-    await user.click(cloneButton);
-
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Clone Role' })).toBeInTheDocument();
-    });
-  });
-
-  it('opens restore defaults confirmation when restore button is clicked', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    const restoreButton = screen.getByRole('button', { name: /restore defaults/i });
-    await user.click(restoreButton);
-
-    await waitFor(() => {
-      expect(screen.getByText(/restore "field technician" to default capabilities/i)).toBeInTheDocument();
-      expect(screen.getByText(/this will reset all capabilities to the system template defaults/i)).toBeInTheDocument();
-    });
-  });
-
-  it('calls restore defaults API when confirmed', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    vi.mocked(apiClient.post).mockResolvedValue({ data: mockRole });
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // Open restore confirmation
-    const restoreButton = screen.getByRole('button', { name: /restore defaults/i });
-    await user.click(restoreButton);
-
-    // Confirm restore
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /^restore$/i })).toBeInTheDocument();
-    });
-
-    const confirmButton = screen.getByRole('button', { name: /^restore$/i });
-    await user.click(confirmButton);
-
-    await waitFor(() => {
-      expect(apiClient.post).toHaveBeenCalledWith('/users/roles/role-123/restore-defaults');
-    });
-  });
-
-  it('cancels restore defaults when cancel is clicked', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // Open restore confirmation
-    const restoreButton = screen.getByRole('button', { name: /restore defaults/i });
-    await user.click(restoreButton);
-
-    // Cancel
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
-    });
-
-    const cancelButton = screen.getByRole('button', { name: /cancel/i });
-    await user.click(cancelButton);
-
-    expect(apiClient.post).not.toHaveBeenCalled();
-    await waitFor(() => {
-      expect(screen.queryByText(/restore "field technician"/i)).not.toBeInTheDocument();
-    });
-  });
-
-  it('displays restoring state during restore operation', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    vi.mocked(apiClient.post).mockImplementation(
-      () => new Promise(() => {}) // Never resolves
-    );
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // Open restore confirmation
-    const restoreButton = screen.getByRole('button', { name: /restore defaults/i });
-    await user.click(restoreButton);
-
-    // Confirm restore
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /^restore$/i })).toBeInTheDocument();
-    });
-
-    const confirmButton = screen.getByRole('button', { name: /^restore$/i });
-    await user.click(confirmButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('Restoring...')).toBeInTheDocument();
-    });
-
-    expect(confirmButton).toBeDisabled();
-  });
-
-  it('displays error message when restore defaults fails', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users/roles/role-123') {
-        return Promise.resolve({ data: mockRole });
-      }
-      if (url === '/users/capabilities/grouped') {
-        return Promise.resolve({ data: mockCapabilitiesData });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-    const error = new Error('Failed to restore');
-    // @ts-expect-error - Adding response property to Error for test
-    error.response = { data: { message: 'Failed to restore' } };
-    vi.mocked(apiClient.post).mockRejectedValue(error);
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-    const user = userEvent.setup();
-
-    renderWithProviders(<RoleDetailPage />, {
-      initialEntries: ['/roles/role-123'],
-      path: '/roles/:id',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
-    });
-
-    // Open restore confirmation
-    const restoreButton = screen.getByRole('button', { name: /restore defaults/i });
-    await user.click(restoreButton);
-
-    // Confirm restore
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /^restore$/i })).toBeInTheDocument();
-    });
-
-    const confirmButton = screen.getByRole('button', { name: /^restore$/i });
-    await user.click(confirmButton);
-
-    await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith('Failed to restore');
-    });
-
-    alertSpy.mockRestore();
   });
 });

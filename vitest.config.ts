@@ -18,6 +18,9 @@ export default defineConfig({
         'dist/**',
         // Untracked design-handoff dump (not checked into the repo)
         'handoff/**',
+        // Designer reference files (JSX mocks of design comps + their
+        // handoff helpers). Not shipped, not imported by the app.
+        'claude_designs/**',
         '**/*.config.{ts,js}',
         '**/main.tsx',
         '**/vite-env.d.ts',

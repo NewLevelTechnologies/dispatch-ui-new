@@ -73,6 +73,11 @@ export {
   type CreateRoleRequest,
   type UpdateRoleRequest,
   type RestoreAllDefaultsResponse,
+  type RoleMember,
+  type RoleMembersResponse,
+  type RolesListResponse,
+  type AccentInUseRef,
+  type ColorsInUseMap,
   type AuditLogEntry,
   type TwoFactorStatus
 } from './userApi';
