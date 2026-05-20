@@ -95,28 +95,32 @@
 
 /* ── Dark theme ──────────────────────────────────────────────────── */
 .theme-dark {
-  --bg:                 oklch(17% 0.008 250);
-  --bg-sunken:          oklch(14% 0.008 250);
-  --bg-elev:            oklch(21% 0.01 250);
-  --bg-elev-2:          oklch(24% 0.011 250);
-  --bg-hover:           oklch(26% 0.012 250);
-  --bg-active:          oklch(29% 0.014 250);
+  /* Surfaces — lifted off pure black so text has contrast headroom */
+  --bg:           oklch(22% 0.008 250);   /* topbar           was 17% */
+  --bg-sunken:    oklch(19% 0.008 250);   /* content pane     was 14% */
+  --bg-elev:      oklch(24% 0.010 250);   /* cards            was 21% */
+  --bg-elev-2:    oklch(27% 0.011 250);   /*                  was 24% */
+  --bg-hover:     oklch(29% 0.012 250);   /*                  was 26% */
+  --bg-active:    oklch(32% 0.014 250);   /*                  was 29% */
 
-  --sidebar-bg:         oklch(13% 0.008 255);
-  --sidebar-bg-2:       oklch(17% 0.01 255);
-  --sidebar-fg:         oklch(88% 0.008 255);
-  --sidebar-fg-dim:     oklch(66% 0.01 255);
-  --sidebar-border:     oklch(22% 0.011 255);
+  --sidebar-bg:     oklch(16% 0.008 255); /*                  was 13% */
+  --sidebar-bg-2:   oklch(21% 0.010 255); /*                  was 17% */
+  --sidebar-fg:     oklch(92% 0.008 255); /*                  was 88% */
+  --sidebar-fg-dim: oklch(72% 0.010 255); /*                  was 66% */
+  --sidebar-border: oklch(26% 0.011 255); /*                  was 22% */
 
-  --fg:                 oklch(92% 0.008 250);
-  --fg-strong:          oklch(98% 0.004 250);
-  --fg-muted:           oklch(75% 0.012 250);
-  --fg-dim:             oklch(66% 0.012 250);
+  /* Foreground — primary content gets brighter, dim stays for chrome only */
+  --fg:         oklch(94% 0.006 250);     /*                  was 92% */
+  --fg-strong:  oklch(99% 0.003 250);     /*                  was 98% */
+  --fg-muted:   oklch(80% 0.010 250);     /*                  was 75% */
+  --fg-dim:     oklch(70% 0.010 250);     /*                  was 66% */
 
-  --border:             oklch(28% 0.013 250);
-  --border-strong:      oklch(35% 0.015 250);
-  --border-soft:        oklch(24% 0.011 250);
+  /* Borders — more present so cards read as cards */
+  --border:        oklch(32% 0.012 250);  /*                  was 28% */
+  --border-strong: oklch(40% 0.015 250);  /*                  was 35% */
+  --border-soft:   oklch(28% 0.010 250);  /*                  was 24% */
 
+  /* Shadows unchanged */
   --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.4);
   --shadow-md: 0 1px 3px 0 rgba(0,0,0,0.5), 0 1px 2px -1px rgba(0,0,0,0.4);
   --shadow-lg: 0 4px 14px -2px rgba(0,0,0,0.5), 0 2px 6px -3px rgba(0,0,0,0.4);
