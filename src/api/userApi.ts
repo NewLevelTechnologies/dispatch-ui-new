@@ -142,15 +142,15 @@ export interface RestoreAllDefaultsResponse {
 }
 
 // Members of a role — surfaces on the role detail page Members card.
-// `title` is the user's primary role name (first entry in `User.roles`)
-// for now; the backend may add a dedicated job-title field later.
+// `roles` is the user's full role list (slim id+name refs). The FE derives
+// the sub-line "title" string from this list per the role detail page.
 export interface RoleMember {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
-  title: string;
   photoUrl?: string | null;
+  roles: { id: string; name: string }[];
 }
 
 export interface RoleMembersResponse {
@@ -342,13 +342,11 @@ export const userApi = {
     return response.data;
   },
 
-  // TODO: backend not built. Swap the body for
-  //   const r = await apiClient.get<RoleMembersResponse>(`/users/roles/${id}/members`);
-  //   return r.data;
-  // once GET /users/roles/{id}/members lands. UI renders the empty state in the meantime.
   listRoleMembers: async (id: string): Promise<RoleMembersResponse> => {
-    void id;
-    return { users: [] };
+    const response = await apiClient.get<RoleMembersResponse>(
+      `/users/roles/${id}/members`
+    );
+    return response.data;
   },
 
   // Audit log

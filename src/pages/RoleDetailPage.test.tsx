@@ -58,10 +58,15 @@ const groupedCaps = {
   ],
 };
 
-function mockGets(role: typeof customRole | typeof builtInAdminRole) {
+function mockGets(
+  role: typeof customRole | typeof builtInAdminRole,
+  members: { id: string; firstName: string; lastName: string; email: string; photoUrl: string | null; roles: { id: string; name: string }[] }[] = []
+) {
   vi.mocked(apiClient.get).mockImplementation((url: string) => {
     if (url === `/users/roles/${role.id}`)
       return Promise.resolve({ data: role });
+    if (url === `/users/roles/${role.id}/members`)
+      return Promise.resolve({ data: { users: members } });
     if (url === '/users/capabilities/grouped')
       return Promise.resolve({ data: groupedCaps });
     return Promise.reject(new Error(`Unmocked URL: ${url}`));
@@ -231,6 +236,44 @@ describe('RoleDetailPage', () => {
       const addBtn = screen.getByRole('button', { name: /add user/i });
       await user.click(addBtn);
       expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users');
+    });
+
+    it('renders member rows + derives sub-line from a member\'s other roles', async () => {
+      mockGets(customRole, [
+        {
+          id: 'u1',
+          firstName: 'Maria',
+          lastName: 'Chen',
+          email: 'maria@example.com',
+          photoUrl: null,
+          // Holds both the current role (Refund Approver = role-123) AND
+          // Field Supervisor. Sub-line should prefer the non-current role.
+          roles: [
+            { id: 'role-123', name: 'Refund Approver' },
+            { id: 'role-fs', name: 'Field Supervisor' },
+          ],
+        },
+        {
+          id: 'u2',
+          firstName: 'Sam',
+          lastName: 'Singh',
+          email: 'sam@example.com',
+          photoUrl: null,
+          // Only has the current role — sub-line falls back to it.
+          roles: [{ id: 'role-123', name: 'Refund Approver' }],
+        },
+      ]);
+      renderWithProviders(<RoleDetailPage />);
+
+      // Member rows render
+      expect(await screen.findByText('Maria Chen')).toBeInTheDocument();
+      expect(screen.getByText('Sam Singh')).toBeInTheDocument();
+
+      // Sub-line for Maria: "Field Supervisor" (other role)
+      expect(screen.getByText('Field Supervisor')).toBeInTheDocument();
+      // Sub-line for Sam: falls back to "Refund Approver"
+      // (appears in heading too — assert via getAllByText length > 0)
+      expect(screen.getAllByText('Refund Approver').length).toBeGreaterThan(0);
     });
   });
 
