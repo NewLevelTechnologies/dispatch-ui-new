@@ -25,7 +25,7 @@ import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChi
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
-import { roleColor } from '../utils/roleColor';
+import { roleAccentFromRole } from '../utils/roleColor';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 
 type TypeFilter = 'builtin' | 'custom' | '';
@@ -403,7 +403,7 @@ export default function RolesPage() {
                       totalCapabilities > 0
                         ? Math.round((capCount / totalCapabilities) * 100)
                         : 0;
-                    const accent = roleColor(role.name);
+                    const accent = roleAccentFromRole(role);
                     return (
                       <DenseRow
                         key={role.id}

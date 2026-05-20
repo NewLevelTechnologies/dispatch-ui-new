@@ -346,7 +346,11 @@ export default function UsersPage() {
                               return (
                                 <div className="flex flex-wrap gap-1">
                                   {visible.map((role) => (
-                                    <RoleChip key={role.id} name={role.name} />
+                                    <RoleChip
+                                      key={role.id}
+                                      name={role.name}
+                                      accentId={role.accentId}
+                                    />
                                   ))}
                                   {overflow.length > 0 && (
                                     <span title={overflow.map((r) => r.name).join(', ')}>

@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { userApi, dispatchRegionApi, type User, type Role } from '../api';
 import { RoleChip } from '../components/RoleChip';
-import { roleColor } from '../utils/roleColor';
+import { roleAccent } from '../utils/roleColor';
 import { auditApi, type AccountActivityEvent } from '../api/auditApi';
 import { formatPhone } from '../utils/formatPhone';
 import { useHasCapability } from '../hooks/useCurrentUser';
@@ -303,7 +303,7 @@ function RoleStack({ roles, max = 3 }: { roles: Role[]; max?: number }) {
   return (
     <div className="flex flex-wrap items-center gap-1">
       {inline.map((r) => (
-        <RoleChip key={r.id} name={r.name} />
+        <RoleChip key={r.id} name={r.name} accentId={r.accentId} />
       ))}
       {more > 0 && (
         <Badge title={roles.slice(max).map((r) => r.name).join(', ')}>
@@ -348,7 +348,9 @@ function RolesAndRegionsCard({
       >
         <div className="flex flex-wrap gap-1">
           {(user.roles ?? []).length > 0 ? (
-            user.roles!.map((r) => <RoleChip key={r.id} name={r.name} />)
+            user.roles!.map((r) => (
+              <RoleChip key={r.id} name={r.name} accentId={r.accentId} />
+            ))
           ) : (
             <span className="text-[11.5px] italic text-fg-dim">No roles assigned</span>
           )}
@@ -405,6 +407,7 @@ function CapabilityDetail({ user }: { user: User }) {
   const userCaps = new Set(user.capabilities ?? []);
   const sourceRoles = (user.roles ?? []).map((r) => ({
     name: r.name,
+    accentId: r.accentId,
     caps: new Set(r.capabilities ?? []),
   }));
   const groups = data.groups
@@ -445,7 +448,7 @@ function CapabilityDetail({ user }: { user: User }) {
                     {sources.length > 0 && sources.length < (user.roles?.length ?? 0) && (
                       <span
                         className="rounded px-1 text-[9px] font-bold uppercase tracking-wider text-white"
-                        style={{ background: roleColor(sources[0].name) }}
+                        style={{ background: roleAccent(sources[0].accentId, sources[0].name) }}
                       >
                         {sources[0].name
                           .split(' ')

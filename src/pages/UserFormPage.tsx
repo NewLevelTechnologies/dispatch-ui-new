@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { PatternFormat } from 'react-number-format';
 import { userApi, dispatchRegionApi, type Role } from '../api';
-import { roleColor } from '../utils/roleColor';
+import { roleAccentFromRole } from '../utils/roleColor';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
@@ -482,7 +482,7 @@ function RoleMultiSelect({
           {displayed.map((role) => {
             const on = selected.includes(role.id);
             const capCount = role.capabilities?.length ?? 0;
-            const color = roleColor(role.name);
+            const color = roleAccentFromRole(role);
             return (
               // Native <label> wrapping a Catalyst Checkbox — the browser
               // forwards clicks anywhere inside the label to the nested
