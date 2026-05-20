@@ -27,7 +27,7 @@ import {
   DropdownMenu,
 } from '../components/catalyst/dropdown';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { roleColor } from '../utils/roleColor';
+import { roleAccentFromRole } from '../utils/roleColor';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 
 function formatDateShort(value?: string): string {
@@ -143,7 +143,7 @@ export default function RoleDetailPage() {
     );
   }
 
-  const accent = roleColor(role.name);
+  const accent = roleAccentFromRole(role);
   const userCount = members.length;
   const grantedCaps = new Set(role.capabilities ?? []);
 
