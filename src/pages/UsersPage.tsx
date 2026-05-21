@@ -168,15 +168,6 @@ export default function UsersPage() {
     });
   }, [users, searchQuery, roleFilter, statusFilter]);
 
-  // Format date helper
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
   // Subtitle reflects the *displayed* set (matches filtered count) and adds
   // an "X disabled" breakdown when it's non-zero — Users loads all rows on a
   // single GET, so this is cheap.
@@ -300,7 +291,6 @@ export default function UsersPage() {
                   <tr>
                     <th>{t('common.form.name')}</th>
                     <th>{t('common.form.role')}</th>
-                    <th>{t('users.table.lastActive')}</th>
                     <th>{t('common.form.status')}</th>
                     <th style={{ width: 40 }}></th>
                   </tr>
@@ -364,7 +354,6 @@ export default function UsersPage() {
                             <span className="text-fg-dim">—</span>
                           )}
                         </td>
-                        <td className="muted">{formatDate(user.updatedAt)}</td>
                         <td>
                           {user.enabled ? (
                             <Pill tone="success" dot live>{t('common.active')}</Pill>

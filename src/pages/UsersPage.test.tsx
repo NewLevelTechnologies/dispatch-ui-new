@@ -189,25 +189,6 @@ describe('UsersPage', () => {
     expect(dashElements.length).toBeGreaterThan(0);
   });
 
-  it('formats dates correctly', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: mockUsers });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    renderWithProviders(<UsersPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Jan 15, 2024')).toBeInTheDocument();
-      expect(screen.getByText('Jan 20, 2024')).toBeInTheDocument();
-    });
-  });
-
   it('displays error message when fetch fails', async () => {
     vi.mocked(apiClient.get).mockRejectedValue(new Error('Network error'));
 
