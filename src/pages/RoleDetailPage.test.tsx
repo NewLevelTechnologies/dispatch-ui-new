@@ -200,7 +200,9 @@ describe('RoleDetailPage', () => {
         ).toBeInTheDocument();
       });
 
-      await user.click(screen.getByRole('button', { name: /show all/i }));
+      // ToggleGroup is built on Headless RadioGroup — options expose
+      // role="radio", not role="button".
+      await user.click(screen.getByRole('radio', { name: /show all/i }));
 
       await waitFor(() => {
         expect(screen.getByText('View Work Orders')).toBeInTheDocument();

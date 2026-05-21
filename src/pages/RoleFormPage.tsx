@@ -7,9 +7,10 @@ import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { userApi, type Role } from '../api';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
+import { Checkbox } from '../components/catalyst/checkbox';
 import { ErrorMessage, Field, Label } from '../components/catalyst/fieldset';
 import { Heading } from '../components/catalyst/heading';
-import { Input } from '../components/catalyst/input';
+import { Input, InputGroup } from '../components/catalyst/input';
 import { Textarea } from '../components/catalyst/textarea';
 import { Text } from '../components/catalyst/text';
 import { Callout } from '../components/ui/Callout';
@@ -336,10 +337,7 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
 
             {/* Identity */}
             <Card title="Identity" className="mb-3">
-              <div
-                className="grid items-start gap-2.5"
-                style={{ gridTemplateColumns: '1.4fr 1fr' }}
-              >
+              <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-cols-[1.4fr_1fr]">
                 <Field size="xs">
                   <Label size="xs" required>
                     {t('roles.form.title')}
@@ -357,7 +355,7 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
                   <Label size="xs" required>
                     {t('roles.form.colorLabel')}
                   </Label>
-                  <ColorPicker
+                  <RoleColorPicker
                     value={accentId}
                     onChange={(id) => {
                       setAccentId(id);
@@ -399,14 +397,14 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
                 className="mb-3"
               >
                 <div className="flex flex-wrap gap-1.5">
-                  <StartFromChip
+                  <RoleStartFromChip
                     selected={capabilities.size === 0}
                     onClick={() => setCapabilities(new Set())}
                   >
                     {t('roles.form.blank')}
-                  </StartFromChip>
+                  </RoleStartFromChip>
                   {allRoles.map((r) => (
-                    <StartFromChip
+                    <RoleStartFromChip
                       key={r.id}
                       onClick={() => setCapabilities(new Set(r.capabilities ?? []))}
                     >
@@ -418,7 +416,7 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
                       <span className="font-mono text-[10px] text-fg-dim tabular-nums">
                         {r.capabilities?.length ?? 0}
                       </span>
-                    </StartFromChip>
+                    </RoleStartFromChip>
                   ))}
                 </div>
               </Card>
@@ -437,15 +435,19 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
               }
               action={
                 <>
-                  <div className="relative">
-                    <MagnifyingGlassIcon className="pointer-events-none absolute left-2 top-1/2 size-3 -translate-y-1/2 text-fg-dim" />
-                    <input
-                      ref={searchRef}
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder={t('roles.form.capabilityFilterPlaceholder')}
-                      className="block h-6 w-[200px] rounded-md border border-border bg-bg-elev-2 pl-7 pr-2 text-[11.5px] text-fg-strong outline-none focus:border-accent-500"
-                    />
+                  <div className="w-[200px]">
+                    <InputGroup>
+                      <MagnifyingGlassIcon data-slot="icon" />
+                      <Input
+                        ref={searchRef}
+                        type="search"
+                        size="xs"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder={t('roles.form.capabilityFilterPlaceholder')}
+                        aria-label={t('roles.form.capabilityFilterPlaceholder')}
+                      />
+                    </InputGroup>
                   </div>
                   {capabilities.size > 0 && !isAdmin && (
                     <Button outline size="xs" onClick={clearAll}>
@@ -516,18 +518,18 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
                       {t('roles.form.capabilitiesHiddenByFilter', { count: hiddenCount })}
                     </span>
                     <span className="text-fg-dim">·</span>
-                    <button
-                      type="button"
+                    <Button
+                      plain
+                      size="xxs"
                       onClick={() => {
                         setSearch('');
                         // Refocus so a keyboard user can keep typing without
                         // reaching for the mouse.
                         requestAnimationFrame(() => searchRef.current?.focus());
                       }}
-                      className="font-medium text-accent-700 hover:underline"
                     >
                       {t('roles.form.clearFilter')}
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -597,9 +599,10 @@ export function RoleEditPage() {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// Color picker — 10 swatches, stores a token id, not the oklch value
+// RoleColorPicker — 10 swatches, stores a token id, not the oklch value.
+// Page-local: lives here until a second surface needs the same picker.
 // ──────────────────────────────────────────────────────────────────
-function ColorPicker({
+function RoleColorPicker({
   value,
   onChange,
   colorsInUse,
@@ -657,9 +660,10 @@ function ColorPicker({
 }
 
 // ──────────────────────────────────────────────────────────────────
-// StartFromChip — single chip in the add-mode template row
+// RoleStartFromChip — single chip in the add-mode template row.
+// Page-local: lives here until a second surface needs it.
 // ──────────────────────────────────────────────────────────────────
-function StartFromChip({
+function RoleStartFromChip({
   selected,
   onClick,
   children,
@@ -736,16 +740,19 @@ function AreaBlock({
   return (
     <div className={isLast ? '' : 'border-b border-border-soft'}>
       <div className="flex items-center gap-2.5 border-b border-border-soft bg-bg-elev px-3 py-2">
-        <label className={'inline-flex min-w-0 items-center gap-2 ' + (disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer')}>
-          <input
-            type="checkbox"
+        <label
+          className={
+            'inline-flex min-w-0 items-center gap-2 ' +
+            (disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer')
+          }
+        >
+          <Checkbox
+            color="accent"
             checked={allOn}
             disabled={disabled}
-            ref={(el) => {
-              if (el) el.indeterminate = someOn;
-            }}
+            indeterminate={someOn}
+            aria-label={area.displayName}
             onChange={() => onToggleArea(all.map((c) => c.name), allOn)}
-            className="size-[13px] accent-accent-500"
           />
           <span className="text-[12px] font-semibold text-fg-strong">
             {area.displayName}
@@ -759,13 +766,13 @@ function AreaBlock({
           {grantedCount}/{all.length}
         </span>
         {!disabled && (
-          <button
-            type="button"
+          <Button
+            plain
+            size="xxs"
             onClick={() => onToggleArea(all.map((c) => c.name), allOn)}
-            className="text-[10.5px] font-medium text-accent-700 hover:underline"
           >
             {allOn ? t('roles.form.clearArea') : t('roles.form.selectAll')}
-          </button>
+          </Button>
         )}
       </div>
       <div className="grid grid-cols-3 gap-1 p-2 max-md:grid-cols-2 max-sm:grid-cols-1">
@@ -780,12 +787,12 @@ function AreaBlock({
                 (on ? ' border border-accent-500/25 bg-accent-500/5' : ' border border-transparent')
               }
             >
-              <input
-                type="checkbox"
+              <Checkbox
+                color="accent"
                 checked={on}
                 disabled={disabled}
+                aria-label={c.displayName}
                 onChange={() => onToggleCap(c.name)}
-                className="size-3 shrink-0 accent-accent-500"
               />
               <span
                 className={
