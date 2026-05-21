@@ -19,6 +19,12 @@
 //       </DenseRow>
 //     </tbody>
 //   </DenseTable>
+//
+// Mobile-card layout (< 640px) assumes the FIRST cell is the row's title
+// and the LAST cell is the kebab. If you need leading-edge chrome —
+// drag handle, checkbox, expand caret — put it INSIDE the first content
+// cell as a flex sibling, not in its own column. A separate first-column
+// cell will hijack the title slot on mobile.
 // ─────────────────────────────────────────────────────────────────
 import type { HTMLAttributes, KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import clsx from 'clsx';
