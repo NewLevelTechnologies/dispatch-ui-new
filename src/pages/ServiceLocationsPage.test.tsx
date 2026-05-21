@@ -442,9 +442,9 @@ describe('ServiceLocationsPage', () => {
       expect(screen.getByText('Warehouse')).toBeInTheDocument();
     });
 
-    // Warehouse has no contact, should show dash
-    const rows = screen.getAllByRole('row');
-    const warehouseRow = rows.find(row => row.textContent?.includes('Warehouse'));
+    // Warehouse has no contact, should show dash. Clickable DenseRows expose
+    // `role="button"` so locate the row via its text content + closest <tr>.
+    const warehouseRow = screen.getByText('Warehouse').closest('tr');
     expect(warehouseRow?.textContent).toContain('-');
   });
 

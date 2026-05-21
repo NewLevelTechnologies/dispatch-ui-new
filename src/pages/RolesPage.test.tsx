@@ -214,10 +214,11 @@ describe('RolesPage', () => {
       });
 
       // Tech has 2 users, Admin has 1, Refund Approver has 0 — order should
-      // match that.
-      const cells = screen.getAllByRole('row').slice(1); // strip thead
+      // match that. Clickable DenseRows expose `role="button"` (not `role="row"`)
+      // so query the tbody directly.
+      const cells = Array.from(document.querySelectorAll('tbody tr'));
       const orderedNames = cells.map(
-        (row) => within(row).getByText(/Admin|Technician|Refund Approver/).textContent
+        (row) => within(row as HTMLElement).getByText(/Admin|Technician|Refund Approver/).textContent
       );
       expect(orderedNames).toEqual(['Technician', 'Admin', 'Refund Approver']);
     });

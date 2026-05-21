@@ -262,9 +262,6 @@ export default function PaymentsPage() {
                 </tbody>
               </DenseTable>
               <ListFooter
-                page={1}
-                totalPages={1}
-                pageHref={() => '#'}
                 left={t('common.pagination.showing', {
                   start: filteredPayments.length > 0 ? 1 : 0,
                   end: filteredPayments.length,
