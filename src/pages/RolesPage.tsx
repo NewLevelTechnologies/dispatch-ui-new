@@ -14,13 +14,13 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from '../components/catalyst/dropdown';
-import { Alert, AlertActions, AlertDescription, AlertTitle } from '../components/catalyst/alert';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { Pill } from '../components/ui/Pill';
 import { Card, CardBody } from '../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import { PageHead } from '../components/ui/PageHead';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListFooter } from '../components/ui/ListFooter';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -223,33 +223,43 @@ export default function RolesPage() {
         actions={
           canManage ? (
             <>
-              {canEditRoles && (
-                <Button
-                  outline
-                  size="xs"
-                  disabled={!builtinPresent}
-                  onClick={() => setIsRestoreAllAlertOpen(true)}
-                  title={
-                    !builtinPresent
-                      ? 'All built-in roles are at their defaults'
-                      : undefined
-                  }
-                >
-                  {t('roles.actions.restoreAllDefaults')}
-                </Button>
-              )}
               {canCreateRoles && (
-                <Button color="accent" size="xs" href="/settings/access/roles/new">
+                <Button
+                  color="accent"
+                  size="xs"
+                  href="/settings/access/roles/new"
+                  className="whitespace-nowrap max-sm:flex-1"
+                >
                   {t('common.actions.add', { entity: t('entities.role').toLowerCase() })}
                 </Button>
+              )}
+              {canEditRoles && (
+                <Dropdown>
+                  <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                    <EllipsisVerticalIcon className="size-4" />
+                  </DropdownButton>
+                  <DropdownMenu anchor="bottom end">
+                    <DropdownItem
+                      disabled={!builtinPresent}
+                      onClick={() => setIsRestoreAllAlertOpen(true)}
+                    >
+                      <DropdownLabel>{t('roles.actions.restoreAllDefaults')}</DropdownLabel>
+                    </DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
               )}
             </>
           ) : null
         }
       />
 
-      {/* Summary strip — 5 cells, soft dividers */}
-      <div className="mb-3 grid grid-cols-5 overflow-hidden rounded-[10px] border border-border bg-bg-elev">
+      {/* Summary strip — 5 cells. Designer-approved exception (the
+          design-system reference confines metric strips to dashboards,
+          but the built-in/custom/users/capabilities breakdown earns its
+          spot on this page). On mobile the row reflows to a 2-column
+          grid; the trailing odd cell sits alone so the count of stats
+          stays visible. */}
+      <div className="mb-3 grid grid-cols-2 overflow-hidden rounded-[10px] border border-border bg-bg-elev sm:grid-cols-5">
         <SummaryCell label={t('roles.summary.roles')} value={totals.total} />
         <SummaryCell label={t('roles.summary.builtIn')} value={totals.builtin} />
         <SummaryCell label={t('roles.summary.custom')} value={totals.custom} />
@@ -502,22 +512,27 @@ export default function RolesPage() {
                   })}
                 </tbody>
               </DenseTable>
-              <div className="flex items-center gap-2 border-t border-border-soft bg-bg-elev-2 px-4 py-2 text-[11.5px] text-fg-muted">
-                <span>
-                  {t('settings.showingCount', {
-                    count: filteredRoles.length,
-                    noun: t('entities.roles').toLowerCase(),
-                  })}{' '}
-                  ·{' '}
-                  {t('roles.breakdown.builtIn', {
-                    count: filteredRoles.filter((r) => r.isSystemRole).length,
-                  })}{' '}
-                  ·{' '}
-                  {t('roles.breakdown.custom', {
-                    count: filteredRoles.filter((r) => !r.isSystemRole).length,
-                  })}
-                </span>
-              </div>
+              <ListFooter
+                page={1}
+                totalPages={1}
+                pageHref={() => '#'}
+                left={
+                  <>
+                    {t('settings.showingCount', {
+                      count: filteredRoles.length,
+                      noun: t('entities.roles').toLowerCase(),
+                    })}{' '}
+                    ·{' '}
+                    {t('roles.breakdown.builtIn', {
+                      count: filteredRoles.filter((r) => r.isSystemRole).length,
+                    })}{' '}
+                    ·{' '}
+                    {t('roles.breakdown.custom', {
+                      count: filteredRoles.filter((r) => !r.isSystemRole).length,
+                    })}
+                  </>
+                }
+              />
             </>
           )}
         </CardBody>
@@ -536,33 +551,22 @@ export default function RolesPage() {
         isPending={deleteMutation.isPending}
       />
 
-      <Alert
-        open={isRestoreAllAlertOpen}
+      <ConfirmDialog
+        isOpen={isRestoreAllAlertOpen}
         onClose={() => setIsRestoreAllAlertOpen(false)}
-      >
-        <AlertTitle>{t('roles.actions.restoreAllDefaultsConfirm')}</AlertTitle>
-        <AlertDescription>
-          {t('roles.actions.restoreAllDefaultsDescription', {
-            count: (roles ?? []).filter((r) => r.isSystemRole).length || 6,
-          })}{' '}
-          {t('roles.actions.restoreAllDefaultsDetails')}{' '}
-          {t('roles.actions.restoreAllDefaultsWarning')}
-        </AlertDescription>
-        <AlertActions>
-          <Button plain onClick={() => setIsRestoreAllAlertOpen(false)}>
-            {t('common.cancel')}
-          </Button>
-          <Button
-            color="accent"
-            onClick={() => restoreAllMutation.mutate()}
-            disabled={restoreAllMutation.isPending}
-          >
-            {restoreAllMutation.isPending
-              ? t('common.restoring')
-              : t('roles.actions.restoreAllDefaults')}
-          </Button>
-        </AlertActions>
-      </Alert>
+        onConfirm={() => restoreAllMutation.mutate()}
+        title={t('roles.actions.restoreAllDefaultsConfirm')}
+        message={`${t('roles.actions.restoreAllDefaultsDescription', {
+          count: (roles ?? []).filter((r) => r.isSystemRole).length || 6,
+        })} ${t('roles.actions.restoreAllDefaultsDetails')} ${t('roles.actions.restoreAllDefaultsWarning')}`}
+        confirmLabel={
+          restoreAllMutation.isPending
+            ? t('common.restoring')
+            : t('roles.actions.restoreAllDefaults')
+        }
+        isDestructive
+        isPending={restoreAllMutation.isPending}
+      />
     </div>
   );
 }
@@ -576,11 +580,14 @@ function SummaryCell({
   value: number;
   last?: boolean;
 }) {
+  // The vertical dividers only line up in the desktop 5-col layout. In
+  // the 2-col mobile layout they'd land between odd/even cells where
+  // they don't belong — hide below sm, restore at sm:.
   return (
     <div
       className={
         'px-4 py-[11px]' +
-        (last ? '' : ' border-r border-border-soft')
+        (last ? '' : ' sm:border-r sm:border-border-soft')
       }
     >
       <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-fg-muted">
