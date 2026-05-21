@@ -586,7 +586,19 @@ function InlineAddRow({ existing, nextSortOrder }: InlineAddRowProps) {
   }
 
   const disabled = createMutation.isPending;
-  const dimInput = 'w-[64px] text-center tabular-nums';
+  // Catalyst <Input> wraps the <input> in a `block w-full` <span>, so a
+  // fixed-width sibling wrapper around each Input is what actually pins
+  // the dimension boxes to 56 px. Don't use <Field> here — Field's block
+  // rhythm stretches each input across the row.
+  const dimInputClass =
+    'text-center tabular-nums ' +
+    // Hide the number-spinner arrows so 1- to 2-digit dimensions read clean.
+    '[&_input]:[-moz-appearance:textfield] ' +
+    '[&_input::-webkit-outer-spin-button]:m-0 ' +
+    '[&_input::-webkit-outer-spin-button]:appearance-none ' +
+    '[&_input::-webkit-inner-spin-button]:m-0 ' +
+    '[&_input::-webkit-inner-spin-button]:appearance-none';
+  const dimWrap = 'inline-block w-14 shrink-0';
 
   return (
     <tr>
@@ -596,57 +608,78 @@ function InlineAddRow({ existing, nextSortOrder }: InlineAddRowProps) {
           role="group"
           aria-label={t('settings.filterSizes.addRowLabel')}
           onSubmit={handleSubmit}
-          className="flex flex-wrap items-center gap-2 px-2 py-1.5"
+          className="flex flex-nowrap items-center gap-2 px-2 py-1.5 max-sm:flex-wrap"
         >
-          <Input
-            ref={lengthRef}
-            size="xs"
-            type="number"
-            inputMode="decimal"
-            step="0.25"
-            min="0"
-            autoFocus
-            className={dimInput}
-            value={draft.length}
-            onChange={(e) => updateField('length', e.target.value)}
-            onKeyDown={handleKey}
-            placeholder={t('settings.filterSizes.dimAbbrev.length')}
-            aria-label={t('settings.filterSizes.length')}
-            disabled={disabled}
-          />
+          <label className="sr-only" htmlFor="fs-length">
+            {t('settings.filterSizes.length')}
+          </label>
+          <span className={dimWrap}>
+            <Input
+              id="fs-length"
+              ref={lengthRef}
+              size="xs"
+              type="number"
+              inputMode="decimal"
+              step="0.25"
+              min="1"
+              max="96"
+              autoFocus
+              className={dimInputClass}
+              value={draft.length}
+              onChange={(e) => updateField('length', e.target.value)}
+              onKeyDown={handleKey}
+              placeholder={t('settings.filterSizes.dimAbbrev.length')}
+              disabled={disabled}
+            />
+          </span>
           <span className="text-fg-muted" aria-hidden>×</span>
-          <Input
-            ref={widthRef}
-            size="xs"
-            type="number"
-            inputMode="decimal"
-            step="0.25"
-            min="0"
-            className={dimInput}
-            value={draft.width}
-            onChange={(e) => updateField('width', e.target.value)}
-            onKeyDown={handleKey}
-            placeholder={t('settings.filterSizes.dimAbbrev.width')}
-            aria-label={t('settings.filterSizes.width')}
-            disabled={disabled}
-          />
+
+          <label className="sr-only" htmlFor="fs-width">
+            {t('settings.filterSizes.width')}
+          </label>
+          <span className={dimWrap}>
+            <Input
+              id="fs-width"
+              ref={widthRef}
+              size="xs"
+              type="number"
+              inputMode="decimal"
+              step="0.25"
+              min="1"
+              max="96"
+              className={dimInputClass}
+              value={draft.width}
+              onChange={(e) => updateField('width', e.target.value)}
+              onKeyDown={handleKey}
+              placeholder={t('settings.filterSizes.dimAbbrev.width')}
+              disabled={disabled}
+            />
+          </span>
           <span className="text-fg-muted" aria-hidden>×</span>
-          <Input
-            ref={thicknessRef}
-            size="xs"
-            type="number"
-            inputMode="decimal"
-            step="0.25"
-            min="0"
-            className={dimInput}
-            value={draft.thickness}
-            onChange={(e) => updateField('thickness', e.target.value)}
-            onKeyDown={handleKey}
-            placeholder={t('settings.filterSizes.dimAbbrev.thickness')}
-            aria-label={t('settings.filterSizes.thickness')}
-            disabled={disabled}
-          />
-          <span className="ml-1 text-[11px] text-fg-dim">
+
+          <label className="sr-only" htmlFor="fs-thickness">
+            {t('settings.filterSizes.thickness')}
+          </label>
+          <span className={dimWrap}>
+            <Input
+              id="fs-thickness"
+              ref={thicknessRef}
+              size="xs"
+              type="number"
+              inputMode="decimal"
+              step="0.25"
+              min="0.5"
+              max="12"
+              className={dimInputClass}
+              value={draft.thickness}
+              onChange={(e) => updateField('thickness', e.target.value)}
+              onKeyDown={handleKey}
+              placeholder={t('settings.filterSizes.dimAbbrev.thickness')}
+              disabled={disabled}
+            />
+          </span>
+
+          <span className="ml-2 text-[11px] text-fg-dim max-sm:w-full">
             {t('settings.filterSizes.dimensionsHint')}
           </span>
           {/* Allow Enter from any input to submit the row. */}
