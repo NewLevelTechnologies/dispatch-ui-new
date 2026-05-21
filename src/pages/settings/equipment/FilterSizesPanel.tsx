@@ -281,10 +281,6 @@ export default function FilterSizesPanel() {
                 <DenseTable>
                   <DenseTHead>
                     <tr>
-                      <th
-                        style={{ width: 28 }}
-                        className="hidden sm:table-cell"
-                      ></th>
                       <th>{t('settings.filterSizes.size')}</th>
                       <th style={{ width: 40 }}></th>
                     </tr>
@@ -336,10 +332,14 @@ export default function FilterSizesPanel() {
                             .filter(Boolean)
                             .join(' ')}
                         >
-                          <td className="hidden sm:table-cell">
-                            <DragHandle />
+                          <td className="strong">
+                            <span className="flex items-center gap-2">
+                              <span className="hidden sm:flex">
+                                <DragHandle />
+                              </span>
+                              {formatFilterSize(item)}
+                            </span>
                           </td>
-                          <td className="strong">{formatFilterSize(item)}</td>
                           <td className="right">
                             <Dropdown>
                               <DropdownButton
@@ -571,7 +571,7 @@ function InlineAddRow({ existing, nextSortOrder }: InlineAddRowProps) {
   if (!adding) {
     return (
       <tr>
-        <td colSpan={3}>
+        <td colSpan={2}>
           <button
             type="button"
             onClick={() => setAdding(true)}
@@ -602,7 +602,6 @@ function InlineAddRow({ existing, nextSortOrder }: InlineAddRowProps) {
 
   return (
     <tr>
-      <td className="hidden sm:table-cell"></td>
       <td colSpan={2}>
         <form
           role="group"

@@ -810,6 +810,8 @@ When adding a new feature:
 2. Search the codebase for existing usage examples
 3. Follow the exact structure shown in Catalyst documentation
 
+**Tables with drag handles, checkboxes, or other leading-edge chrome**: put the chrome inside the first content cell as a flex sibling (`hidden sm:flex` if it's desktop-only), not in its own column. A separate chrome column breaks DenseTable's mobile-card layout.
+
 ---
 
 ### React Query Error Handling Pattern
