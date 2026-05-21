@@ -144,4 +144,76 @@ describe('CompanyProfilePanel', () => {
     expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/file size/i));
     alertSpy.mockRestore();
   });
+
+  it('uploads a valid logo and calls the upload endpoint', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { ...mockSettings, logoOriginalUrl: 'https://x/logo.png' },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() =>
+      expect(screen.getByText('Acme HVAC')).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole('button', { name: /edit/i }));
+
+    const fileInput = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    const goodFile = new File(['x'], 'logo.png', { type: 'image/png' });
+    await user.upload(fileInput, goodFile);
+
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalled();
+    });
+  });
+
+  it('updates address fields on edit', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() =>
+      expect(screen.getByText('Acme HVAC')).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole('button', { name: /edit/i }));
+
+    const cityInput = screen.getByDisplayValue('Springfield');
+    await user.clear(cityInput);
+    await user.type(cityInput, 'Shelbyville');
+    expect(cityInput).toHaveValue('Shelbyville');
+  });
+
+  it('reverts edits when Cancel is clicked', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() =>
+      expect(screen.getByText('Acme HVAC')).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole('button', { name: /edit/i }));
+
+    const cityInput = screen.getByDisplayValue('Springfield');
+    await user.clear(cityInput);
+    await user.type(cityInput, 'Shelbyville');
+
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+    // Back in view mode — old city is shown.
+    await user.click(screen.getByRole('button', { name: /edit/i }));
+    expect(screen.getByDisplayValue('Springfield')).toBeInTheDocument();
+  });
+
+  it('shows alert when update API rejects', async () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.mocked(apiClient.put).mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() =>
+      expect(screen.getByText('Acme HVAC')).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole('button', { name: /edit/i }));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalled();
+    });
+    alertSpy.mockRestore();
+  });
 });

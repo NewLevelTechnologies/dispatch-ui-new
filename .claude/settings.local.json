@@ -55,7 +55,8 @@
       "Bash(grep -n \"<AppLayout>\\\\|</AppLayout>\\\\|^      <div>\\\\s*$\\\\|^      </div>\\\\s*$\" src/pages/CustomersPage.tsx)",
       "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
       "Bash(awk -F'|' '$4+0 < 80 {print $1, \"fn:\"$4}')",
-      "Bash(npx vitest *)"
+      "Bash(npx vitest *)",
+      "Bash(node -e ' *)"
     ]
   }
 }

@@ -391,5 +391,97 @@ describe('WorkOrdersPage', () => {
         expect(blockedTab).toHaveAttribute('aria-selected', 'true');
       });
     });
+
+    it('typing in search updates the input value', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
+      const user = userEvent.setup();
+      renderWithProviders(<WorkOrdersPage />);
+
+      const search = screen.getByPlaceholderText(
+        /search by wo#, customer, or address/i,
+      );
+      await user.type(search, 'lenox');
+      expect(search).toHaveValue('lenox');
+    });
+
+    it('selecting a date preset updates the URL', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
+      const user = userEvent.setup();
+      const { router } = renderWithProviders(<WorkOrdersPage />);
+
+      // Scheduled filter is the date preset filter chip.
+      const scheduledFilter = await screen.findByRole('button', {
+        name: /scheduled/i,
+      });
+      await user.click(scheduledFilter);
+
+      // Pick "Today" preset.
+      const today = await screen.findByRole('option', { name: /today/i });
+      await user.click(today);
+
+      await waitFor(() => {
+        expect(router.state.location.search).toContain('date=today');
+      });
+    });
+  });
+
+  describe('Archive flow', () => {
+    it('shows archive confirmation when archive action is clicked', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({
+        data: pageOf(mockWorkOrders),
+      });
+      const confirmSpy = vi
+        .spyOn(window, 'confirm')
+        .mockReturnValue(false);
+      const user = userEvent.setup();
+
+      renderWithProviders(<WorkOrdersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('WO-00001')).toBeInTheDocument();
+      });
+
+      const dropdownButtons = screen.getAllByRole('button', {
+        name: /more options/i,
+      });
+      await user.click(dropdownButtons[0]);
+
+      const archiveItem = await screen.findByRole('menuitem', {
+        name: /^archive/i,
+      });
+      await user.click(archiveItem);
+
+      expect(confirmSpy).toHaveBeenCalled();
+      confirmSpy.mockRestore();
+    });
+
+    it('opens cancel dialog when cancel action is clicked', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({
+        data: pageOf(mockWorkOrders),
+      });
+      const user = userEvent.setup();
+
+      renderWithProviders(<WorkOrdersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('WO-00001')).toBeInTheDocument();
+      });
+
+      const dropdownButtons = screen.getAllByRole('button', {
+        name: /more options/i,
+      });
+      await user.click(dropdownButtons[0]);
+
+      const cancelItem = await screen.findByRole('menuitem', {
+        name: /cancel/i,
+      });
+      await user.click(cancelItem);
+
+      // CancelWorkOrderDialog opens with the WO context.
+      await waitFor(() => {
+        const dialogs = screen.queryAllByRole('dialog');
+        expect(dialogs.length).toBeGreaterThan(0);
+      });
+    });
   });
 });
