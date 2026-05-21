@@ -531,14 +531,18 @@ function TaxonomyBlock({
         <div
           role="button"
           tabIndex={0}
+          aria-expanded={isExpanded}
+          aria-controls={`taxonomy-block-${type.id}-categories`}
           onClick={onToggle}
           onKeyDown={(e) => {
+            // Child interactives (drag handle, kebab) own their own key handling.
+            if (e.currentTarget !== e.target) return;
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
               onToggle();
             }
           }}
-          className="grid w-full cursor-pointer grid-cols-[20px_18px_1fr_auto_26px] items-center gap-2.5 px-3.5 py-3 text-left max-sm:grid-cols-[18px_1fr_auto_26px]"
+          className="acc-type-row grid w-full cursor-pointer grid-cols-[20px_18px_1fr_auto_26px] items-center gap-2.5 px-3.5 py-3 text-left max-sm:grid-cols-[18px_1fr_auto_26px]"
         >
           <span className="max-sm:hidden">
             <DragHandle />
@@ -599,7 +603,10 @@ function TaxonomyBlock({
         </div>
 
         {isExpanded && (
-          <div className="border-t border-border-soft bg-bg-sunken pb-2 pt-1.5 pl-3.5 pr-3.5 sm:pl-[50px]">
+          <div
+            id={`taxonomy-block-${type.id}-categories`}
+            className="border-t border-border-soft bg-bg-sunken pb-2 pt-1.5 pl-3.5 pr-3.5 sm:pl-[50px]"
+          >
             {type.categories.length === 0 ? (
               <EmptyState
                 compact

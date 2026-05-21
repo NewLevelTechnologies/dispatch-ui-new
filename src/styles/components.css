@@ -432,6 +432,15 @@
   box-shadow: inset 2px 0 0 var(--accent-500), inset -1px 0 0 var(--border-soft);
 }
 
+/* Keyboard focus ring for accordion type-block headers on the equipment
+   taxonomy page. Same accent-token treatment as `.dense-row-interactive`,
+   scoped via `:focus-visible` so mouse clicks don't show the ring. */
+.acc-type-row:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: -2px;
+  border-radius: inherit;
+}
+
 .dense-table .num { font-variant-numeric: tabular-nums; letter-spacing: -0.005em; }
 .dense-table .strong { color: var(--fg-strong); font-weight: 600; }
 .dense-table .muted { color: var(--fg-muted); font-size: 11px; }
