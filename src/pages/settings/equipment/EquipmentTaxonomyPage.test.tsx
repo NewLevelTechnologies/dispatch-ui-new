@@ -293,6 +293,283 @@ describe('EquipmentTaxonomyPage', () => {
     expect(moveDown).not.toHaveAttribute('aria-disabled', 'true');
   });
 
+  it('renames a type via the kebab Rename item', async () => {
+    mockTypesGetAll.mockResolvedValue([baseType('t1', 'HVAC', 0)]);
+    mockCatsGetAll.mockResolvedValue([]);
+    mockTypesUpdate.mockResolvedValue(baseType('t1', 'HVAC Systems', 0));
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
+
+    const kebabs = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(kebabs[0]);
+    const renameItem = await screen.findByRole('menuitem', { name: /rename/i });
+    await user.click(renameItem);
+
+    const nameInput = await screen.findByLabelText(/name/i);
+    expect(nameInput).toHaveValue('HVAC');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'HVAC Systems');
+    await user.click(screen.getByRole('button', { name: /^update$/i }));
+
+    await waitFor(() => {
+      expect(mockTypesUpdate).toHaveBeenCalledWith('t1', { name: 'HVAC Systems' });
+    });
+  });
+
+  it('renames a category via its kebab Rename item', async () => {
+    mockTypesGetAll.mockResolvedValue([baseType('t1', 'HVAC')]);
+    mockCatsGetAll.mockResolvedValue([baseCategory('c1', 'Furnace', 't1', 0)]);
+    mockCatsUpdate.mockResolvedValue(baseCategory('c1', 'Gas Furnace', 't1', 0));
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
+    await user.click(screen.getByText('HVAC'));
+    await screen.findByText('Furnace');
+
+    // Two kebabs are now visible: the type's and the category's.
+    const kebabs = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(kebabs[1]);
+    const renameItem = await screen.findByRole('menuitem', { name: /rename/i });
+    await user.click(renameItem);
+
+    const nameInput = await screen.findByLabelText(/name/i);
+    expect(nameInput).toHaveValue('Furnace');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Gas Furnace');
+    await user.click(screen.getByRole('button', { name: /^update$/i }));
+
+    await waitFor(() => {
+      expect(mockCatsUpdate).toHaveBeenCalledWith('c1', { name: 'Gas Furnace' });
+    });
+  });
+
+  it('deletes a category via the kebab + confirm', async () => {
+    mockTypesGetAll.mockResolvedValue([baseType('t1', 'HVAC')]);
+    mockCatsGetAll.mockResolvedValue([baseCategory('c1', 'Furnace', 't1', 0)]);
+    mockCatsDelete.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
+    await user.click(screen.getByText('HVAC'));
+    await screen.findByText('Furnace');
+
+    const kebabs = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(kebabs[1]);
+    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
+    await user.click(deleteItem);
+
+    // Confirm dialog appears; click the destructive Delete in it.
+    expect(
+      await screen.findByText(/Equipment records using this category/i)
+    ).toBeInTheDocument();
+    const confirmButtons = screen.getAllByRole('button', { name: /^delete$/i });
+    await user.click(confirmButtons[confirmButtons.length - 1]);
+
+    await waitFor(() => expect(mockCatsDelete).toHaveBeenCalledWith('c1'));
+  });
+
+  it('reorders categories within a type via drag-and-drop', async () => {
+    mockTypesGetAll.mockResolvedValue([baseType('t1', 'HVAC')]);
+    mockCatsGetAll.mockResolvedValue([
+      baseCategory('c1', 'Furnace', 't1', 0),
+      baseCategory('c2', 'Heat Pump', 't1', 1),
+    ]);
+    mockCatsReorder.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
+    await user.click(screen.getByText('HVAC'));
+
+    const furnaceRow = (await screen.findByText('Furnace')).closest(
+      '[draggable="true"]'
+    ) as HTMLElement;
+    const heatPumpRow = (await screen.findByText('Heat Pump')).closest(
+      '[draggable="true"]'
+    ) as HTMLElement;
+
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: vi.fn(),
+      getData: vi.fn(),
+      types: [],
+      files: [],
+      items: [],
+    };
+
+    fireEvent.dragStart(heatPumpRow, { dataTransfer });
+    fireEvent.dragOver(furnaceRow, { dataTransfer });
+    fireEvent.drop(furnaceRow, { dataTransfer });
+
+    await waitFor(() =>
+      expect(mockCatsReorder).toHaveBeenCalledWith('t1', ['c2', 'c1'])
+    );
+  });
+
+  it('moves a category down via the kebab Move down item', async () => {
+    mockTypesGetAll.mockResolvedValue([baseType('t1', 'HVAC')]);
+    mockCatsGetAll.mockResolvedValue([
+      baseCategory('c1', 'Furnace', 't1', 0),
+      baseCategory('c2', 'Heat Pump', 't1', 1),
+    ]);
+    mockCatsReorder.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
+    await user.click(screen.getByText('HVAC'));
+    await screen.findByText('Furnace');
+
+    // Category kebabs are after the type kebab. The first category kebab is the
+    // Furnace row.
+    const kebabs = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(kebabs[1]);
+    const moveDown = await screen.findByRole('menuitem', { name: /move down/i });
+    await user.click(moveDown);
+
+    await waitFor(() =>
+      expect(mockCatsReorder).toHaveBeenCalledWith('t1', ['c2', 'c1'])
+    );
+  });
+
+  it('shows the No categories yet empty state when expanding a type with no categories', async () => {
+    mockTypesGetAll.mockResolvedValue([baseType('t1', 'HVAC')]);
+    mockCatsGetAll.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
+    await user.click(screen.getByText('HVAC'));
+
+    expect(await screen.findByText(/no categories yet/i)).toBeInTheDocument();
+  });
+
+  it('Expand all opens every block; Collapse all closes them', async () => {
+    mockTypesGetAll.mockResolvedValue([
+      baseType('t1', 'HVAC', 0),
+      baseType('t2', 'Refrigeration', 1),
+    ]);
+    mockCatsGetAll.mockResolvedValue([
+      baseCategory('c1', 'Furnace', 't1', 0),
+      baseCategory('c2', 'Walk-in', 't2', 0),
+    ]);
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /expand all/i }));
+    expect(
+      await screen.findByRole('button', { name: /add category to hvac/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /add category to refrigeration/i })
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /collapse all/i }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', { name: /add category to hvac/i })
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('clears search via the no-match empty state action', async () => {
+    mockTypesGetAll.mockResolvedValue([baseType('t1', 'HVAC')]);
+    mockCatsGetAll.mockResolvedValue([baseCategory('c1', 'Furnace', 't1', 0)]);
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
+
+    await user.type(
+      screen.getByPlaceholderText(/search types & categories/i),
+      'zzzzz-no-match'
+    );
+    expect(
+      await screen.findByText(/no types or categories match your search/i)
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /clear search/i }));
+    await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
+  });
+
+  it('shows an inline error message in the dialog when create fails', async () => {
+    mockTypesGetAll.mockResolvedValue([]);
+    mockCatsGetAll.mockResolvedValue([]);
+    const apiError = Object.assign(new Error('request failed'), {
+      response: { data: { message: 'Server says no' } },
+    });
+    mockTypesCreate.mockRejectedValue(apiError);
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/no equipment types yet/i)).toBeInTheDocument()
+    );
+
+    const addButtons = screen.getAllByRole('button', { name: /add type/i });
+    await user.click(addButtons[0]);
+
+    await user.type(await screen.findByLabelText(/name/i), 'Plumbing');
+    await user.click(screen.getByRole('button', { name: /^create$/i }));
+
+    expect(await screen.findByText(/server says no/i)).toBeInTheDocument();
+  });
+
+  it('blocks submit when the dialog name field is empty', async () => {
+    mockTypesGetAll.mockResolvedValue([]);
+    mockCatsGetAll.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/no equipment types yet/i)).toBeInTheDocument()
+    );
+
+    const addButtons = screen.getAllByRole('button', { name: /add type/i });
+    await user.click(addButtons[0]);
+
+    // Required HTML attr blocks submit; mutation never fires.
+    await screen.findByLabelText(/name/i);
+    await user.click(screen.getByRole('button', { name: /^create$/i }));
+    expect(mockTypesCreate).not.toHaveBeenCalled();
+  });
+
+  it('cancel closes the dialog without calling create', async () => {
+    mockTypesGetAll.mockResolvedValue([]);
+    mockCatsGetAll.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/no equipment types yet/i)).toBeInTheDocument()
+    );
+
+    const addButtons = screen.getAllByRole('button', { name: /add type/i });
+    await user.click(addButtons[0]);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mockTypesCreate).not.toHaveBeenCalled();
+  });
+
+  it('renders an ErrorState with retry when the types query fails', async () => {
+    mockTypesGetAll.mockRejectedValue(new Error('boom'));
+    mockCatsGetAll.mockResolvedValue([]);
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    expect(
+      await screen.findByText(/couldn't load equipment types/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
+  });
+
   it('opens the Add category dialog from inside an expanded type', async () => {
     mockTypesGetAll.mockResolvedValue([baseType('t1', 'HVAC')]);
     mockCatsGetAll.mockResolvedValue([baseCategory('c1', 'Furnace', 't1', 0)]);
