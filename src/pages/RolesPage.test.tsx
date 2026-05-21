@@ -131,18 +131,23 @@ describe('RolesPage', () => {
   });
 
   describe('header', () => {
-    it('renders title, sub, and CTAs as link buttons', () => {
+    it('renders title, kebab menu, and Add role CTA', async () => {
       mockAllGets();
+      const user = userEvent.setup();
       renderWithProviders(<RolesPage />);
 
       expect(screen.getByRole('heading', { name: 'Roles' })).toBeInTheDocument();
-      // Restore all defaults — disabled when no built-in roles loaded yet
-      expect(
-        screen.getByRole('button', { name: /restore all defaults/i })
-      ).toBeInTheDocument();
       // Add role — anchor href
       const addLink = screen.getByRole('link', { name: /add role/i });
       expect(addLink).toHaveAttribute('href', '/settings/access/roles/new');
+      // "Restore all defaults" now lives behind the page-header kebab.
+      // Open it and verify the menu item appears.
+      const kebabs = screen.getAllByRole('button', { name: /more options/i });
+      // First kebab is the page-header one (row kebabs come after).
+      await user.click(kebabs[0]);
+      expect(
+        await screen.findByRole('menuitem', { name: /restore all defaults/i })
+      ).toBeInTheDocument();
     });
 
     it('disables Restore all defaults when no protected roles exist', async () => {
@@ -153,14 +158,17 @@ describe('RolesPage', () => {
           return Promise.resolve({ data: mockCapabilities });
         return Promise.reject(new Error(url));
       });
+      const user = userEvent.setup();
       renderWithProviders(<RolesPage />);
 
       await waitFor(() => {
         expect(screen.getByText('Refund Approver')).toBeInTheDocument();
       });
-      expect(
-        screen.getByRole('button', { name: /restore all defaults/i })
-      ).toBeDisabled();
+      const kebabs = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(kebabs[0]);
+      const item = await screen.findByRole('menuitem', { name: /restore all defaults/i });
+      // Headless MenuItem reflects the disabled prop via aria-disabled.
+      expect(item).toHaveAttribute('aria-disabled', 'true');
     });
   });
 
@@ -479,11 +487,14 @@ describe('RolesPage', () => {
         expect(screen.getByText('Admin')).toBeInTheDocument();
       });
 
-      // The PageHead button (first match — there's a second copy inside the
-      // alert when it opens).
-      await user.click(
-        screen.getByRole('button', { name: /restore all defaults/i })
-      );
+      // Open the page-header kebab (first 'more options' button — row
+      // kebabs follow it) and click the "Restore all defaults" menuitem.
+      const kebabs = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(kebabs[0]);
+      const item = await screen.findByRole('menuitem', {
+        name: /restore all defaults/i,
+      });
+      await user.click(item);
 
       await waitFor(() => {
         expect(
@@ -491,11 +502,11 @@ describe('RolesPage', () => {
         ).toBeInTheDocument();
       });
 
-      const confirmBtns = screen.getAllByRole('button', {
+      // The destructive confirm button has the same label as the menu item.
+      const confirmBtn = screen.getByRole('button', {
         name: /restore all defaults/i,
       });
-      // The confirm button is the last one (inside the alert)
-      await user.click(confirmBtns[confirmBtns.length - 1]);
+      await user.click(confirmBtn);
 
       await waitFor(() => {
         expect(apiClient.post).toHaveBeenCalledWith(

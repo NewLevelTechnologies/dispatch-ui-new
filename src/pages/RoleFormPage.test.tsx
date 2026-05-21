@@ -275,14 +275,12 @@ describe('RoleFormPage', () => {
 
       // The role's own capability is checked
       expect(
-        (screen.getByRole('checkbox', { name: /refund invoices/i }) as HTMLInputElement)
-          .checked
-      ).toBe(true);
+        screen.getByRole('checkbox', { name: /refund invoices/i })
+      ).toBeChecked();
       // A capability it doesn't have is not
       expect(
-        (screen.getByRole('checkbox', { name: /view work orders/i }) as HTMLInputElement)
-          .checked
-      ).toBe(false);
+        screen.getByRole('checkbox', { name: /view work orders/i })
+      ).not.toBeChecked();
     });
 
     it('does NOT render the Start from card in edit mode', async () => {
@@ -330,9 +328,13 @@ describe('RoleFormPage', () => {
         /e\.g\. Refund Approver/i
       ) as HTMLInputElement;
       expect(nameInput).toBeDisabled();
-      // Capability checkboxes disabled
+      // Capability checkboxes disabled. Catalyst Checkbox renders as a
+      // Headless span with role=checkbox; it reflects the disabled prop
+      // through aria-disabled rather than the form-element disabled attr.
       const checkboxes = screen.getAllByRole('checkbox');
-      expect(checkboxes.every((c) => (c as HTMLInputElement).disabled)).toBe(true);
+      checkboxes.forEach((c) =>
+        expect(c).toHaveAttribute('aria-disabled', 'true')
+      );
       // Admin lock callout visible
       expect(screen.getByText('Admin role')).toBeInTheDocument();
     });
@@ -421,13 +423,11 @@ describe('RoleFormPage', () => {
       await user.click(selectAllButtons[0]);
 
       expect(
-        (screen.getByRole('checkbox', { name: /view work orders/i }) as HTMLInputElement)
-          .checked
-      ).toBe(true);
+        screen.getByRole('checkbox', { name: /view work orders/i })
+      ).toBeChecked();
       expect(
-        (screen.getByRole('checkbox', { name: /edit work orders/i }) as HTMLInputElement)
-          .checked
-      ).toBe(true);
+        screen.getByRole('checkbox', { name: /edit work orders/i })
+      ).toBeChecked();
     });
 
     it('Clear area drops every capability in that area', async () => {
@@ -447,9 +447,8 @@ describe('RoleFormPage', () => {
       await user.click(clearArea);
 
       expect(
-        (screen.getByRole('checkbox', { name: /view work orders/i }) as HTMLInputElement)
-          .checked
-      ).toBe(false);
+        screen.getByRole('checkbox', { name: /view work orders/i })
+      ).not.toBeChecked();
     });
 
     it('Clear all from the card header removes every selection at once', async () => {
@@ -468,9 +467,8 @@ describe('RoleFormPage', () => {
       await user.click(screen.getByRole('button', { name: /clear all/i }));
 
       expect(
-        (screen.getByRole('checkbox', { name: /view work orders/i }) as HTMLInputElement)
-          .checked
-      ).toBe(false);
+        screen.getByRole('checkbox', { name: /view work orders/i })
+      ).not.toBeChecked();
       // The empty-state callout reappears once everything is unchecked.
       expect(screen.getByText(/pick at least one capability/i)).toBeInTheDocument();
     });
