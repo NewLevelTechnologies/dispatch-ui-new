@@ -50,8 +50,10 @@
     "default": "Default",
     "delete": "Delete",
     "deleting": "Deleting...",
-    "edit": "Edit",
+    "disable": "Disable",
     "disabled": "Disabled",
+    "edit": "Edit",
+    "enable": "Enable",
     "enabled": "Enabled",
     "entitiesCount": "{{entities}} ({{count}})",
     "hide": "Hide",
@@ -1194,6 +1196,37 @@
       "toastReorderFailed": "Couldn't reorder sizes",
       "toastSeedFailed": "Couldn't seed common sizes",
       "width": "Width (in)"
+    },
+    "dispatchRegions": {
+      "clearSearch": "Clear search",
+      "col": {
+        "abbreviation": "Abbreviation",
+        "name": "Name",
+        "status": "Status"
+      },
+      "disableConfirm": {
+        "body": "Service locations and technicians assigned to \"{{name}}\" will lose their region. They'll appear in an Unassigned bucket on the {{dispatch, lowercase}} board until reassigned.",
+        "title": "Disable \"{{name}}\"?"
+      },
+      "emptyDescription": "Add a region to start organizing service locations and technicians on the {{dispatch, lowercase}} board.",
+      "emptyTitle": "No {{regions, lowercase}} yet",
+      "field": {
+        "abbreviation": "Abbreviation",
+        "abbreviationHint": "Short code on board cells, e.g. GA, ATL",
+        "name": "Name"
+      },
+      "loading": "Loading {{regions, lowercase}}…",
+      "searchPlaceholder": "Search {{regions, lowercase}}…",
+      "subtitle": "{{count}} {{regions, lowercase}}",
+      "titleAdd": "Add {{region}}",
+      "titleEdit": "Edit {{region}}",
+      "toast": {
+        "disabled": "Region disabled",
+        "disableFailed": "Couldn't disable region",
+        "enabled": "Region enabled",
+        "enableFailed": "Couldn't enable region",
+        "reorderFailed": "Couldn't reorder regions"
+      }
     },
     "businessDefaults": {
       "description": "How operations and money behave by default. Used when nothing more specific is set on a record.",

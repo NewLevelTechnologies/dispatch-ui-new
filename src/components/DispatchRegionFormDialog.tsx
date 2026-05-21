@@ -1,15 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useGlossary } from '../contexts/GlossaryContext';
-import { dispatchRegionApi, type DispatchRegion, type CreateDispatchRegionRequest, type UpdateDispatchRegionRequest } from '../api';
-import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
+import {
+  dispatchRegionApi,
+  type CreateDispatchRegionRequest,
+  type DispatchRegion,
+  type UpdateDispatchRegionRequest,
+} from '../api';
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogTitle,
+} from './catalyst/dialog';
 import { Button } from './catalyst/button';
-import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
+import { Description, Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
-import { Textarea } from './catalyst/textarea';
-import { Select } from './catalyst/select';
-import { US_STATES } from '../constants/states';
+import { extractApiError } from '../lib/toast';
 
 interface DispatchRegionFormDialogProps {
   isOpen: boolean;
@@ -18,230 +26,151 @@ interface DispatchRegionFormDialogProps {
   nextSortOrder: number;
 }
 
-export default function DispatchRegionFormDialog({ isOpen, onClose, region, nextSortOrder }: DispatchRegionFormDialogProps) {
+export default function DispatchRegionFormDialog({
+  isOpen,
+  onClose,
+  region,
+  nextSortOrder,
+}: DispatchRegionFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
-  const isEdit = !!region;
-  const [showOptionalFields, setShowOptionalFields] = useState(false);
+  const isEdit = Boolean(region);
+  const regionSingular = `${getName('dispatch')} ${t('entities.region')}`;
 
-  const [formData, setFormData] = useState<CreateDispatchRegionRequest | UpdateDispatchRegionRequest>({
-    name: '',
-    abbreviation: '',
-    description: '',
-    state: '',
-    tabDisplayName: '',
-  });
+  const [name, setName] = useState('');
+  const [abbreviation, setAbbreviation] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!isOpen) return;
-
-    const initialData = region
-      ? {
-          name: region.name,
-          abbreviation: region.abbreviation,
-          description: region.description || '',
-          state: region.state || '',
-          tabDisplayName: region.tabDisplayName || '',
-        }
-      : {
-          name: '',
-          abbreviation: '',
-          description: '',
-          state: '',
-          tabDisplayName: '',
-        };
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFormData(initialData);
+    setErrorMessage(null);
+    setName(region?.name ?? '');
+    setAbbreviation(region?.abbreviation ?? '');
   }, [isOpen, region]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: CreateDispatchRegionRequest) => dispatchRegionApi.create(data),
+    mutationFn: (payload: CreateDispatchRegionRequest) =>
+      dispatchRegionApi.create(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dispatch-regions'] });
       onClose();
     },
-    onError: (error: unknown) => {
-      let errorMessage: string | undefined;
-
-      if (error instanceof Error && 'response' in error) {
-        const axiosError = error as { response?: { data?: unknown } };
-        const data = axiosError.response?.data;
-
-        if (typeof data === 'string') {
-          errorMessage = data;
-        } else if (data && typeof data === 'object') {
-          errorMessage = (data as { message?: string }).message;
-        }
-      }
-
-      alert(errorMessage || t('common.form.errorCreate', { entity: `${getName('dispatch')} ${t('entities.region')}` }));
-    },
+    onError: (err) =>
+      setErrorMessage(
+        extractApiError(err) ??
+          t('common.form.errorCreate', { entity: regionSingular }),
+      ),
   });
 
-  // Update mutation
   const updateMutation = useMutation({
-    mutationFn: (data: UpdateDispatchRegionRequest) => {
+    mutationFn: (payload: UpdateDispatchRegionRequest) => {
       if (!region) throw new Error('No region to update');
-      return dispatchRegionApi.update(region.id, data);
+      return dispatchRegionApi.update(region.id, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dispatch-regions'] });
       onClose();
     },
-    onError: (error: unknown) => {
-      let errorMessage: string | undefined;
-
-      if (error instanceof Error && 'response' in error) {
-        const axiosError = error as { response?: { data?: unknown } };
-        const data = axiosError.response?.data;
-
-        if (typeof data === 'string') {
-          errorMessage = data;
-        } else if (data && typeof data === 'object') {
-          errorMessage = (data as { message?: string }).message;
-        }
-      }
-
-      alert(errorMessage || t('common.form.errorUpdate', { entity: `${getName('dispatch')} ${t('entities.region')}` }));
-    },
+    onError: (err) =>
+      setErrorMessage(
+        extractApiError(err) ??
+          t('common.form.errorUpdate', { entity: regionSingular }),
+      ),
   });
 
-  const handleChange = (field: keyof typeof formData, value: string | number | boolean) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+  const trimmedName = name.trim();
+  const trimmedAbbreviation = abbreviation.trim();
+  const canSubmit = trimmedName.length > 0 && trimmedAbbreviation.length > 0 && !isSaving;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-
+    setErrorMessage(null);
+    if (!trimmedName || !trimmedAbbreviation) return;
     if (isEdit) {
-      updateMutation.mutate({
-        name: formData.name,
-        abbreviation: formData.abbreviation,
-        description: formData.description?.trim() || '',
-        state: formData.state?.trim() || '',
-        tabDisplayName: formData.tabDisplayName?.trim() || '',
-      });
+      updateMutation.mutate({ name: trimmedName, abbreviation: trimmedAbbreviation });
     } else {
       createMutation.mutate({
-        name: formData.name as string,
-        abbreviation: formData.abbreviation as string,
-        description: formData.description?.trim() || '',
-        state: formData.state?.trim() || '',
-        tabDisplayName: formData.tabDisplayName?.trim() || '',
+        name: trimmedName,
+        abbreviation: trimmedAbbreviation,
         sortOrder: nextSortOrder,
       });
     }
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
-
   return (
-    <Dialog open={isOpen} onClose={onClose}>
+    <Dialog open={isOpen} onClose={onClose} size="sm">
       <DialogTitle>
-        {t(isEdit ? 'dispatchRegions.form.titleEdit' : 'dispatchRegions.form.titleCreate', { dispatch: getName('dispatch') })}
+        {isEdit
+          ? t('settings.dispatchRegions.titleEdit', { region: regionSingular })
+          : t('settings.dispatchRegions.titleAdd', { region: regionSingular })}
       </DialogTitle>
-      <DialogDescription>
-        {t(isEdit ? 'dispatchRegions.form.descriptionEdit' : 'dispatchRegions.form.descriptionCreate', { dispatch: getName('dispatch') })}
-      </DialogDescription>
       <form onSubmit={handleSubmit}>
         <DialogBody>
+          {errorMessage && (
+            <div
+              role="alert"
+              className="mb-4 rounded-lg bg-danger-100 p-3 text-[12.5px] text-danger-500 ring-1 ring-danger-500/20"
+            >
+              {errorMessage}
+            </div>
+          )}
           <Fieldset>
-            <FieldGroup className="space-y-2">
-              {/* Name + Abbreviation */}
-              <div className="grid grid-cols-3 gap-2">
-                <Field className="col-span-2">
-                  <Label className="text-xs">{t('dispatchRegions.form.name')} *</Label>
+            <FieldGroup className="!space-y-3">
+              {/* Equal-width columns: Name and Abbreviation sit side-by-side
+                  on sm+, stack on mobile. The hint that used to live inline
+                  on the label drops to a Description below the abbreviation
+                  input where it has room to read straight across without
+                  wrapping under a narrow column. */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                <Field size="xs">
+                  <Label size="xs" required>
+                    {t('settings.dispatchRegions.field.name')}
+                  </Label>
                   <Input
+                    size="xs"
                     name="name"
-                    value={formData.name}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('name', e.target.value)}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     maxLength={100}
                     required
                     autoFocus
-                    placeholder="Atlanta Region"
                   />
                 </Field>
-                <Field>
-                  <Label className="text-xs">{t('dispatchRegions.form.abbreviation')} *</Label>
+                <Field size="xs">
+                  <Label size="xs" required>
+                    {t('settings.dispatchRegions.field.abbreviation')}
+                  </Label>
                   <Input
+                    size="xs"
                     name="abbreviation"
-                    value={formData.abbreviation}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('abbreviation', e.target.value.toUpperCase())}
-                    maxLength={20}
+                    value={abbreviation}
+                    onChange={(e) => setAbbreviation(e.target.value.toUpperCase())}
+                    maxLength={6}
                     required
-                    placeholder="ATL"
+                    className="font-mono tracking-wider tabular-nums"
                   />
+                  <Description size="xs">
+                    {t('settings.dispatchRegions.field.abbreviationHint')}
+                  </Description>
                 </Field>
               </div>
-
-              {/* Optional fields - collapsible */}
-              <div className="border-t border-zinc-200 pt-2 dark:border-zinc-800">
-                <button
-                  type="button"
-                  onClick={() => setShowOptionalFields(!showOptionalFields)}
-                  className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
-                >
-                  <svg className={`h-4 w-4 transition-transform ${showOptionalFields ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                  {t('common.form.optional')} (3)
-                </button>
-                {showOptionalFields && (
-                  <div className="mt-2 space-y-2 pl-6">
-                    <Field>
-                      <Label className="text-xs">{t('dispatchRegions.form.state')}</Label>
-                      <Select
-                        name="state"
-                        value={formData.state || ''}
-                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('state', e.target.value)}
-                      >
-                        <option value="">{t('common.form.select')}</option>
-                        {US_STATES.map((state) => (
-                          <option key={state} value={state}>
-                            {state}
-                          </option>
-                        ))}
-                      </Select>
-                    </Field>
-
-                  {/* Tab Display Name */}
-                  <Field>
-                    <Label className="text-xs">{t('dispatchRegions.form.tabDisplayName', { dispatch: getName('dispatch') })}</Label>
-                    <Input
-                      name="tabDisplayName"
-                      value={formData.tabDisplayName || ''}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('tabDisplayName', e.target.value)}
-                      maxLength={50}
-                      placeholder="Optional"
-                    />
-                  </Field>
-
-                  {/* Description */}
-                  <Field>
-                    <Label className="text-xs">{t('dispatchRegions.form.description')}</Label>
-                    <Textarea
-                      name="description"
-                      value={formData.description || ''}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('description', e.target.value)}
-                      rows={2}
-                      placeholder="Optional"
-                    />
-                  </Field>
-                </div>
-              )}
-            </div>
             </FieldGroup>
           </Fieldset>
         </DialogBody>
         <DialogActions>
-          <Button plain onClick={onClose} disabled={isPending}>
+          <Button plain onClick={onClose} disabled={isSaving}>
             {t('common.cancel')}
           </Button>
-          <Button type="submit" disabled={isPending}>
-            {isPending ? t('common.saving') : isEdit ? t('common.update') : t('common.create')}
+          <Button type="submit" color="accent" disabled={!canSubmit}>
+            {isSaving
+              ? t('common.saving')
+              : isEdit
+                ? t('common.update')
+                : t('common.create')}
           </Button>
         </DialogActions>
       </form>
