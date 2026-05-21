@@ -95,6 +95,9 @@ describe('UserDetailPage', () => {
       if (url === '/users/capabilities/grouped') {
         return Promise.resolve({ data: mockCapabilitiesData });
       }
+      if (url === `/users/${user.id}/2fa/status`) {
+        return Promise.resolve({ data: { enabled: [], preferred: undefined } });
+      }
 
       // Fallback for unmatched URLs
       console.warn('Unmatched API URL in test:', url);
@@ -834,6 +837,151 @@ describe('UserDetailPage', () => {
     // confirmation was cancelled. (Activate/deactivate moved from PUT
     // + body to dedicated POST endpoints.)
     expect(apiClient.post).not.toHaveBeenCalled();
+  });
+
+  it('sends a password reset link when confirmed', async () => {
+    setupStandardMocks();
+    vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'John Doe' }),
+      ).toBeInTheDocument();
+    });
+
+    const sendResetBtn = screen.getByRole('button', {
+      name: /send reset link/i,
+    });
+    await user.click(sendResetBtn);
+
+    // Confirm dialog opens — the confirm button has the same label.
+    const confirmBtns = await screen.findAllByRole('button', {
+      name: /send reset link/i,
+    });
+    await user.click(confirmBtns[confirmBtns.length - 1]);
+
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/users/user-123/reset-password',
+      );
+    });
+  });
+
+  it('signs the user out everywhere when confirmed', async () => {
+    setupStandardMocks();
+    vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'John Doe' }),
+      ).toBeInTheDocument();
+    });
+
+    const signOutBtn = screen.getByRole('button', {
+      name: /sign out everywhere/i,
+    });
+    await user.click(signOutBtn);
+
+    const confirmBtns = await screen.findAllByRole('button', {
+      name: /sign out everywhere/i,
+    });
+    await user.click(confirmBtns[confirmBtns.length - 1]);
+
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledWith('/users/user-123/sign-out');
+    });
+  });
+
+  it('shows Reset 2FA button when MFA is enabled and resets when confirmed', async () => {
+    // Setup standard mocks then override the 2FA status response.
+    setupStandardMocks();
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url === `/users/${mockUser.id}`) {
+        return Promise.resolve({ data: mockUser });
+      }
+      if (url === '/users/roles') {
+        return Promise.resolve({ data: mockRoles });
+      }
+      if (url === '/tenant/dispatch-regions?includeInactive=true') {
+        return Promise.resolve({ data: mockDispatchRegions });
+      }
+      if (
+        url === `/audit/account-activity/${mockUser.id}` ||
+        url === `/audit/user/${mockUser.id}` ||
+        url === `/audit/TenantUser/${mockUser.id}`
+      ) {
+        return Promise.resolve({ data: [] });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      if (url === `/users/${mockUser.id}/2fa/status`) {
+        return Promise.resolve({
+          data: { enabled: ['TOTP'], preferred: 'TOTP' },
+        });
+      }
+      return Promise.reject(new Error(`Unmocked API call: ${url}`));
+    });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    const resetBtn = await screen.findByRole('button', { name: /reset 2fa/i });
+    await user.click(resetBtn);
+
+    const confirmBtns = await screen.findAllByRole('button', {
+      name: /reset 2fa/i,
+    });
+    await user.click(confirmBtns[confirmBtns.length - 1]);
+
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/users/user-123/mfa-reset',
+      );
+    });
+  });
+
+  it('reveals detailed permissions when "View detailed permissions" is clicked', async () => {
+    setupStandardMocks();
+    const user = userEvent.setup();
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'John Doe' }),
+      ).toBeInTheDocument();
+    });
+
+    const detailsBtn = await screen.findByRole('button', {
+      name: /view detailed permissions/i,
+    });
+    await user.click(detailsBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /hide details/i }),
+      ).toBeInTheDocument();
+    });
   });
 
 });
