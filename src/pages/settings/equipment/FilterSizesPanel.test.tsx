@@ -47,6 +47,20 @@ const size = (id: string, l: number, w: number, t: number, sortOrder = 0) => ({
   createdAt: '',
 });
 
+// Open the inline-add row and return the three numeric inputs.
+const openInlineAdd = async (user: ReturnType<typeof userEvent.setup>) => {
+  // The dashed "+ Add size" trigger inside the table — distinct from the
+  // accent "Add size" button in the PageHead. Both have the same accessible
+  // name; the trigger is the last in DOM order, the PageHead button is
+  // first. Click the table-row one to enter inline-add mode.
+  const triggers = screen.getAllByRole('button', { name: /add size/i });
+  await user.click(triggers[triggers.length - 1]);
+  const length = await screen.findByRole('spinbutton', { name: /length/i });
+  const width = screen.getByRole('spinbutton', { name: /width/i });
+  const thickness = screen.getByRole('spinbutton', { name: /thickness/i });
+  return { length, width, thickness };
+};
+
 describe('FilterSizesPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -69,13 +83,16 @@ describe('FilterSizesPanel', () => {
     await waitFor(() =>
       expect(screen.getByText(/no filter sizes yet/i)).toBeInTheDocument(),
     );
-    expect(screen.getByRole('button', { name: /add size/i })).toBeInTheDocument();
+    // PageHead Add + EmptyState Add → ≥1 button reachable.
+    expect(
+      screen.getAllByRole('button', { name: /add size/i }).length,
+    ).toBeGreaterThan(0);
     expect(
       screen.getByRole('button', { name: /seed common sizes/i }),
     ).toBeInTheDocument();
   });
 
-  it('inline-adds a new size by parsing L×W×T input', async () => {
+  it('inline-adds a new size via three numeric fields (L → W → T → Enter)', async () => {
     mockGetAll.mockResolvedValue([size('s1', 16, 20, 1, 0)]);
     mockCreate.mockResolvedValue(size('new', 14, 20, 1, 1));
     const user = userEvent.setup();
@@ -83,11 +100,14 @@ describe('FilterSizesPanel', () => {
 
     await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
 
-    // Click the dashed "+ Add size" affordance at the bottom of the table.
-    await user.click(screen.getByRole('button', { name: /add size/i }));
-
-    const input = await screen.findByPlaceholderText(/16×20×1/i);
-    await user.type(input, '14x20x1{Enter}');
+    const { length, width, thickness } = await openInlineAdd(user);
+    await user.type(length, '14');
+    await user.tab();
+    expect(width).toHaveFocus();
+    await user.type(width, '20');
+    await user.tab();
+    expect(thickness).toHaveFocus();
+    await user.type(thickness, '1{Enter}');
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledWith({
@@ -99,33 +119,37 @@ describe('FilterSizesPanel', () => {
     });
   });
 
-  it('rejects malformed inline-add input', async () => {
+  it('rejects inline-add when a dimension is missing and focuses the empty field', async () => {
     mockGetAll.mockResolvedValue([size('s1', 16, 20, 1, 0)]);
     const user = userEvent.setup();
     renderWithProviders(<FilterSizesPanel />);
 
     await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: /add size/i }));
-
-    const input = await screen.findByPlaceholderText(/16×20×1/i);
-    await user.type(input, 'not-a-size{Enter}');
+    const { length, width, thickness } = await openInlineAdd(user);
+    // Fill length + thickness only — width is missing.
+    await user.type(length, '16');
+    await user.click(thickness);
+    await user.type(thickness, '1');
+    // Submit by pressing Enter from the thickness field.
+    await user.keyboard('{Enter}');
 
     expect(
-      await screen.findByText(/use the form 16×20×1/i),
+      await screen.findByText(/length, width, and thickness/i),
     ).toBeInTheDocument();
+    expect(width).toHaveFocus();
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it('rejects duplicate inline-add (case-insensitive on the same dimensions)', async () => {
+  it('rejects duplicate inline-add (same L/W/T triple)', async () => {
     mockGetAll.mockResolvedValue([size('s1', 16, 20, 1, 0)]);
     const user = userEvent.setup();
     renderWithProviders(<FilterSizesPanel />);
 
     await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: /add size/i }));
-
-    const input = await screen.findByPlaceholderText(/16×20×1/i);
-    await user.type(input, '16X20X1{Enter}');
+    const { length, width, thickness } = await openInlineAdd(user);
+    await user.type(length, '16');
+    await user.type(width, '20');
+    await user.type(thickness, '1{Enter}');
 
     expect(
       await screen.findByText(/already in your list/i),
@@ -133,7 +157,26 @@ describe('FilterSizesPanel', () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it('opens the edit dialog from the kebab Rename action', async () => {
+  it('Esc inside an inline-add field cancels the row', async () => {
+    mockGetAll.mockResolvedValue([size('s1', 16, 20, 1, 0)]);
+    const user = userEvent.setup();
+    renderWithProviders(<FilterSizesPanel />);
+
+    await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
+    const { length } = await openInlineAdd(user);
+    await user.type(length, '14');
+    await user.keyboard('{Escape}');
+
+    // Inputs are gone; the "+ Add size" trigger is back.
+    expect(
+      screen.queryByRole('spinbutton', { name: /length/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole('button', { name: /add size/i }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('opens the edit dialog from the kebab Edit action', async () => {
     mockGetAll.mockResolvedValue([size('s1', 16, 20, 1, 0)]);
     mockUpdate.mockResolvedValue(size('s1', 18, 20, 1, 0));
     const user = userEvent.setup();
@@ -141,11 +184,11 @@ describe('FilterSizesPanel', () => {
 
     await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
     const moreButtons = screen.getAllByRole('button', { name: /more options/i });
-    // First kebab in the table row (header's kebab is also there for Seed common).
+    // moreButtons[0] is the PageHead ⋯; [1] is the row's kebab.
     await user.click(moreButtons[1]);
 
-    const renameItem = await screen.findByRole('menuitem', { name: /rename/i });
-    await user.click(renameItem);
+    const editItem = await screen.findByRole('menuitem', { name: /^edit$/i });
+    await user.click(editItem);
 
     const length = await screen.findByLabelText(/length/i);
     await user.clear(length);
@@ -174,10 +217,8 @@ describe('FilterSizesPanel', () => {
     const deleteItem = await screen.findByRole('menuitem', { name: /^delete$/i });
     await user.click(deleteItem);
 
-    // Confirm dialog appears with the size in the title.
     expect(await screen.findByText(/delete "16×20×1"/i)).toBeInTheDocument();
 
-    // The destructive Delete button in the alert.
     const confirmButtons = screen.getAllByRole('button', { name: /^delete$/i });
     await user.click(confirmButtons[confirmButtons.length - 1]);
 
@@ -216,7 +257,7 @@ describe('FilterSizesPanel', () => {
     });
   });
 
-  it('seeds common sizes through the header kebab + ConfirmDialog', async () => {
+  it('seeds common sizes through the header ⋯ dropdown + ConfirmDialog', async () => {
     mockGetAll.mockResolvedValue([size('s1', 16, 20, 1, 0)]);
     mockSeedCommon.mockResolvedValue({ added: 9, skipped: 1 });
     const user = userEvent.setup();
@@ -224,8 +265,7 @@ describe('FilterSizesPanel', () => {
 
     await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
 
-    // Header kebab (first More options button — header is rendered before
-    // any table rows).
+    // Header kebab (first ⋯ button in DOM order).
     const moreButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(moreButtons[0]);
 
@@ -234,7 +274,6 @@ describe('FilterSizesPanel', () => {
     });
     await user.click(seedItem);
 
-    // Confirm dialog.
     expect(
       await screen.findByText(/add common filter sizes\?/i),
     ).toBeInTheDocument();
@@ -246,7 +285,7 @@ describe('FilterSizesPanel', () => {
     await waitFor(() => expect(mockSeedCommon).toHaveBeenCalled());
   });
 
-  it('shows the seed-common CTA inside the empty state', async () => {
+  it('opens the Seed common confirm dialog from the empty state', async () => {
     mockGetAll.mockResolvedValue([]);
     mockSeedCommon.mockResolvedValue({ added: 10, skipped: 0 });
     const user = userEvent.setup();
@@ -259,13 +298,12 @@ describe('FilterSizesPanel', () => {
       screen.getByRole('button', { name: /seed common sizes/i }),
     );
 
-    // Confirm dialog opens.
     expect(
       await screen.findByText(/add common filter sizes\?/i),
     ).toBeInTheDocument();
   });
 
-  it('filters the list with the search input and shows "no matches" state', async () => {
+  it('search normalizes separators — "1620" and "16x20" both match 16×20×1', async () => {
     mockGetAll.mockResolvedValue([
       size('s1', 16, 20, 1, 0),
       size('s2', 20, 25, 1, 1),
@@ -276,14 +314,18 @@ describe('FilterSizesPanel', () => {
     await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
 
     const search = screen.getByPlaceholderText(/search sizes/i);
-    await user.type(search, '16');
 
-    expect(screen.queryByText('20×25×1')).not.toBeInTheDocument();
+    await user.type(search, '1620');
     expect(screen.getByText('16×20×1')).toBeInTheDocument();
+    expect(screen.queryByText('20×25×1')).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, '16x20');
+    expect(screen.getByText('16×20×1')).toBeInTheDocument();
+    expect(screen.queryByText('20×25×1')).not.toBeInTheDocument();
 
     await user.clear(search);
     await user.type(search, 'zzz');
-
     expect(
       await screen.findByText(/no sizes match your search/i),
     ).toBeInTheDocument();

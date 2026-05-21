@@ -556,12 +556,17 @@ vi.mock('react-i18next', () => {
     'settings.equipmentTypes.titleAdd': 'Add Equipment Type',
     'settings.equipmentTypes.titleEdit': 'Edit Equipment Type',
     'settings.filterSizes.add': 'Add size',
-    'settings.filterSizes.addPlaceholder': 'e.g. 16×20×1',
+    'settings.filterSizes.addRowLabel':
+      'Add filter size — Length × Width × Thickness in inches',
     'settings.filterSizes.clearSearch': 'Clear search',
     'settings.filterSizes.deleteBody':
       "This size won't appear as a quick-add chip on equipment forms. Existing equipment records keep their dimensions.",
     'settings.filterSizes.deleteTitle': 'Delete "{{name}}"?',
     'settings.filterSizes.description': 'Common filter sizes that appear as quick-add chips.',
+    'settings.filterSizes.dimAbbrev.length': 'L',
+    'settings.filterSizes.dimAbbrev.thickness': 'T',
+    'settings.filterSizes.dimAbbrev.width': 'W',
+    'settings.filterSizes.dimensionsHint': 'Length × Width × Thickness · inches',
     'settings.filterSizes.duplicateError': '"{{name}}" is already in your list',
     'settings.filterSizes.empty': 'No filter sizes configured yet.',
     'settings.filterSizes.emptyDescription':
@@ -573,8 +578,7 @@ vi.mock('react-i18next', () => {
     'settings.filterSizes.errorSave': 'Failed to save filter size',
     'settings.filterSizes.errorSeed': 'Failed to seed common filter sizes',
     'settings.filterSizes.invalidDimensions':
-      'Length, width, and thickness must all be greater than zero.',
-    'settings.filterSizes.invalidFormat': 'Use the form 16×20×1',
+      'Length, width, and thickness must all be positive numbers.',
     'settings.filterSizes.length': 'Length (in)',
     'settings.filterSizes.loading': 'Loading filter sizes…',
     'settings.filterSizes.noMatchDescription': 'Try a different search term.',

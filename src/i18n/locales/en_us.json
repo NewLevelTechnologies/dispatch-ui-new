@@ -1146,11 +1146,17 @@
     },
     "filterSizes": {
       "add": "Add size",
-      "addPlaceholder": "e.g. 16×20×1",
+      "addRowLabel": "Add filter size — Length × Width × Thickness in inches",
       "clearSearch": "Clear search",
       "deleteBody": "This size won't appear as a quick-add chip on equipment forms. Existing equipment records keep their dimensions.",
       "deleteTitle": "Delete \"{{name}}\"?",
       "description": "Common filter sizes that appear as quick-add chips on the equipment filters tab.",
+      "dimAbbrev": {
+        "length": "L",
+        "thickness": "T",
+        "width": "W"
+      },
+      "dimensionsHint": "Length × Width × Thickness · inches",
       "duplicateError": "\"{{name}}\" is already in your list",
       "empty": "No filter sizes configured yet.",
       "emptyDescription": "Add a size or seed the common HVAC defaults to get started.",
@@ -1160,8 +1166,7 @@
       "errorReorder": "Failed to reorder filter sizes",
       "errorSave": "Failed to save filter size",
       "errorSeed": "Failed to seed common filter sizes",
-      "invalidDimensions": "Length, width, and thickness must all be greater than zero.",
-      "invalidFormat": "Use the form 16×20×1",
+      "invalidDimensions": "Length, width, and thickness must all be positive numbers.",
       "length": "Length (in)",
       "loading": "Loading filter sizes…",
       "noMatchDescription": "Try a different search term.",

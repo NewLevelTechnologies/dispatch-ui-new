@@ -63,29 +63,6 @@ import { formatFilterSize } from '../../../utils/formatFilterSize';
 
 const QUERY_KEY = ['tenant-filter-sizes'] as const;
 
-// Accept "16x20x1", "16×20×1", "16 X 20 X 1", with decimals like 0.5 allowed.
-// Anything else (slashes, dashes, missing parts) fails the format check.
-function parseFilterSizeInput(
-  raw: string,
-): { lengthIn: number; widthIn: number; thicknessIn: number } | null {
-  const parts = raw
-    .trim()
-    .split(/\s*[×xX]\s*/)
-    .map((s) => s.trim());
-  if (parts.length !== 3) return null;
-  const nums = parts.map((p) => Number(p));
-  if (!nums.every((n) => Number.isFinite(n) && n > 0)) return null;
-  return { lengthIn: nums[0], widthIn: nums[1], thicknessIn: nums[2] };
-}
-
-function dimsKey(s: {
-  lengthIn: number;
-  widthIn: number;
-  thicknessIn: number;
-}): string {
-  return `${s.lengthIn}×${s.widthIn}×${s.thicknessIn}`;
-}
-
 export default function FilterSizesPanel() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -130,11 +107,19 @@ export default function FilterSizesPanel() {
   const nextSortOrder =
     sorted.length > 0 ? Math.max(...sorted.map((i) => i.sortOrder)) + 1 : 0;
 
+  // Strip separators (×, x, *, whitespace, decimal point) so users can type
+  // "1620", "16x20", or "16×20" and match the same record. We keep digits
+  // and the literal `.` collapsed-out so `16.5×20×1` is searchable as
+  // `16520` or `16.5x20x1` interchangeably.
   const filteredSizes = useMemo(() => {
-    const needle = searchQuery.trim().toLowerCase();
+    const needle = searchQuery
+      .toLowerCase()
+      .replace(/[×x*\s.]/g, '');
     if (!needle) return sorted;
     return sorted.filter((s) =>
-      formatFilterSize(s).toLowerCase().includes(needle),
+      `${s.lengthIn}${s.widthIn}${s.thicknessIn}`
+        .replace(/\./g, '')
+        .includes(needle),
     );
   }, [sorted, searchQuery]);
 
@@ -203,6 +188,14 @@ export default function FilterSizesPanel() {
         sub={subtitle}
         actions={
           <div className="flex items-center gap-2">
+            <Button
+              color="accent"
+              size="xs"
+              onClick={() => setFormState({ item: null })}
+            >
+              <PlusIcon className="size-4" />
+              {t('settings.filterSizes.add')}
+            </Button>
             <Dropdown>
               <DropdownButton
                 as={IconButton}
@@ -386,7 +379,7 @@ export default function FilterSizesPanel() {
                                   onClick={() => setFormState({ item })}
                                 >
                                   <DropdownLabel>
-                                    {t('common.actions.rename')}
+                                    {t('common.edit')}
                                   </DropdownLabel>
                                 </DropdownItem>
                                 <DropdownItem
@@ -458,9 +451,13 @@ export default function FilterSizesPanel() {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// InlineAddRow — last row in the table. Tap to expand into a single
-// input that parses "16×20×1" → three numbers and posts. Enter
-// re-focuses for rapid bulk entry; Esc / blur-empty closes.
+// InlineAddRow — last row in the table. Tap to expand into three
+// numeric fields (L × W × T inches). Tab moves between fields,
+// Enter submits, Esc cancels. After a successful save the fields
+// clear and focus returns to Length — rapid bulk-entry loop.
+//
+// Mirrors the FilterSizeFormDialog's validation shape: three positive
+// numbers, no free-text strings ever reach the API.
 // ─────────────────────────────────────────────────────────────────
 
 interface InlineAddRowProps {
@@ -468,13 +465,18 @@ interface InlineAddRowProps {
   nextSortOrder: number;
 }
 
+type Draft = { length: string; width: string; thickness: string };
+const emptyDraft: Draft = { length: '', width: '', thickness: '' };
+
 function InlineAddRow({ existing, nextSortOrder }: InlineAddRowProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [adding, setAdding] = useState(false);
-  const [value, setValue] = useState('');
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [err, setErr] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const lengthRef = useRef<HTMLInputElement>(null);
+  const widthRef = useRef<HTMLInputElement>(null);
+  const thicknessRef = useRef<HTMLInputElement>(null);
 
   const createMutation = useMutation({
     mutationFn: (dims: {
@@ -488,10 +490,10 @@ function InlineAddRow({ existing, nextSortOrder }: InlineAddRowProps) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      setValue('');
+      setDraft(emptyDraft);
       setErr(null);
-      // Stay in adding mode and refocus — rapid-entry pattern.
-      requestAnimationFrame(() => inputRef.current?.focus());
+      // Stay in adding mode and refocus Length — rapid bulk-entry loop.
+      requestAnimationFrame(() => lengthRef.current?.focus());
     },
     onError: (e) => {
       setErr(extractApiError(e) ?? t('settings.filterSizes.errorSave'));
@@ -500,30 +502,52 @@ function InlineAddRow({ existing, nextSortOrder }: InlineAddRowProps) {
 
   const reset = () => {
     setAdding(false);
-    setValue('');
+    setDraft(emptyDraft);
     setErr(null);
   };
 
   const submit = () => {
     setErr(null);
-    const raw = value.trim();
-    if (!raw) {
-      reset();
+    const L = Number(draft.length);
+    const W = Number(draft.width);
+    const T = Number(draft.thickness);
+    const filled =
+      draft.length.trim() !== '' &&
+      draft.width.trim() !== '' &&
+      draft.thickness.trim() !== '';
+    const allPositive =
+      [L, W, T].every((n) => Number.isFinite(n) && n > 0);
+
+    if (!filled || !allPositive) {
+      setErr(t('settings.filterSizes.invalidDimensions'));
+      // Focus the first invalid field.
+      if (!draft.length.trim() || !Number.isFinite(L) || L <= 0) {
+        lengthRef.current?.focus();
+      } else if (!draft.width.trim() || !Number.isFinite(W) || W <= 0) {
+        widthRef.current?.focus();
+      } else {
+        thicknessRef.current?.focus();
+      }
       return;
     }
-    const dims = parseFilterSizeInput(raw);
-    if (!dims) {
-      setErr(t('settings.filterSizes.invalidFormat'));
-      return;
-    }
-    const newKey = dimsKey(dims);
-    if (existing.some((s) => dimsKey(s) === newKey)) {
+
+    const isDup = existing.some(
+      (s) => s.lengthIn === L && s.widthIn === W && s.thicknessIn === T,
+    );
+    if (isDup) {
       setErr(
-        t('settings.filterSizes.duplicateError', { name: newKey }),
+        t('settings.filterSizes.duplicateError', {
+          name: formatFilterSize({
+            lengthIn: L,
+            widthIn: W,
+            thicknessIn: T,
+          }),
+        }),
       );
       return;
     }
-    createMutation.mutate(dims);
+
+    createMutation.mutate({ lengthIn: L, widthIn: W, thicknessIn: T });
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -531,23 +555,17 @@ function InlineAddRow({ existing, nextSortOrder }: InlineAddRowProps) {
     submit();
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') {
       e.preventDefault();
       reset();
     }
+    // Enter is handled by the form's onSubmit — don't double-handle.
   };
 
-  const handleBlur = () => {
-    // Blur-with-empty cancels; blur-with-text saves so the typed work
-    // isn't lost. Don't reset if an error is showing — user needs to
-    // fix the value, not lose it.
-    if (err) return;
-    if (!value.trim()) {
-      reset();
-      return;
-    }
-    submit();
+  const updateField = (field: keyof Draft, value: string) => {
+    setDraft((d) => ({ ...d, [field]: value }));
+    if (err) setErr(null);
   };
 
   if (!adding) {
@@ -567,35 +585,83 @@ function InlineAddRow({ existing, nextSortOrder }: InlineAddRowProps) {
     );
   }
 
+  const disabled = createMutation.isPending;
+  const dimInput = 'w-[64px] text-center tabular-nums';
+
   return (
     <tr>
       <td className="hidden sm:table-cell"></td>
       <td colSpan={2}>
-        <form onSubmit={handleSubmit} className="px-2 py-1.5">
+        <form
+          role="group"
+          aria-label={t('settings.filterSizes.addRowLabel')}
+          onSubmit={handleSubmit}
+          className="flex flex-wrap items-center gap-2 px-2 py-1.5"
+        >
           <Input
-            ref={inputRef}
+            ref={lengthRef}
             size="xs"
+            type="number"
+            inputMode="decimal"
+            step="0.25"
+            min="0"
             autoFocus
-            value={value}
-            onChange={(e) => {
-              setValue(e.target.value);
-              if (err) setErr(null);
-            }}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-            placeholder={t('settings.filterSizes.addPlaceholder')}
-            disabled={createMutation.isPending}
-            aria-label={t('settings.filterSizes.add')}
+            className={dimInput}
+            value={draft.length}
+            onChange={(e) => updateField('length', e.target.value)}
+            onKeyDown={handleKey}
+            placeholder={t('settings.filterSizes.dimAbbrev.length')}
+            aria-label={t('settings.filterSizes.length')}
+            disabled={disabled}
           />
-          {err && (
-            <div
-              role="alert"
-              className="mt-1 text-[11px] text-danger-500"
-            >
-              {err}
-            </div>
-          )}
+          <span className="text-fg-muted" aria-hidden>×</span>
+          <Input
+            ref={widthRef}
+            size="xs"
+            type="number"
+            inputMode="decimal"
+            step="0.25"
+            min="0"
+            className={dimInput}
+            value={draft.width}
+            onChange={(e) => updateField('width', e.target.value)}
+            onKeyDown={handleKey}
+            placeholder={t('settings.filterSizes.dimAbbrev.width')}
+            aria-label={t('settings.filterSizes.width')}
+            disabled={disabled}
+          />
+          <span className="text-fg-muted" aria-hidden>×</span>
+          <Input
+            ref={thicknessRef}
+            size="xs"
+            type="number"
+            inputMode="decimal"
+            step="0.25"
+            min="0"
+            className={dimInput}
+            value={draft.thickness}
+            onChange={(e) => updateField('thickness', e.target.value)}
+            onKeyDown={handleKey}
+            placeholder={t('settings.filterSizes.dimAbbrev.thickness')}
+            aria-label={t('settings.filterSizes.thickness')}
+            disabled={disabled}
+          />
+          <span className="ml-1 text-[11px] text-fg-dim">
+            {t('settings.filterSizes.dimensionsHint')}
+          </span>
+          {/* Allow Enter from any input to submit the row. */}
+          <button type="submit" className="sr-only">
+            {t('common.add')}
+          </button>
         </form>
+        {err && (
+          <div
+            role="alert"
+            className="px-2 pb-1.5 text-[11px] text-danger-500"
+          >
+            {err}
+          </div>
+        )}
       </td>
     </tr>
   );
