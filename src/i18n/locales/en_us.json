@@ -35,6 +35,7 @@
       "notFound": "No {{entities, lowercase}} found",
       "open": "Open {{entities}}",
       "removeFilter": "Remove {{name}} filter",
+      "rename": "Rename",
       "rowsPerPage": "Rows per page",
       "title": "Actions",
       "tryAdjustingFilters": "Try clearing or adjusting filters.",
@@ -1083,6 +1084,49 @@
       "titleAdd": "Add Category",
       "titleEdit": "Edit Category"
     },
+    "equipmentTaxonomy": {
+      "addCategoryTo": "Add category to {{name}}",
+      "addType": "Add type",
+      "clearSearch": "Clear search",
+      "collapseAll": "Collapse all",
+      "delete": {
+        "categoryMessage": "Equipment records using this category will lose their category assignment.",
+        "categoryTitle": "Delete {{name}}?",
+        "typeMessage": "{{count}} categories will be deleted. Equipment records using this type will lose their type assignment.",
+        "typeMessageEmpty": "This type has no categories. Delete?",
+        "typeMessageOne": "1 category will be deleted. Equipment records using this type will lose their type assignment.",
+        "typeTitle": "Delete {{name}}?"
+      },
+      "dialog": {
+        "addCategoryTo": "Add category to {{name}}",
+        "addType": "Add equipment type",
+        "editCategory": "Edit category",
+        "editType": "Edit equipment type"
+      },
+      "empty": {
+        "noCategoriesTitle": "No categories yet",
+        "noMatchDescription": "Try a different search term.",
+        "noMatchTitle": "No types or categories match your search",
+        "noTypesDescription": "Add your first type — categories nest within types.",
+        "noTypesTitle": "No equipment types yet"
+      },
+      "errorLoad": "Couldn't load equipment types",
+      "errorSaveCategory": "Failed to save category",
+      "errorSaveType": "Failed to save equipment type",
+      "expandAll": "Expand all",
+      "loading": "Loading equipment types…",
+      "searchPlaceholder": "Search types & categories…",
+      "subtitle": "Equipment classifications used when adding equipment records. Drag to reorder — order shown is the order in dropdowns.",
+      "title": "Types & Categories",
+      "toast": {
+        "categoryDeleted": "Category deleted",
+        "deleteCategoryFailed": "Couldn't delete category",
+        "deleteTypeFailed": "Couldn't delete type",
+        "reorderCategoriesFailed": "Couldn't reorder categories",
+        "reorderTypesFailed": "Couldn't reorder types",
+        "typeDeleted": "Type deleted"
+      }
+    },
     "equipmentTypes": {
       "add": "Add Type",
       "description": "Top-level equipment classifications (e.g. HVAC, Refrigeration, Plumbing). Categories nest within each type. Drag to reorder.",
@@ -1207,6 +1251,7 @@
       "businessDefaults": "Business Defaults",
       "companyProfile": "Company Profile",
       "equipmentCategories": "Categories",
+      "equipmentTaxonomy": "Types & Categories",
       "equipmentTypes": "Types",
       "filterSizes": "Filter Sizes",
       "general": "General",
