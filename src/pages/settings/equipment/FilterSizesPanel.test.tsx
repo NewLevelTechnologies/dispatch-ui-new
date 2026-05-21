@@ -25,11 +25,27 @@ vi.mock('../../../api/equipmentApi', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../hooks/useCurrentUser', () => ({
-  useHasCapability: () => true,
-}));
-
 vi.mock('../../../api/client');
+
+vi.mock('../../../lib/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../lib/toast')>();
+  return {
+    ...actual,
+    showSuccess: vi.fn(),
+    showError: vi.fn(),
+  };
+});
+
+const size = (id: string, l: number, w: number, t: number, sortOrder = 0) => ({
+  id,
+  tenantId: 't',
+  lengthIn: l,
+  widthIn: w,
+  thicknessIn: t,
+  sortOrder,
+  archivedAt: null,
+  createdAt: '',
+});
 
 describe('FilterSizesPanel', () => {
   beforeEach(() => {
@@ -37,10 +53,7 @@ describe('FilterSizesPanel', () => {
   });
 
   it('renders configured sizes formatted as L × W × T', async () => {
-    mockGetAll.mockResolvedValue([
-      { id: 's1', tenantId: 't', lengthIn: 16, widthIn: 20, thicknessIn: 1, sortOrder: 0, archivedAt: null, createdAt: '' },
-      { id: 's2', tenantId: 't', lengthIn: 20, widthIn: 25, thicknessIn: 1, sortOrder: 1, archivedAt: null, createdAt: '' },
-    ]);
+    mockGetAll.mockResolvedValue([size('s1', 16, 20, 1, 0), size('s2', 20, 25, 1, 1)]);
     renderWithProviders(<FilterSizesPanel />);
 
     await waitFor(() => {
@@ -49,62 +62,90 @@ describe('FilterSizesPanel', () => {
     });
   });
 
-  it('rejects non-positive dimensions on save', async () => {
+  it('shows the empty state with Add + Seed common when there are no sizes', async () => {
     mockGetAll.mockResolvedValue([]);
-    const user = userEvent.setup();
     renderWithProviders(<FilterSizesPanel />);
 
-    await waitFor(() => expect(screen.getByText(/no filter sizes configured/i)).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: /add size/i }));
-
-    await user.type(await screen.findByLabelText(/length/i), '0');
-    await user.type(screen.getByLabelText(/width/i), '20');
-    await user.type(screen.getByLabelText(/thickness/i), '1');
-    await user.click(screen.getByRole('button', { name: /^create$/i }));
-
+    await waitFor(() =>
+      expect(screen.getByText(/no filter sizes yet/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: /add size/i })).toBeInTheDocument();
     expect(
-      screen.getByText(/length, width, and thickness must all be greater than zero/i)
+      screen.getByRole('button', { name: /seed common sizes/i }),
     ).toBeInTheDocument();
-    expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it('creates a new filter size with parsed numeric values', async () => {
-    mockGetAll.mockResolvedValue([]);
-    mockCreate.mockResolvedValue({ id: 'new' });
+  it('inline-adds a new size by parsing L×W×T input', async () => {
+    mockGetAll.mockResolvedValue([size('s1', 16, 20, 1, 0)]);
+    mockCreate.mockResolvedValue(size('new', 14, 20, 1, 1));
     const user = userEvent.setup();
     renderWithProviders(<FilterSizesPanel />);
 
-    await waitFor(() => expect(screen.getByText(/no filter sizes configured/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
+
+    // Click the dashed "+ Add size" affordance at the bottom of the table.
     await user.click(screen.getByRole('button', { name: /add size/i }));
 
-    await user.type(await screen.findByLabelText(/length/i), '14');
-    await user.type(screen.getByLabelText(/width/i), '20');
-    await user.type(screen.getByLabelText(/thickness/i), '1');
-    await user.click(screen.getByRole('button', { name: /^create$/i }));
+    const input = await screen.findByPlaceholderText(/16×20×1/i);
+    await user.type(input, '14x20x1{Enter}');
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledWith({
         lengthIn: 14,
         widthIn: 20,
         thicknessIn: 1,
-        sortOrder: 0,
+        sortOrder: 1,
       });
     });
   });
 
-  it('updates an existing filter size', async () => {
-    mockGetAll.mockResolvedValue([
-      { id: 's1', tenantId: 't', lengthIn: 16, widthIn: 20, thicknessIn: 1, sortOrder: 0, archivedAt: null, createdAt: '' },
-    ]);
-    mockUpdate.mockResolvedValue({ id: 's1' });
+  it('rejects malformed inline-add input', async () => {
+    mockGetAll.mockResolvedValue([size('s1', 16, 20, 1, 0)]);
+    const user = userEvent.setup();
+    renderWithProviders(<FilterSizesPanel />);
+
+    await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /add size/i }));
+
+    const input = await screen.findByPlaceholderText(/16×20×1/i);
+    await user.type(input, 'not-a-size{Enter}');
+
+    expect(
+      await screen.findByText(/use the form 16×20×1/i),
+    ).toBeInTheDocument();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate inline-add (case-insensitive on the same dimensions)', async () => {
+    mockGetAll.mockResolvedValue([size('s1', 16, 20, 1, 0)]);
+    const user = userEvent.setup();
+    renderWithProviders(<FilterSizesPanel />);
+
+    await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /add size/i }));
+
+    const input = await screen.findByPlaceholderText(/16×20×1/i);
+    await user.type(input, '16X20X1{Enter}');
+
+    expect(
+      await screen.findByText(/already in your list/i),
+    ).toBeInTheDocument();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('opens the edit dialog from the kebab Rename action', async () => {
+    mockGetAll.mockResolvedValue([size('s1', 16, 20, 1, 0)]);
+    mockUpdate.mockResolvedValue(size('s1', 18, 20, 1, 0));
     const user = userEvent.setup();
     renderWithProviders(<FilterSizesPanel />);
 
     await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
     const moreButtons = screen.getAllByRole('button', { name: /more options/i });
-    await user.click(moreButtons[0]);
-    const editItem = await screen.findByRole('menuitem', { name: /edit/i });
-    await user.click(editItem);
+    // First kebab in the table row (header's kebab is also there for Seed common).
+    await user.click(moreButtons[1]);
+
+    const renameItem = await screen.findByRole('menuitem', { name: /rename/i });
+    await user.click(renameItem);
 
     const length = await screen.findByLabelText(/length/i);
     await user.clear(length);
@@ -120,31 +161,33 @@ describe('FilterSizesPanel', () => {
     });
   });
 
-  it('deletes after confirmation', async () => {
-    mockGetAll.mockResolvedValue([
-      { id: 's1', tenantId: 't', lengthIn: 16, widthIn: 20, thicknessIn: 1, sortOrder: 0, archivedAt: null, createdAt: '' },
-    ]);
+  it('deletes via ConfirmDialog after confirmation', async () => {
+    mockGetAll.mockResolvedValue([size('s1', 16, 20, 1, 0)]);
     mockDelete.mockResolvedValue(undefined);
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
     renderWithProviders(<FilterSizesPanel />);
 
     await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
     const moreButtons = screen.getAllByRole('button', { name: /more options/i });
-    await user.click(moreButtons[0]);
-    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
+    await user.click(moreButtons[1]);
+
+    const deleteItem = await screen.findByRole('menuitem', { name: /^delete$/i });
     await user.click(deleteItem);
 
-    await waitFor(() => {
-      expect(mockDelete).toHaveBeenCalledWith('s1');
-    });
-    confirmSpy.mockRestore();
+    // Confirm dialog appears with the size in the title.
+    expect(await screen.findByText(/delete "16×20×1"/i)).toBeInTheDocument();
+
+    // The destructive Delete button in the alert.
+    const confirmButtons = screen.getAllByRole('button', { name: /^delete$/i });
+    await user.click(confirmButtons[confirmButtons.length - 1]);
+
+    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('s1'));
   });
 
   it('reorders rows via drag-and-drop, posting the new id order', async () => {
     mockGetAll.mockResolvedValue([
-      { id: 's1', tenantId: 't', lengthIn: 16, widthIn: 20, thicknessIn: 1, sortOrder: 0, archivedAt: null, createdAt: '' },
-      { id: 's2', tenantId: 't', lengthIn: 20, widthIn: 25, thicknessIn: 1, sortOrder: 1, archivedAt: null, createdAt: '' },
+      size('s1', 16, 20, 1, 0),
+      size('s2', 20, 25, 1, 1),
     ]);
     mockReorder.mockResolvedValue([]);
     renderWithProviders(<FilterSizesPanel />);
@@ -173,48 +216,76 @@ describe('FilterSizesPanel', () => {
     });
   });
 
-  it('cancel closes the dialog', async () => {
-    mockGetAll.mockResolvedValue([]);
+  it('seeds common sizes through the header kebab + ConfirmDialog', async () => {
+    mockGetAll.mockResolvedValue([size('s1', 16, 20, 1, 0)]);
+    mockSeedCommon.mockResolvedValue({ added: 9, skipped: 1 });
     const user = userEvent.setup();
     renderWithProviders(<FilterSizesPanel />);
 
-    await waitFor(() => expect(screen.getByText(/no filter sizes configured/i)).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: /add size/i }));
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /cancel/i }));
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
+
+    // Header kebab (first More options button — header is rendered before
+    // any table rows).
+    const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(moreButtons[0]);
+
+    const seedItem = await screen.findByRole('menuitem', {
+      name: /seed common sizes/i,
     });
+    await user.click(seedItem);
+
+    // Confirm dialog.
+    expect(
+      await screen.findByText(/add common filter sizes\?/i),
+    ).toBeInTheDocument();
+    const confirmButtons = screen.getAllByRole('button', {
+      name: /seed common sizes/i,
+    });
+    await user.click(confirmButtons[confirmButtons.length - 1]);
+
+    await waitFor(() => expect(mockSeedCommon).toHaveBeenCalled());
   });
 
-  it('shows the seed-common CTA in the empty state', async () => {
+  it('shows the seed-common CTA inside the empty state', async () => {
     mockGetAll.mockResolvedValue([]);
+    mockSeedCommon.mockResolvedValue({ added: 10, skipped: 0 });
+    const user = userEvent.setup();
     renderWithProviders(<FilterSizesPanel />);
 
     await waitFor(() =>
-      expect(screen.getByText(/no filter sizes configured/i)).toBeInTheDocument()
+      expect(screen.getByText(/no filter sizes yet/i)).toBeInTheDocument(),
     );
+    await user.click(
+      screen.getByRole('button', { name: /seed common sizes/i }),
+    );
+
+    // Confirm dialog opens.
     expect(
-      screen.getByRole('button', { name: /seed common sizes/i })
+      await screen.findByText(/add common filter sizes\?/i),
     ).toBeInTheDocument();
   });
 
-  it('calls seedCommon and surfaces the added/skipped result', async () => {
-    mockGetAll.mockResolvedValue([]);
-    mockSeedCommon.mockResolvedValue({ added: 10, skipped: 0 });
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+  it('filters the list with the search input and shows "no matches" state', async () => {
+    mockGetAll.mockResolvedValue([
+      size('s1', 16, 20, 1, 0),
+      size('s2', 20, 25, 1, 1),
+    ]);
     const user = userEvent.setup();
     renderWithProviders(<FilterSizesPanel />);
 
-    await waitFor(() =>
-      expect(screen.getByText(/no filter sizes configured/i)).toBeInTheDocument()
-    );
-    await user.click(screen.getByRole('button', { name: /seed common sizes/i }));
+    await waitFor(() => expect(screen.getByText('16×20×1')).toBeInTheDocument());
 
-    await waitFor(() => {
-      expect(mockSeedCommon).toHaveBeenCalled();
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/added 10/i));
-    });
-    alertSpy.mockRestore();
+    const search = screen.getByPlaceholderText(/search sizes/i);
+    await user.type(search, '16');
+
+    expect(screen.queryByText('20×25×1')).not.toBeInTheDocument();
+    expect(screen.getByText('16×20×1')).toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, 'zzz');
+
+    expect(
+      await screen.findByText(/no sizes match your search/i),
+    ).toBeInTheDocument();
   });
 });
