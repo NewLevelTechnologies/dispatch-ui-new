@@ -660,7 +660,6 @@ vi.mock('react-i18next', () => {
     'users.table.auditLog': 'Audit Log',
     'users.table.disable': 'Disable',
     'users.table.enable': 'Enable',
-    'users.table.lastActive': 'Last Active',
     'users.table.lastUpdated': 'Last Updated',
     'users.table.you': 'You',
     'capabilities.clearGroup': 'Clear group',
