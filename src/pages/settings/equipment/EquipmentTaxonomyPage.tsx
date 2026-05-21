@@ -39,6 +39,7 @@ import { Input } from '../../../components/catalyst/input';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import IconButton from '../../../components/IconButton';
 import { DragHandle } from '../../../components/settings/DragHandle';
+import { useGlossary } from '../../../contexts/GlossaryContext';
 import { Card, CardBody } from '../../../components/ui/Card';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
@@ -69,7 +70,10 @@ type PendingDelete =
 
 export default function EquipmentTaxonomyPage() {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const queryClient = useQueryClient();
+  const equipmentName = getName('equipment');
+  const equipmentNamePlural = getName('equipment', true);
 
   const [q, setQ] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -251,14 +255,17 @@ export default function EquipmentTaxonomyPage() {
         categoryCount === 0
           ? t('settings.equipmentTaxonomy.delete.typeMessageEmpty')
           : categoryCount === 1
-            ? t('settings.equipmentTaxonomy.delete.typeMessageOne')
-            : t('settings.equipmentTaxonomy.delete.typeMessage', { count: categoryCount });
+            ? t('settings.equipmentTaxonomy.delete.typeMessageOne', { entity: equipmentNamePlural })
+            : t('settings.equipmentTaxonomy.delete.typeMessage', {
+                count: categoryCount,
+                entity: equipmentNamePlural,
+              });
       return { title, message };
     }
     const { category } = pendingDelete;
     return {
       title: t('settings.equipmentTaxonomy.delete.categoryTitle', { name: category.name }),
-      message: t('settings.equipmentTaxonomy.delete.categoryMessage'),
+      message: t('settings.equipmentTaxonomy.delete.categoryMessage', { entity: equipmentNamePlural }),
     };
   })();
 
@@ -272,7 +279,7 @@ export default function EquipmentTaxonomyPage() {
     <>
       <PageHead
         title={t('settings.equipmentTaxonomy.title')}
-        sub={t('settings.equipmentTaxonomy.subtitle')}
+        sub={t('settings.equipmentTaxonomy.subtitle', { entity: equipmentName })}
         actions={
           <Button color="accent" size="xs" onClick={() => setDialog({ kind: 'addType' })}>
             <PlusIcon className="size-4" />
@@ -302,10 +309,10 @@ export default function EquipmentTaxonomyPage() {
 
       <div className="mt-4 max-w-[900px]">
         {isLoading ? (
-          <LoadingState label={t('settings.equipmentTaxonomy.loading')} />
+          <LoadingState label={t('settings.equipmentTaxonomy.loading', { entity: equipmentName })} />
         ) : typesError ? (
           <ErrorState
-            title={t('settings.equipmentTaxonomy.errorLoad')}
+            title={t('settings.equipmentTaxonomy.errorLoad', { entity: equipmentName })}
             description={extractApiError(typesError) ?? (typesError as Error).message}
             action={
               <Button outline onClick={() => refetch()}>
@@ -328,7 +335,7 @@ export default function EquipmentTaxonomyPage() {
           ) : (
             <EmptyState
               icon={<Squares2X2Icon className="size-10 text-fg-dim" />}
-              title={t('settings.equipmentTaxonomy.empty.noTypesTitle')}
+              title={t('settings.equipmentTaxonomy.empty.noTypesTitle', { entity: equipmentName })}
               description={t('settings.equipmentTaxonomy.empty.noTypesDescription')}
               action={
                 <Button color="accent" onClick={() => setDialog({ kind: 'addType' })}>
@@ -738,7 +745,9 @@ function TaxonomyDialog({
   onTypeCreated,
 }: DialogProps) {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const queryClient = useQueryClient();
+  const equipmentName = getName('equipment');
   const [name, setName] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -762,7 +771,7 @@ function TaxonomyDialog({
       onClose();
     },
     onError: (err) =>
-      setErrorMessage(extractApiError(err) ?? t('settings.equipmentTaxonomy.errorSaveType')),
+      setErrorMessage(extractApiError(err) ?? t('settings.equipmentTaxonomy.errorSaveType', { entity: equipmentName })),
   });
 
   const updateTypeMutation = useMutation({
@@ -772,7 +781,7 @@ function TaxonomyDialog({
       onClose();
     },
     onError: (err) =>
-      setErrorMessage(extractApiError(err) ?? t('settings.equipmentTaxonomy.errorSaveType')),
+      setErrorMessage(extractApiError(err) ?? t('settings.equipmentTaxonomy.errorSaveType', { entity: equipmentName })),
   });
 
   const createCategoryMutation = useMutation({
@@ -825,9 +834,9 @@ function TaxonomyDialog({
     if (!state) return '';
     switch (state.kind) {
       case 'addType':
-        return t('settings.equipmentTaxonomy.dialog.addType');
+        return t('settings.equipmentTaxonomy.dialog.addType', { entity: equipmentName });
       case 'editType':
-        return t('settings.equipmentTaxonomy.dialog.editType');
+        return t('settings.equipmentTaxonomy.dialog.editType', { entity: equipmentName });
       case 'addCategory':
         return t('settings.equipmentTaxonomy.dialog.addCategoryTo', {
           name: state.typeName,
