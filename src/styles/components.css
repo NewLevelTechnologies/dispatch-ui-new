@@ -417,6 +417,21 @@
 }
 .dense-table tbody tr:hover td { background: var(--bg-hover); }
 .dense-table tbody tr.urgent td { background: color-mix(in oklch, var(--danger-500) 5%, var(--bg-elev)); }
+
+/* Keyboard focus ring for clickable rows. `:focus-visible` keeps this off
+   mouse clicks; non-interactive `DenseRow`s never get the class. */
+.dense-table tbody tr.dense-row-interactive:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: -2px;
+  position: relative;
+}
+/* On the sticky-left layout the outer outline gets clipped by the sticky
+   first cell — replicate the left edge of the ring via inset box-shadow
+   so the focus indicator stays continuous around the row. */
+.dense-table tbody tr.dense-row-interactive:focus-visible td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent-500), inset -1px 0 0 var(--border-soft);
+}
+
 .dense-table .num { font-variant-numeric: tabular-nums; letter-spacing: -0.005em; }
 .dense-table .strong { color: var(--fg-strong); font-weight: 600; }
 .dense-table .muted { color: var(--fg-muted); font-size: 11px; }

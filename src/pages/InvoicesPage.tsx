@@ -324,9 +324,6 @@ export default function InvoicesPage() {
                 </tbody>
               </DenseTable>
               <ListFooter
-                page={1}
-                totalPages={1}
-                pageHref={() => '#'}
                 left={t('common.pagination.showing', {
                   start: filteredInvoices.length > 0 ? 1 : 0,
                   end: filteredInvoices.length,

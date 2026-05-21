@@ -5,7 +5,7 @@
 // Right: Catalyst Pagination — middle/cmd-click opens a new tab when
 //        hrefs are passed (the hrefs preserve current filter state).
 //
-// Usage:
+// Usage with pagination:
 //   <ListFooter
 //     page={pageNumber}
 //     totalPages={totalPages}
@@ -13,9 +13,12 @@
 //     left={<>Showing <strong>1–25</strong> of 142 customers · West only</>}
 //   />
 //
-// If `totalPages` is 1 or less, renders nothing — callers don't have to
-// guard. When pagination is hidden the left text still shows when the
-// count line is interesting (e.g. with filter chips applied).
+// Usage without pagination (client-side filtered list):
+//   <ListFooter left={<>Showing 12 users</>} />
+//
+// `page` / `totalPages` / `pageHref` are all optional — omit them when
+// there's nothing to paginate and the left band renders alone. Callers
+// don't need to fabricate `page={1} totalPages={1}`.
 // ─────────────────────────────────────────────────────────────────
 import type { ReactNode } from 'react';
 import {
@@ -28,14 +31,22 @@ import {
 } from '../catalyst/pagination';
 
 type Props = {
-  page: number;
-  totalPages: number;
-  pageHref: (page: number) => string;
+  page?: number;
+  totalPages?: number;
+  pageHref?: (page: number) => string;
   left?: ReactNode;
 };
 
 export function ListFooter({ page, totalPages, pageHref, left }: Props) {
-  if (totalPages <= 1) {
+  // Render the count-only band when there's nothing to paginate. Inlined
+  // (rather than going through a boolean local) so TS narrows page /
+  // totalPages / pageHref to non-undefined in the pagination branch.
+  if (
+    typeof page !== 'number' ||
+    typeof totalPages !== 'number' ||
+    typeof pageHref !== 'function' ||
+    totalPages <= 1
+  ) {
     if (!left) return null;
     return (
       <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-3 py-2 text-[11.5px] text-fg-muted">

@@ -401,9 +401,6 @@ export default function UsersPage() {
                 </tbody>
               </DenseTable>
                 <ListFooter
-                  page={1}
-                  totalPages={1}
-                  pageHref={() => '#'}
                   left={
                     <>
                       {t('settings.showingCount', {

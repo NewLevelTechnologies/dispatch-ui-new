@@ -20,7 +20,7 @@
 //     </tbody>
 //   </DenseTable>
 // ─────────────────────────────────────────────────────────────────
-import type { HTMLAttributes, ReactNode } from 'react';
+import type { HTMLAttributes, KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import clsx from 'clsx';
 
 export function DenseTable({ className, ...p }: HTMLAttributes<HTMLTableElement>) {
@@ -32,9 +32,34 @@ export function DenseTHead(p: HTMLAttributes<HTMLTableSectionElement>) {
 }
 
 export function DenseRow({
-  urgent, className, ...p
+  urgent, className, onClick, onKeyDown, ...p
 }: HTMLAttributes<HTMLTableRowElement> & { urgent?: boolean }) {
-  return <tr className={clsx(urgent && 'urgent', className)} {...p} />;
+  const isClickable = typeof onClick === 'function';
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTableRowElement>) => {
+    // Caller's own keydown handler wins.
+    onKeyDown?.(e);
+    if (e.defaultPrevented) return;
+
+    if (isClickable && (e.key === 'Enter' || e.key === ' ')) {
+      // Only activate when the row itself is focused — child interactives
+      // (kebab buttons, links) own their own key handling.
+      if (e.currentTarget !== e.target) return;
+      e.preventDefault();
+      onClick(e as unknown as MouseEvent<HTMLTableRowElement>);
+    }
+  };
+
+  return (
+    <tr
+      className={clsx(urgent && 'urgent', isClickable && 'dense-row-interactive', className)}
+      onClick={onClick}
+      onKeyDown={isClickable ? handleKeyDown : onKeyDown}
+      tabIndex={isClickable ? 0 : undefined}
+      role={isClickable ? 'button' : undefined}
+      {...p}
+    />
+  );
 }
 
 export function CellStack({ children }: { children: ReactNode }) {
