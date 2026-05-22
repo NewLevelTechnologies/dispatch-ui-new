@@ -50,15 +50,15 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
     enabled: isEdit && !!id,
   });
 
-  // Members count — drives the capability-removal warning. Stubbed today, real
-  // when the backend ships GET /users/roles/{id}/members. Until then count is
-  // 0 and the warning is silent.
+  // Member count — drives the capability-removal warning. We only need the
+  // total here, so request size=1 and read totalElements instead of pulling
+  // the full member list.
   const { data: membersResp } = useQuery({
-    queryKey: ['roles', id, 'members'],
-    queryFn: () => userApi.listRoleMembers(id!),
+    queryKey: ['roles', id, 'members', 'count'],
+    queryFn: () => userApi.listRoleMembers(id!, { size: 1 }),
     enabled: isEdit && !!id,
   });
-  const memberCount = membersResp?.users.length ?? 0;
+  const memberCount = membersResp?.totalElements ?? 0;
 
   // Full roles envelope — needed for `colorsInUse` in add mode (the BE
   // returns the map at the top level alongside the roles array). In edit

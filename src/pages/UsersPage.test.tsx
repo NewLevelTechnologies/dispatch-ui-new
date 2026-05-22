@@ -4,10 +4,10 @@ import { renderWithProviders, userEvent } from '../test/utils';
 import UsersPage from './UsersPage';
 import apiClient from '../api/client';
 
-// Mock the API client
 vi.mock('../api/client');
 
-// Mock react-router-dom navigate
+// react-router's useNavigate is the side-effect we assert on for row clicks,
+// dropdown actions, and the add CTA — patch it once for the whole file.
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
@@ -18,19 +18,25 @@ vi.mock('react-router-dom', async () => {
 });
 
 const mockRoles = [
-  {
-    id: 'role-1',
-    name: 'Admin',
-    description: 'Administrator role',
-  },
-  {
-    id: 'role-2',
-    name: 'Technician',
-    description: 'Field technician role',
-  },
+  { id: 'role-1', name: 'Admin', description: 'Administrator role' },
+  { id: 'role-2', name: 'Technician', description: 'Field technician role' },
 ];
 
-const mockUsers = [
+type MockUser = {
+  id: string;
+  tenantId: string;
+  cognitoSub: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  enabled: boolean;
+  invitationStatus?: 'ACTIVE' | 'INVITED' | 'INVITATION_EXPIRED';
+  roles: { id: string; name: string; description?: string }[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+const mockUsers: MockUser[] = [
   {
     id: 'user-1',
     tenantId: 'tenant-1',
@@ -39,6 +45,7 @@ const mockUsers = [
     firstName: 'John',
     lastName: 'Doe',
     enabled: true,
+    invitationStatus: 'ACTIVE',
     roles: [mockRoles[0]],
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-15T10:30:00Z',
@@ -51,6 +58,7 @@ const mockUsers = [
     firstName: 'Jane',
     lastName: 'Smith',
     enabled: false,
+    invitationStatus: 'ACTIVE',
     roles: [mockRoles[1]],
     createdAt: '2024-01-02T00:00:00Z',
     updatedAt: '2024-01-20T14:20:00Z',
@@ -63,57 +71,103 @@ const mockUsers = [
     firstName: 'Bob',
     lastName: 'Johnson',
     enabled: true,
+    invitationStatus: 'INVITED',
     roles: [],
     createdAt: '2024-01-03T00:00:00Z',
     updatedAt: '2024-01-25T09:15:00Z',
   },
 ];
 
+// Spring page envelope wrapper used by `GET /users` now. Counts ignores the
+// status / invitation filters per the BE contract, but we don't exercise
+// that nuance — disabled count = enabled-filtered set is close enough for
+// the subtitle tests.
+function pageOf(users: MockUser[], opts: { counts?: { disabled: number; invited: number } } = {}) {
+  return {
+    data: {
+      content: users,
+      page: 0,
+      size: 50,
+      totalElements: users.length,
+      totalPages: users.length === 0 ? 0 : 1,
+      counts: opts.counts ?? {
+        disabled: users.filter((u) => !u.enabled).length,
+        invited: users.filter((u) => u.invitationStatus && u.invitationStatus !== 'ACTIVE').length,
+      },
+    },
+  };
+}
+
+// Parse the URL the page sent and return the matching slice of `users`.
+// Mirrors the server's filter semantics (case-insensitive contains on
+// firstName/lastName/email; enabled boolean; repeatable roleId and
+// invitationStatus).
+function applyUsersQuery(url: string, users: MockUser[]): MockUser[] {
+  const qi = url.indexOf('?');
+  const params = new URLSearchParams(qi >= 0 ? url.slice(qi + 1) : '');
+  let out = users;
+  const q = params.get('q')?.toLowerCase();
+  if (q) {
+    out = out.filter(
+      (u) =>
+        u.firstName.toLowerCase().includes(q) ||
+        u.lastName.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q)
+    );
+  }
+  const enabled = params.get('enabled');
+  if (enabled === 'true') out = out.filter((u) => u.enabled);
+  else if (enabled === 'false') out = out.filter((u) => !u.enabled);
+  const roleIds = params.getAll('roleId');
+  if (roleIds.length > 0) {
+    out = out.filter((u) => u.roles.some((r) => roleIds.includes(r.id)));
+  }
+  const invitationStatuses = params.getAll('invitationStatus');
+  if (invitationStatuses.length > 0) {
+    out = out.filter((u) => u.invitationStatus && invitationStatuses.includes(u.invitationStatus));
+  }
+  return out;
+}
+
+function installApiMock(users: MockUser[] = mockUsers, roles = mockRoles) {
+  vi.mocked(apiClient.get).mockImplementation((url: string) => {
+    if (url.startsWith('/users/roles')) {
+      return Promise.resolve({ data: roles });
+    }
+    if (url === '/users' || url.startsWith('/users?')) {
+      return Promise.resolve(pageOf(applyUsersQuery(url, users)));
+    }
+    if (url === '/users/me') {
+      return Promise.resolve({ data: users[0] ?? null });
+    }
+    return Promise.reject(new Error(`Unknown URL: ${url}`));
+  });
+}
+
 describe('UsersPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockNavigate.mockClear();
+    installApiMock();
   });
 
-  it('renders the page title and add button', () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
-
+  it('renders the page title and add button', async () => {
     renderWithProviders(<UsersPage />);
 
     expect(screen.getByRole('heading', { name: 'Users' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /add user/i })).toBeInTheDocument();
   });
 
-  it('displays page heading', () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
-
-    renderWithProviders(<UsersPage />);
-
-    expect(screen.getByRole('heading', { name: /users/i })).toBeInTheDocument();
-  });
-
   it('displays loading state while fetching users', async () => {
-    vi.mocked(apiClient.get).mockImplementation(
-      () => new Promise(() => {}) // Never resolves
-    );
+    vi.mocked(apiClient.get).mockImplementation(() => new Promise(() => {}));
 
     renderWithProviders(<UsersPage />);
 
-    // LoadingState has a 250 ms delay before becoming visible — wait it out.
+    // LoadingState has a 250 ms delay before becoming visible.
     expect(await screen.findByText('Loading users...')).toBeInTheDocument();
   });
 
   it('displays users in a table', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: mockUsers });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
@@ -126,16 +180,6 @@ describe('UsersPage', () => {
   });
 
   it('displays role badges for users', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: mockUsers });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
@@ -147,37 +191,18 @@ describe('UsersPage', () => {
   });
 
   it('displays enabled/disabled status indicators', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: mockUsers });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    // Active rows use the success dot + "Active" text; disabled rows use "Disabled".
     expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Disabled').length).toBeGreaterThan(0);
   });
 
   it('displays an em-dash for users with no roles', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: [mockUsers[2]] });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
+    installApiMock([mockUsers[2]]);
 
     renderWithProviders(<UsersPage />);
 
@@ -185,8 +210,7 @@ describe('UsersPage', () => {
       expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
     });
 
-    const dashElements = screen.getAllByText('—');
-    expect(dashElements.length).toBeGreaterThan(0);
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
   it('displays error message when fetch fails', async () => {
@@ -202,7 +226,7 @@ describe('UsersPage', () => {
   });
 
   it('displays empty state when no users exist', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    installApiMock([]);
 
     renderWithProviders(<UsersPage />);
 
@@ -211,47 +235,25 @@ describe('UsersPage', () => {
     });
 
     expect(screen.getByText(/invite your team to get started/i)).toBeInTheDocument();
-    // EmptyState surfaces an "Add user" CTA when the viewer can invite.
-    // (The page header also has one; both share the same label.)
+    // PageHead + EmptyState both expose an "Add user" CTA when permitted.
     expect(screen.getAllByRole('button', { name: /^add user$/i }).length).toBeGreaterThan(0);
   });
 
   it('navigates to detail page when row is clicked', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: mockUsers });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    const nameCell = screen.getByText('John Doe');
-    await user.click(nameCell);
+    await user.click(screen.getByText('John Doe'));
 
     expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users/user-1');
   });
 
   it('navigates to edit page when edit menu item is clicked', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: mockUsers });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
     const user = userEvent.setup();
-
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
@@ -261,97 +263,55 @@ describe('UsersPage', () => {
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
 
-    const editButton = screen.getByRole('menuitem', { name: /edit/i });
-    await user.click(editButton);
+    await user.click(screen.getByRole('menuitem', { name: /edit/i }));
 
-    // Edit now navigates to the dedicated edit page instead of opening a dialog.
-    // mockUsers[0] is the first user — assert the route uses its id.
     expect(mockNavigate).toHaveBeenCalledWith(`/settings/access/users/${mockUsers[0].id}/edit`);
   });
 
   it('does not navigate when dropdown is clicked', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: mockUsers });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
     const { router } = renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    // Click the dropdown button
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
 
-    // Should not navigate
     expect(router.state.location.pathname).toBe('/');
   });
 
   it('opens disable confirmation for enabled users', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: mockUsers });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
     const user = userEvent.setup();
-
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    // Click the dropdown button for enabled user
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
 
-    // Click disable option in the dropdown
-    const disableMenuItem = screen.getByRole('menuitem', { name: /disable/i });
-    await user.click(disableMenuItem);
+    await user.click(screen.getByRole('menuitem', { name: /disable/i }));
 
-    // ConfirmDialog (Alert) renders with the user's name in the title
     await waitFor(() => {
       expect(screen.getByText(/disable john doe/i)).toBeInTheDocument();
     });
   });
 
   it('opens enable confirmation for disabled users', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: mockUsers });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
     const user = userEvent.setup();
-
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Jane Smith')).toBeInTheDocument();
     });
 
-    // Click the dropdown button for disabled user
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[1]);
 
-    // Click enable option in the dropdown
-    const enableMenuItem = screen.getByRole('menuitem', { name: /enable/i });
-    await user.click(enableMenuItem);
+    await user.click(screen.getByRole('menuitem', { name: /enable/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/enable jane smith/i)).toBeInTheDocument();
@@ -359,108 +319,60 @@ describe('UsersPage', () => {
   });
 
   it('calls disable mutation when confirmed', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: mockUsers });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
     vi.mocked(apiClient.post).mockResolvedValue({ data: { ...mockUsers[0], enabled: false } });
     const user = userEvent.setup();
-
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    // Open dropdown → click Disable in the menu
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
-    const disableMenuItem = screen.getByRole('menuitem', { name: /disable/i });
-    await user.click(disableMenuItem);
+    await user.click(screen.getByRole('menuitem', { name: /disable/i }));
 
-    // Confirm in the dialog
     const confirmButton = await screen.findByRole('button', { name: /^disable$/i });
     await user.click(confirmButton);
 
     await waitFor(() => {
-      // PUT /users/{id} no longer takes an `enabled` field; activation
-      // moved to a dedicated POST endpoint that also emits the matching
-      // activity-feed event server-side.
       expect(apiClient.post).toHaveBeenCalledWith('/users/user-1/deactivate');
     });
   });
 
-  it('opens delete alert when delete button is clicked', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: mockUsers });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
+  it('opens delete alert when delete menu item is clicked', async () => {
     const user = userEvent.setup();
-
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    // Click the dropdown button
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
+    await user.click(screen.getByRole('menuitem', { name: /delete/i }));
 
-    // Click delete option
-    const deleteButton = screen.getByRole('menuitem', { name: /delete/i });
-    await user.click(deleteButton);
-
-    // Delete alert should open
     await waitFor(() => {
       expect(screen.getByText(/delete john doe/i)).toBeInTheDocument();
-      expect(screen.getByText(/all user data and history will be permanently removed/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/all user data and history will be permanently removed/i)
+      ).toBeInTheDocument();
     });
   });
 
-  it('calls delete mutation when delete is confirmed', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: mockUsers });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
+  it('calls delete mutation when confirmed', async () => {
     vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
     const user = userEvent.setup();
-
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    // Click the dropdown button
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
+    await user.click(screen.getByRole('menuitem', { name: /delete/i }));
 
-    // Click delete option
-    const deleteButton = screen.getByRole('menuitem', { name: /delete/i });
-    await user.click(deleteButton);
-
-    // Confirm delete
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /^delete$/i })).toBeInTheDocument();
-    });
-
-    const confirmButton = screen.getByRole('button', { name: /^delete$/i });
+    const confirmButton = await screen.findByRole('button', { name: /^delete$/i });
     await user.click(confirmButton);
 
     await waitFor(() => {
@@ -468,102 +380,78 @@ describe('UsersPage', () => {
     });
   });
 
-  it('cancels delete when cancel button is clicked', async () => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
-      if (url === '/users') {
-        return Promise.resolve({ data: mockUsers });
-      }
-      if (url === '/users/roles') {
-        return Promise.resolve({ data: mockRoles });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
+  it('cancels delete when cancel is clicked', async () => {
     const user = userEvent.setup();
-
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    // Click the dropdown button
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
+    await user.click(screen.getByRole('menuitem', { name: /delete/i }));
 
-    // Click delete option
-    const deleteButton = screen.getByRole('menuitem', { name: /delete/i });
-    await user.click(deleteButton);
-
-    // Cancel delete
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
-    });
-
-    const cancelButton = screen.getByRole('button', { name: /cancel/i });
+    const cancelButton = await screen.findByRole('button', { name: /cancel/i });
     await user.click(cancelButton);
 
     expect(apiClient.delete).not.toHaveBeenCalled();
   });
 
-  describe('Search and Filters', () => {
-    it('displays search bar when users exist', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
-
+  describe('Search', () => {
+    it('shows the search input', async () => {
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      expect(screen.getByPlaceholderText(/search by name, email, or role/i)).toBeInTheDocument();
+      // Placeholder reflects the new server-side q semantics (name + email).
+      expect(screen.getByPlaceholderText(/search by name or email/i)).toBeInTheDocument();
     });
 
-    it('filters users by search query', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
+    it('queries the server and filters users by q', async () => {
       const user = userEvent.setup();
-
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      const searchInput = screen.getByPlaceholderText(/search by name, email, or role/i);
+      const searchInput = screen.getByPlaceholderText(/search by name or email/i);
       await user.type(searchInput, 'jane');
 
       await waitFor(() => {
         expect(screen.getByText('Jane Smith')).toBeInTheDocument();
         expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
       });
+
+      // Verify the q param hit the wire.
+      const calls = vi.mocked(apiClient.get).mock.calls.map((c) => c[0]);
+      expect(calls.some((url) => typeof url === 'string' && url.includes('q=jane'))).toBe(true);
     });
 
-    it('displays role filter dropdown', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
+    it('shows the no-match empty state when q returns zero rows', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
+      const searchInput = screen.getByPlaceholderText(/search by name or email/i);
+      await user.type(searchInput, 'nonexistentuser');
+
+      await waitFor(() => {
+        expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /clear filters/i })).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Role filter', () => {
+    it('renders the role filter chip', async () => {
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
@@ -573,17 +461,55 @@ describe('UsersPage', () => {
       expect(screen.getByRole('button', { name: /^Role$/i })).toBeInTheDocument();
     });
 
-    it('displays status filter dropdown', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
+    it('filters users by selected role via the server', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
       });
 
+      await user.click(screen.getByRole('button', { name: /^Role$/i }));
+      await user.click(screen.getByRole('option', { name: /^admin$/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+      });
+
+      const calls = vi.mocked(apiClient.get).mock.calls.map((c) => c[0]);
+      expect(
+        calls.some((url) => typeof url === 'string' && url.includes('roleId=role-1'))
+      ).toBe(true);
+    });
+
+    it('clears the role filter via the chip × button', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /^Role$/i }));
+      await user.click(screen.getByRole('option', { name: /^admin$/i }));
+
+      await waitFor(() => {
+        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /role.*clear/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Status filter', () => {
+    it('renders the status filter chip', async () => {
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
@@ -592,97 +518,185 @@ describe('UsersPage', () => {
 
       expect(screen.getByRole('button', { name: /^Status$/i })).toBeInTheDocument();
     });
-  });
 
-  describe('Row navigation', () => {
-    it('navigates to user detail page when user name is clicked', async () => {
+    it('filters users by enabled status', async () => {
       const user = userEvent.setup();
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: [] });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
-
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
+        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
       });
 
-      const nameCell = screen.getByText('John Doe');
-      await user.click(nameCell);
+      await user.click(screen.getByRole('button', { name: /^Status$/i }));
+      await user.click(screen.getByRole('option', { name: /^enabled$/i }));
 
-      expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users/user-1');
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+        expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
+        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+      });
+
+      const calls = vi.mocked(apiClient.get).mock.calls.map((c) => c[0]);
+      expect(
+        calls.some((url) => typeof url === 'string' && url.includes('enabled=true'))
+      ).toBe(true);
     });
 
-    it('does not navigate when clicking dropdown button', async () => {
+    it('filters users by disabled status', async () => {
       const user = userEvent.setup();
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: [] });
-        }
-        return Promise.reject(new Error('Unknown URL'));
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
       });
 
+      await user.click(screen.getByRole('button', { name: /^Status$/i }));
+      await user.click(screen.getByRole('option', { name: /^disabled$/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+        expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+        expect(screen.queryByText('Bob Johnson')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Invitation filter', () => {
+    it('renders the invitation filter chip', async () => {
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      const dropdownButtons = screen.queryAllByRole('button', { name: '' });
-      if (dropdownButtons.length > 0) {
-        await user.click(dropdownButtons[0]);
-        // Should not navigate
-        expect(mockNavigate).not.toHaveBeenCalled();
-      }
+      expect(screen.getByRole('button', { name: /^Invitation$/i })).toBeInTheDocument();
+    });
+
+    it('filters users by INVITED status', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /^Invitation$/i }));
+      await user.click(screen.getByRole('option', { name: /^invited$/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
+        expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+      });
+
+      const calls = vi.mocked(apiClient.get).mock.calls.map((c) => c[0]);
+      expect(
+        calls.some(
+          (url) => typeof url === 'string' && url.includes('invitationStatus=INVITED')
+        )
+      ).toBe(true);
+    });
+  });
+
+  describe('Per-chip clear', () => {
+    it('hides × on chips when empty and shows it when set', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole('button', { name: /status.*clear/i })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /^Status$/i }));
+      await user.click(screen.getByRole('option', { name: /^enabled$/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /status.*clear/i })).toBeInTheDocument();
+      });
+    });
+
+    it('clears each filter independently', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /^Role$/i }));
+      await user.click(screen.getByRole('option', { name: /^admin$/i }));
+
+      await waitFor(() => {
+        const statusBtn = screen.getByRole('button', { name: /^Status$/i });
+        return user.click(statusBtn);
+      });
+      await user.click(screen.getByRole('option', { name: /^enabled$/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+        expect(screen.queryByText('Bob Johnson')).not.toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /role.*clear/i }));
+      await user.click(screen.getByRole('button', { name: /status.*clear/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+        expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Enable user', () => {
+    it('calls enable mutation when confirmed', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ data: { ...mockUsers[1], enabled: true } });
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+      });
+
+      const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(dropdownButtons[1]);
+      await user.click(screen.getByRole('menuitem', { name: /enable/i }));
+
+      const confirmButton = await screen.findByRole('button', { name: /^enable$/i });
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith('/users/user-2/activate');
+      });
     });
   });
 
   describe('Invite navigation', () => {
-    it('navigates to the invite page when "Add User" is clicked', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
+    it('navigates to the invite page when "Add user" is clicked', async () => {
       const user = userEvent.setup();
-
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      const addButton = screen.getByRole('button', { name: /add user/i });
-      await user.click(addButton);
+      await user.click(screen.getByRole('button', { name: /add user/i }));
 
       expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users/new');
     });
 
-    it('navigates to the invite page when the empty-state "Add user" CTA is clicked', async () => {
-      vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    it('navigates to the invite page from the empty-state CTA', async () => {
+      installApiMock([]);
       const user = userEvent.setup();
-
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
         expect(screen.getByText(/no users yet/i)).toBeInTheDocument();
       });
 
-      // PageHead and EmptyState both render a CTA with the same "Add user"
-      // label — find both and click the empty-state one (the second match).
       const addButtons = screen.getAllByRole('button', { name: /^add user$/i });
       await user.click(addButtons[addButtons.length - 1]);
 
@@ -690,204 +704,143 @@ describe('UsersPage', () => {
     });
   });
 
-  describe('Role Filter', () => {
-    it('filters users by selected role', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
+  describe('Pagination', () => {
+    // Build a synthetic dataset large enough to span multiple pages and
+    // install a mock that respects ?page and ?size on the wire so we can
+    // assert both the URL link the page renders AND the request that goes
+    // out when a page is selected.
+    function makePagedUsers(count: number): MockUser[] {
+      return Array.from({ length: count }, (_, i) => ({
+        id: `paged-${i + 1}`,
+        tenantId: 'tenant-1',
+        cognitoSub: `cognito-${i + 1}`,
+        email: `user${i + 1}@example.com`,
+        firstName: `User`,
+        lastName: `Number${String(i + 1).padStart(3, '0')}`,
+        enabled: true,
+        invitationStatus: 'ACTIVE' as const,
+        roles: [mockRoles[0]],
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+      }));
+    }
+
+    function installPagedMock(allUsers: MockUser[]) {
+      vi.mocked(apiClient.get).mockImplementation((url: string) => {
+        if (url.startsWith('/users/roles')) {
           return Promise.resolve({ data: mockRoles });
         }
-        return Promise.reject(new Error('Unknown URL'));
+        if (url === '/users' || url.startsWith('/users?')) {
+          const qi = url.indexOf('?');
+          const params = new URLSearchParams(qi >= 0 ? url.slice(qi + 1) : '');
+          const page = parseInt(params.get('page') || '0', 10);
+          const size = parseInt(params.get('size') || '50', 10);
+          const slice = allUsers.slice(page * size, (page + 1) * size);
+          return Promise.resolve({
+            data: {
+              content: slice,
+              page,
+              size,
+              totalElements: allUsers.length,
+              totalPages: Math.ceil(allUsers.length / size),
+              counts: { disabled: 0, invited: 0 },
+            },
+          });
+        }
+        if (url === '/users/me') return Promise.resolve({ data: allUsers[0] ?? null });
+        return Promise.reject(new Error(`Unknown URL: ${url}`));
       });
-      const user = userEvent.setup();
+    }
+
+    it('renders pagination links and shows the first page slice', async () => {
+      const all = makePagedUsers(137);
+      installPagedMock(all);
 
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+        // First page only — last row on page 1 is User Number050.
+        expect(screen.getByText('User Number050')).toBeInTheDocument();
+        expect(screen.queryByText('User Number051')).not.toBeInTheDocument();
       });
 
-      // Open role filter chip
-      const roleFilterButton = screen.getByRole('button', { name: /^Role$/i });
-      await user.click(roleFilterButton);
+      // Subtitle reflects the *full* set, not just the page slice.
+      expect(screen.getByText(/137 users/)).toBeInTheDocument();
 
-      // FilterChipListbox renders options as role="option" via Headless.Listbox.
-      const adminOption = screen.getByRole('option', { name: /^admin$/i });
-      await user.click(adminOption);
-
-      // Should only show John Doe (Admin)
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
-      });
+      // Pagination renders pages 2 and 3 as anchor hrefs. Router resolves the
+      // `?page=N` relative href against the current pathname (`/` in tests),
+      // so the rendered attribute is `/?page=N`.
+      expect(screen.getByRole('link', { name: 'Page 2' })).toHaveAttribute(
+        'href',
+        '/?page=2'
+      );
+      expect(screen.getByRole('link', { name: 'Page 3' })).toHaveAttribute(
+        'href',
+        '/?page=3'
+      );
     });
 
-    it('resets role filter when "All Roles" is selected', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
+    it('requests page=1 (0-based) when the user navigates to page 2', async () => {
+      const all = makePagedUsers(137);
+      installPagedMock(all);
       const user = userEvent.setup();
 
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
+        expect(screen.getByText('User Number001')).toBeInTheDocument();
       });
 
-      // Filter by Admin
-      const roleFilterButton = screen.getByRole('button', { name: /^Role$/i });
-      await user.click(roleFilterButton);
-      const adminOption = screen.getByRole('option', { name: /^admin$/i });
-      await user.click(adminOption);
+      await user.click(screen.getByRole('link', { name: 'Page 2' }));
 
+      // Page 2 slice — User Number051 first, User Number100 last.
       await waitFor(() => {
-        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+        expect(screen.getByText('User Number051')).toBeInTheDocument();
+        expect(screen.queryByText('User Number001')).not.toBeInTheDocument();
       });
 
-      // Reset filter via the chip's × clear button (no "All Roles" reset row
-      // in multi-state filter chips — the × is the canonical clear).
-      const clearRole = screen.getByRole('button', { name: /role.*clear/i });
-      await user.click(clearRole);
-
-      // Both users should be visible again
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Status Filter', () => {
-    it('filters users by enabled status', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
-      const user = userEvent.setup();
-
-      renderWithProviders(<UsersPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-      });
-
-      // Open status filter chip
-      const statusFilterButton = screen.getByRole('button', { name: /^Status$/i });
-      await user.click(statusFilterButton);
-
-      const enabledOption = screen.getByRole('option', { name: /^enabled$/i });
-      await user.click(enabledOption);
-
-      // Should only show enabled users (John and Bob)
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
-        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
-      });
+      // Verify the server saw page=1 (the page is 1-based in the UI/URL,
+      // 0-based on the wire).
+      const calls = vi.mocked(apiClient.get).mock.calls.map((c) => c[0]);
+      expect(
+        calls.some((url) => typeof url === 'string' && /(\?|&)page=1(&|$)/.test(url))
+      ).toBe(true);
     });
 
-    it('filters users by disabled status', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
-      const user = userEvent.setup();
+    it('hides pagination when there is only one page of results', async () => {
+      const all = makePagedUsers(3);
+      installPagedMock(all);
 
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+        expect(screen.getByText('User Number001')).toBeInTheDocument();
       });
 
-      // Open status filter chip
-      const statusFilterButton = screen.getByRole('button', { name: /^Status$/i });
-      await user.click(statusFilterButton);
-
-      const disabledOption = screen.getByRole('option', { name: /^disabled$/i });
-      await user.click(disabledOption);
-
-      // Should only show Jane Smith (disabled)
-      await waitFor(() => {
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-        expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
-        expect(screen.queryByText('Bob Johnson')).not.toBeInTheDocument();
-      });
-    });
-
-    it('resets status filter when "All" is selected', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
-      const user = userEvent.setup();
-
-      renderWithProviders(<UsersPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-      });
-
-      // Filter by enabled
-      const statusFilterButton = screen.getByRole('button', { name: /^Status$/i });
-      await user.click(statusFilterButton);
-      const enabledOption = screen.getByRole('option', { name: /^enabled$/i });
-      await user.click(enabledOption);
-
-      await waitFor(() => {
-        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
-      });
-
-      // Reset via the chip's × clear button.
-      const clearStatus = screen.getByRole('button', { name: /status.*clear/i });
-      await user.click(clearStatus);
-
-      // All users should be visible again
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-        expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
-      });
+      // No page links rendered — totalPages <= 1 collapses to the count-only band.
+      expect(screen.queryByRole('link', { name: /^Page \d+$/ })).not.toBeInTheDocument();
     });
   });
 
-  describe('Per-chip clear', () => {
-    it('shows clear (×) on chips when set, hides on chips when empty', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
+  describe('Counts subtitle', () => {
+    it('renders disabled and invited breakdown from the envelope counts', async () => {
+      vi.mocked(apiClient.get).mockImplementation((url: string) => {
+        if (url.startsWith('/users/roles')) return Promise.resolve({ data: mockRoles });
+        if (url === '/users' || url.startsWith('/users?')) {
+          return Promise.resolve({
+            data: {
+              content: mockUsers,
+              page: 0,
+              size: 50,
+              totalElements: mockUsers.length,
+              totalPages: 1,
+              // Global counts — not derived from the page slice.
+              counts: { disabled: 5, invited: 12 },
+            },
+          });
         }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
+        return Promise.reject(new Error(`Unknown URL: ${url}`));
       });
-      const user = userEvent.setup();
 
       renderWithProviders(<UsersPage />);
 
@@ -895,32 +848,27 @@ describe('UsersPage', () => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      // No per-chip clear button initially (chips are in their empty state)
-      expect(screen.queryByRole('button', { name: /status.*clear/i })).not.toBeInTheDocument();
-
-      // Apply a filter
-      const statusFilterButton = screen.getByRole('button', { name: /^Status$/i });
-      await user.click(statusFilterButton);
-      const enabledOption = screen.getByRole('option', { name: /^enabled$/i });
-      await user.click(enabledOption);
-
-      // The chip now exposes its × clear button.
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /status.*clear/i })).toBeInTheDocument();
-      });
+      // Subtitle is one composite line; assert the pieces appear together.
+      expect(screen.getByText(/3 users · 5 disabled · 12 invited/)).toBeInTheDocument();
     });
 
-    it('clears each filter independently via its × button', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
+    it('hides the breakdown pills when counts are zero', async () => {
+      vi.mocked(apiClient.get).mockImplementation((url: string) => {
+        if (url.startsWith('/users/roles')) return Promise.resolve({ data: mockRoles });
+        if (url === '/users' || url.startsWith('/users?')) {
+          return Promise.resolve({
+            data: {
+              content: mockUsers,
+              page: 0,
+              size: 50,
+              totalElements: mockUsers.length,
+              totalPages: 1,
+              counts: { disabled: 0, invited: 0 },
+            },
+          });
         }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
+        return Promise.reject(new Error(`Unknown URL: ${url}`));
       });
-      const user = userEvent.setup();
 
       renderWithProviders(<UsersPage />);
 
@@ -928,156 +876,20 @@ describe('UsersPage', () => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      // Apply role filter
-      const roleFilterButton = screen.getByRole('button', { name: /^Role$/i });
-      await user.click(roleFilterButton);
-      const adminOption = screen.getByRole('option', { name: /^admin$/i });
-      await user.click(adminOption);
-
-      // Apply status filter
-      await waitFor(() => {
-        const statusFilterButton = screen.getByRole('button', { name: /^Status$/i });
-        return user.click(statusFilterButton);
-      });
-      const enabledOption = screen.getByRole('option', { name: /^enabled$/i });
-      await user.click(enabledOption);
-
-      // Only John should be visible (Admin + Enabled)
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
-        expect(screen.queryByText('Bob Johnson')).not.toBeInTheDocument();
-      });
-
-      // Clear each filter via its × button
-      await user.click(screen.getByRole('button', { name: /role.*clear/i }));
-      await user.click(screen.getByRole('button', { name: /status.*clear/i }));
-
-      // All users should be visible again
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-        expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Search by role name', () => {
-    it('filters users by searching role name', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
-      const user = userEvent.setup();
-
-      renderWithProviders(<UsersPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-      });
-
-      // Search by role name "technician"
-      const searchInput = screen.getByPlaceholderText(/search by name, email, or role/i);
-      await user.type(searchInput, 'technician');
-
-      // Should only show Jane (Technician role)
-      await waitFor(() => {
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-        expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('No search results', () => {
-    it('hides all users when search has no matches', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
-      const user = userEvent.setup();
-
-      renderWithProviders(<UsersPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-      });
-
-      // Search for something that doesn't exist
-      const searchInput = screen.getByPlaceholderText(/search by name, email, or role/i);
-      await user.type(searchInput, 'nonexistentuser');
-
-      // All users should be hidden (no results)
-      await waitFor(() => {
-        expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
-        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
-        expect(screen.queryByText('Bob Johnson')).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Enable user', () => {
-    it('calls enable mutation when confirmed', async () => {
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: mockUsers });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
-      vi.mocked(apiClient.post).mockResolvedValue({ data: { ...mockUsers[1], enabled: true } });
-      const user = userEvent.setup();
-
-      renderWithProviders(<UsersPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-      });
-
-      // Open dropdown for disabled user, click Enable menu item
-      const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
-      await user.click(dropdownButtons[1]);
-      const enableMenuItem = screen.getByRole('menuitem', { name: /enable/i });
-      await user.click(enableMenuItem);
-
-      // Confirm in the dialog
-      const confirmButton = await screen.findByRole('button', { name: /^enable$/i });
-      await user.click(confirmButton);
-
-      await waitFor(() => {
-        // Same migration as deactivate — see the disable test above.
-        expect(apiClient.post).toHaveBeenCalledWith('/users/user-2/activate');
-      });
+      // Bare count, no "· N disabled" tail when the count is zero.
+      expect(screen.getByText('3 users')).toBeInTheDocument();
+      expect(screen.queryByText(/disabled/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/invited/)).not.toBeInTheDocument();
     });
   });
 
   describe('Multiple roles display', () => {
     it('displays user with multiple roles', async () => {
-      const userWithMultipleRoles = {
+      const userWithMultipleRoles: MockUser = {
         ...mockUsers[0],
         roles: [mockRoles[0], mockRoles[1]],
       };
-
-      vi.mocked(apiClient.get).mockImplementation((url) => {
-        if (url === '/users') {
-          return Promise.resolve({ data: [userWithMultipleRoles] });
-        }
-        if (url === '/users/roles') {
-          return Promise.resolve({ data: mockRoles });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
+      installApiMock([userWithMultipleRoles]);
 
       renderWithProviders(<UsersPage />);
 
@@ -1085,16 +897,8 @@ describe('UsersPage', () => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      // Both role badges should be visible
       expect(screen.getByText('Admin')).toBeInTheDocument();
       expect(screen.getByText('Technician')).toBeInTheDocument();
     });
   });
-
-  // Previously tested a "Deleting…" button label flip inside the open Alert
-  // while the mutation was in flight. The unified ConfirmDialog auto-closes
-  // on confirm — pending state is no longer user-visible inside the dialog
-  // (we surface success via a toast instead). The flip is therefore
-  // unobservable; the test would be asserting on a behavior that no longer
-  // exists by design.
 });

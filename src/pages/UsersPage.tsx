@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState, useDeferredValue } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, UsersIcon } from '@heroicons/react/24/outline';
 import IconButton from '../components/IconButton';
-import { userApi, type User, type Role } from '../api';
+import { userApi, type User, type Role, type InvitationStatus } from '../api';
 import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
 import { PageHead } from '../components/ui/PageHead';
 import { Button } from '../components/catalyst/button';
@@ -22,6 +22,10 @@ import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChi
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
+
+// Desktop-dense CSR layout — see CLAUDE.md. Backend cap is 100; 50 keeps two
+// pages visible on a 1080p monitor without scroll.
+const PAGE_SIZE = 50;
 
 // Seniority order — when a user has multiple roles, the higher-rank role
 // shows first. Anything not in this map sorts after, alphabetically. Match
@@ -51,16 +55,41 @@ function sortRolesBySeniority(roles: Role[]): Role[] {
   });
 }
 
+type StatusValue = '' | 'enabled' | 'disabled';
+type InvitationValue = '' | InvitationStatus;
+
+const STATUS_VALUES: StatusValue[] = ['enabled', 'disabled'];
+const INVITATION_VALUES: InvitationStatus[] = ['ACTIVE', 'INVITED', 'INVITATION_EXPIRED'];
+
+function readStatus(raw: string | null): StatusValue {
+  return STATUS_VALUES.includes(raw as StatusValue) ? (raw as StatusValue) : '';
+}
+
+function readInvitation(raw: string | null): InvitationValue {
+  return INVITATION_VALUES.includes(raw as InvitationStatus) ? (raw as InvitationStatus) : '';
+}
+
 export default function UsersPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  // One pending-confirmation slot for any of delete/disable/enable — only
-  // one can be open at a time, so a single state machine is cleaner than
-  // three open/target pairs.
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // URL-driven filter state (matches CustomersPage pattern). Page is 1-based
+  // on the wire to humans; we translate to Spring's 0-based on the request.
+  const urlSearch = searchParams.get('search') ?? '';
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const statusFilter = readStatus(searchParams.get('status'));
+  const roleFilter = searchParams.get('role') ?? '';
+  const invitationFilter = readInvitation(searchParams.get('invitation'));
+
+  // Local input mirrors the URL but lets typing feel instant.
+  const [searchQuery, setSearchQuery] = useState(urlSearch);
+  useEffect(() => {
+    setSearchQuery(urlSearch);
+  }, [urlSearch]);
+  const deferredSearch = useDeferredValue(searchQuery);
+
   const [pendingAction, setPendingAction] = useState<
     { kind: 'delete' | 'disable' | 'enable'; user: User } | null
   >(null);
@@ -71,15 +100,94 @@ export default function UsersPage() {
   const canDeleteUsers = useHasCapability('DELETE_USERS');
   const { data: currentUser } = useCurrentUser();
 
-  const { data: users, isLoading, error, refetch } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => userApi.getAll(),
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: [
+      'users',
+      page,
+      deferredSearch,
+      statusFilter,
+      roleFilter,
+      invitationFilter,
+    ],
+    queryFn: () =>
+      userApi.searchUsers({
+        page: page - 1,
+        size: PAGE_SIZE,
+        q: deferredSearch || undefined,
+        enabled:
+          statusFilter === 'enabled'
+            ? true
+            : statusFilter === 'disabled'
+              ? false
+              : undefined,
+        roleId: roleFilter ? [roleFilter] : undefined,
+        invitationStatus: invitationFilter ? [invitationFilter] : undefined,
+      }),
   });
 
   const { data: roles } = useQuery({
     queryKey: ['roles'],
     queryFn: () => userApi.getRoles(),
   });
+
+  const users = data?.content ?? [];
+  const totalUsers = data?.totalElements ?? 0;
+  const totalPages = data?.totalPages ?? 0;
+  // Aggregates over the q/role-filtered set, ignoring status/invitation chips
+  // so the subtitle breakdown stays meaningful when those filters aren't
+  // active. Null on every page after the first envelope load is fine.
+  const disabledCount = data?.counts?.disabled ?? 0;
+  const invitedCount = data?.counts?.invited ?? 0;
+  const showingStart = totalUsers === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const showingEnd = Math.min(page * PAGE_SIZE, totalUsers);
+
+  // Update URL filters. `replace: true` for search keystrokes so the back
+  // button doesn't step through every character.
+  const updateFilters = (
+    updates: {
+      search?: string;
+      status?: StatusValue;
+      role?: string;
+      invitation?: InvitationValue;
+      page?: number;
+    },
+    options: { replace?: boolean } = {}
+  ) => {
+    const next = new URLSearchParams(searchParams);
+    if (updates.search !== undefined) {
+      if (updates.search) next.set('search', updates.search);
+      else next.delete('search');
+      next.delete('page');
+    }
+    if (updates.status !== undefined) {
+      if (updates.status) next.set('status', updates.status);
+      else next.delete('status');
+      next.delete('page');
+    }
+    if (updates.role !== undefined) {
+      if (updates.role) next.set('role', updates.role);
+      else next.delete('role');
+      next.delete('page');
+    }
+    if (updates.invitation !== undefined) {
+      if (updates.invitation) next.set('invitation', updates.invitation);
+      else next.delete('invitation');
+      next.delete('page');
+    }
+    if (updates.page !== undefined) {
+      if (updates.page <= 1) next.delete('page');
+      else next.set('page', String(updates.page));
+    }
+    setSearchParams(next, { replace: options.replace ?? false });
+  };
+
+  const pageHref = (target: number): string => {
+    const next = new URLSearchParams(searchParams);
+    if (target <= 1) next.delete('page');
+    else next.set('page', String(target));
+    const qs = next.toString();
+    return qs ? `?${qs}` : '?';
+  };
 
   const disableMutation = useMutation({
     mutationFn: (user: User) => userApi.disable(user.id),
@@ -120,11 +228,12 @@ export default function UsersPage() {
   const handleEnable = (user: User) => setPendingAction({ kind: 'enable', user });
   const handleDelete = (user: User) => setPendingAction({ kind: 'delete', user });
 
-  const hasFilters = Boolean(searchQuery || roleFilter || statusFilter);
+  const hasFilters = Boolean(
+    deferredSearch || roleFilter || statusFilter || invitationFilter
+  );
   const clearFilters = () => {
     setSearchQuery('');
-    setRoleFilter('');
-    setStatusFilter('');
+    setSearchParams(new URLSearchParams(), { replace: false });
   };
 
   const confirmPendingAction = () => {
@@ -142,50 +251,40 @@ export default function UsersPage() {
     disableMutation.isPending ||
     enableMutation.isPending;
 
-  // Filter users based on search query, role, and status
-  const filteredUsers = useMemo(() => {
-    return users?.filter((user) => {
-      // Search filter
-      const query = searchQuery.toLowerCase();
-      const roleNames = user.roles?.map(r => r.name.toLowerCase()).join(' ') || '';
-      const matchesSearch = !query || (
-        user.firstName.toLowerCase().includes(query) ||
-        user.lastName.toLowerCase().includes(query) ||
-        user.email.toLowerCase().includes(query) ||
-        roleNames.includes(query)
-      );
-
-      // Role filter
-      const matchesRole = !roleFilter || user.roles?.some(r => r.id === roleFilter);
-
-      // Status filter
-      const matchesStatus = !statusFilter || (
-        (statusFilter === 'enabled' && user.enabled) ||
-        (statusFilter === 'disabled' && !user.enabled)
-      );
-
-      return matchesSearch && matchesRole && matchesStatus;
-    });
-  }, [users, searchQuery, roleFilter, statusFilter]);
-
-  // Subtitle reflects the *displayed* set (matches filtered count) and adds
-  // an "X disabled" breakdown when it's non-zero — Users loads all rows on a
-  // single GET, so this is cheap.
-  const totalUsers = users?.length ?? 0;
-  const displayedCount = filteredUsers?.length ?? 0;
-  const disabledCount = useMemo(
-    () => (filteredUsers ?? []).filter((u) => !u.enabled).length,
-    [filteredUsers]
-  );
+  // Subtitle pieces. Use the server-provided totalElements (matches the full
+  // filter set, not just the current page) and the q/role-scoped counts for
+  // the breakdown pills.
   const userSubtitle = (() => {
     if (totalUsers === 0) return null;
     const parts: string[] = [];
-    parts.push(`${displayedCount.toLocaleString()} ${displayedCount === 1 ? t('entities.user').toLowerCase() : t('entities.users').toLowerCase()}`);
+    const noun =
+      totalUsers === 1
+        ? t('entities.user').toLowerCase()
+        : t('entities.users').toLowerCase();
+    parts.push(`${totalUsers.toLocaleString()} ${noun}`);
     if (disabledCount > 0) {
       parts.push(t('users.breakdown.disabled', { count: disabledCount }));
     }
+    if (invitedCount > 0) {
+      parts.push(t('users.breakdown.invited', { count: invitedCount }));
+    }
     return parts.join(' · ');
   })();
+
+  const invitationLabel = (status: InvitationStatus): string => {
+    switch (status) {
+      case 'ACTIVE':
+        return t('users.filter.invitationActive');
+      case 'INVITED':
+        return t('users.filter.invitationInvited');
+      case 'INVITATION_EXPIRED':
+        return t('users.filter.invitationExpired');
+    }
+  };
+
+  // We can only confidently say "no users" when there are *no* filters
+  // applied. With filters, render the no-matches empty state instead.
+  const showEmpty = !isLoading && !error && users.length === 0;
 
   return (
     <>
@@ -199,47 +298,63 @@ export default function UsersPage() {
         }
       />
 
-      {/* Search + filter chips */}
-      {users && users.length > 0 && (
-        <ListToolbar
-          search={
-            <ListSearch
-              placeholder={t('users.search.placeholder')}
-              value={searchQuery}
-              onChange={setSearchQuery}
-            />
-          }
-        >
-          {roles && roles.length > 0 && (
-            <FilterChipListbox
-              label={t('users.filter.role')}
-              ariaLabel={t('users.filter.role')}
-              value={roleFilter || null}
-              displayValue={roleFilter ? roles.find((r) => r.id === roleFilter)?.name ?? null : null}
-              resetLabel={t('users.filter.allRoles')}
-              onChange={(id) => setRoleFilter(id ?? '')}
-              onClear={() => setRoleFilter('')}
-            >
-              {roles.map((role) => (
-                <ChipListboxOption key={role.id} value={role.id}>{role.name}</ChipListboxOption>
-              ))}
-            </FilterChipListbox>
-          )}
-
+      <ListToolbar
+        search={
+          <ListSearch
+            placeholder={t('users.search.placeholder')}
+            value={searchQuery}
+            onChange={(value) => {
+              setSearchQuery(value);
+              updateFilters({ search: value }, { replace: true });
+            }}
+          />
+        }
+      >
+        {roles && roles.length > 0 && (
           <FilterChipListbox
-            label={t('users.filter.status')}
-            ariaLabel={t('users.filter.status')}
-            value={statusFilter || null}
-            displayValue={statusFilter ? t(`users.filter.${statusFilter}`) : null}
-            resetLabel={t('users.filter.all')}
-            onChange={(id) => setStatusFilter(id ?? '')}
-            onClear={() => setStatusFilter('')}
+            label={t('users.filter.role')}
+            ariaLabel={t('users.filter.role')}
+            value={roleFilter || null}
+            displayValue={roleFilter ? roles.find((r) => r.id === roleFilter)?.name ?? null : null}
+            resetLabel={t('users.filter.allRoles')}
+            onChange={(id) => updateFilters({ role: id ?? '' })}
+            onClear={() => updateFilters({ role: '' })}
           >
-            <ChipListboxOption value="enabled">{t('users.filter.enabled')}</ChipListboxOption>
-            <ChipListboxOption value="disabled">{t('users.filter.disabled')}</ChipListboxOption>
+            {roles.map((role) => (
+              <ChipListboxOption key={role.id} value={role.id}>{role.name}</ChipListboxOption>
+            ))}
           </FilterChipListbox>
-        </ListToolbar>
-      )}
+        )}
+
+        <FilterChipListbox
+          label={t('users.filter.status')}
+          ariaLabel={t('users.filter.status')}
+          value={statusFilter || null}
+          displayValue={statusFilter ? t(`users.filter.${statusFilter}`) : null}
+          resetLabel={t('users.filter.all')}
+          onChange={(id) => updateFilters({ status: readStatus(id) })}
+          onClear={() => updateFilters({ status: '' })}
+        >
+          <ChipListboxOption value="enabled">{t('users.filter.enabled')}</ChipListboxOption>
+          <ChipListboxOption value="disabled">{t('users.filter.disabled')}</ChipListboxOption>
+        </FilterChipListbox>
+
+        <FilterChipListbox
+          label={t('users.filter.invitationStatus')}
+          ariaLabel={t('users.filter.invitationStatus')}
+          value={invitationFilter || null}
+          displayValue={invitationFilter ? invitationLabel(invitationFilter) : null}
+          resetLabel={t('users.filter.allInvitationStatuses')}
+          onChange={(id) => updateFilters({ invitation: readInvitation(id) })}
+          onClear={() => updateFilters({ invitation: '' })}
+        >
+          {INVITATION_VALUES.map((value) => (
+            <ChipListboxOption key={value} value={value}>
+              {invitationLabel(value)}
+            </ChipListboxOption>
+          ))}
+        </FilterChipListbox>
+      </ListToolbar>
 
       <div className="mt-4">
         <Card>
@@ -258,7 +373,7 @@ export default function UsersPage() {
                   </Button>
                 }
               />
-            ) : !filteredUsers || filteredUsers.length === 0 ? (
+            ) : showEmpty ? (
               hasFilters ? (
                 <EmptyState
                   icon={<UsersIcon className="size-10 text-fg-dim" />}
@@ -296,7 +411,7 @@ export default function UsersPage() {
                   </tr>
                 </DenseTHead>
                 <tbody>
-                  {filteredUsers.map((user) => {
+                  {users.map((user) => {
                     const fullName = `${user.firstName} ${user.lastName}`;
                     const isMe = currentUser?.id === user.id;
                     const rowOpacity = !user.enabled ? 'opacity-55' : '';
@@ -401,17 +516,14 @@ export default function UsersPage() {
                 </tbody>
               </DenseTable>
                 <ListFooter
-                  left={
-                    <>
-                      {t('settings.showingCount', {
-                        count: displayedCount,
-                        noun: t('entities.users').toLowerCase(),
-                      })}
-                      {disabledCount > 0 && (
-                        <> · {t('users.breakdown.disabled', { count: disabledCount })}</>
-                      )}
-                    </>
-                  }
+                  page={page}
+                  totalPages={totalPages}
+                  pageHref={pageHref}
+                  left={t('common.pagination.showing', {
+                    start: showingStart,
+                    end: showingEnd,
+                    total: totalUsers.toLocaleString(),
+                  })}
                 />
               </>
             )}

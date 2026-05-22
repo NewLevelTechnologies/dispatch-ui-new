@@ -92,10 +92,10 @@ export default function RoleDetailPage() {
 
   const { data: membersResp } = useQuery({
     queryKey: ['roles', id, 'members'],
-    queryFn: () => userApi.listRoleMembers(id!),
+    queryFn: () => userApi.listRoleMembers(id!, { size: 100 }),
     enabled: !!id,
   });
-  const members: RoleMember[] = membersResp?.users ?? [];
+  const members: RoleMember[] = membersResp?.content ?? [];
 
   const deleteMutation = useMutation({
     mutationFn: () => userApi.deleteRole(id!),

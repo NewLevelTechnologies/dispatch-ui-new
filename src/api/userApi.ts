@@ -165,8 +165,48 @@ export interface RoleMember {
   roles: { id: string; name: string }[];
 }
 
-export interface RoleMembersResponse {
-  users: RoleMember[];
+// Spring-style page envelope. `counts` is populated on `/users` (paged user
+// search) so the list-page subtitle can show "X disabled · Y invited"
+// without a second query; it's null on role-members and other paged
+// endpoints that don't compute aggregates.
+export interface PageEnvelope<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  counts?: UserPageCounts | null;
+}
+
+export interface UserPageCounts {
+  disabled: number;
+  // INVITED + INVITATION_EXPIRED combined — what the subtitle pill needs.
+  invited: number;
+}
+
+// Params for `GET /users`. All optional. `roleId` and `invitationStatus`
+// serialize as repeated keys on the wire (`?roleId=a&roleId=b`).
+//
+// `sort` accepts Spring's `field,dir` form, e.g. `lastName,asc`. Unknown
+// sort fields fall back to `lastName,asc` server-side, no 400. Allowed
+// fields: lastName, firstName, email, createdAt, status, enabled.
+export interface UserSearchParams {
+  q?: string;
+  enabled?: boolean;
+  invitationStatus?: InvitationStatus[];
+  roleId?: string[];
+  page?: number;
+  size?: number;
+  sort?: string;
+}
+
+// Params for `GET /users/roles/{id}/members`. Allowed sort fields here are
+// narrower than on `/users`: lastName, firstName, email.
+export interface RoleMemberSearchParams {
+  q?: string;
+  page?: number;
+  size?: number;
+  sort?: string;
 }
 
 // Admin-facing 2FA status for the User Detail Security card. Mirrors the
@@ -194,9 +234,34 @@ export const userApi = {
     return response.data;
   },
 
-  getAll: async (): Promise<User[]> => {
-    const response = await apiClient.get<User[]>('/users');
+  // Paged user search. The wire format takes repeated keys for
+  // multi-value params (`?roleId=a&roleId=b`); axios's `paramsSerializer`
+  // for arrays produces `roleId[]=a` by default, so build a URLSearchParams
+  // explicitly to keep the shape Spring expects.
+  searchUsers: async (params: UserSearchParams = {}): Promise<PageEnvelope<User>> => {
+    const sp = new URLSearchParams();
+    if (params.q) sp.set('q', params.q);
+    if (typeof params.enabled === 'boolean') sp.set('enabled', String(params.enabled));
+    params.invitationStatus?.forEach((s) => sp.append('invitationStatus', s));
+    params.roleId?.forEach((id) => sp.append('roleId', id));
+    if (typeof params.page === 'number') sp.set('page', String(params.page));
+    if (typeof params.size === 'number') sp.set('size', String(params.size));
+    if (params.sort) sp.set('sort', params.sort);
+    const qs = sp.toString();
+    const response = await apiClient.get<PageEnvelope<User>>(
+      `/users${qs ? `?${qs}` : ''}`
+    );
     return response.data;
+  },
+
+  // Legacy flat-array reader for picker call sites (dispatch assignment,
+  // technician dropdowns). Returns the first page (capped at the server's
+  // max of 100) — fine for current tenant sizes, but flag it before adding
+  // a new caller. Long-term these pickers should fetch role-filtered,
+  // server-paged results directly via `searchUsers`.
+  getAll: async (): Promise<User[]> => {
+    const page = await userApi.searchUsers({ size: 100 });
+    return page.content;
   },
 
   getById: async (id: string): Promise<User> => {
@@ -354,9 +419,21 @@ export const userApi = {
     return response.data;
   },
 
-  listRoleMembers: async (id: string): Promise<RoleMembersResponse> => {
-    const response = await apiClient.get<RoleMembersResponse>(
-      `/users/roles/${id}/members`
+  // Paged role-members search. Backend response is `PageEnvelope<RoleMember>`
+  // (was `{ users: [...] }` pre-migration). Default sort `lastName,asc`;
+  // allowed sort fields: lastName, firstName, email. `counts` is null here.
+  listRoleMembers: async (
+    id: string,
+    params: RoleMemberSearchParams = {}
+  ): Promise<PageEnvelope<RoleMember>> => {
+    const sp = new URLSearchParams();
+    if (params.q) sp.set('q', params.q);
+    if (typeof params.page === 'number') sp.set('page', String(params.page));
+    if (typeof params.size === 'number') sp.set('size', String(params.size));
+    if (params.sort) sp.set('sort', params.sort);
+    const qs = sp.toString();
+    const response = await apiClient.get<PageEnvelope<RoleMember>>(
+      `/users/roles/${id}/members${qs ? `?${qs}` : ''}`
     );
     return response.data;
   },
