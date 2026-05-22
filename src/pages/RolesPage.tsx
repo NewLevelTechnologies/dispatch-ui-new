@@ -422,6 +422,11 @@ export default function RolesPage() {
                             <span className="text-[13px] font-semibold text-fg-strong">
                               {role.name}
                             </span>
+                            {role.performsFieldWork && (
+                              <Pill tone="info" dot>
+                                {t('roles.badge.field')}
+                              </Pill>
+                            )}
                           </div>
                         </td>
                         <td>

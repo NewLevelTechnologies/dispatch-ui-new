@@ -60,6 +60,9 @@ export interface Role {
   // value via `utils/roleColor.ts#roleAccent`. Optional because cloned roles
   // may ship with `null` until the admin picks a color on the edit page.
   accentId?: string | null;
+  // Flags roles whose holders perform field work. Consumed by dispatch-board
+  // pickers and work-order assignment lists (wired in a follow-up PR).
+  performsFieldWork?: boolean;
   // Present on the detail response (`GET /users/roles/{id}`). Absent on
   // list-response role entries — fetch the list separately to get its map.
   colorsInUse?: ColorsInUseMap;
@@ -135,12 +138,14 @@ export interface CreateRoleRequest {
   description?: string;
   capabilities: string[];
   accentId?: string;
+  performsFieldWork?: boolean;
 }
 
 export interface UpdateRoleRequest {
   name: string;
   description?: string;
   accentId?: string;
+  performsFieldWork?: boolean;
 }
 
 export interface UpdateRoleCapabilitiesRequest {

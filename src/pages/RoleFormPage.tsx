@@ -8,7 +8,8 @@ import { userApi, type Role } from '../api';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
 import { Checkbox } from '../components/catalyst/checkbox';
-import { ErrorMessage, Field, Label } from '../components/catalyst/fieldset';
+import { Description, ErrorMessage, Field, Label } from '../components/catalyst/fieldset';
+import { Switch, SwitchField } from '../components/catalyst/switch';
 import { Heading } from '../components/catalyst/heading';
 import { Input, InputGroup } from '../components/catalyst/input';
 import { Textarea } from '../components/catalyst/textarea';
@@ -86,6 +87,7 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [accentId, setAccentId] = useState<string>('orange');
+  const [performsFieldWork, setPerformsFieldWork] = useState(false);
   const [capabilities, setCapabilities] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [initialCaps, setInitialCaps] = useState<Set<string>>(new Set());
@@ -126,6 +128,7 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
         ROLE_ACCENT_OPTIONS.find((o) => !(o.id in taken))?.id ?? 'orange';
       setAccentId(firstFree);
     }
+    setPerformsFieldWork(existingRole.performsFieldWork ?? false);
     const caps = new Set(existingRole.capabilities ?? []);
     setCapabilities(caps);
     setInitialCaps(caps);
@@ -202,13 +205,15 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
           description: description.trim() || undefined,
           capabilities: [...capabilities],
           accentId,
+          performsFieldWork,
         });
       }
       const original = existingRole!;
       const metadataChanged =
         name.trim() !== original.name ||
         (description.trim() || '') !== (original.description ?? '') ||
-        accentId !== (original.accentId ?? 'orange');
+        accentId !== (original.accentId ?? 'orange') ||
+        performsFieldWork !== (original.performsFieldWork ?? false);
       const capsChanged =
         [...capabilities].sort().join('|') !==
         [...(original.capabilities ?? [])].sort().join('|');
@@ -219,6 +224,7 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
           name: name.trim(),
           description: description.trim() || undefined,
           accentId,
+          performsFieldWork,
         });
       }
       if (capsChanged) {
@@ -386,6 +392,18 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
                     placeholder={t('roles.form.descriptionPlaceholder')}
                   />
                 </Field>
+              </div>
+              <div className="mt-2.5 border-t border-border-soft pt-2.5">
+                <SwitchField>
+                  <Switch
+                    checked={performsFieldWork}
+                    onChange={setPerformsFieldWork}
+                  />
+                  <Label>{t('roles.form.performsFieldWorkLabel')}</Label>
+                  <Description>
+                    {t('roles.form.performsFieldWorkHint')}
+                  </Description>
+                </SwitchField>
               </div>
             </Card>
 
