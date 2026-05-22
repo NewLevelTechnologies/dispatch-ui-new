@@ -33,6 +33,7 @@ export type ActivityActionType =
   | 'MFA_RESET'
   | 'GLOBAL_SIGNOUT'
   | 'INVITATION_RESENT'
+  | 'INVITATION_ACCEPTED'
   // Emitted by the Cognito post-authentication Lambda on every
   // successful sign-in. UI composes the meta line ("Chrome · macOS ·
   // 73.41.18.204") from the row's userAgent + ip fields.

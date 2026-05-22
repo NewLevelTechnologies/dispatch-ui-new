@@ -751,6 +751,8 @@ function classifyEvent(event: AccountActivityEvent): {
       return { kind: 'lifecycle-warn', text: 'Account deactivated' };
     case 'INVITATION_RESENT':
       return { kind: 'lifecycle', text: 'Invitation resent' };
+    case 'INVITATION_ACCEPTED':
+      return { kind: 'lifecycle', text: 'Invitation accepted' };
     case 'ROLE_ADDED':
       return { kind: 'access', text: `Role "${rolePayloadName(event.payload)}" added` };
     case 'ROLE_REMOVED':
