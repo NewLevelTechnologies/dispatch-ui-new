@@ -65,8 +65,17 @@ function mockGets(
   vi.mocked(apiClient.get).mockImplementation((url: string) => {
     if (url === `/users/roles/${role.id}`)
       return Promise.resolve({ data: role });
-    if (url === `/users/roles/${role.id}/members`)
-      return Promise.resolve({ data: { users: members } });
+    if (url.startsWith(`/users/roles/${role.id}/members`))
+      return Promise.resolve({
+        data: {
+          content: members,
+          page: 0,
+          size: 100,
+          totalElements: members.length,
+          totalPages: members.length === 0 ? 0 : 1,
+          counts: null,
+        },
+      });
     if (url === '/users/capabilities/grouped')
       return Promise.resolve({ data: groupedCaps });
     return Promise.reject(new Error(`Unmocked URL: ${url}`));

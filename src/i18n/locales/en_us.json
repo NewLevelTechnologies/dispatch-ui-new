@@ -1461,7 +1461,8 @@
       "enableWarning": "They'll regain sign-in access immediately. Roles and regions are kept as-is."
     },
     "breakdown": {
-      "disabled": "{{count}} disabled"
+      "disabled": "{{count}} disabled",
+      "invited": "{{count}} invited"
     },
     "description": "People who can sign in to the app. Assign each user a role — roles determine which screens and actions they can access. Manage role permissions under Access › Roles.",
     "empty": {
@@ -1539,10 +1540,15 @@
     },
     "filter": {
       "all": "All",
+      "allInvitationStatuses": "Any invitation",
       "allRoles": "All roles",
       "clearFilters": "Clear filters",
       "disabled": "Disabled",
       "enabled": "Enabled",
+      "invitationActive": "Active",
+      "invitationExpired": "Invitation expired",
+      "invitationInvited": "Invited",
+      "invitationStatus": "Invitation",
       "role": "Role",
       "status": "Status"
     },
@@ -1592,7 +1598,7 @@
     },
     "search": {
       "noMatch": "No users match \"{{query}}\"",
-      "placeholder": "Search by name, email, or role..."
+      "placeholder": "Search by name or email..."
     },
     "status": {
       "disabled": "Disabled",
