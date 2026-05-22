@@ -295,6 +295,11 @@ function RoleHeader({
               {t('roles.table.custom')}
             </Pill>
           )}
+          {role.performsFieldWork && (
+            <Pill tone="info" dot>
+              {t('roles.badge.field')}
+            </Pill>
+          )}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-fg-muted">
           <span>

@@ -836,6 +836,9 @@
       "restoreDefaultsConfirm": "Restore \"{{name}}\" to default capabilities?",
       "restoreDefaultsWarning": "This will reset all capabilities to the system template defaults. Custom changes will be lost."
     },
+    "badge": {
+      "field": "Field"
+    },
     "breakdown": {
       "builtIn": "{{count}} built-in",
       "custom": "{{count}} custom"
@@ -883,6 +886,8 @@
       "editTitle": "Edit {{name}}",
       "errorEmptyCapabilities": "Pick at least one capability. A role with zero capabilities can't grant access.",
       "namePlaceholder": "e.g. Refund Approver",
+      "performsFieldWorkHint": "Users in this role can be assigned to work orders and appear in dispatch-board pickers.",
+      "performsFieldWorkLabel": "Performs field work",
       "removalWarningArea": "{{area}}: removing {{count}} capability",
       "removalWarningArea_other": "{{area}}: removing {{count}} capabilities",
       "removalWarningTitle_one": "{{count}} user holds this role.",
