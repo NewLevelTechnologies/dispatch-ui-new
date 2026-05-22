@@ -703,6 +703,7 @@ describe('UserDetailPage', () => {
       { id: 'a-2', occurredAt: ts(20),  actionType: 'USER_ACTIVATED',      payload: null, actor, ip: null, userAgent: null },
       { id: 'a-3', occurredAt: ts(30),  actionType: 'USER_DEACTIVATED',    payload: null, actor, ip: null, userAgent: null },
       { id: 'a-4', occurredAt: ts(40),  actionType: 'INVITATION_RESENT',   payload: null, actor, ip: null, userAgent: null },
+      { id: 'a-4b', occurredAt: ts(45), actionType: 'INVITATION_ACCEPTED', payload: null, actor, ip: null, userAgent: null },
       { id: 'a-5', occurredAt: ts(50),  actionType: 'ROLE_ADDED',          payload: { roleId: 'r1', roleName: 'Dispatcher' }, actor, ip: null, userAgent: null },
       { id: 'a-6', occurredAt: ts(60),  actionType: 'ROLE_REMOVED',        payload: { roleId: 'r2', roleName: 'Sales' },      actor, ip: null, userAgent: null },
       { id: 'a-7', occurredAt: ts(70),  actionType: 'PASSWORD_RESET_SENT', payload: null, actor, ip: null, userAgent: null },
@@ -728,6 +729,7 @@ describe('UserDetailPage', () => {
       expect(screen.getByText('Account activated')).toBeInTheDocument();
       expect(screen.getByText('Account deactivated')).toBeInTheDocument();
       expect(screen.getByText('Invitation resent')).toBeInTheDocument();
+      expect(screen.getByText('Invitation accepted')).toBeInTheDocument();
       expect(screen.getByText('Role "Dispatcher" added')).toBeInTheDocument();
       expect(screen.getByText('Role "Sales" removed')).toBeInTheDocument();
       expect(screen.getByText('Password reset link sent')).toBeInTheDocument();
