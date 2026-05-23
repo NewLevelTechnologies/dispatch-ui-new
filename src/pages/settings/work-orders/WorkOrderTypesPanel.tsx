@@ -71,11 +71,11 @@ export default function WorkOrderTypesPanel() {
   });
 
   const types = useMemo(() => {
-    const list = data?.types ?? [];
+    const list = data?.workOrderTypes ?? [];
     return [...list].sort(
       (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)
     );
-  }, [data?.types]);
+  }, [data?.workOrderTypes]);
 
   const colorsInUse = data?.colorsInUse ?? {};
 
@@ -96,13 +96,13 @@ export default function WorkOrderTypesPanel() {
     mutationFn: (orderedIds: string[]) => workOrderTypesApi.reorder(orderedIds),
     onSuccess: (updated) => {
       const previous = queryClient.getQueryData<{
-        types: WorkOrderType[];
+        workOrderTypes: WorkOrderType[];
         colorsInUse: typeof colorsInUse;
       }>([...QUERY_KEY]);
       if (previous) {
         queryClient.setQueryData([...QUERY_KEY], {
           ...previous,
-          types: updated,
+          workOrderTypes: updated,
         });
       } else {
         queryClient.invalidateQueries({ queryKey: [...QUERY_KEY] });

@@ -6,10 +6,10 @@ import apiClient from '../../../api/client';
 
 vi.mock('../../../api/client');
 
-const EMPTY_ENVELOPE = { types: [], colorsInUse: {} };
+const EMPTY_ENVELOPE = { workOrderTypes: [], colorsInUse: {} };
 
 const TWO_TYPES_ENVELOPE = {
-  types: [
+  workOrderTypes: [
     {
       id: 't1',
       tenantId: 'tn',
