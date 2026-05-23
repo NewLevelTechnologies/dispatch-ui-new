@@ -23,7 +23,7 @@ export interface WorkOrderTypeColorOwner {
 }
 
 export interface WorkOrderTypeListResponse {
-  types: WorkOrderType[];
+  workOrderTypes: WorkOrderType[];
   colorsInUse: Record<string, WorkOrderTypeColorOwner>;
 }
 
@@ -157,7 +157,7 @@ export const workOrderTypesApi = {
   },
   getAll: async (): Promise<WorkOrderType[]> => {
     const envelope = await workOrderTypesApi.list();
-    return envelope.types;
+    return envelope.workOrderTypes;
   },
   create: async (request: CreateWorkOrderTypeRequest): Promise<WorkOrderType> => {
     const response = await apiClient.post<WorkOrderType>(`${BASE}/types`, request);
