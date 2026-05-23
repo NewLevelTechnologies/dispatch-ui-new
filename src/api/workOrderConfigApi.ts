@@ -1,36 +1,51 @@
 import apiClient from './client';
 
-// ===== Shared taxonomy types (Work Order Types & Divisions) =====
-export interface TaxonomyItem {
+// ===== Work Order Type (curated palette) =====
+// Mirrors the roles shape: persisted `accentId` token, server-computed
+// `colorsInUse` map on list/detail responses, 409 ACCENT_ID_TAKEN on
+// conflicting writes. Description column is retained on the BE but no
+// longer surfaced — omit it from request bodies on FE writes.
+export interface WorkOrderType {
   id: string;
   tenantId: string;
   name: string;
   code: string;
-  description?: string | null;
-  color?: string | null;
-  icon?: string | null;
+  accentId: string;
   isActive: boolean;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreateTaxonomyItemRequest {
+export interface WorkOrderTypeColorOwner {
+  typeId: string;
+  typeName: string;
+}
+
+export interface WorkOrderTypeListResponse {
+  types: WorkOrderType[];
+  colorsInUse: Record<string, WorkOrderTypeColorOwner>;
+}
+
+export interface CreateWorkOrderTypeRequest {
   name: string;
   code: string;
-  description?: string | null;
-  color?: string | null;
-  icon?: string | null;
+  accentId: string;
   sortOrder?: number;
 }
 
-export interface UpdateTaxonomyItemRequest {
+export interface UpdateWorkOrderTypeRequest {
   name?: string;
-  description?: string | null;
-  color?: string | null;
-  icon?: string | null;
+  accentId?: string;
   isActive?: boolean;
   sortOrder?: number;
+}
+
+export interface AccentConflictBody {
+  code?: 'ACCENT_ID_TAKEN';
+  field?: 'accentId';
+  conflictingTypeId?: string;
+  conflictingTypeName?: string;
 }
 
 // ===== Work Item Status =====
@@ -132,47 +147,80 @@ export interface UpdateWorkflowConfigRequest {
 const BASE = '/work-orders/config';
 
 // ===== Work Order Types =====
+// `list()` is the canonical envelope (carries colorsInUse for the picker).
+// `getAll()` flattens to just the array for non-settings consumers that only
+// need names/ids (work order forms, dispatch board, reports, etc.).
 export const workOrderTypesApi = {
-  getAll: async (): Promise<TaxonomyItem[]> => {
-    const response = await apiClient.get<TaxonomyItem[]>(`${BASE}/types`);
+  list: async (): Promise<WorkOrderTypeListResponse> => {
+    const response = await apiClient.get<WorkOrderTypeListResponse>(`${BASE}/types`);
     return response.data;
   },
-  create: async (request: CreateTaxonomyItemRequest): Promise<TaxonomyItem> => {
-    const response = await apiClient.post<TaxonomyItem>(`${BASE}/types`, request);
+  getAll: async (): Promise<WorkOrderType[]> => {
+    const envelope = await workOrderTypesApi.list();
+    return envelope.types;
+  },
+  create: async (request: CreateWorkOrderTypeRequest): Promise<WorkOrderType> => {
+    const response = await apiClient.post<WorkOrderType>(`${BASE}/types`, request);
     return response.data;
   },
-  update: async (id: string, request: UpdateTaxonomyItemRequest): Promise<TaxonomyItem> => {
-    const response = await apiClient.patch<TaxonomyItem>(`${BASE}/types/${id}`, request);
+  update: async (id: string, request: UpdateWorkOrderTypeRequest): Promise<WorkOrderType> => {
+    const response = await apiClient.patch<WorkOrderType>(`${BASE}/types/${id}`, request);
     return response.data;
   },
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`${BASE}/types/${id}`);
   },
-  reorder: async (orderedIds: string[]): Promise<TaxonomyItem[]> => {
-    const response = await apiClient.post<TaxonomyItem[]>(`${BASE}/types/reorder`, { orderedIds });
+  reorder: async (orderedIds: string[]): Promise<WorkOrderType[]> => {
+    const response = await apiClient.post<WorkOrderType[]>(`${BASE}/types/reorder`, { orderedIds });
     return response.data;
   },
 };
 
-// ===== Divisions =====
+// ===== Division (name + code only) =====
+// Description and color were dropped — divisions are a view-scope switcher,
+// not a visual differentiator. If cross-division distinction is ever needed
+// (rare), add a fresh `accentId` rather than reviving the column.
+export interface Division {
+  id: string;
+  tenantId: string;
+  name: string;
+  code: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDivisionRequest {
+  name: string;
+  code: string;
+  sortOrder?: number;
+}
+
+export interface UpdateDivisionRequest {
+  name?: string;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
 export const divisionsApi = {
-  getAll: async (): Promise<TaxonomyItem[]> => {
-    const response = await apiClient.get<TaxonomyItem[]>(`${BASE}/divisions`);
+  getAll: async (): Promise<Division[]> => {
+    const response = await apiClient.get<Division[]>(`${BASE}/divisions`);
     return response.data;
   },
-  create: async (request: CreateTaxonomyItemRequest): Promise<TaxonomyItem> => {
-    const response = await apiClient.post<TaxonomyItem>(`${BASE}/divisions`, request);
+  create: async (request: CreateDivisionRequest): Promise<Division> => {
+    const response = await apiClient.post<Division>(`${BASE}/divisions`, request);
     return response.data;
   },
-  update: async (id: string, request: UpdateTaxonomyItemRequest): Promise<TaxonomyItem> => {
-    const response = await apiClient.patch<TaxonomyItem>(`${BASE}/divisions/${id}`, request);
+  update: async (id: string, request: UpdateDivisionRequest): Promise<Division> => {
+    const response = await apiClient.patch<Division>(`${BASE}/divisions/${id}`, request);
     return response.data;
   },
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`${BASE}/divisions/${id}`);
   },
-  reorder: async (orderedIds: string[]): Promise<TaxonomyItem[]> => {
-    const response = await apiClient.post<TaxonomyItem[]>(`${BASE}/divisions/reorder`, { orderedIds });
+  reorder: async (orderedIds: string[]): Promise<Division[]> => {
+    const response = await apiClient.post<Division[]>(`${BASE}/divisions/reorder`, { orderedIds });
     return response.data;
   },
 };

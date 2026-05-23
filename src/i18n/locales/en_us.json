@@ -1361,11 +1361,61 @@
       "errorReorder": "Failed to reorder {{entity}}"
     },
     "divisions": {
-      "description": "Operating units (e.g., HVAC, Electrical, Plumbing) used to organize {{divisions}} and route work."
+      "codeChangedWarning": "Changing the code may break integrations and reports that reference this division.",
+      "codeHint": "Stable identifier. UPPERCASE_WITH_UNDERSCORES. Auto-generated from name.",
+      "codeImmutable": "Editing the code may break integrations and reports.",
+      "colCode": "Code",
+      "colName": "Name",
+      "couldNotLoad": "Couldn't load divisions",
+      "deleteConfirm": "Delete \"{{name}}\"?",
+      "deleteWarning": "Customers, technicians, and work orders assigned to this division will become unassigned.",
+      "description": "Operating units (e.g., HVAC, Electrical, Plumbing) used to organize {{divisions}} and route work.",
+      "emptyDescription": "Add a division to split your dispatch board view by team, region, or service line.",
+      "emptyTitle": "No divisions yet",
+      "errorCreate": "Failed to create division",
+      "errorUpdate": "Failed to update division",
+      "form": {
+        "create": "Create division",
+        "save": "Save changes",
+        "titleAdd": "Add Division",
+        "titleEdit": "Edit {{name}}"
+      },
+      "noMatches": "No divisions match your search.",
+      "rowsCount": "{{count}} {{noun}}",
+      "searchPlaceholder": "Search divisions…",
+      "subtitle": "{{count}} divisions · split the dispatch board view and segment reports"
     },
     "workOrderTypes": {
+      "addColorless": "Set up the {{count}} {{accents}} after adding the type.",
+      "codeChangedWarning": "Changing the code may break integrations and reports that reference this type.",
+      "codeHint": "Stable identifier. UPPERCASE_WITH_UNDERSCORES. Auto-generated from name.",
+      "codeImmutable": "Editing the code may break integrations and reports.",
+      "colColor": "Color",
+      "colCode": "Code",
+      "colName": "Name",
+      "colorConflict": "This color is already used by {{typeName}}. Pick a different color.",
+      "colorHint": "Shown on work order lists, the dispatch board, and reports.",
+      "colorLabel": "Color",
+      "colorTakenBy": "Used by {{name}}",
+      "couldNotLoad": "Couldn't load work order types",
+      "deleteConfirm": "Delete \"{{name}}\"?",
+      "deleteWarning": "Work orders currently classified as this type will keep their value until reassigned.",
       "description": "Categories that classify {{workOrder}}s (e.g., Service Call, Installation, Maintenance).",
-      "singular": "Type"
+      "emptyDescription": "Add a type to start classifying work orders.",
+      "emptyTitle": "No work order types yet",
+      "errorCreate": "Failed to create work order type",
+      "errorUpdate": "Failed to update work order type",
+      "form": {
+        "create": "Create type",
+        "save": "Save changes",
+        "titleAdd": "Add Work Order Type",
+        "titleEdit": "Edit {{name}}"
+      },
+      "noMatches": "No work order types match your search.",
+      "rowsCount": "{{count}} {{noun}}",
+      "searchPlaceholder": "Search types…",
+      "singular": "Type",
+      "subtitle": "{{count}} types · used to classify work orders in lists, the dispatch board, and reports"
     },
     "workflowConfig": {
       "behavior": "Behavior",
