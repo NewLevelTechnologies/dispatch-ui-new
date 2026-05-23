@@ -15,6 +15,7 @@ import { Input, InputGroup } from '../components/catalyst/input';
 import { Textarea } from '../components/catalyst/textarea';
 import { Text } from '../components/catalyst/text';
 import { Callout } from '../components/ui/Callout';
+import { AccentPicker } from '../components/ui/AccentPicker';
 import {
   ROLE_ACCENT_OPTIONS,
   roleAccent,
@@ -361,15 +362,15 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
                   <Label size="xs" required>
                     {t('roles.form.colorLabel')}
                   </Label>
-                  <RoleColorPicker
+                  <AccentPicker
                     value={accentId}
                     onChange={(id) => {
                       setAccentId(id);
                       if (accentConflict) setAccentConflict(null);
                     }}
                     colorsInUse={colorsInUse}
-                    formatTakenLabel={(roleName) =>
-                      t('roles.form.colorTakenBy', { name: roleName })
+                    formatTakenLabel={(owner) =>
+                      t('roles.form.colorTakenBy', { name: owner.roleName })
                     }
                   />
                   {accentConflict && (
@@ -614,67 +615,6 @@ export function RoleAddPage() {
 
 export function RoleEditPage() {
   return <RoleFormPage mode="edit" />;
-}
-
-// ──────────────────────────────────────────────────────────────────
-// RoleColorPicker — 10 swatches, stores a token id, not the oklch value.
-// Page-local: lives here until a second surface needs the same picker.
-// ──────────────────────────────────────────────────────────────────
-function RoleColorPicker({
-  value,
-  onChange,
-  colorsInUse,
-  formatTakenLabel,
-}: {
-  value: string;
-  onChange: (id: string) => void;
-  // Accent ids already owned by other roles. The picker dims + disables
-  // those swatches and surfaces the owner via the native `title` tooltip.
-  // Caller filters out the current role's own entry in edit mode.
-  colorsInUse?: Record<string, { roleId: string; roleName: string }>;
-  // Localized formatter so the picker stays i18n-agnostic.
-  formatTakenLabel?: (roleName: string) => string;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1">
-      {ROLE_ACCENT_OPTIONS.map((opt) => {
-        const on = opt.id === value;
-        const owner = colorsInUse?.[opt.id];
-        const taken = !!owner && !on;
-        const title = taken && formatTakenLabel
-          ? formatTakenLabel(owner.roleName)
-          : opt.label;
-        return (
-          <button
-            key={opt.id}
-            type="button"
-            aria-label={opt.label}
-            title={title}
-            disabled={taken}
-            onClick={() => !taken && onChange(opt.id)}
-            className={
-              'inline-flex size-[26px] items-center justify-center rounded-[7px] bg-bg-elev-2 p-0 transition-colors ' +
-              (on
-                ? 'border-[1.5px] border-fg-strong'
-                : taken
-                  ? 'cursor-not-allowed border-[1.5px] border-border opacity-35'
-                  : 'border-[1.5px] border-border hover:border-border-strong')
-            }
-          >
-            <span
-              className="size-3.5 rounded-full"
-              style={{
-                background: opt.value,
-                boxShadow: on
-                  ? `0 0 0 2px color-mix(in oklch, ${opt.value} 20%, transparent)`
-                  : 'none',
-              }}
-            />
-          </button>
-        );
-      })}
-    </div>
-  );
 }
 
 // ──────────────────────────────────────────────────────────────────

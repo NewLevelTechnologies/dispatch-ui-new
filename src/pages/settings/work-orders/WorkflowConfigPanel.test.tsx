@@ -31,7 +31,7 @@ const mockConfig: WorkflowConfig = {
 function mockApis(config: WorkflowConfig = mockConfig) {
   vi.mocked(apiClient.get).mockImplementation((url: string) => {
     if (url.endsWith('/workflow')) return Promise.resolve({ data: config });
-    if (url.endsWith('/types')) return Promise.resolve({ data: mockTypes });
+    if (url.endsWith('/types')) return Promise.resolve({ data: { types: mockTypes, colorsInUse: {} } });
     if (url.endsWith('/item-statuses')) return Promise.resolve({ data: mockStatuses });
     return Promise.reject(new Error(`unexpected GET ${url}`));
   });

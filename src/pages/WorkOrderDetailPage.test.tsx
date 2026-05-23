@@ -73,7 +73,10 @@ describe('WorkOrderDetailPage', () => {
       }
       if (url.includes('/work-orders/config/types')) {
         return Promise.resolve({
-          data: [{ id: 'type-1', name: 'HVAC Service', code: 'HVAC', isActive: true, sortOrder: 0 }],
+          data: {
+            types: [{ id: 'type-1', name: 'HVAC Service', code: 'HVAC', accentId: 'blue', isActive: true, sortOrder: 0 }],
+            colorsInUse: {},
+          },
         });
       }
       if (url.includes('/work-orders/config/divisions')) {
