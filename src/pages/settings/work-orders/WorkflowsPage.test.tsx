@@ -4,22 +4,23 @@ import type { RouteObject } from 'react-router-dom';
 import { renderWithProviders, userEvent } from '../../../test/utils';
 import WorkflowsPage from './WorkflowsPage';
 import apiClient from '../../../api/client';
+import type { WorkflowConfig, WorkflowSummary } from '../../../api';
 
 vi.mock('../../../api/client');
 
-const baseConfig = {
+const baseConfig: WorkflowConfig = {
   id: 'cfg-1',
   tenantId: 't',
-  enforcementMode: 'OPEN' as const,
+  enforcementMode: 'OPEN',
   defaultApprovalExpiryHours: 72,
   defaultWorkOrderTypeId: null,
   defaultWorkItemStatusId: null,
-  dispatchBoardType: 'STATUS_BASED' as const,
+  dispatchBoardType: 'STATUS_BASED',
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
 };
 
-const seededWorkflow = {
+const seededWorkflow: WorkflowSummary = {
   id: 'wf-1',
   tenantId: 't',
   workOrderTypeId: 'type-1',
@@ -39,7 +40,7 @@ const seededWorkflow = {
   updatedAt: '2026-01-01T00:00:00Z',
 };
 
-const customWorkflow = {
+const customWorkflow: WorkflowSummary = {
   ...seededWorkflow,
   id: 'wf-2',
   workOrderTypeId: 'type-2',
@@ -60,8 +61,8 @@ function mockGetEndpoints({
   workflows = [seededWorkflow],
   config = baseConfig,
 }: {
-  workflows?: typeof seededWorkflow[];
-  config?: typeof baseConfig;
+  workflows?: WorkflowSummary[];
+  config?: WorkflowConfig;
 } = {}) {
   vi.mocked(apiClient.get).mockImplementation((url) => {
     if (url === '/work-orders/config/workflows') {
