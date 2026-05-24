@@ -14,6 +14,8 @@ const status = (id: string, name: string): WorkItemStatus => ({
   code: name.toUpperCase().replace(/\s+/g, '_'),
   statusCategory: 'NOT_STARTED',
   isTerminal: false,
+  isSeeded: false,
+  accentId: 'blue',
   isActive: true,
   sortOrder: 0,
   createdAt: '2026-01-01T00:00:00Z',

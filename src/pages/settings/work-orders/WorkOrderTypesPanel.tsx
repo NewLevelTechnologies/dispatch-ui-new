@@ -174,7 +174,7 @@ export default function WorkOrderTypesPanel() {
         title={`${workOrder} ${t('settings.nav.types')}`}
         sub={
           types.length > 0
-            ? t('settings.workOrderTypes.subtitle', { count: types.length })
+            ? t('settings.workOrderTypes.subtitle', { count: types.length, workOrder })
             : null
         }
         actions={
@@ -203,7 +203,7 @@ export default function WorkOrderTypesPanel() {
               <LoadingState />
             ) : error ? (
               <ErrorState
-                title={t('settings.workOrderTypes.couldNotLoad')}
+                title={t('settings.workOrderTypes.couldNotLoad', { workOrder })}
                 description={extractApiError(error) ?? (error as Error).message}
                 action={
                   <Button outline onClick={() => refetch()}>
@@ -214,8 +214,8 @@ export default function WorkOrderTypesPanel() {
             ) : showEmpty ? (
               <EmptyState
                 icon={<RectangleStackIcon className="size-10 text-fg-dim" />}
-                title={t('settings.workOrderTypes.emptyTitle')}
-                description={t('settings.workOrderTypes.emptyDescription')}
+                title={t('settings.workOrderTypes.emptyTitle', { workOrder })}
+                description={t('settings.workOrderTypes.emptyDescription', { workOrder })}
                 action={
                   <Button color="accent" onClick={handleAdd}>
                     {t('common.actions.add', { entity: t('settings.workOrderTypes.singular') })}
@@ -223,7 +223,7 @@ export default function WorkOrderTypesPanel() {
                 }
               />
             ) : showNoMatches ? (
-              <EmptyState title={t('settings.workOrderTypes.noMatches')} />
+              <EmptyState title={t('settings.workOrderTypes.noMatches', { workOrder })} />
             ) : (
               <>
                 <DenseTable>
@@ -371,7 +371,7 @@ export default function WorkOrderTypesPanel() {
         title={t('settings.workOrderTypes.deleteConfirm', {
           name: pendingDelete?.name ?? '',
         })}
-        message={t('settings.workOrderTypes.deleteWarning')}
+        message={t('settings.workOrderTypes.deleteWarning', { workOrder })}
         confirmLabel={
           deleteMutation.isPending ? t('common.deleting') : t('common.delete')
         }

@@ -24,7 +24,11 @@ export type RoleAccentId =
   | 'slate';
 
 export interface AccentOption {
-  id: RoleAccentId;
+  // String, not `RoleAccentId`, because palettes are now plural — work order
+  // types use the role palette, item statuses use a separate 7-swatch palette
+  // (see STATUS_ACCENT_OPTIONS below). The picker only needs identity, not
+  // a discriminated union.
+  id: string;
   label: string;
   value: string;
 }
@@ -45,9 +49,35 @@ export const ROLE_ACCENT_OPTIONS: AccentOption[] = [
   { id: 'slate', label: 'Slate', value: 'oklch(50% 0.02 250)' },
 ];
 
-const ACCENT_BY_ID: Record<string, string> = Object.fromEntries(
-  ROLE_ACCENT_OPTIONS.map((o) => [o.id, o.value])
-);
+// Item-status palette. Constrained to 7 swatches the backend documents as
+// canonical for item statuses. Tuned to match `ROLE_ACCENT_OPTIONS` visual
+// weight; `coral` and `gray` are unique to this palette.
+export type StatusAccentId =
+  | 'blue'
+  | 'green'
+  | 'amber'
+  | 'violet'
+  | 'teal'
+  | 'coral'
+  | 'gray';
+
+export const STATUS_ACCENT_OPTIONS: AccentOption[] = [
+  { id: 'blue', label: 'Blue', value: 'oklch(58% 0.14 215)' },
+  { id: 'green', label: 'Green', value: 'oklch(60% 0.14 145)' },
+  { id: 'amber', label: 'Amber', value: 'oklch(60% 0.14 70)' },
+  { id: 'violet', label: 'Violet', value: 'oklch(60% 0.14 285)' },
+  { id: 'teal', label: 'Teal', value: 'oklch(58% 0.12 195)' },
+  { id: 'coral', label: 'Coral', value: 'oklch(64% 0.16 30)' },
+  { id: 'gray', label: 'Gray', value: 'oklch(60% 0.02 250)' },
+];
+
+// Lookup spans both palettes so `roleAccent('coral')` and `roleAccent('blue')`
+// both resolve. Where keys overlap (`blue`, `green`, `amber`, `violet`, `teal`)
+// the role palette wins — the role values are the established visual weight.
+const ACCENT_BY_ID: Record<string, string> = {
+  ...Object.fromEntries(STATUS_ACCENT_OPTIONS.map((o) => [o.id, o.value])),
+  ...Object.fromEntries(ROLE_ACCENT_OPTIONS.map((o) => [o.id, o.value])),
+};
 
 // Resolve a persisted accent id to an oklch value. Unknown ids fall back
 // to the hash path so a typo or stale id doesn't render as a missing color.

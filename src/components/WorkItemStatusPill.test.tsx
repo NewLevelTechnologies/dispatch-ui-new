@@ -18,6 +18,8 @@ const status = (id: string, name: string, category: WorkItemStatus['statusCatego
   code: name.toUpperCase().replace(/\s+/g, '_'),
   statusCategory: category,
   isTerminal: category === 'COMPLETED' || category === 'CANCELLED',
+  isSeeded: false,
+  accentId: 'blue',
   isActive: true,
   sortOrder: 0,
   createdAt: '2026-01-01T00:00:00Z',

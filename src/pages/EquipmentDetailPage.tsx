@@ -80,6 +80,7 @@ const FILTER_SIZE_CHIP_COLLAPSED = 10;
 // Service History card).
 const PROGRESS_COLORS: Record<ProgressCategory, 'zinc' | 'sky' | 'blue' | 'amber' | 'lime'> = {
   NOT_STARTED: 'zinc',
+  AWAITING_SCHEDULE: 'sky',
   IN_PROGRESS: 'blue',
   BLOCKED: 'amber',
   COMPLETED: 'lime',
@@ -88,6 +89,7 @@ const PROGRESS_COLORS: Record<ProgressCategory, 'zinc' | 'sky' | 'blue' | 'amber
 
 const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
   NOT_STARTED: 'notStarted',
+  AWAITING_SCHEDULE: 'awaitingSchedule',
   IN_PROGRESS: 'inProgress',
   BLOCKED: 'blocked',
   COMPLETED: 'completed',

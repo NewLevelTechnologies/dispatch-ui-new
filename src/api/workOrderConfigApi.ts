@@ -49,18 +49,24 @@ export interface AccentConflictBody {
 }
 
 // ===== Work Item Status =====
+// Mirrors the WorkOrderType shape: persisted `accentId` token, server-computed
+// `colorsInUse` map on the list envelope, 409 ACCENT_ID_TAKEN on conflicting
+// writes. `isSeeded` flags built-in statuses provisioned by the backend —
+// their `code` is locked client-side and the backend rejects DELETE on them.
 export type StatusCategory =
   | 'NOT_STARTED'
+  | 'AWAITING_SCHEDULE'
   | 'IN_PROGRESS'
-  | 'COMPLETED'
   | 'BLOCKED'
+  | 'COMPLETED'
   | 'CANCELLED';
 
 export const STATUS_CATEGORIES: StatusCategory[] = [
   'NOT_STARTED',
+  'AWAITING_SCHEDULE',
   'IN_PROGRESS',
-  'COMPLETED',
   'BLOCKED',
+  'COMPLETED',
   'CANCELLED',
 ];
 
@@ -71,8 +77,8 @@ export interface WorkItemStatus {
   code: string;
   statusCategory: StatusCategory;
   isTerminal: boolean;
-  description?: string | null;
-  color?: string | null;
+  isSeeded: boolean;
+  accentId: string;
   icon?: string | null;
   isActive: boolean;
   sortOrder: number;
@@ -80,13 +86,21 @@ export interface WorkItemStatus {
   updatedAt: string;
 }
 
+// 422 payload returned by the BE when the caller tries to edit `code` on a
+// seeded row, or DELETE a seeded row. The FE disables those affordances
+// preemptively but we surface this shape if a race or stale state slips
+// through.
+export interface SeededRowImmutableBody {
+  code?: 'SEEDED_ROW_IMMUTABLE';
+  message?: string;
+}
+
 export interface CreateWorkItemStatusRequest {
   name: string;
   code: string;
   statusCategory: StatusCategory;
+  accentId: string;
   isTerminal?: boolean;
-  description?: string | null;
-  color?: string | null;
   icon?: string | null;
   sortOrder?: number;
 }
@@ -94,9 +108,8 @@ export interface CreateWorkItemStatusRequest {
 export interface UpdateWorkItemStatusRequest {
   name?: string;
   statusCategory?: StatusCategory;
+  accentId?: string;
   isTerminal?: boolean;
-  description?: string | null;
-  color?: string | null;
   icon?: string | null;
   isActive?: boolean;
   sortOrder?: number;
@@ -226,6 +239,9 @@ export const divisionsApi = {
 };
 
 // ===== Work Item Statuses =====
+// The list endpoint returns a plain array — there is no envelope and no
+// `colorsInUse` map (unlike work-order-types). Multiple statuses are
+// allowed to share an `accentId`.
 export const workItemStatusesApi = {
   getAll: async (): Promise<WorkItemStatus[]> => {
     const response = await apiClient.get<WorkItemStatus[]>(`${BASE}/item-statuses`);

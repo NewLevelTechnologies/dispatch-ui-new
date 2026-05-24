@@ -9,6 +9,7 @@ type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
 
 const PROGRESS_TONES: Record<ProgressCategory, PillTone> = {
   NOT_STARTED: 'neutral',
+  AWAITING_SCHEDULE: 'info',
   IN_PROGRESS: 'info',
   BLOCKED: 'warning',
   COMPLETED: 'success',
@@ -17,6 +18,7 @@ const PROGRESS_TONES: Record<ProgressCategory, PillTone> = {
 
 const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
   NOT_STARTED: 'notStarted',
+  AWAITING_SCHEDULE: 'awaitingSchedule',
   IN_PROGRESS: 'inProgress',
   BLOCKED: 'blocked',
   COMPLETED: 'completed',
