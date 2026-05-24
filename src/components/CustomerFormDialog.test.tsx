@@ -358,6 +358,302 @@ describe('CustomerFormDialog', () => {
     });
   });
 
+  describe('Billing-only customer', () => {
+    it('renders billing-only fields when the BILLING_ONLY type is selected', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CustomerFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      // Switch to billing-only — the standard service-location grid goes away
+      // and the billing-only address grid takes its place. Catalyst radios use
+      // Headless UI under the hood and respond to clicks on the value-bearing
+      // span, not the hidden <input>. The i18n mock leaves the radio's label
+      // as the literal i18n key, so we match on that.
+      const billingOnlyRadio = screen.getByRole('radio', {
+        name: 'customers.form.customerTypeBillingOnly',
+      });
+      await user.click(billingOnlyRadio);
+
+      // The billing-only branch uses dedicated input names so we don't fight
+      // duplicate labels with the standard branch.
+      const nameInput = document.querySelector('input[name="billingOnlyName"]') as HTMLInputElement;
+      expect(nameInput).toBeInTheDocument();
+      await user.type(nameInput, 'Acme Warranty');
+
+      // Email — billing-only branch
+      const emailInput = screen.getByLabelText(/^email \*/i);
+      await user.type(emailInput, 'billing@acme.com');
+
+      // Phone — single field in this branch
+      const phoneInput = screen.getByLabelText(/^phone/i);
+      fireEvent.change(phoneInput, { target: { value: '(555) 999-1234' } });
+
+      // Address fields
+      const streetInput = document.querySelector('input[name="billingStreetAddress"]') as HTMLInputElement;
+      await user.type(streetInput, '500 Corporate Way');
+
+      const line2Input = document.querySelector('input[name="billingStreetAddressLine2"]') as HTMLInputElement;
+      await user.type(line2Input, 'Suite 200');
+
+      const cityInput = document.querySelector('input[name="billingCity"]') as HTMLInputElement;
+      await user.type(cityInput, 'New York');
+
+      const stateSelect = document.querySelector('select[name="billingState"]') as HTMLSelectElement;
+      await user.selectOptions(stateSelect, 'NY');
+
+      const zipInput = document.querySelector('input[name="billingZipCode"]') as HTMLInputElement;
+      await user.type(zipInput, '10001');
+
+      vi.mocked(apiClient.post).mockResolvedValue({ data: mockCustomer });
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith('/customers', expect.objectContaining({
+          name: 'Acme Warranty',
+          email: 'billing@acme.com',
+          phone: '5559991234',
+          type: 'BILLING_ONLY',
+          billingAddress: expect.objectContaining({
+            streetAddress: '500 Corporate Way',
+            streetAddressLine2: 'Suite 200',
+            city: 'New York',
+            state: 'NY',
+            zipCode: '10001',
+          }),
+          serviceLocations: [],
+        }));
+      });
+    });
+  });
+
+  describe('Standard customer with separate billing address', () => {
+    it('renders the billing-address section and submits both addresses', { timeout: 15000 }, async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.post).mockResolvedValue({ data: mockCustomer });
+      renderWithProviders(<CustomerFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      // Required service-location fields
+      await user.type(screen.getByLabelText(/^name \*/i), 'Joe Restaurant');
+      await user.type(screen.getByLabelText(/^email \*/i), 'joe@example.com');
+      const phoneInput = screen.getByLabelText(/^phone/i);
+      fireEvent.change(phoneInput, { target: { value: '(555) 222-3333' } });
+
+      await user.type(screen.getByLabelText(/^street address \*/i), '10 Service Rd');
+      await user.type(screen.getByLabelText(/^city \*/i), 'Boston');
+      await user.selectOptions(screen.getByLabelText(/^state \*/i), 'MA');
+      await user.type(screen.getByLabelText(/^zip code \*/i), '02101');
+
+      // Toggle off "send invoice to same address" so the billing section renders
+      const sameAddressCheckbox = screen.getByRole('checkbox', { name: /send invoice to same address/i });
+      await user.click(sameAddressCheckbox);
+
+      // Now the billing recipient block exists — fill it. The recipient block
+      // owns the customer-level "name" field (locationName is the service-loc
+      // name only), so we have to fill the billing name explicitly here.
+      const billingNameField = document.querySelector('input[name="billingName"]') as HTMLInputElement;
+      await user.type(billingNameField, 'Joe Restaurant Corp');
+
+      const billingStreet = document.querySelector('input[name="billingStreetAddress"]') as HTMLInputElement;
+      await user.type(billingStreet, '99 Corporate Blvd');
+
+      const billingLine2 = document.querySelector('input[name="billingStreetAddressLine2"]') as HTMLInputElement;
+      await user.type(billingLine2, 'Fl 4');
+
+      const billingCity = document.querySelector('input[name="billingCity"]') as HTMLInputElement;
+      await user.type(billingCity, 'Cambridge');
+
+      const billingState = document.querySelector('select[name="billingState"]') as HTMLSelectElement;
+      await user.selectOptions(billingState, 'MA');
+
+      const billingZip = document.querySelector('input[name="billingZipCode"]') as HTMLInputElement;
+      await user.type(billingZip, '02139');
+
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith('/customers', expect.objectContaining({
+          billingAddressSameAsService: false,
+          billingAddress: expect.objectContaining({
+            streetAddress: '99 Corporate Blvd',
+            streetAddressLine2: 'Fl 4',
+            city: 'Cambridge',
+            state: 'MA',
+            zipCode: '02139',
+          }),
+        }));
+      });
+    });
+  });
+
+  describe('API error handling', () => {
+    it('alerts when create fails with an API error message', async () => {
+      const user = userEvent.setup();
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      const apiError = Object.assign(new Error('boom'), {
+        response: { data: { message: 'Email already exists' } },
+      });
+      vi.mocked(apiClient.post).mockRejectedValue(apiError);
+
+      renderWithProviders(<CustomerFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      await user.type(screen.getByLabelText(/^name \*/i), 'John Doe');
+      await user.type(screen.getByLabelText(/^email \*/i), 'john@example.com');
+      await user.type(screen.getByLabelText(/^street address \*/i), '123 Main St');
+      await user.type(screen.getByLabelText(/^city \*/i), 'Boston');
+      await user.selectOptions(screen.getByLabelText(/^state \*/i), 'MA');
+      await user.type(screen.getByLabelText(/^zip code \*/i), '02101');
+
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith('Email already exists');
+      });
+
+      // onClose should NOT be called on error
+      expect(mockOnClose).not.toHaveBeenCalled();
+      alertSpy.mockRestore();
+    });
+
+    it('falls back to a generic message when the API error has no message', async () => {
+      const user = userEvent.setup();
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      vi.mocked(apiClient.post).mockRejectedValue(new Error('Network error'));
+
+      renderWithProviders(<CustomerFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      await user.type(screen.getByLabelText(/^name \*/i), 'John Doe');
+      await user.type(screen.getByLabelText(/^email \*/i), 'john@example.com');
+      await user.type(screen.getByLabelText(/^street address \*/i), '123 Main St');
+      await user.type(screen.getByLabelText(/^city \*/i), 'Boston');
+      await user.selectOptions(screen.getByLabelText(/^state \*/i), 'MA');
+      await user.type(screen.getByLabelText(/^zip code \*/i), '02101');
+
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith('Failed to create customer');
+      });
+      alertSpy.mockRestore();
+    });
+
+    it('alerts when update fails', async () => {
+      const user = userEvent.setup();
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      const apiError = Object.assign(new Error('boom'), {
+        response: { data: { message: 'Validation failed' } },
+      });
+      vi.mocked(apiClient.put).mockRejectedValue(apiError);
+
+      renderWithProviders(
+        <CustomerFormDialog isOpen={true} onClose={mockOnClose} customer={mockCustomer} />
+      );
+
+      const nameInput = screen.getByDisplayValue('John Doe');
+      await user.clear(nameInput);
+      await user.type(nameInput, 'Jane Doe');
+
+      await user.click(screen.getByRole('button', { name: /update/i }));
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith('Validation failed');
+      });
+      alertSpy.mockRestore();
+    });
+  });
+
+  describe('Edit mode billing address and type', () => {
+    it('persists billing-address edits via the dedicated endpoint', { timeout: 10000 }, async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.put).mockResolvedValue({ data: mockCustomer });
+
+      renderWithProviders(
+        <CustomerFormDialog isOpen={true} onClose={mockOnClose} customer={mockCustomer} />
+      );
+
+      // Update email (triggers the edit-mode email onChange)
+      const emailInput = screen.getByDisplayValue('john@example.com');
+      await user.clear(emailInput);
+      await user.type(emailInput, 'new@example.com');
+
+      // Update each billing-address field — these are the edit-mode handlers
+      // that the original test never touched.
+      const street = screen.getByDisplayValue('123 Main St');
+      await user.clear(street);
+      await user.type(street, '999 New St');
+
+      const line2Field = document.querySelector('input[name="billingStreetAddressLine2"]') as HTMLInputElement;
+      await user.clear(line2Field);
+      await user.type(line2Field, 'Apt 5');
+
+      const city = screen.getByDisplayValue('Boston');
+      await user.clear(city);
+      await user.type(city, 'Cambridge');
+
+      const stateSelect = document.querySelector('select[name="billingState"]') as HTMLSelectElement;
+      await user.selectOptions(stateSelect, 'NY');
+
+      const zip = screen.getByDisplayValue('02101');
+      await user.clear(zip);
+      await user.type(zip, '10001');
+
+      await user.click(screen.getByRole('button', { name: /update/i }));
+
+      await waitFor(() => {
+        expect(apiClient.put).toHaveBeenCalledWith('/customers/1', expect.objectContaining({
+          email: 'new@example.com',
+        }));
+      });
+
+      // Billing address changed → the component also hits the dedicated
+      // billing-address endpoint with a PUT.
+      await waitFor(() => {
+        expect(apiClient.put).toHaveBeenCalledWith(
+          '/customers/1/billing-address',
+          expect.objectContaining({
+            billingAddress: expect.objectContaining({
+              streetAddress: '999 New St',
+              streetAddressLine2: 'Apt 5',
+              city: 'Cambridge',
+              state: 'NY',
+              zipCode: '10001',
+            }),
+          })
+        );
+      });
+    });
+
+    it('toggling the type radio sends the new type', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.put).mockResolvedValue({ data: mockCustomer });
+
+      // BILLING_ONLY customers don't have active locations, so toggling to
+      // STANDARD isn't blocked.
+      const billingOnly = {
+        ...mockCustomer,
+        type: 'BILLING_ONLY' as const,
+        serviceLocations: [],
+      };
+
+      renderWithProviders(
+        <CustomerFormDialog isOpen={true} onClose={mockOnClose} customer={billingOnly} />
+      );
+
+      // Flip the type to STANDARD — the i18n mock leaves the radio's label as
+      // the literal i18n key, so we match on that.
+      const standardRadio = screen.getByRole('radio', {
+        name: 'customers.form.customerTypeStandard',
+      });
+      await user.click(standardRadio);
+
+      await user.click(screen.getByRole('button', { name: /update/i }));
+
+      await waitFor(() => {
+        expect(apiClient.put).toHaveBeenCalledWith('/customers/1', expect.objectContaining({
+          type: 'STANDARD',
+        }));
+      });
+    });
+  });
+
   describe('Dialog behavior', () => {
     it('calls onClose when cancel button is clicked', async () => {
       const user = userEvent.setup();
