@@ -132,7 +132,6 @@ export interface WorkflowSummary {
     accentId: string;
   };
   name: string;
-  description?: string | null;
   initialStatusId?: string | null;
   isSeeded: boolean;
   transitionCount: number;
