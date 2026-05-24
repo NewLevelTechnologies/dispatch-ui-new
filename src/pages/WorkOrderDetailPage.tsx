@@ -11,7 +11,7 @@ import {
   workOrderTypesApi,
   divisionsApi,
   workItemStatusesApi,
-  statusWorkflowsApi,
+  workflowsApi,
   workflowConfigApi,
   type Dispatch,
   type Equipment,
@@ -489,15 +489,28 @@ export default function WorkOrderDetailPage() {
     queryFn: () => workItemStatusesApi.getAll(),
   });
 
-  const { data: statusWorkflows = [] } = useQuery({
-    queryKey: ['status-workflows'],
-    queryFn: () => statusWorkflowsApi.getAll(),
-  });
-
   const { data: workflowConfig } = useQuery({
     queryKey: ['workflow-config'],
     queryFn: () => workflowConfigApi.get(),
   });
+
+  // Resolve the workflow for this WO's type, then its transitions. The
+  // status pill consumes the transition list to decide allowed moves under
+  // Strict enforcement. Two-step fetch because the list endpoint is summary-
+  // only — transitions[] only lands on the detail call.
+  const { data: workflowList = [] } = useQuery({
+    queryKey: ['workflows'],
+    queryFn: () => workflowsApi.getAll(),
+  });
+  const matchingWorkflowId = workOrder?.workOrderTypeId
+    ? workflowList.find((w) => w.workOrderTypeId === workOrder.workOrderTypeId)?.id
+    : undefined;
+  const { data: activeWorkflow } = useQuery({
+    queryKey: ['workflow', matchingWorkflowId],
+    queryFn: () => workflowsApi.getById(matchingWorkflowId!),
+    enabled: Boolean(matchingWorkflowId),
+  });
+  const workflowTransitions = activeWorkflow?.transitions ?? [];
 
   // Same query key as DispatchesSection — React Query dedupes the actual fetch.
   // Read here so the header ETA can derive from the next non-cancelled dispatch.
@@ -1217,8 +1230,8 @@ export default function WorkOrderDetailPage() {
               workOrderId={workOrder.id}
               workItems={workOrder.workItems ?? []}
               statuses={workItemStatuses}
-              workflows={statusWorkflows}
-              enforceWorkflow={workflowConfig?.enforceStatusWorkflow ?? false}
+              transitions={workflowTransitions}
+              enforceWorkflow={workflowConfig?.enforcementMode === 'STRICT'}
               readOnly={isCancelled || isArchived}
               onAdd={() => {
                 setEditingWorkItem(null);

@@ -4,7 +4,7 @@ import { renderWithProviders, userEvent } from '../test/utils';
 import WorkItemStatusPill from './WorkItemStatusPill';
 import apiClient from '../api/client';
 import type {
-  StatusWorkflowRule,
+  WorkflowTransition,
   WorkItemResponse,
   WorkItemStatus,
 } from '../api';
@@ -55,7 +55,7 @@ describe('WorkItemStatusPill', () => {
         workOrderId="wo-1"
         workItem={baseWorkItem}
         statuses={allStatuses}
-        workflows={[]}
+        transitions={[]}
         enforceWorkflow={false}
       />
     );
@@ -68,7 +68,7 @@ describe('WorkItemStatusPill', () => {
         workOrderId="wo-1"
         workItem={{ ...baseWorkItem, statusId: null }}
         statuses={allStatuses}
-        workflows={[]}
+        transitions={[]}
         enforceWorkflow={false}
       />
     );
@@ -83,7 +83,7 @@ describe('WorkItemStatusPill', () => {
         workOrderId="wo-1"
         workItem={baseWorkItem}
         statuses={allStatuses}
-        workflows={[]}
+        transitions={[]}
         enforceWorkflow={false}
         readOnly
       />
@@ -98,7 +98,7 @@ describe('WorkItemStatusPill', () => {
         workOrderId="wo-1"
         workItem={baseWorkItem}
         statuses={allStatuses}
-        workflows={[]}
+        transitions={[]}
         enforceWorkflow={false}
       />
     );
@@ -115,14 +115,15 @@ describe('WorkItemStatusPill', () => {
   });
 
   it('only shows allowed transitions when workflow is enforced', async () => {
-    const workflows: StatusWorkflowRule[] = [
+    const transitions: WorkflowTransition[] = [
       {
-        id: 'rule-1',
+        id: 'tx-1',
         tenantId: 't',
+        workflowId: 'wf-1',
         fromStatusId: 's-pending',
         toStatusId: 's-progress',
-        isAllowed: true,
         requiresApproval: false,
+        approverCapabilities: [],
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
       },
@@ -133,7 +134,7 @@ describe('WorkItemStatusPill', () => {
         workOrderId="wo-1"
         workItem={baseWorkItem}
         statuses={allStatuses}
-        workflows={workflows}
+        transitions={transitions}
         enforceWorkflow
       />
     );
@@ -154,7 +155,7 @@ describe('WorkItemStatusPill', () => {
         workOrderId="wo-1"
         workItem={baseWorkItem}
         statuses={allStatuses}
-        workflows={[]}
+        transitions={[]}
         enforceWorkflow
       />
     );
@@ -170,7 +171,7 @@ describe('WorkItemStatusPill', () => {
         workOrderId="wo-1"
         workItem={baseWorkItem}
         statuses={allStatuses}
-        workflows={[]}
+        transitions={[]}
         enforceWorkflow={false}
       />
     );

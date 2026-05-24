@@ -67,7 +67,7 @@ describe('WorkItemsTable', () => {
         workOrderId="wo-1"
         workItems={[]}
         statuses={[]}
-        workflows={[]}
+        transitions={[]}
         enforceWorkflow={false}
       />
     );
@@ -80,7 +80,7 @@ describe('WorkItemsTable', () => {
         workOrderId="wo-1"
         workItems={[wi('wi-1', 'Replace filter'), wi('wi-2', 'Inspect coils')]}
         statuses={[]}
-        workflows={[]}
+        transitions={[]}
         enforceWorkflow={false}
       />
     );
@@ -94,7 +94,7 @@ describe('WorkItemsTable', () => {
         workOrderId="wo-1"
         workItems={[wi('wi-1', 'Replace filter')]}
         statuses={[]}
-        workflows={[]}
+        transitions={[]}
         enforceWorkflow={false}
         readOnly
       />
@@ -111,7 +111,7 @@ describe('WorkItemsTable', () => {
         workOrderId="wo-1"
         workItems={[wi('wi-1', 'Replace filter', { equipment: equip() })]}
         statuses={[]}
-        workflows={[]}
+        transitions={[]}
         enforceWorkflow={false}
       />
     );
@@ -129,7 +129,7 @@ describe('WorkItemsTable', () => {
           workOrderId="wo-1"
           workItems={[wi('wi-1', 'Replace filter', { equipment: equip() })]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
         />
       );
@@ -146,7 +146,7 @@ describe('WorkItemsTable', () => {
           workOrderId="wo-1"
           workItems={[wi('wi-1', 'Replace filter', { equipment: equip() })]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
         />
       );
@@ -175,7 +175,7 @@ describe('WorkItemsTable', () => {
           workOrderId="wo-1"
           workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ id: 'eq-99' }) })]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
           onEditEquipment={onEditEquipment}
         />
@@ -195,7 +195,7 @@ describe('WorkItemsTable', () => {
           workOrderId="wo-1"
           workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ id: 'eq-42' }) })]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
         />
       );
@@ -213,7 +213,7 @@ describe('WorkItemsTable', () => {
           workOrderId="wo-1"
           workItems={[wi('wi-1', 'Replace filter', { equipment: equip() })]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
           readOnly
           onEditEquipment={vi.fn()}
@@ -233,7 +233,7 @@ describe('WorkItemsTable', () => {
           workOrderId="wo-1"
           workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ id: 'eq-7' }) })]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
         />
       );
@@ -261,7 +261,7 @@ describe('WorkItemsTable', () => {
           workOrderId="wo-1"
           workItems={[wi('wi-1', 'Replace filter', { equipment: equip() })]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
         />
       );
@@ -287,7 +287,7 @@ describe('WorkItemsTable', () => {
             }),
           ]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
         />
       );
@@ -308,7 +308,7 @@ describe('WorkItemsTable', () => {
           workOrderId="wo-1"
           workItems={[wi('wi-1', 'Inspect ductwork')]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
           onEdit={onEdit}
           onDelete={vi.fn()}
@@ -331,7 +331,7 @@ describe('WorkItemsTable', () => {
           workOrderId="wo-1"
           workItems={[wi('wi-1', 'Inspect ductwork')]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
           readOnly
         />
@@ -352,7 +352,7 @@ describe('WorkItemsTable', () => {
           workOrderId="wo-1"
           workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ status: 'ACTIVE' }) })]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
         />
       );
@@ -368,7 +368,7 @@ describe('WorkItemsTable', () => {
           workOrderId="wo-1"
           workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ status: 'RETIRED' }) })]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
         />
       );
@@ -384,7 +384,7 @@ describe('WorkItemsTable', () => {
           workOrderId="wo-1"
           workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ id: 'eq-9', status: 'RETIRED' }) })]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
         />
       );
@@ -438,7 +438,7 @@ describe('WorkItemsTable', () => {
             }),
           ]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
         />
       );
@@ -460,7 +460,7 @@ describe('WorkItemsTable', () => {
             }),
           ]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
         />
       );
@@ -487,7 +487,7 @@ describe('WorkItemsTable', () => {
             }),
           ]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
         />
       );
@@ -506,7 +506,7 @@ describe('WorkItemsTable', () => {
           workOrderId="wo-1"
           workItems={[wi('wi-1', 'Replace filter', { equipment: equip() })]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
         />
       );
@@ -532,7 +532,7 @@ describe('WorkItemsTable', () => {
             }),
           ]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
           onSelectSubUnit={onSelectSubUnit}
         />
@@ -564,7 +564,7 @@ describe('WorkItemsTable', () => {
             }),
           ]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
           onAddSubUnit={onAddSubUnit}
         />
@@ -590,7 +590,7 @@ describe('WorkItemsTable', () => {
             }),
           ]}
           statuses={[]}
-          workflows={[]}
+          transitions={[]}
           enforceWorkflow={false}
           readOnly
           onAddSubUnit={vi.fn()}

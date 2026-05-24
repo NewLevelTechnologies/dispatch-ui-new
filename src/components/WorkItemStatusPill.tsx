@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   workOrderApi,
   type ProgressCategory,
-  type StatusWorkflowRule,
+  type WorkflowTransition,
   type WorkItemResponse,
   type WorkItemStatus,
 } from '../api';
@@ -38,7 +38,9 @@ interface Props {
   workOrderId: string;
   workItem: WorkItemResponse;
   statuses: WorkItemStatus[];
-  workflows: StatusWorkflowRule[];
+  /** Transitions in the WO's workflow. Presence of a row means the move is
+   *  allowed (the old isAllowed flag is gone — undefined rows are denied). */
+  transitions: WorkflowTransition[];
   /** When false, all active statuses are allowed transitions. */
   enforceWorkflow: boolean;
   /** Cancelled / archived WOs lock the pill to read-only. */
@@ -49,7 +51,7 @@ export default function WorkItemStatusPill({
   workOrderId,
   workItem,
   statuses,
-  workflows,
+  transitions,
   enforceWorkflow,
   readOnly = false,
 }: Props) {
@@ -83,16 +85,16 @@ export default function WorkItemStatusPill({
   const activeStatuses = statuses.filter((s) => s.isActive);
 
   // If workflow isn't enforced (or there's no current status to transition from),
-  // any active status is a valid target. Otherwise, only statuses with an explicit
-  // allow-rule from the current state are options.
+  // any active status is a valid target. Otherwise, only statuses reachable
+  // via a defined transition from the current state are options.
   const allowedStatuses =
     !enforceWorkflow || !workItem.statusId
       ? activeStatuses.filter((s) => s.id !== workItem.statusId)
       : (() => {
           const allowedIds = new Set(
-            workflows
-              .filter((w) => w.fromStatusId === workItem.statusId && w.isAllowed)
-              .map((w) => w.toStatusId)
+            transitions
+              .filter((tx) => tx.fromStatusId === workItem.statusId)
+              .map((tx) => tx.toStatusId)
           );
           return activeStatuses.filter((s) => allowedIds.has(s.id));
         })();

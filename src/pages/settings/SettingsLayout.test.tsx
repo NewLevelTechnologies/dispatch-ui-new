@@ -33,8 +33,7 @@ describe('SettingsLayout', () => {
     expect(links).toContain('/settings/work-orders/types');
     expect(links).toContain('/settings/work-orders/divisions');
     expect(links).toContain('/settings/work-orders/item-statuses');
-    expect(links).toContain('/settings/work-orders/status-workflows');
-    expect(links).toContain('/settings/work-orders/workflow-config');
+    expect(links).toContain('/settings/work-orders/workflows');
     expect(links).toContain('/settings/access/roles');
   });
 

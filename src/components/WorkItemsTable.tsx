@@ -10,7 +10,7 @@ import {
   type EquipmentFilter,
   type EquipmentImage,
   type EquipmentNote,
-  type StatusWorkflowRule,
+  type WorkflowTransition,
   type UpdateEquipmentRequest,
   type WorkItemEquipmentSummary,
   type WorkItemResponse,
@@ -54,7 +54,7 @@ interface Props {
   workOrderId: string;
   workItems: WorkItemResponse[];
   statuses: WorkItemStatus[];
-  workflows: StatusWorkflowRule[];
+  transitions: WorkflowTransition[];
   enforceWorkflow: boolean;
   readOnly?: boolean;
   /** When provided, each row gets a per-row menu with an Edit option. Also
@@ -106,7 +106,7 @@ export default function WorkItemsTable({
   workOrderId,
   workItems,
   statuses,
-  workflows,
+  transitions,
   enforceWorkflow,
   readOnly = false,
   onEdit,
@@ -273,7 +273,7 @@ export default function WorkItemsTable({
                   workOrderId={workOrderId}
                   workItem={wi}
                   statuses={statuses}
-                  workflows={workflows}
+                  transitions={transitions}
                   enforceWorkflow={enforceWorkflow}
                   readOnly={readOnly}
                 />

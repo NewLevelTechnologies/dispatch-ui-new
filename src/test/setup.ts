@@ -1641,6 +1641,85 @@ vi.mock('react-i18next', () => {
     'workOrders.activity.loadMore': 'Load more',
     'workOrders.activity.loading': 'Loading activity…',
     'workOrders.activity.systemActor': 'System',
+
+    'common.builtIn': 'Built-in',
+    'settings.nav.workflows': 'Workflows',
+    'settings.workflows.title': 'Workflows',
+    'settings.workflows.subtitle':
+      'One workflow per work order type · defines the allowed status transitions',
+    'settings.workflows.backToList': 'Workflows',
+    'settings.workflows.couldNotLoad': "Couldn't load workflows",
+    'settings.workflows.emptyTitle': 'No workflows yet',
+    'settings.workflows.emptyDescription':
+      'Workflows are created automatically when you add a work order type.',
+    'settings.workflows.resetToDefault': 'Reset to default',
+    'settings.workflows.onlyBuiltInResettable': 'Only built-in workflows can be reset.',
+    'settings.workflows.resetSuccess': '{{name}} workflow restored to defaults',
+    'settings.workflows.resetSuccessGeneric': 'Workflow restored to defaults',
+    'settings.workflows.resetError': "Couldn't reset the workflow",
+    'settings.workflows.resetConfirm.title': 'Reset {{name}} workflow to default?',
+    'settings.workflows.resetConfirm.body':
+      'Current transitions and approval gates will be replaced with the built-in defaults. Pending approval requests are left untouched.',
+    'settings.workflows.enforcement.title': 'Enforcement',
+    'settings.workflows.enforcement.open': 'Open',
+    'settings.workflows.enforcement.strict': 'Strict',
+    'settings.workflows.enforcement.openDescription':
+      'Items can transition to any status. Workflows below are suggestions only. Switch to Strict to enforce defined transitions.',
+    'settings.workflows.enforcement.strictDescription':
+      'Items can only transition along defined paths. Undefined transitions return an error. System actions (dispatch events) bypass enforcement.',
+    'settings.workflows.enforcement.saved': 'Enforcement mode updated',
+    'settings.workflows.enforcement.saveError': "Couldn't update enforcement mode",
+    'settings.workflows.row.transitionCount': '{{count}} transitions',
+    'settings.workflows.row.transitionCount_one': '{{count}} transition',
+    'settings.workflows.row.transitionCount_other': '{{count}} transitions',
+    'settings.workflows.row.approvalCount': '{{count}} approval gates',
+    'settings.workflows.row.approvalCount_one': '{{count}} approval gate',
+    'settings.workflows.row.approvalCount_other': '{{count}} approval gates',
+    'settings.workflows.editor.subtitle':
+      "Click a cell to toggle whether items in the row status can transition to the column status. System actions (dispatch creation, completion, cancellation) also drive automatic changes — those don't appear in the matrix.",
+    'settings.workflows.editor.noStatuses':
+      'No statuses available. Create item statuses first to define a workflow.',
+    'settings.workflows.cellAria': '{{from}} to {{to}}: {{state}}',
+    'settings.workflows.cellState.allowed': 'allowed',
+    'settings.workflows.cellState.allowedWithApproval': 'allowed (requires approval)',
+    'settings.workflows.cellState.notAllowed': 'not allowed',
+    'settings.workflows.legend.allowed': 'Allowed',
+    'settings.workflows.legend.allowedWithApproval': 'Requires approval',
+    'settings.workflows.transitionSummary':
+      '{{count}} transitions · {{approvals}} approval gates',
+    'settings.workflows.transitionSummary_zero': 'No transitions defined',
+    'settings.workflows.transitionSummary_one':
+      '1 transition · {{approvals}} approval gates',
+    'settings.workflows.transitionSummary_other':
+      '{{count}} transitions · {{approvals}} approval gates',
+    'settings.workflows.panel.editTransition': 'Edit transition',
+    'settings.workflows.panel.allowed': 'Allow this transition',
+    'settings.workflows.panel.allowedHint':
+      'When on, items in {{from}} can be moved to {{to}}.',
+    'settings.workflows.panel.requiresApproval': 'Require approval',
+    'settings.workflows.panel.requiresApprovalHint':
+      'When on, the transition is held in an Awaiting Approval state until an approver acts.',
+    'settings.workflows.panel.approverCapabilities': 'Approver capabilities',
+    'settings.workflows.panel.approverCapabilitiesHint':
+      'Users holding any of these capabilities can approve. Approvers are notified when a request is created.',
+    'settings.workflows.panel.noApproverCapabilities':
+      'No approver capabilities are defined yet. Configure capabilities in Access settings first.',
+    'settings.workflows.panel.atLeastOneCapability':
+      'Pick at least one approver capability.',
+    'settings.workflows.panel.expiryHours': 'Expiry (hours)',
+    'settings.workflows.panel.expiryHoursHint':
+      'Leave blank to use the tenant default ({{default}}h)',
+    'settings.workflows.panel.expiryRange': 'Enter a value between 1 and 720.',
+    'settings.workflows.panel.deleteTransition': 'Delete transition',
+    'settings.workflows.panel.deleteConfirmTitle':
+      'Delete transition {{from}} → {{to}}?',
+    'settings.workflows.panel.deleteConfirmBody':
+      'This transition will be removed from the workflow. Items currently in transit are unaffected.',
+    'settings.workflows.panel.saveError': "Couldn't save the transition",
+    'settings.workflows.panel.deleteError': "Couldn't delete the transition",
+    'settings.workflows.panel.savedCreate': 'Transition added',
+    'settings.workflows.panel.savedUpdate': 'Transition updated',
+    'settings.workflows.panel.savedDelete': 'Transition removed',
   };
 
   return {
