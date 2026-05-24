@@ -39,7 +39,6 @@ const seededWorkflow = {
     accentId: 'blue',
   },
   name: 'Service Call workflow',
-  description: null,
   initialStatusId: 's-new',
   isSeeded: true,
   transitionCount: 1,

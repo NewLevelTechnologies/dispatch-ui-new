@@ -52,7 +52,6 @@ const workflow = (transitions: WorkflowTransition[]): Workflow => ({
   workOrderTypeId: 'type-1',
   workOrderType: { id: 'type-1', name: 'Service Call', code: 'SERVICE', accentId: 'blue' },
   name: 'Service Call workflow',
-  description: null,
   initialStatusId: 's-new',
   isSeeded: true,
   transitionCount: transitions.length,

@@ -65,9 +65,6 @@ function WorkflowRow({ workflow, canEdit, onOpen, onReset }: WorkflowRowProps) {
             <Pill tone="neutral" inline>{t('common.builtIn')}</Pill>
           )}
         </div>
-        {workflow.description && (
-          <Text size="xs" tone="muted" className="mt-0.5">{workflow.description}</Text>
-        )}
       </div>
       <Text size="xs" tone="muted" as="span" className="tabular-nums">
         {t('settings.workflows.row.transitionCount', { count: workflow.transitionCount })}
