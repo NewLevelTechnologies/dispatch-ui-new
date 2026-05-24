@@ -115,34 +115,76 @@ export interface UpdateWorkItemStatusRequest {
   sortOrder?: number;
 }
 
-// ===== Status Workflow =====
-export interface StatusWorkflowRule {
+// ===== Workflow (per-WOType transition graph) =====
+// The container for an ordered transition graph keyed to a single
+// work_order_type. Seeded workflows ship one per built-in WOType; tenant
+// customizations land in the same row (no parallel "draft" workflow).
+// `transitionCount` / `approvalGateCount` come from the list envelope so
+// the row UI can summarize without fetching transitions[].
+export interface WorkflowSummary {
   id: string;
   tenantId: string;
-  fromStatusId: string;
-  toStatusId: string;
-  isAllowed: boolean;
-  requiresApproval: boolean;
-  approvalRole?: string | null;
+  workOrderTypeId: string;
+  workOrderType: {
+    id: string;
+    name: string;
+    code: string;
+    accentId: string;
+  };
+  name: string;
+  description?: string | null;
+  initialStatusId?: string | null;
+  isSeeded: boolean;
+  transitionCount: number;
+  approvalGateCount: number;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreateStatusWorkflowRequest {
+export interface WorkflowTransition {
+  id: string;
+  tenantId: string;
+  workflowId: string;
   fromStatusId: string;
   toStatusId: string;
-  isAllowed?: boolean;
+  requiresApproval: boolean;
+  approverCapabilities: string[];
+  approvalExpiryHours?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Workflow extends WorkflowSummary {
+  transitions: WorkflowTransition[];
+}
+
+export interface CreateWorkflowTransitionRequest {
+  fromStatusId: string;
+  toStatusId: string;
   requiresApproval?: boolean;
-  approvalRole?: string | null;
+  approverCapabilities?: string[];
+  approvalExpiryHours?: number | null;
+}
+
+export interface UpdateWorkflowTransitionRequest {
+  requiresApproval?: boolean;
+  approverCapabilities?: string[];
+  approvalExpiryHours?: number | null;
 }
 
 // ===== Workflow Config (per-tenant settings) =====
+// `enforcementMode` replaced the old `enforceStatusWorkflow` boolean — OPEN
+// lets work items transition freely, STRICT enforces the per-WOType workflow
+// transition graph (and 422s undefined moves). `defaultApprovalExpiryHours`
+// is the tenant-wide fallback when a transition doesn't specify its own.
 export type DispatchBoardType = 'STATUS_BASED' | 'SCHEDULE_BASED';
+export type EnforcementMode = 'OPEN' | 'STRICT';
 
 export interface WorkflowConfig {
   id: string;
   tenantId: string;
-  enforceStatusWorkflow: boolean;
+  enforcementMode: EnforcementMode;
+  defaultApprovalExpiryHours: number;
   defaultWorkOrderTypeId?: string | null;
   defaultWorkItemStatusId?: string | null;
   dispatchBoardType: DispatchBoardType;
@@ -151,7 +193,8 @@ export interface WorkflowConfig {
 }
 
 export interface UpdateWorkflowConfigRequest {
-  enforceStatusWorkflow?: boolean;
+  enforcementMode?: EnforcementMode;
+  defaultApprovalExpiryHours?: number;
   defaultWorkOrderTypeId?: string | null;
   defaultWorkItemStatusId?: string | null;
   dispatchBoardType?: DispatchBoardType;
@@ -264,18 +307,48 @@ export const workItemStatusesApi = {
   },
 };
 
-// ===== Status Workflows =====
-export const statusWorkflowsApi = {
-  getAll: async (): Promise<StatusWorkflowRule[]> => {
-    const response = await apiClient.get<StatusWorkflowRule[]>(`${BASE}/status-workflows`);
+// ===== Workflows (per-WOType transition graphs) =====
+// Replaces the flat statusWorkflowsApi. One Workflow per (tenant, WOType);
+// transitions are nested under their workflow. `resetToDefault` is only
+// valid against seeded workflows — server returns 422 on custom ones.
+export const workflowsApi = {
+  getAll: async (): Promise<WorkflowSummary[]> => {
+    const response = await apiClient.get<WorkflowSummary[]>(`${BASE}/workflows`);
     return response.data;
   },
-  create: async (request: CreateStatusWorkflowRequest): Promise<StatusWorkflowRule> => {
-    const response = await apiClient.post<StatusWorkflowRule>(`${BASE}/status-workflows`, request);
+  getById: async (id: string): Promise<Workflow> => {
+    const response = await apiClient.get<Workflow>(`${BASE}/workflows/${id}`);
     return response.data;
   },
-  delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`${BASE}/status-workflows/${id}`);
+  createTransition: async (
+    workflowId: string,
+    request: CreateWorkflowTransitionRequest,
+  ): Promise<WorkflowTransition> => {
+    const response = await apiClient.post<WorkflowTransition>(
+      `${BASE}/workflows/${workflowId}/transitions`,
+      request,
+    );
+    return response.data;
+  },
+  updateTransition: async (
+    workflowId: string,
+    transitionId: string,
+    request: UpdateWorkflowTransitionRequest,
+  ): Promise<WorkflowTransition> => {
+    const response = await apiClient.patch<WorkflowTransition>(
+      `${BASE}/workflows/${workflowId}/transitions/${transitionId}`,
+      request,
+    );
+    return response.data;
+  },
+  deleteTransition: async (workflowId: string, transitionId: string): Promise<void> => {
+    await apiClient.delete(`${BASE}/workflows/${workflowId}/transitions/${transitionId}`);
+  },
+  resetToDefault: async (workflowId: string): Promise<Workflow> => {
+    const response = await apiClient.post<Workflow>(
+      `${BASE}/workflows/${workflowId}/reset-to-default`,
+    );
+    return response.data;
   },
 };
 

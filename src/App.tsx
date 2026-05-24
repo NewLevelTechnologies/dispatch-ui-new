@@ -43,8 +43,8 @@ import DispatchRegionsPanel from './pages/settings/DispatchRegionsPanel';
 import WorkOrderTypesPanel from './pages/settings/work-orders/WorkOrderTypesPanel';
 import DivisionsPanel from './pages/settings/work-orders/DivisionsPanel';
 import ItemStatusesPanel from './pages/settings/work-orders/ItemStatusesPanel';
-import StatusWorkflowsPanel from './pages/settings/work-orders/StatusWorkflowsPanel';
-import WorkflowConfigPanel from './pages/settings/work-orders/WorkflowConfigPanel';
+import WorkflowsPage from './pages/settings/work-orders/WorkflowsPage';
+import WorkflowEditorPage from './pages/settings/work-orders/WorkflowEditorPage';
 import EquipmentTaxonomyPage from './pages/settings/equipment/EquipmentTaxonomyPage';
 import FilterSizesPanel from './pages/settings/equipment/FilterSizesPanel';
 import AccountSettingsPage from './pages/AccountSettingsPage';
@@ -194,8 +194,16 @@ function App() {
         <Route path="work-orders/types" element={<WorkOrderTypesPanel />} />
         <Route path="work-orders/divisions" element={<DivisionsPanel />} />
         <Route path="work-orders/item-statuses" element={<ItemStatusesPanel />} />
-        <Route path="work-orders/status-workflows" element={<StatusWorkflowsPanel />} />
-        <Route path="work-orders/workflow-config" element={<WorkflowConfigPanel />} />
+        <Route path="work-orders/workflows" element={<WorkflowsPage />} />
+        <Route path="work-orders/workflows/:id" element={<WorkflowEditorPage />} />
+        <Route
+          path="work-orders/status-workflows"
+          element={<Navigate to="/settings/work-orders/workflows" replace />}
+        />
+        <Route
+          path="work-orders/workflow-config"
+          element={<Navigate to="/settings/work-orders/workflows" replace />}
+        />
         <Route path="equipment/types" element={<EquipmentTaxonomyPage />} />
         <Route
           path="equipment/categories"

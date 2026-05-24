@@ -48,8 +48,7 @@ export default function SettingsLayout() {
         { label: t('settings.nav.types'), to: '/settings/work-orders/types' },
         { label: getName('division', true), to: '/settings/work-orders/divisions' },
         { label: t('settings.nav.itemStatuses'), to: '/settings/work-orders/item-statuses' },
-        { label: t('settings.nav.statusWorkflows'), to: '/settings/work-orders/status-workflows' },
-        { label: t('settings.nav.workflowConfig'), to: '/settings/work-orders/workflow-config' },
+        { label: t('settings.nav.workflows'), to: '/settings/work-orders/workflows' },
       ],
     },
     {

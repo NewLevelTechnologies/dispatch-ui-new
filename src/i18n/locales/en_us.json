@@ -43,6 +43,7 @@
     },
     "active": "Active",
     "add": "Add",
+    "builtIn": "Built-in",
     "cancel": "Cancel",
     "close": "Close",
     "cloning": "Cloning...",
@@ -1356,10 +1357,9 @@
       "itemStatuses": "Item Statuses",
       "modulesFeatures": "Modules & Features",
       "notificationTemplates": "Notification Templates",
-      "statusWorkflows": "Status Workflows",
       "terminology": "Terminology",
       "types": "Types",
-      "workflowConfig": "Workflow Config"
+      "workflows": "Workflows"
     },
     "planned": "Planned",
     "resetDefaults": "Reset to defaults",
@@ -1378,13 +1378,6 @@
       "default": "default",
       "description": "Customize how entity names appear throughout the app and on customer-facing documents. Leave a field blank to use the default shown in the placeholder.",
       "title": "Terminology"
-    },
-    "statusWorkflows": {
-      "addRule": "Add Transition",
-      "description": "Define which status transitions are allowed. Only enforced when 'Enforce Workflow' is enabled in Workflow Config.",
-      "empty": "No transition rules defined. Without rules, all transitions are allowed (or all blocked, depending on enforcement).",
-      "from": "From",
-      "to": "To"
     },
     "taxonomy": {
       "codeHelper": "Stable identifier. UPPERCASE_WITH_UNDERSCORES. Auto-generated from name.",
@@ -1450,25 +1443,76 @@
       "singular": "Type",
       "subtitle": "{{count}} types · used to classify {{workOrder, lowercase}}s in lists, the dispatch board, and reports"
     },
-    "workflowConfig": {
-      "behavior": "Behavior",
-      "boardTypeHelper": "Choose how the dispatch board groups work — by current status or by scheduled time.",
-      "defaultItemStatus": "Default Item Status",
-      "defaultStatusHelper": "Starting status applied to newly created work items.",
-      "defaultTypeHelper": "Pre-selected on the create work order form.",
-      "defaultWorkOrderType": "Default {{workOrder}} Type",
-      "defaults": "Defaults",
-      "description": "Tenant-wide rules that govern how work moves through the system.",
-      "descriptionLong": "Tenant-wide rules that govern how work moves through the system. Changes here affect every work order — new and existing.",
-      "dispatchBoardType": "{{dispatch}} Board Type",
-      "enforce": "Enforce Status Workflow",
-      "enforceHelper": "When enabled, only transitions defined in Status Workflows are allowed. Recommended for teams with strict QA gates.",
-      "errorLoad": "Failed to load workflow config.",
-      "errorSave": "Failed to update workflow config",
-      "lastSaved": "Last saved {{when}}",
-      "noneOption": "None",
-      "scheduleBased": "Schedule-based",
-      "statusBased": "Status-based"
+    "workflows": {
+      "backToList": "Workflows",
+      "cellAria": "{{from}} to {{to}}: {{state}}",
+      "cellState": {
+        "allowed": "allowed",
+        "allowedWithApproval": "allowed (requires approval)",
+        "notAllowed": "not allowed"
+      },
+      "couldNotLoad": "Couldn't load workflows",
+      "editor": {
+        "noStatuses": "No statuses available. Create item statuses first to define a workflow.",
+        "subtitle": "Click a cell to toggle whether items in the row status can transition to the column status. System actions (dispatch creation, completion, cancellation) also drive automatic changes — those don't appear in the matrix."
+      },
+      "emptyDescription": "Workflows are created automatically when you add a work order type.",
+      "emptyTitle": "No workflows yet",
+      "enforcement": {
+        "open": "Open",
+        "openDescription": "Items can transition to any status. Workflows below are suggestions only. Switch to Strict to enforce defined transitions.",
+        "saved": "Enforcement mode updated",
+        "saveError": "Couldn't update enforcement mode",
+        "strict": "Strict",
+        "strictDescription": "Items can only transition along defined paths. Undefined transitions return an error. System actions (dispatch events) bypass enforcement.",
+        "title": "Enforcement"
+      },
+      "legend": {
+        "allowed": "Allowed",
+        "allowedWithApproval": "Requires approval"
+      },
+      "onlyBuiltInResettable": "Only built-in workflows can be reset.",
+      "panel": {
+        "allowed": "Allow this transition",
+        "allowedHint": "When on, items in {{from}} can be moved to {{to}}.",
+        "approverCapabilities": "Approver capabilities",
+        "approverCapabilitiesHint": "Users holding any of these capabilities can approve. Approvers are notified when a request is created.",
+        "atLeastOneCapability": "Pick at least one approver capability.",
+        "deleteConfirmBody": "This transition will be removed from the workflow. Items currently in transit are unaffected.",
+        "deleteConfirmTitle": "Delete transition {{from}} → {{to}}?",
+        "deleteError": "Couldn't delete the transition",
+        "deleteTransition": "Delete transition",
+        "editTransition": "Edit transition",
+        "expiryHours": "Expiry (hours)",
+        "expiryHoursHint": "Leave blank to use the tenant default ({{default}}h)",
+        "expiryRange": "Enter a value between 1 and 720.",
+        "noApproverCapabilities": "No approver capabilities are defined yet. Configure capabilities in Access settings first.",
+        "requiresApproval": "Require approval",
+        "requiresApprovalHint": "When on, the transition is held in an Awaiting Approval state until an approver acts.",
+        "saveError": "Couldn't save the transition",
+        "savedCreate": "Transition added",
+        "savedDelete": "Transition removed",
+        "savedUpdate": "Transition updated"
+      },
+      "resetConfirm": {
+        "body": "Current transitions and approval gates will be replaced with the built-in defaults. Pending approval requests are left untouched.",
+        "title": "Reset {{name}} workflow to default?"
+      },
+      "resetError": "Couldn't reset the workflow",
+      "resetSuccess": "{{name}} workflow restored to defaults",
+      "resetSuccessGeneric": "Workflow restored to defaults",
+      "resetToDefault": "Reset to default",
+      "row": {
+        "approvalCount_one": "{{count}} approval gate",
+        "approvalCount_other": "{{count}} approval gates",
+        "transitionCount_one": "{{count}} transition",
+        "transitionCount_other": "{{count}} transitions"
+      },
+      "subtitle": "One workflow per work order type · defines the allowed status transitions",
+      "title": "Workflows",
+      "transitionSummary_one": "1 transition · {{approvals}} approval gates",
+      "transitionSummary_other": "{{count}} transitions · {{approvals}} approval gates",
+      "transitionSummary_zero": "No transitions defined"
     }
   },
   "tenantSettings": {

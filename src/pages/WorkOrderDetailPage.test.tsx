@@ -87,12 +87,37 @@ describe('WorkOrderDetailPage', () => {
       if (url.includes('/work-orders/config/item-statuses')) {
         return Promise.resolve({ data: [] });
       }
-      if (url.includes('/work-orders/config/status-workflows')) {
+      if (url.match(/\/work-orders\/config\/workflows\/[^/]+$/)) {
+        return Promise.resolve({
+          data: {
+            id: 'wf-1',
+            tenantId: 't',
+            workOrderTypeId: 'type-1',
+            workOrderType: { id: 'type-1', name: 'HVAC Service', code: 'HVAC', accentId: 'blue' },
+            name: 'HVAC Service workflow',
+            isSeeded: true,
+            transitionCount: 0,
+            approvalGateCount: 0,
+            transitions: [],
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          },
+        });
+      }
+      if (url.endsWith('/work-orders/config/workflows')) {
         return Promise.resolve({ data: [] });
       }
-      if (url.includes('/work-orders/config/workflow')) {
+      if (url.endsWith('/work-orders/config/workflow')) {
         return Promise.resolve({
-          data: { enforceStatusWorkflow: false, dispatchBoardType: 'STATUS_BASED' },
+          data: {
+            id: 'cfg-1',
+            tenantId: 't',
+            enforcementMode: 'OPEN',
+            defaultApprovalExpiryHours: 72,
+            dispatchBoardType: 'STATUS_BASED',
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          },
         });
       }
       if (url.includes('/scheduling/dispatches')) {
