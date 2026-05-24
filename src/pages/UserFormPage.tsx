@@ -1,7 +1,7 @@
 /* eslint-disable i18next/no-literal-string -- dense v1.5 visual form; key strings are wrapped via t() but inline glyphs/separators/labels are kept as literals to keep the form markup readable */
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { PatternFormat } from 'react-number-format';
@@ -79,18 +79,27 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
   }, [existingUser, isInvite]);
 
   // Live "effective capabilities" — union of capability lists across
-  // every selected role, grouped by feature area. Memoized off the
-  // role list so toggling a checkbox doesn't recompute when nothing
-  // structural changed. The grid shows ROLE_CAPS per-role; the form
-  // computes the union for the live summary line in the footer.
+  // every selected role. The /users/roles list response ships only
+  // `capabilityCount`, not the full capability arrays, so we fetch each
+  // selected role's detail (which does include `capabilities`) via
+  // useQueries. React Query caches per-role, so toggling a previously-
+  // loaded role recomputes the union with no network round-trip.
+  const selectedRoleDetailQueries = useQueries({
+    queries: formData.roleIds.map((roleId) => ({
+      queryKey: ['users', 'roles', roleId],
+      queryFn: () => userApi.getRoleById(roleId),
+      staleTime: 5 * 60 * 1000,
+    })),
+  });
+
   const effective = useMemo(() => {
     const selected = roles.filter((r) => formData.roleIds.includes(r.id));
     const all = new Set<string>();
-    for (const r of selected) {
-      for (const c of r.capabilities ?? []) all.add(c);
+    for (const q of selectedRoleDetailQueries) {
+      for (const c of q.data?.capabilities ?? []) all.add(c);
     }
     return { count: all.size, set: all, roles: selected };
-  }, [roles, formData.roleIds]);
+  }, [roles, formData.roleIds, selectedRoleDetailQueries]);
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -481,7 +490,7 @@ function RoleMultiSelect({
         >
           {displayed.map((role) => {
             const on = selected.includes(role.id);
-            const capCount = role.capabilities?.length ?? 0;
+            const capCount = role.capabilityCount ?? role.capabilities?.length ?? 0;
             const color = roleAccentFromRole(role);
             return (
               // Native <label> wrapping a Catalyst Checkbox — the browser
