@@ -14,8 +14,8 @@ const mockStatuses = [
     code: 'NEW',
     statusCategory: 'NOT_STARTED' as const,
     isTerminal: false,
-    description: null,
-    color: '#9CA3AF',
+    isSeeded: true,
+    accentId: 'blue',
     icon: null,
     isActive: true,
     sortOrder: 0,
@@ -29,8 +29,8 @@ const mockStatuses = [
     code: 'IN_PROGRESS',
     statusCategory: 'IN_PROGRESS' as const,
     isTerminal: false,
-    description: null,
-    color: '#3B82F6',
+    isSeeded: true,
+    accentId: 'amber',
     icon: null,
     isActive: true,
     sortOrder: 1,
@@ -40,15 +40,45 @@ const mockStatuses = [
   {
     id: 'st-3',
     tenantId: 't-1',
+    name: 'Parts Arrived',
+    code: 'PARTS_ARRIVED',
+    statusCategory: 'AWAITING_SCHEDULE' as const,
+    isTerminal: false,
+    isSeeded: true,
+    accentId: 'green',
+    icon: null,
+    isActive: true,
+    sortOrder: 2,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+  },
+  {
+    id: 'st-4',
+    tenantId: 't-1',
+    name: 'Tenant Custom',
+    code: 'CUSTOM_STATE',
+    statusCategory: 'BLOCKED' as const,
+    isTerminal: false,
+    isSeeded: false,
+    accentId: 'coral',
+    icon: null,
+    isActive: true,
+    sortOrder: 3,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+  },
+  {
+    id: 'st-5',
+    tenantId: 't-1',
     name: 'Complete',
     code: 'COMPLETE',
     statusCategory: 'COMPLETED' as const,
     isTerminal: true,
-    description: null,
-    color: '#10B981',
+    isSeeded: true,
+    accentId: 'green',
     icon: null,
     isActive: true,
-    sortOrder: 2,
+    sortOrder: 4,
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
   },
@@ -60,36 +90,50 @@ describe('ItemStatusesPanel', () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockStatuses });
   });
 
-  it('renders statuses with category badges', async () => {
+  it('renders statuses with category pills', async () => {
     renderWithProviders(<ItemStatusesPanel />);
 
     await waitFor(() => expect(screen.getByText('New')).toBeInTheDocument());
     expect(screen.getByText('Complete')).toBeInTheDocument();
-    // "In Progress" appears twice (name + category badge label)
-    expect(screen.getAllByText('In Progress').length).toBe(2);
+    expect(screen.getByText('Parts Arrived')).toBeInTheDocument();
+    // Category label for the new AWAITING_SCHEDULE category is present
+    expect(screen.getByText('Awaiting Schedule')).toBeInTheDocument();
     expect(screen.getByText('Not Started')).toBeInTheDocument();
     expect(screen.getByText('Completed')).toBeInTheDocument();
   });
 
-  it('shows Enabled marker for terminal statuses', async () => {
+  it('shows the Terminal badge for terminal statuses', async () => {
     renderWithProviders(<ItemStatusesPanel />);
 
     await waitFor(() => expect(screen.getByText('Complete')).toBeInTheDocument());
 
     const completeRow = screen.getByText('Complete').closest('tr')!;
-    expect(within(completeRow).getByText('Enabled')).toBeInTheDocument();
+    expect(within(completeRow).getByText('Terminal')).toBeInTheDocument();
   });
 
-  it('renders empty state', async () => {
+  it('shows the Built-in badge for seeded statuses', async () => {
+    renderWithProviders(<ItemStatusesPanel />);
+
+    await waitFor(() => expect(screen.getByText('New')).toBeInTheDocument());
+
+    const seededRow = screen.getByText('New').closest('tr')!;
+    expect(within(seededRow).getByText('Built-in')).toBeInTheDocument();
+
+    // The tenant-custom row should NOT carry the Built-in pill.
+    const customRow = screen.getByText('Tenant Custom').closest('tr')!;
+    expect(within(customRow).queryByText('Built-in')).not.toBeInTheDocument();
+  });
+
+  it('renders empty state when the API returns no statuses', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
     renderWithProviders(<ItemStatusesPanel />);
 
     await waitFor(() => {
-      expect(screen.getByText(/no.*item statuses.*found/i)).toBeInTheDocument();
+      expect(screen.getByText(/no.*statuses yet/i)).toBeInTheDocument();
     });
   });
 
-  it('surfaces API error message on load failure', async () => {
+  it('surfaces the API error message on load failure', async () => {
     const error = Object.assign(new Error('fail'), {
       response: { data: { message: 'Backend unavailable' } },
     });
@@ -102,7 +146,7 @@ describe('ItemStatusesPanel', () => {
     });
   });
 
-  it('opens create dialog with category dropdown and terminal toggle', async () => {
+  it('opens the create dialog with category select and terminal toggle', async () => {
     const user = userEvent.setup();
     renderWithProviders(<ItemStatusesPanel />);
 
@@ -113,9 +157,11 @@ describe('ItemStatusesPanel', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByLabelText(/category/i)).toBeInTheDocument();
     expect(within(dialog).getByLabelText(/terminal/i)).toBeInTheDocument();
+    // No more freeform "description" or hex color picker in the new dialog.
+    expect(within(dialog).queryByLabelText(/description/i)).not.toBeInTheDocument();
   });
 
-  it('submits create with auto-assigned sortOrder', async () => {
+  it('submits create with auto-assigned sortOrder and accentId', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.post).mockResolvedValue({ data: mockStatuses[0] });
 
@@ -127,7 +173,7 @@ describe('ItemStatusesPanel', () => {
     const dialog = await screen.findByRole('dialog');
 
     await user.type(within(dialog).getByLabelText(/name/i), 'Pending Parts');
-    await user.click(within(dialog).getByRole('button', { name: /^create$/i }));
+    await user.click(within(dialog).getByRole('button', { name: /^create status$/i }));
 
     await waitFor(() => {
       expect(apiClient.post).toHaveBeenCalledWith(
@@ -135,20 +181,21 @@ describe('ItemStatusesPanel', () => {
         expect.objectContaining({
           name: 'Pending Parts',
           code: 'PENDING_PARTS',
-          sortOrder: 3, // max(0,1,2) + 1
+          sortOrder: 5, // max(0..4) + 1
           statusCategory: 'NOT_STARTED',
           isTerminal: false,
+          accentId: 'blue', // first swatch is the default
         })
       );
     });
   });
 
-  it('disables code field when editing existing status', async () => {
+  it('disables the code field when editing a seeded status', async () => {
     const user = userEvent.setup();
     renderWithProviders(<ItemStatusesPanel />);
 
-    // Find the row by the unique status code (codes are unique; status names may collide
-    // with category labels, e.g. "In Progress").
+    // Find the row by the unique code (names like "In Progress" also appear
+    // in the category column).
     await waitFor(() => expect(screen.getByText('IN_PROGRESS')).toBeInTheDocument());
 
     const row = screen.getByText('IN_PROGRESS').closest('tr')!;
@@ -160,6 +207,32 @@ describe('ItemStatusesPanel', () => {
     expect(within(dialog).getByLabelText(/name/i)).toHaveValue('In Progress');
   });
 
+  it('leaves the code field editable for a tenant-created status', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ItemStatusesPanel />);
+
+    await waitFor(() => expect(screen.getByText('CUSTOM_STATE')).toBeInTheDocument());
+
+    const row = screen.getByText('CUSTOM_STATE').closest('tr')!;
+    await user.click(within(row).getByRole('button', { name: /more options/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /^edit$/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText(/code/i)).not.toBeDisabled();
+  });
+
+  it('disables Delete on seeded statuses', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ItemStatusesPanel />);
+
+    await waitFor(() => expect(screen.getByText('NEW')).toBeInTheDocument());
+
+    const seededRow = screen.getByText('NEW').closest('tr')!;
+    await user.click(within(seededRow).getByRole('button', { name: /more options/i }));
+    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
+    expect(deleteItem).toHaveAttribute('aria-disabled', 'true');
+  });
+
   it('reorders rows via drag-and-drop, posting the new id order', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: mockStatuses });
 
@@ -167,9 +240,7 @@ describe('ItemStatusesPanel', () => {
 
     await waitFor(() => expect(screen.getByText('New')).toBeInTheDocument());
 
-    // Drag "In Progress" (st-2) onto "New" (st-1) → [st-2, st-1, st-3].
-    // Use the code column (IN_PROGRESS / NEW) to disambiguate — the name "In Progress"
-    // also appears in the category Pill column.
+    // Drag "In Progress" (st-2) onto "New" (st-1) → [st-2, st-1, st-3, st-4, st-5].
     const newRow = screen.getByText('NEW').closest('tr')!;
     const inProgressRow = screen.getByText('IN_PROGRESS').closest('tr')!;
 
@@ -190,76 +261,42 @@ describe('ItemStatusesPanel', () => {
     await waitFor(() => {
       expect(apiClient.post).toHaveBeenCalledWith(
         '/work-orders/config/item-statuses/reorder',
-        { orderedIds: ['st-2', 'st-1', 'st-3'] }
+        { orderedIds: ['st-2', 'st-1', 'st-3', 'st-4', 'st-5'] }
       );
     });
   });
 
-  it('exercises every field in the create dialog', async () => {
+  it('opens the confirm dialog when deleting a tenant-created status', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.post).mockResolvedValue({ data: mockStatuses[0] });
     renderWithProviders(<ItemStatusesPanel />);
 
-    await waitFor(() => expect(screen.getByText('New')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: /^add status$/i }));
+    await waitFor(() => expect(screen.getByText('Tenant Custom')).toBeInTheDocument());
 
-    const dialog = await screen.findByRole('dialog');
-    await user.type(within(dialog).getByLabelText(/name/i), 'Pending Parts');
-    await user.type(within(dialog).getByLabelText(/description/i), 'Waiting on parts');
-
-    // Change category dropdown
-    await user.selectOptions(within(dialog).getByLabelText(/category/i), 'BLOCKED');
-
-    // Toggle isTerminal
-    await user.click(within(dialog).getByLabelText(/terminal/i));
-
-    // Type into the color text mirror
-    const colorInputs = within(dialog).getAllByDisplayValue('#6366F1');
-    const colorText = colorInputs.find((i) => (i as HTMLInputElement).type === 'text');
-    if (colorText) {
-      await user.clear(colorText);
-      await user.type(colorText, '#FF8800');
-    }
-
-    // Manually edit the code
-    const codeInput = within(dialog).getByLabelText(/code/i);
-    await user.clear(codeInput);
-    await user.type(codeInput, 'WAITING_PARTS');
-
-    await user.click(within(dialog).getByRole('button', { name: /^create$/i }));
-
-    await waitFor(() => {
-      expect(apiClient.post).toHaveBeenCalledWith(
-        '/work-orders/config/item-statuses',
-        expect.objectContaining({
-          name: 'Pending Parts',
-          code: 'WAITING_PARTS',
-          description: 'Waiting on parts',
-          statusCategory: 'BLOCKED',
-          isTerminal: true,
-          color: '#FF8800',
-        })
-      );
-    });
-  });
-
-  it('deletes after confirmation', async () => {
-    const user = userEvent.setup();
-    vi.mocked(apiClient.delete).mockResolvedValue({ data: undefined });
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-
-    renderWithProviders(<ItemStatusesPanel />);
-
-    await waitFor(() => expect(screen.getByText('Complete')).toBeInTheDocument());
-
-    const row = screen.getByText('Complete').closest('tr')!;
+    const row = screen.getByText('Tenant Custom').closest('tr')!;
     await user.click(within(row).getByRole('button', { name: /more options/i }));
     await user.click(await screen.findByRole('menuitem', { name: /^delete$/i }));
 
-    await waitFor(() => {
-      expect(apiClient.delete).toHaveBeenCalledWith('/work-orders/config/item-statuses/st-3');
-    });
+    await screen.findByText(/delete "tenant custom"\?/i);
+  });
 
-    confirmSpy.mockRestore();
+  it('warns when the category is changed on a seeded status', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ItemStatusesPanel />);
+
+    await waitFor(() => expect(screen.getByText('NEW')).toBeInTheDocument());
+
+    const seededRow = screen.getByText('NEW').closest('tr')!;
+    await user.click(within(seededRow).getByRole('button', { name: /more options/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /^edit$/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.selectOptions(
+      within(dialog).getByLabelText(/category/i),
+      'AWAITING_SCHEDULE'
+    );
+
+    expect(
+      within(dialog).getByText(/may affect dispatch queue and progress rollups/i)
+    ).toBeInTheDocument();
   });
 });

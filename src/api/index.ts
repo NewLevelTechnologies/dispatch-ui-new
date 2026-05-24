@@ -306,6 +306,7 @@ export {
   type WorkItemStatus,
   type CreateWorkItemStatusRequest,
   type UpdateWorkItemStatusRequest,
+  type SeededRowImmutableBody,
   type StatusCategory,
   type StatusWorkflowRule,
   type CreateStatusWorkflowRequest,

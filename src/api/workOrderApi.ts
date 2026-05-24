@@ -8,10 +8,17 @@ export const LifecycleState = {
   CANCELLED: 'CANCELLED',
 } as const;
 
-export type ProgressCategory = 'NOT_STARTED' | 'IN_PROGRESS' | 'BLOCKED' | 'COMPLETED' | 'CANCELLED';
+export type ProgressCategory =
+  | 'NOT_STARTED'
+  | 'AWAITING_SCHEDULE'
+  | 'IN_PROGRESS'
+  | 'BLOCKED'
+  | 'COMPLETED'
+  | 'CANCELLED';
 
 export const ProgressCategory = {
   NOT_STARTED: 'NOT_STARTED',
+  AWAITING_SCHEDULE: 'AWAITING_SCHEDULE',
   IN_PROGRESS: 'IN_PROGRESS',
   BLOCKED: 'BLOCKED',
   COMPLETED: 'COMPLETED',

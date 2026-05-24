@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useGlossary } from '../../contexts/GlossaryContext';
 import {
   workOrderTypesApi,
   type WorkOrderType,
@@ -35,6 +36,8 @@ export default function WorkOrderTypeFormDialog({
 }: Props) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const workOrder = getName('work_order');
   const isEdit = !!item;
 
   const [name, setName] = useState('');
@@ -139,8 +142,8 @@ export default function WorkOrderTypeFormDialog({
     }
     showError(
       editing
-        ? t('settings.workOrderTypes.errorUpdate')
-        : t('settings.workOrderTypes.errorCreate'),
+        ? t('settings.workOrderTypes.errorUpdate', { workOrder })
+        : t('settings.workOrderTypes.errorCreate', { workOrder }),
       extractApiError(err)
     );
   };
@@ -161,7 +164,7 @@ export default function WorkOrderTypeFormDialog({
         <DialogTitle>
           {isEdit
             ? t('settings.workOrderTypes.form.titleEdit', { name: item.name })
-            : t('settings.workOrderTypes.form.titleAdd')}
+            : t('settings.workOrderTypes.form.titleAdd', { workOrder })}
         </DialogTitle>
         <DialogBody>
           <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-cols-[1.4fr_1fr]">
@@ -197,7 +200,7 @@ export default function WorkOrderTypeFormDialog({
               )}
               {!accentConflict && (
                 <Description size="xs">
-                  {t('settings.workOrderTypes.colorHint')}
+                  {t('settings.workOrderTypes.colorHint', { workOrder })}
                 </Description>
               )}
             </Field>
