@@ -278,6 +278,22 @@ export {
   type UpdateDispatchRegionRequest,
 } from './dispatchRegionApi';
 
+// Approvals API (workflow engine approval requests)
+export {
+  approvalsApi,
+  type ApprovalRequest,
+  type ApprovalStatus,
+  type ApprovalStatusRef,
+  type ApprovalTransitionRef,
+  type ApprovalWorkItemRef,
+  type ApprovalWorkOrderRef,
+  type ApprovalUserRef,
+  type ListApprovalsParams,
+  type ApprovalCountParams,
+  type ApproveApprovalRequest,
+  type RejectApprovalRequest,
+} from './approvalsApi';
+
 // Two-Factor Auth API
 export {
   twoFactorApi,

@@ -45,6 +45,10 @@
     "add": "Add",
     "builtIn": "Built-in",
     "cancel": "Cancel",
+    "clear": "Clear",
+    "customer": "Customer",
+    "id": "ID",
+    "serviceLocation": "Service location",
     "close": "Close",
     "cloning": "Cloning...",
     "create": "Create",
@@ -137,6 +141,75 @@
     "themeAccentWarm": "Warm",
     "update": "Update",
     "updateStatus": "Update {{entity, lowercase}} status"
+  },
+  "approvals": {
+    "title": "Approvals",
+    "subtitle": "Work item transitions waiting on your sign-off · expiries auto-reject if untouched",
+    "filteredByWorkOrder": "Filtered by work order",
+    "tabs": {
+      "pending": "Pending",
+      "myRequests": "My requests",
+      "all": "All",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "expired": "Expired"
+    },
+    "rail": {
+      "countLabel_one": "{{count}} Pending",
+      "countLabel_other": "{{count}} Pending"
+    },
+    "expiringIn": "Expires in {{time}}",
+    "detail": {
+      "header": "{{name}} requested an approval",
+      "workflowName": "{{workflow}} workflow",
+      "workOrder": "Work order",
+      "workItem": "Work item",
+      "reasonFromRequester": "Reason from requester",
+      "notApprover": "You don't have the capability to approve this transition. The request is visible here for reference.",
+      "by": "by {{name}}"
+    },
+    "action": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "reasonOptional": "Add a note (optional on approve, required on reject)",
+      "reasonRequired": "Reason required to reject",
+      "notePlaceholder": "A note to {{requesterName}} — visible in the audit log…",
+      "nextPrev": "Next / Prev"
+    },
+    "empty": {
+      "allClear": {
+        "title": "All clear",
+        "description": "No approvals waiting on you right now."
+      },
+      "noResults": {
+        "title": "No approvals match this filter",
+        "description": "Try a different tab."
+      }
+    },
+    "errors": {
+      "couldNotLoad": "Couldn't load approvals"
+    },
+    "callout": {
+      "title": "Approval pending",
+      "requestedBy": "Requested by {{name}} {{time}}",
+      "viewInQueue": "View in queue →",
+      "viewAllInQueue_other": "View all {{count}} in queue →",
+      "rejectTitle": "Reject this approval?",
+      "rejectMessage": "Provide a reason — the requester will see it in the audit log."
+    },
+    "nav": {
+      "pendingCount_one": "{{count}} pending approval",
+      "pendingCount_other": "{{count}} pending approvals",
+      "bellAria_zero": "Approvals — no pending",
+      "bellAria_one": "Approvals — 1 pending",
+      "bellAria_other": "Approvals — {{count}} pending"
+    },
+    "notifications": {
+      "approved": "Approved · {{transition}}",
+      "rejected": "Rejected · {{transition}}",
+      "errorApprove": "Couldn't approve",
+      "errorReject": "Couldn't reject"
+    }
   },
   "contacts": {
     "actions": {

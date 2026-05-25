@@ -35,6 +35,7 @@ import FinancialDrawer, { type FinancialTab } from '../components/FinancialDrawe
 import WorkItemFormDialog from '../components/WorkItemFormDialog';
 import WorkItemsTable from '../components/WorkItemsTable';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
+import WorkOrderApprovalsCallout from '../features/work-orders/WorkOrderApprovalsCallout';
 import { formatPhone } from '../utils/formatPhone';
 import { formatRelativeTime } from '../utils/formatRelativeTime';
 import { Heading } from '../components/catalyst/heading';
@@ -1048,6 +1049,12 @@ export default function WorkOrderDetailPage() {
               </div>
             );
           })()}
+        </div>
+
+        {/* Approval callout — self-contained per workflow approval engine spec.
+            Renders only when this WO has at least one pending approval. */}
+        <div className="px-4 pt-3">
+          <WorkOrderApprovalsCallout workOrderId={workOrder.id} />
         </div>
 
         {/* Body grid (§5d — right rail removed; activity is in a drawer):

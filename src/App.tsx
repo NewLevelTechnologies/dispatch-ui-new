@@ -48,6 +48,7 @@ import WorkflowEditorPage from './pages/settings/work-orders/WorkflowEditorPage'
 import EquipmentTaxonomyPage from './pages/settings/equipment/EquipmentTaxonomyPage';
 import FilterSizesPanel from './pages/settings/equipment/FilterSizesPanel';
 import AccountSettingsPage from './pages/AccountSettingsPage';
+import ApprovalsPage from './pages/ApprovalsPage';
 import PublicInvoicePage from './pages/PublicInvoicePage';
 import PublicQuotePage from './pages/PublicQuotePage';
 
@@ -179,6 +180,7 @@ function App() {
       <Route path="/availability" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AvailabilityPage />} />} />
       <Route path="/recurring-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<RecurringOrdersPage />} />} />
       <Route path="/scheduling" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<SchedulingPage />} />} />
+      <Route path="/approvals" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ApprovalsPage />} />} />
       {/* Legacy redirects: /roles moved under /settings/access */}
       <Route path="/roles" element={<Navigate to="/settings/access/roles" replace />} />
       <Route path="/roles/:id" element={<LegacyRolesRedirect />} />
