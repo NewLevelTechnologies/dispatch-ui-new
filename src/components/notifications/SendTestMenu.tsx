@@ -78,7 +78,7 @@ export function SendTestMenu({ template, draft, sampleId }: Props) {
       if (resp?.status === 403) {
         showError(
           'Recipient not allowed',
-          'Test sends are restricted to tenant users or your verified domain.'
+          'Test sends are restricted to existing tenant users.'
         );
         return;
       }
