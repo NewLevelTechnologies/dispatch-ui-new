@@ -189,6 +189,20 @@
     "errors": {
       "couldNotLoad": "Couldn't load approvals"
     },
+    "bell": {
+      "countPill_one": "{{count}} pending",
+      "countPill_other": "{{count}} pending",
+      "loading": "Loading…",
+      "notePlaceholder": "Note to requester (required to reject)…",
+      "preferences": "Preferences",
+      "requestedApproval": "requested approval",
+      "tabs": {
+        "forMe": "For me",
+        "mine": "Mine"
+      },
+      "title": "Approvals",
+      "viewAll": "View all in queue"
+    },
     "callout": {
       "title": "Approval pending",
       "requestedBy": "Requested by {{name}} {{time}}",

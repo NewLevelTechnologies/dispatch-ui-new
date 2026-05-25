@@ -36,7 +36,9 @@ import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel,
 import { useTheme } from './ThemeProvider';
 import { ToggleGroup, ToggleGroupOption } from './ui/ToggleGroup';
 import { useCurrentUser, useHasAnyCapability } from '../hooks/useCurrentUser';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { roleColor } from '../utils/roleColor';
+import ApprovalsBellPopover from './ApprovalsBellPopover';
 
 const ENV_BADGE: Record<string, { label: string; className: string }> = {
   development: { label: 'DEV', className: 'bg-warning-500/20 text-warning-500 ring-warning-500/30' },
@@ -89,6 +91,12 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
     refetchOnWindowFocus: true,
     staleTime: 30_000,
   });
+
+  // Desktop gets the peek-and-resume bell popover; mobile keeps the
+  // page-takeover behavior (the full inbox is already single-column
+  // and back-friendly on small viewports, so a popover would be more
+  // friction, not less).
+  const isDesktop = useMediaQuery('(min-width: 768px)');
 
   const envKey = (import.meta.env.VITE_ENV || '').toLowerCase();
   const envBadge = ENV_BADGE[envKey];
@@ -387,21 +395,25 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
             <span className="text-fg-dim">{t('common.search')}</span>
             <span aria-hidden className="ml-auto rounded border border-border bg-bg px-1.5 py-px font-mono text-[10px]">{'⌘K'}</span>
           </div>
-          <Link
-            to="/approvals?tab=pending"
-            aria-label={t('approvals.nav.bellAria', { count: pendingApprovalCount })}
-            className="relative grid size-8 shrink-0 place-items-center rounded-md text-fg-muted hover:bg-bg-hover hover:text-fg-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
-          >
-            <BellIcon className="size-[18px]" />
-            {pendingApprovalCount > 0 && (
-              <span
-                aria-hidden
-                className="absolute -top-px -right-px inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full border-2 border-bg bg-accent-500 px-[3px] font-mono text-[9.5px] font-bold leading-none text-white"
-              >
-                {pendingApprovalCount > 99 ? '99+' : pendingApprovalCount}
-              </span>
-            )}
-          </Link>
+          {isDesktop ? (
+            <ApprovalsBellPopover pendingCount={pendingApprovalCount} />
+          ) : (
+            <Link
+              to="/approvals?tab=pending"
+              aria-label={t('approvals.nav.bellAria', { count: pendingApprovalCount })}
+              className="relative grid size-8 shrink-0 place-items-center rounded-md text-fg-muted hover:bg-bg-hover hover:text-fg-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+            >
+              <BellIcon className="size-[18px]" />
+              {pendingApprovalCount > 0 && (
+                <span
+                  aria-hidden
+                  className="absolute -top-px -right-px inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full border-2 border-bg bg-accent-500 px-[3px] font-mono text-[9.5px] font-bold leading-none text-white"
+                >
+                  {pendingApprovalCount > 99 ? '99+' : pendingApprovalCount}
+                </span>
+              )}
+            </Link>
+          )}
         </Navbar>
       }
     >
