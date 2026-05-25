@@ -56,7 +56,12 @@
       "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
       "Bash(awk -F'|' '$4+0 < 80 {print $1, \"fn:\"$4}')",
       "Bash(npx vitest *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(awk -F'|' '{ gsub\\(/^[ ]+|[ ]+$/, \"\", $1\\); gsub\\(/^[ ]+|[ ]+$/, \"\", $4\\); printf \"%-40s %s\\\\n\", $1, $4 }')",
+      "Bash(sort -t' ' -k2 -n)",
+      "Bash(awk '-F|' '{ *)",
+      "Bash(awk -F'|' '{ print $1 \"|\" $4 }')",
+      "Bash(awk -F'|' '{ name=$1; gsub\\(/^[ ]+|[ ]+$/,\"\",name\\); fn=$4; gsub\\(/^[ ]+|[ ]+$/,\"\",fn\\); print fn \"% \" name }')"
     ]
   }
 }
