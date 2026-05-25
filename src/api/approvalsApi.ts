@@ -7,38 +7,46 @@ import apiClient from './client';
 
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
 
+// Embedded refs are tolerant of cache misses on the server side: name /
+// accentId / customerName may come back null when the upstream record has
+// been deleted or hasn't propagated through the cross-service cache yet.
+// Components that consume these fields render "Unknown" / "gray" rather
+// than crashing.
+
 export interface ApprovalStatusRef {
   id: string;
-  name: string;
-  accentId: string;
+  name: string | null;
+  accentId: string | null;
 }
 
 export interface ApprovalTransitionRef {
   id: string;
   fromStatus: ApprovalStatusRef;
   toStatus: ApprovalStatusRef;
-  workflowName: string;
-  /** Capabilities allowed to approve; embedded so the FE can decide whether
-   *  to render the inline approve/reject affordance without a second fetch. */
-  approverCapabilities?: string[];
+  workflowName: string | null;
+  /** Capabilities allowed to approve. Server fills with the generic
+   *  ['APPROVE_WORK_ITEM_TRANSITIONS'] when the underlying transition row
+   *  has no explicit list (or has been deleted), so the FE can do a pure
+   *  intersection check with the caller's caps. */
+  approverCapabilities: string[];
 }
 
 export interface ApprovalWorkItemRef {
   id: string;
-  name: string;
+  name: string | null;
 }
 
 export interface ApprovalWorkOrderRef {
   id: string;
   displayId: string;
-  customerName: string;
-  serviceLocation?: string;
+  customerName: string | null;
+  serviceLocation?: string | null;
 }
 
 export interface ApprovalUserRef {
   id: string;
-  firstName: string;
-  lastName: string;
+  firstName: string | null;
+  lastName: string | null;
   initials: string;
 }
 
@@ -53,7 +61,7 @@ export interface ApprovalRequest {
   expiresAt: string;
   reason?: string;
   respondedAt?: string;
-  respondedBy?: { id: string; firstName: string; lastName: string };
+  respondedBy?: { id: string; firstName: string | null; lastName: string | null };
   responseNote?: string;
 }
 
@@ -62,16 +70,32 @@ export interface ListApprovalsParams {
   assignedToMe?: boolean;
   requestedByMe?: boolean;
   workOrderId?: string;
+  page?: number;
+  size?: number;
 }
 
 export interface ApprovalCountParams {
   status?: ApprovalStatus | ApprovalStatus[];
   assignedToMe?: boolean;
   requestedByMe?: boolean;
+  workOrderId?: string;
 }
 
 export interface ApprovalCountResponse {
   count: number;
+}
+
+// Spring Data Page<T> envelope — same shape as GET /work-orders. The list
+// endpoint returns this; callers that don't paginate get the first page
+// flattened via `list()` and the page envelope itself via `listPage()`.
+export interface ApprovalsPage {
+  content: ApprovalRequest[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  first?: boolean;
+  last?: boolean;
 }
 
 export interface ApproveApprovalRequest {
@@ -82,9 +106,9 @@ export interface RejectApprovalRequest {
   reason: string;
 }
 
-function toQuery(params: ListApprovalsParams | ApprovalCountParams | undefined): Record<string, string | boolean> | undefined {
+function toQuery(params: ListApprovalsParams | ApprovalCountParams | undefined): Record<string, string | number | boolean> | undefined {
   if (!params) return undefined;
-  const out: Record<string, string | boolean> = {};
+  const out: Record<string, string | number | boolean> = {};
   if (params.status) {
     out.status = Array.isArray(params.status) ? params.status.join(',') : params.status;
   }
@@ -92,20 +116,29 @@ function toQuery(params: ListApprovalsParams | ApprovalCountParams | undefined):
   if (params.requestedByMe) out.requestedByMe = true;
   const wo = (params as ListApprovalsParams).workOrderId;
   if (wo) out.workOrderId = wo;
+  const p = (params as ListApprovalsParams).page;
+  if (p != null) out.page = p;
+  const s = (params as ListApprovalsParams).size;
+  if (s != null) out.size = s;
   return out;
 }
 
 export const approvalsApi = {
-  list: async (params?: ListApprovalsParams): Promise<ApprovalRequest[]> => {
-    const response = await apiClient.get<ApprovalRequest[]>('/approvals', { params: toQuery(params) });
+  listPage: async (params?: ListApprovalsParams): Promise<ApprovalsPage> => {
+    const response = await apiClient.get<ApprovalsPage>('/approvals', { params: toQuery(params) });
     return response.data;
+  },
+  // Convenience flatten for the inbox surfaces — they don't paginate
+  // through pages yet; v1 reads the first page (default size 50) and
+  // shows it. Future paging-aware callers should use listPage.
+  list: async (params?: ListApprovalsParams): Promise<ApprovalRequest[]> => {
+    const page = await approvalsApi.listPage(params);
+    return page.content;
   },
   getById: async (id: string): Promise<ApprovalRequest> => {
     const response = await apiClient.get<ApprovalRequest>(`/approvals/${id}`);
     return response.data;
   },
-  // Lightweight count for the topbar bell. Backend may not expose this yet —
-  // callers should fall back to `list(...).length` if the endpoint 404s.
   getCount: async (params?: ApprovalCountParams): Promise<number> => {
     const response = await apiClient.get<ApprovalCountResponse>('/approvals/count', {
       params: toQuery(params),

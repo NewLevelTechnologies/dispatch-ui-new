@@ -87,8 +87,16 @@ function humanDuration(iso: string): string {
   return `${d}d`;
 }
 
+// Embedded refs can come back with null name fields when the upstream
+// record has dropped out of the cross-service cache. Coalesce to a
+// readable fallback so the row / detail / toast text stays sensible.
 function requesterFullName(r: ApprovalRequest['requester']) {
-  return `${r.firstName} ${r.lastName}`.trim();
+  const full = `${r.firstName ?? ''} ${r.lastName ?? ''}`.trim();
+  return full || 'Unknown user';
+}
+
+function fallbackText(value: string | null | undefined, fallback: string) {
+  return value && value.trim() ? value : fallback;
 }
 
 // ─── Page ──────────────────────────────────────────────────────
@@ -461,7 +469,7 @@ function RequestRow({
       </div>
 
       <div className="font-mono text-[11px] text-fg-muted">
-        <Strong>{request.workOrder.displayId}</Strong> · {request.workOrder.customerName}
+        <Strong>{request.workOrder.displayId}</Strong> · {fallbackText(request.workOrder.customerName, 'Unknown customer')}
       </div>
 
       {urgent && (
@@ -562,7 +570,7 @@ function DetailPane({
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-fg-muted">
               <span>{relativeTime(request.requestedAt)}</span>
               <span className="text-fg-dim">·</span>
-              <span>{t('approvals.detail.workflowName', { workflow: request.transition.workflowName })}</span>
+              <span>{t('approvals.detail.workflowName', { workflow: fallbackText(request.transition.workflowName, 'Unknown') })}</span>
               {request.status === 'PENDING' && (
                 <>
                   <span className="text-fg-dim">·</span>
@@ -595,11 +603,17 @@ function DetailPane({
               </button>
             }
           />
-          <KVRow k={t('common.customer')} v={request.workOrder.customerName} />
+          <KVRow
+            k={t('common.customer')}
+            v={fallbackText(request.workOrder.customerName, 'Unknown customer')}
+          />
           {request.workOrder.serviceLocation && (
             <KVRow k={t('common.serviceLocation')} v={request.workOrder.serviceLocation} />
           )}
-          <KVRow k={t('approvals.detail.workItem')} v={request.workItem.name} />
+          <KVRow
+            k={t('approvals.detail.workItem')}
+            v={fallbackText(request.workItem.name, 'Unknown work item')}
+          />
         </KV>
 
         {request.reason && (
@@ -611,7 +625,7 @@ function DetailPane({
 
         {request.status === 'PENDING' && canApprove && (
           <ActionPane
-            requesterFirstName={request.requester.firstName}
+            requesterFirstName={request.requester.firstName ?? 'the requester'}
             isPending={approveMutation.isPending || rejectMutation.isPending}
             onApprove={(reason) => approveMutation.mutate({ id: request.id, reason })}
             onReject={(reason) => rejectMutation.mutate({ id: request.id, reason })}
@@ -672,7 +686,8 @@ function ReasonQuote({ children }: { children: React.ReactNode }) {
 function ResolutionPane({ request }: { request: ApprovalRequest }) {
   const { t } = useTranslation();
   const respondedByName = request.respondedBy
-    ? `${request.respondedBy.firstName} ${request.respondedBy.lastName}`.trim()
+    ? (`${request.respondedBy.firstName ?? ''} ${request.respondedBy.lastName ?? ''}`.trim() ||
+       'Unknown user')
     : null;
   const statusLabel: Record<ApprovalStatus, string> = {
     PENDING: t('approvals.tabs.pending'),

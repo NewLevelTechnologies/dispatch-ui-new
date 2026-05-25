@@ -288,6 +288,7 @@ export {
   type ApprovalWorkItemRef,
   type ApprovalWorkOrderRef,
   type ApprovalUserRef,
+  type ApprovalsPage,
   type ListApprovalsParams,
   type ApprovalCountParams,
   type ApproveApprovalRequest,

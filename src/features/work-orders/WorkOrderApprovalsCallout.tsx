@@ -111,7 +111,10 @@ export default function WorkOrderApprovalsCallout({ workOrderId }: Props) {
   const canApprove =
     approverCaps.length > 0 && approverCaps.some((cap) => userCaps.includes(cap));
 
-  const requesterName = `${primary.requester.firstName} ${primary.requester.lastName}`.trim();
+  const requesterName =
+    `${primary.requester.firstName ?? ''} ${primary.requester.lastName ?? ''}`.trim() ||
+    'Unknown user';
+  const requesterFirstNameForPlaceholder = primary.requester.firstName ?? 'the requester';
 
   return (
     <>
@@ -197,7 +200,7 @@ export default function WorkOrderApprovalsCallout({ workOrderId }: Props) {
             rows={3}
             autoFocus
             placeholder={t('approvals.action.notePlaceholder', {
-              requesterName: primary.requester.firstName,
+              requesterName: requesterFirstNameForPlaceholder,
             })}
             resizable={false}
           />
