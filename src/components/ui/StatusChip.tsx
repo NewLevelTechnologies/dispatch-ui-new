@@ -12,10 +12,14 @@
 import clsx from 'clsx';
 import { roleAccent } from '../../utils/roleColor';
 
+// Approval embeds can return null name/accentId when the upstream status
+// row has been deleted or hasn't yet propagated through the cross-service
+// cache. Render an "Unknown" label with the gray fallback dot instead of
+// crashing — the data is referentially stale, not the user's problem.
 type StatusLike = {
   id?: string;
-  name: string;
-  accentId: string;
+  name: string | null | undefined;
+  accentId: string | null | undefined;
 };
 
 type Size = 'sm' | 'lg';
@@ -30,6 +34,11 @@ export function StatusChip({
   className?: string;
 }) {
   const dotPx = size === 'lg' ? 8 : 6;
+  const label = status.name ?? 'Unknown';
+  // roleAccent falls back through the name hash when accentId is missing,
+  // and to a deterministic palette entry when both are absent. Passing
+  // empty strings keeps the function happy without TS narrowing pain.
+  const dotColor = roleAccent(status.accentId ?? null, label);
   return (
     <span
       className={clsx(
@@ -44,10 +53,10 @@ export function StatusChip({
         style={{
           width: dotPx,
           height: dotPx,
-          background: roleAccent(status.accentId, status.name),
+          background: dotColor,
         }}
       />
-      {status.name}
+      {label}
     </span>
   );
 }
