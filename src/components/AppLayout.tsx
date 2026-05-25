@@ -28,7 +28,7 @@ import {
   BellIcon,
   CheckBadgeIcon,
 } from '@heroicons/react/24/outline';
-import { approvalsApi } from '../api';
+import { approvalsApi, type ApprovalsBellSummary } from '../api';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarHeading, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
 import { Navbar } from './catalyst/navbar';
@@ -36,6 +36,7 @@ import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel,
 import { useTheme } from './ThemeProvider';
 import { ToggleGroup, ToggleGroupOption } from './ui/ToggleGroup';
 import { useCurrentUser, useHasAnyCapability } from '../hooks/useCurrentUser';
+import { useApprovalsVisible } from '../hooks/useApprovalsVisible';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { roleColor } from '../utils/roleColor';
 import ApprovalsBellPopover from './ApprovalsBellPopover';
@@ -73,24 +74,31 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
   // Permission checks for navigation visibility
   const canViewSettings = useHasAnyCapability('VIEW_SETTINGS');
 
-  // Pending approvals assigned to me — drives the sidebar badge AND the
-  // topbar bell. Polls every 60s and refetches on window focus so a
-  // newly-assigned request surfaces without a manual reload.
-  const { data: pendingApprovalCount = 0 } = useQuery({
-    queryKey: ['approvals', 'count', { assignedToMe: true, status: 'PENDING' }],
-    queryFn: async () => {
-      try {
-        return await approvalsApi.getCount({ assignedToMe: true, status: 'PENDING' });
-      } catch {
-        const list = await approvalsApi.list({ assignedToMe: true, status: 'PENDING' });
-        return list.length;
-      }
-    },
-    enabled: authStatus === 'authenticated',
-    refetchInterval: 60_000,
+  const approvalsVisible = useApprovalsVisible();
+
+  // Bell summary: pending-for-me (approver workload) + recently-resolved-
+  // mine (24h server window, requester side). Drives both the sidebar
+  // nav badge (pending-for-me only) and the topbar bell badge
+  // (pendingForMe + recentlyResolvedMine — the union of "anything for
+  // me to look at").
+  //
+  // Polls every 5 minutes — approvals are low-frequency, no reason to
+  // hammer the endpoint. `refetchIntervalInBackground: false` pauses
+  // polling when the tab is hidden; `refetchOnWindowFocus` picks up
+  // the moment the user returns. Gated on `approvalsVisible` so
+  // OPEN-mode tenants with no history don't generate background traffic.
+  const { data: bellSummary } = useQuery<ApprovalsBellSummary>({
+    queryKey: ['approvals', 'bell-summary'],
+    queryFn: () => approvalsApi.getBellSummary(),
+    enabled: authStatus === 'authenticated' && approvalsVisible,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
-    staleTime: 30_000,
   });
+
+  const pendingApprovalCount = bellSummary?.pendingForMe ?? 0;
+  const recentlyResolvedMine = bellSummary?.recentlyResolvedMine ?? 0;
+  const bellBadgeCount = pendingApprovalCount + recentlyResolvedMine;
 
   // Desktop gets the peek-and-resume bell popover; mobile keeps the
   // page-takeover behavior (the full inbox is already single-column
@@ -110,7 +118,9 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
     { name: getName('customer', true), href: '/customers', icon: UserGroupIcon },
     { name: getName('service_location', true), href: '/service-locations', icon: MapPinIcon },
     { name: getName('work_order', true), href: '/work-orders', icon: ClipboardDocumentListIcon },
-    { name: t('approvals.title'), href: '/approvals', icon: CheckBadgeIcon, badge: pendingApprovalCount },
+    ...(approvalsVisible
+      ? [{ name: t('approvals.title'), href: '/approvals', icon: CheckBadgeIcon, badge: pendingApprovalCount }]
+      : []),
   ];
 
   const equipmentNavigation = [
@@ -395,24 +405,26 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
             <span className="text-fg-dim">{t('common.search')}</span>
             <span aria-hidden className="ml-auto rounded border border-border bg-bg px-1.5 py-px font-mono text-[10px]">{'⌘K'}</span>
           </div>
-          {isDesktop ? (
-            <ApprovalsBellPopover pendingCount={pendingApprovalCount} />
-          ) : (
-            <Link
-              to="/approvals?tab=pending"
-              aria-label={t('approvals.nav.bellAria', { count: pendingApprovalCount })}
-              className="relative grid size-8 shrink-0 place-items-center rounded-md text-fg-muted hover:bg-bg-hover hover:text-fg-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
-            >
-              <BellIcon className="size-[18px]" />
-              {pendingApprovalCount > 0 && (
-                <span
-                  aria-hidden
-                  className="absolute -top-px -right-px inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full border-2 border-bg bg-accent-500 px-[3px] font-mono text-[9.5px] font-bold leading-none text-white"
-                >
-                  {pendingApprovalCount > 99 ? '99+' : pendingApprovalCount}
-                </span>
-              )}
-            </Link>
+          {approvalsVisible && (
+            isDesktop ? (
+              <ApprovalsBellPopover badgeCount={bellBadgeCount} />
+            ) : (
+              <Link
+                to="/approvals?tab=pending"
+                aria-label={t('approvals.nav.bellAria', { count: bellBadgeCount })}
+                className="relative grid size-8 shrink-0 place-items-center rounded-md text-fg-muted hover:bg-bg-hover hover:text-fg-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+              >
+                <BellIcon className="size-[18px]" />
+                {bellBadgeCount > 0 && (
+                  <span
+                    aria-hidden
+                    className="absolute -top-px -right-px inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full border-2 border-bg bg-accent-500 px-[3px] font-mono text-[9.5px] font-bold leading-none text-white"
+                  >
+                    {bellBadgeCount > 99 ? '99+' : bellBadgeCount}
+                  </span>
+                )}
+              </Link>
+            )
           )}
         </Navbar>
       }

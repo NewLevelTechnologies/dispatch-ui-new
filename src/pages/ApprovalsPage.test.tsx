@@ -73,6 +73,22 @@ let pendingList: ApprovalRequest[] = [];
 function installApiMock() {
   vi.mocked(apiClient.get).mockImplementation((url: string) => {
     if (url === '/users/me') return Promise.resolve({ data: approverUser });
+    // Workflow config — used by the relevance gate and the WO detail
+    // page. STRICT keeps the approvals surface visible in the page body.
+    if (url === '/work-orders/config/workflow') {
+      return Promise.resolve({
+        data: {
+          id: 'cfg-1',
+          tenantId: 't-1',
+          enforcementMode: 'STRICT',
+          defaultApprovalExpiryHours: 48,
+          dispatchBoardType: 'STATUS_BASED',
+          hasAnyApprovalRequests: true,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+        },
+      });
+    }
     if (url === '/work-orders/approvals' || url.startsWith('/work-orders/approvals?')) {
       return Promise.resolve({
         data: {
@@ -85,7 +101,9 @@ function installApiMock() {
       });
     }
     if (url === '/work-orders/approvals/count' || url.startsWith('/work-orders/approvals/count?')) {
-      return Promise.resolve({ data: { count: pendingList.length } });
+      return Promise.resolve({
+        data: { pendingForMe: pendingList.length, recentlyResolvedMine: 0 },
+      });
     }
     return Promise.reject(new Error(`Unmocked GET ${url}`));
   });

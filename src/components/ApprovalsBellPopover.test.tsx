@@ -53,6 +53,13 @@ function installApiMock() {
   vi.mocked(apiClient.get).mockImplementation((url: string, config?: unknown) => {
     if (url === '/work-orders/approvals') {
       const params = (config as { params?: Record<string, unknown> } | undefined)?.params ?? {};
+      // Resolved-mine list (Mine tab fetches APPROVED/REJECTED/EXPIRED
+      // separately to render the "Recently resolved" section).
+      if (typeof params.status === 'string' && params.status.includes('APPROVED')) {
+        return Promise.resolve({
+          data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 50 },
+        });
+      }
       const list = params.requestedByMe ? mineList : forMeList;
       return Promise.resolve({
         data: {
@@ -61,6 +68,16 @@ function installApiMock() {
           totalPages: list.length === 0 ? 0 : 1,
           number: 0,
           size: 50,
+        },
+      });
+    }
+    // Bell summary call — no params. Default to all-zero counts; tests
+    // that want to exercise the resolved-mine section override per-test.
+    if (url === '/work-orders/approvals/count') {
+      return Promise.resolve({
+        data: {
+          pendingForMe: 0,
+          recentlyResolvedMine: 0,
         },
       });
     }
@@ -101,7 +118,7 @@ describe('ApprovalsBellPopover', () => {
   });
 
   it('renders the bell with a count badge but no panel until clicked', () => {
-    renderWithProviders(<ApprovalsBellPopover pendingCount={3} />);
+    renderWithProviders(<ApprovalsBellPopover badgeCount={3} />);
 
     // Bell button visible; count rendered in badge.
     expect(
@@ -119,7 +136,7 @@ describe('ApprovalsBellPopover', () => {
       makeRequest('B', { firstName: 'Tanya', lastName: 'Reyes' }, { expiresInHours: 24 }),
     ];
 
-    renderWithProviders(<ApprovalsBellPopover pendingCount={2} />);
+    renderWithProviders(<ApprovalsBellPopover badgeCount={2} />);
     await openPopover();
 
     // Both rows render, sorted by expiry asc — Maria first (12h), Tanya second.
@@ -138,7 +155,7 @@ describe('ApprovalsBellPopover', () => {
       makeRequest('B', { firstName: 'Tanya', lastName: 'Reyes' }, { expiresInHours: 24 }),
     ];
 
-    renderWithProviders(<ApprovalsBellPopover pendingCount={2} />);
+    renderWithProviders(<ApprovalsBellPopover badgeCount={2} />);
     await openPopover();
 
     await screen.findByText('Maria Chen');
@@ -164,7 +181,7 @@ describe('ApprovalsBellPopover', () => {
   it('first reject click without a reason focuses the textarea and switches the placeholder hint', async () => {
     forMeList = [makeRequest('A', { firstName: 'Maria', lastName: 'Chen' })];
 
-    renderWithProviders(<ApprovalsBellPopover pendingCount={1} />);
+    renderWithProviders(<ApprovalsBellPopover badgeCount={1} />);
     await openPopover();
 
     await screen.findByText('Maria Chen');
@@ -191,7 +208,7 @@ describe('ApprovalsBellPopover', () => {
   it('rejects with a typed reason and removes the row', async () => {
     forMeList = [makeRequest('A', { firstName: 'Maria', lastName: 'Chen' })];
 
-    renderWithProviders(<ApprovalsBellPopover pendingCount={1} />);
+    renderWithProviders(<ApprovalsBellPopover badgeCount={1} />);
     await openPopover();
 
     await screen.findByText('Maria Chen');
@@ -212,7 +229,7 @@ describe('ApprovalsBellPopover', () => {
   it('shows the "all clear" empty state when no pending requests are assigned', async () => {
     forMeList = [];
 
-    renderWithProviders(<ApprovalsBellPopover pendingCount={0} />);
+    renderWithProviders(<ApprovalsBellPopover badgeCount={0} />);
     await openPopover();
 
     expect(await screen.findByText(/all clear/i)).toBeInTheDocument();
@@ -225,7 +242,7 @@ describe('ApprovalsBellPopover', () => {
     forMeList = [makeRequest('A', { firstName: 'Maria', lastName: 'Chen' })];
     mineList = [makeRequest('B', { firstName: 'Tanya', lastName: 'Reyes' })];
 
-    renderWithProviders(<ApprovalsBellPopover pendingCount={1} />);
+    renderWithProviders(<ApprovalsBellPopover badgeCount={1} />);
     await openPopover();
 
     // Default tab is "For me" — Maria is visible, Tanya isn't.

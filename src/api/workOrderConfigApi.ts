@@ -187,6 +187,11 @@ export interface WorkflowConfig {
   defaultWorkOrderTypeId?: string | null;
   defaultWorkItemStatusId?: string | null;
   dispatchBoardType: DispatchBoardType;
+  // True if the tenant has ever had an approval request created. Drives
+  // the FE's "do we surface approvals at all?" gate together with
+  // `enforcementMode`. Optional so old backends (pre-relevance-flags) keep
+  // working — treat `undefined` as false.
+  hasAnyApprovalRequests?: boolean;
   createdAt: string;
   updatedAt: string;
 }

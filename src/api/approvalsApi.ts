@@ -81,9 +81,19 @@ export interface ApprovalCountParams {
   workOrderId?: string;
 }
 
-export interface ApprovalCountResponse {
-  count: number;
+// Finalized envelope returned by GET /work-orders/approvals/count.
+// `pendingForMe` = pending approvals where the caller is in the approver
+// pool. `recentlyResolvedMine` = the caller's own requests resolved in
+// the last 24h that they haven't seen yet (server window + seen_at gate).
+export interface ApprovalsCountResponse {
+  pendingForMe: number;
+  recentlyResolvedMine: number;
 }
+
+// Re-export under the legacy name for the bell call site that wanted a
+// more descriptive type alias. Same shape — keeps the two consumers
+// (badge + Mine-tab section) intention-revealing without two types.
+export type ApprovalsBellSummary = ApprovalsCountResponse;
 
 // Spring Data Page<T> envelope — same shape as GET /work-orders. The list
 // endpoint returns this; callers that don't paginate get the first page
@@ -140,10 +150,24 @@ export const approvalsApi = {
     return response.data;
   },
   getCount: async (params?: ApprovalCountParams): Promise<number> => {
-    const response = await apiClient.get<ApprovalCountResponse>('/work-orders/approvals/count', {
-      params: toQuery(params),
-    });
-    return response.data.count;
+    const response = await apiClient.get<ApprovalsCountResponse>(
+      '/work-orders/approvals/count',
+      { params: toQuery(params) },
+    );
+    return response.data.pendingForMe;
+  },
+  // Full bell-summary envelope. Used by the topbar bell to drive both
+  // the badge math (pendingForMe + recentlyResolvedMine) and the Mine
+  // tab's "Recently resolved" section gate.
+  getBellSummary: async (): Promise<ApprovalsBellSummary> => {
+    const response = await apiClient.get<ApprovalsBellSummary>('/work-orders/approvals/count');
+    return response.data;
+  },
+  // Mark a single resolved request as seen by the requester. 204; safe
+  // to call multiple times. Decrements `recentlyResolvedMine` on the
+  // next poll.
+  markSeen: async (id: string): Promise<void> => {
+    await apiClient.post(`/work-orders/approvals/${id}/mark-seen`);
   },
   approve: async (id: string, request: ApproveApprovalRequest = {}): Promise<ApprovalRequest> => {
     const response = await apiClient.post<ApprovalRequest>(`/work-orders/approvals/${id}/approve`, request);
