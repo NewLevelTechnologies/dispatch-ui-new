@@ -125,7 +125,7 @@ function toQuery(params: ListApprovalsParams | ApprovalCountParams | undefined):
 
 export const approvalsApi = {
   listPage: async (params?: ListApprovalsParams): Promise<ApprovalsPage> => {
-    const response = await apiClient.get<ApprovalsPage>('/approvals', { params: toQuery(params) });
+    const response = await apiClient.get<ApprovalsPage>('/work-orders/approvals', { params: toQuery(params) });
     return response.data;
   },
   // Convenience flatten for the inbox surfaces — they don't paginate
@@ -136,21 +136,21 @@ export const approvalsApi = {
     return page.content;
   },
   getById: async (id: string): Promise<ApprovalRequest> => {
-    const response = await apiClient.get<ApprovalRequest>(`/approvals/${id}`);
+    const response = await apiClient.get<ApprovalRequest>(`/work-orders/approvals/${id}`);
     return response.data;
   },
   getCount: async (params?: ApprovalCountParams): Promise<number> => {
-    const response = await apiClient.get<ApprovalCountResponse>('/approvals/count', {
+    const response = await apiClient.get<ApprovalCountResponse>('/work-orders/approvals/count', {
       params: toQuery(params),
     });
     return response.data.count;
   },
   approve: async (id: string, request: ApproveApprovalRequest = {}): Promise<ApprovalRequest> => {
-    const response = await apiClient.post<ApprovalRequest>(`/approvals/${id}/approve`, request);
+    const response = await apiClient.post<ApprovalRequest>(`/work-orders/approvals/${id}/approve`, request);
     return response.data;
   },
   reject: async (id: string, request: RejectApprovalRequest): Promise<ApprovalRequest> => {
-    const response = await apiClient.post<ApprovalRequest>(`/approvals/${id}/reject`, request);
+    const response = await apiClient.post<ApprovalRequest>(`/work-orders/approvals/${id}/reject`, request);
     return response.data;
   },
 };
