@@ -1,18 +1,32 @@
 // Notification Template API Client
 import apiClient from './client';
+import { type NotificationChannel } from './notificationApi';
+
+// BE PR-1 adds a `scope` array per variable (which fields it's valid in) and
+// renames `exampleValue` → `example`. Both are optional here during the
+// transition; once BE PR-1 ships, the legacy fallbacks in templateEditor.ts
+// can be removed.
+export type VariableScope = 'SUBJECT' | 'BODY';
 
 export interface NotificationTemplateVariable {
   name: string;
   description: string;
   required: boolean;
-  exampleValue: string;
+  example?: string;
+  exampleValue?: string;
+  scope?: VariableScope[];
 }
+
+// PUSH is stubbed FAILED in the BE — the FE filters PUSH out of the catalog
+// list. When PUSH lights up, the filter comes off. The NotificationChannel
+// type itself is shared with the notification log/preference APIs.
+export type { NotificationChannel } from './notificationApi';
 
 export interface NotificationTemplate {
   id: string;
   notificationTypeKey: string;
   displayName: string;
-  channel: 'EMAIL' | 'SMS';
+  channel: NotificationChannel;
   tenantId: string | null;
   isSystemTemplate: boolean;
   subject?: string | null;
@@ -31,13 +45,18 @@ export interface NotificationTemplateListItem {
   id: string;
   notificationTypeKey: string;
   displayName: string;
-  channel: 'EMAIL' | 'SMS';
+  channel: NotificationChannel;
   tenantId: string | null;
   isSystemTemplate: boolean;
   subject?: string | null;
   hasHtmlBody: boolean;
   version: number;
   isActive: boolean;
+  // BE PR-1 surfaces these on list items so the customized-row CellSub can
+  // render "Updated …" without an N+1 detail fetch.
+  updatedAt?: string;
+  updatedByName?: string;
+  availableVariables?: NotificationTemplateVariable[];
 }
 
 export interface CreateNotificationTemplateRequest {
@@ -97,8 +116,31 @@ export interface TemplateVersion {
 export interface TemplateVersionHistoryResponse {
   notificationTypeKey: string;
   displayName: string;
-  channel: 'EMAIL' | 'SMS';
+  channel: NotificationChannel;
   versions: TemplateVersion[];
+}
+
+// BE PR-2 — gated by flags.notificationSamples until it ships.
+export interface TemplateSample {
+  id: string;
+  label: string;
+  description?: string;
+  data: Record<string, string>;
+}
+
+export interface TemplateSamplesResponse {
+  samples: TemplateSample[];
+}
+
+// BE PR-2 — gated by flags.notificationTestSend until it ships.
+export interface SendTestRequest {
+  recipient: string;
+  sampleId?: string;
+  draft: {
+    subject?: string | null;
+    bodyTemplate?: string | null;
+    htmlBodyTemplate?: string | null;
+  };
 }
 
 export interface NotificationTemplatesResponse {
@@ -189,6 +231,24 @@ export const notificationTemplateApi = {
       `/notification-templates/${id}/rollback/${versionId}`
     );
     return response.data;
+  },
+
+  /**
+   * Sample data sets for previews. BE PR-2 — gated by flags.notificationSamples.
+   */
+  getSamples: async (id: string): Promise<TemplateSample[]> => {
+    const response = await apiClient.get<TemplateSamplesResponse>(
+      `/notification-templates/${id}/samples`
+    );
+    return response.data.samples;
+  },
+
+  /**
+   * Send a one-off test against the current draft (not the saved template).
+   * BE PR-2 — gated by flags.notificationTestSend.
+   */
+  sendTest: async (id: string, request: SendTestRequest): Promise<void> => {
+    await apiClient.post(`/notification-templates/${id}/send-test`, request);
   },
 };
 

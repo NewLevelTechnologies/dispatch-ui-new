@@ -39,6 +39,7 @@ import BusinessDefaultsPanel from './pages/settings/BusinessDefaultsPanel';
 import ModulesFeaturesPanel from './pages/settings/ModulesFeaturesPanel';
 import TerminologyPanel from './pages/settings/TerminologyPanel';
 import NotificationTemplatesPanel from './pages/settings/NotificationTemplatesPanel';
+import NotificationTemplateEditPage from './pages/settings/NotificationTemplateEditPage';
 import DispatchRegionsPanel from './pages/settings/DispatchRegionsPanel';
 import WorkOrderTypesPanel from './pages/settings/work-orders/WorkOrderTypesPanel';
 import DivisionsPanel from './pages/settings/work-orders/DivisionsPanel';
@@ -191,7 +192,9 @@ function App() {
         <Route path="business-defaults" element={<BusinessDefaultsPanel />} />
         <Route path="modules-features" element={<ModulesFeaturesPanel />} />
         <Route path="terminology" element={<TerminologyPanel />} />
-        <Route path="notification-templates" element={<NotificationTemplatesPanel />} />
+        <Route path="notifications" element={<NotificationTemplatesPanel />} />
+        <Route path="notifications/:id" element={<NotificationTemplateEditPage />} />
+        <Route path="notification-templates" element={<Navigate to="/settings/notifications" replace />} />
         <Route path="dispatch-regions" element={<DispatchRegionsPanel />} />
         <Route path="work-orders/types" element={<WorkOrderTypesPanel />} />
         <Route path="work-orders/divisions" element={<DivisionsPanel />} />

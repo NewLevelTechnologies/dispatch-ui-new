@@ -259,6 +259,7 @@ export {
   type NotificationTemplate,
   type NotificationTemplateListItem,
   type NotificationTemplateVariable,
+  type VariableScope,
   type CreateNotificationTemplateRequest,
   type UpdateNotificationTemplateRequest,
   type TemplatePreviewRequest,
@@ -268,6 +269,9 @@ export {
   type ValidationWarning,
   type TemplateVersion,
   type TemplateVersionHistoryResponse,
+  type TemplateSample,
+  type TemplateSamplesResponse,
+  type SendTestRequest,
 } from './notificationTemplateApi';
 
 // Dispatch Region API
