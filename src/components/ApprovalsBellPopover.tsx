@@ -82,6 +82,23 @@ function fallbackText(value: string | null | undefined, fallback: string): strin
   return value && value.trim() ? value : fallback;
 }
 
+// Filter resolved-mine requests to the same 24h window the server uses
+// for `recentlyResolvedMine`. Defined outside the component so the
+// `react-hooks/purity` rule doesn't flag the Date.now() read inside
+// useMemo (helpers reading Date.now() are fine).
+function pickRecentlyResolved(items: ApprovalRequest[], cap: number): ApprovalRequest[] {
+  if (cap === 0) return [];
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  return items
+    .filter((r) => r.respondedAt && new Date(r.respondedAt).getTime() >= cutoff)
+    .sort((a, b) => {
+      const ar = a.respondedAt ? new Date(a.respondedAt).getTime() : 0;
+      const br = b.respondedAt ? new Date(b.respondedAt).getTime() : 0;
+      return br - ar;
+    })
+    .slice(0, cap);
+}
+
 // ─── Public component ──────────────────────────────────────────
 
 interface Props {
@@ -188,7 +205,6 @@ function PopoverContent({ onDismiss }: { onDismiss: () => void }) {
   const { data: summary } = useQuery<ApprovalsBellSummary>({
     queryKey: ['approvals', 'bell-summary'],
     queryFn: () => approvalsApi.getBellSummary(),
-    staleTime: 30_000,
   });
 
   const resolvedMineKey = useMemo(
@@ -210,21 +226,15 @@ function PopoverContent({ onDismiss }: { onDismiss: () => void }) {
     enabled: tab === 'mine' && (summary?.recentlyResolvedMine ?? 0) > 0,
   });
 
-  // Intersect against the summary's id list so we render exactly the
-  // server's notion of "recent + unseen" — even if the list endpoint
-  // returns more (e.g., a tenant with lots of resolved history).
-  const recentlyResolvedItems = useMemo<ApprovalRequest[]>(() => {
-    if (tab !== 'mine') return [];
-    const idSet = new Set(summary?.recentlyResolvedMineIds ?? []);
-    if (idSet.size === 0) return [];
-    return resolvedMine
-      .filter((r) => idSet.has(r.id))
-      .sort((a, b) => {
-        const ar = a.respondedAt ? new Date(a.respondedAt).getTime() : 0;
-        const br = b.respondedAt ? new Date(b.respondedAt).getTime() : 0;
-        return br - ar;
-      });
-  }, [tab, summary?.recentlyResolvedMineIds, resolvedMine]);
+  // Trust the server's count as the cap. We don't have an id list, so
+  // pick the N most-recent within-24h resolved-mine items — same window
+  // the server filters on. If the FE has stale list data the section
+  // may render slightly old items, but the count itself is authoritative
+  // and decrements after mark-seen.
+  const recentlyResolvedItems = useMemo<ApprovalRequest[]>(
+    () => (tab === 'mine' ? pickRecentlyResolved(resolvedMine, summary?.recentlyResolvedMine ?? 0) : []),
+    [tab, summary?.recentlyResolvedMine, resolvedMine],
+  );
 
   // Sort by expiry asc — most urgent first — mirroring the inbox's
   // pending sort order. The resolved section is rendered separately

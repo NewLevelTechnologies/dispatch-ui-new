@@ -140,32 +140,17 @@ export default function ApprovalsPage() {
     queryFn: () => approvalsApi.list(listParams),
   });
 
-  // Counts surfaced on tabs — only the two heavily-trafficked tabs poll
-  // their own counts. Pending count drives the bell too (same key).
+  // Counts surfaced on tabs. Same key the bell uses, so a resolve in
+  // either surface refreshes the other on the next poll.
   const { data: pendingCount = 0 } = useQuery({
     queryKey: ['approvals', 'count', { assignedToMe: true, status: 'PENDING' }],
-    queryFn: async () => {
-      try {
-        return await approvalsApi.getCount({ assignedToMe: true, status: 'PENDING' });
-      } catch {
-        // Backend may not expose /approvals/count yet. Fall back to a list.
-        const list = await approvalsApi.list({ assignedToMe: true, status: 'PENDING' });
-        return list.length;
-      }
-    },
+    queryFn: () => approvalsApi.getCount({ assignedToMe: true, status: 'PENDING' }),
     staleTime: 60_000,
   });
 
   const { data: myRequestsCount = 0 } = useQuery({
     queryKey: ['approvals', 'count', { requestedByMe: true, status: 'PENDING' }],
-    queryFn: async () => {
-      try {
-        return await approvalsApi.getCount({ requestedByMe: true, status: 'PENDING' });
-      } catch {
-        const list = await approvalsApi.list({ requestedByMe: true, status: 'PENDING' });
-        return list.length;
-      }
-    },
+    queryFn: () => approvalsApi.getCount({ requestedByMe: true, status: 'PENDING' }),
     staleTime: 60_000,
   });
 

@@ -76,23 +76,24 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
 
   const approvalsVisible = useApprovalsVisible();
 
-  // Bell summary: pending-for-me (approver workload) + pending-mine +
-  // recently-resolved-mine (24h server window). Drives both the sidebar
-  // nav badge (still pending-for-me only) and the topbar bell badge
+  // Bell summary: pending-for-me (approver workload) + recently-resolved-
+  // mine (24h server window, requester side). Drives both the sidebar
+  // nav badge (pending-for-me only) and the topbar bell badge
   // (pendingForMe + recentlyResolvedMine — the union of "anything for
   // me to look at").
   //
-  // Polls every 60s and refetches on window focus so newly-assigned or
-  // newly-resolved requests surface without a manual reload. Gated on
-  // `approvalsVisible` so OPEN-mode tenants with no history don't
-  // generate background traffic.
+  // Polls every 5 minutes — approvals are low-frequency, no reason to
+  // hammer the endpoint. `refetchIntervalInBackground: false` pauses
+  // polling when the tab is hidden; `refetchOnWindowFocus` picks up
+  // the moment the user returns. Gated on `approvalsVisible` so
+  // OPEN-mode tenants with no history don't generate background traffic.
   const { data: bellSummary } = useQuery<ApprovalsBellSummary>({
     queryKey: ['approvals', 'bell-summary'],
     queryFn: () => approvalsApi.getBellSummary(),
     enabled: authStatus === 'authenticated' && approvalsVisible,
-    refetchInterval: 60_000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
-    staleTime: 30_000,
   });
 
   const pendingApprovalCount = bellSummary?.pendingForMe ?? 0;

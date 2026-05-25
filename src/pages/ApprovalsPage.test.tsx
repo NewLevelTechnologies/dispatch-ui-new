@@ -101,7 +101,9 @@ function installApiMock() {
       });
     }
     if (url === '/work-orders/approvals/count' || url.startsWith('/work-orders/approvals/count?')) {
-      return Promise.resolve({ data: { count: pendingList.length } });
+      return Promise.resolve({
+        data: { pendingForMe: pendingList.length, recentlyResolvedMine: 0 },
+      });
     }
     return Promise.reject(new Error(`Unmocked GET ${url}`));
   });

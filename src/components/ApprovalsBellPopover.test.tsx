@@ -77,9 +77,7 @@ function installApiMock() {
       return Promise.resolve({
         data: {
           pendingForMe: 0,
-          pendingMine: 0,
           recentlyResolvedMine: 0,
-          recentlyResolvedMineIds: [],
         },
       });
     }

@@ -81,25 +81,19 @@ export interface ApprovalCountParams {
   workOrderId?: string;
 }
 
-// Legacy single-count envelope. Backends that haven't shipped the
-// relevance-flags update still return this shape from /count when called
-// with explicit filters; the FE keeps reading it for the count-by-filter
-// fallback path.
-export interface ApprovalCountResponse {
-  count: number;
+// Finalized envelope returned by GET /work-orders/approvals/count.
+// `pendingForMe` = pending approvals where the caller is in the approver
+// pool. `recentlyResolvedMine` = the caller's own requests resolved in
+// the last 24h that they haven't seen yet (server window + seen_at gate).
+export interface ApprovalsCountResponse {
+  pendingForMe: number;
+  recentlyResolvedMine: number;
 }
 
-// Bell-summary envelope from /count with no filter params. Returns the
-// four numbers the topbar bell + Mine tab need in a single call, plus
-// the ids of recently-resolved requests so the popover can render them
-// without a follow-up list fetch. See
-// handoff/backend-approvals-relevance-flags.md.
-export interface ApprovalsBellSummary {
-  pendingForMe: number;
-  pendingMine: number;
-  recentlyResolvedMine: number;
-  recentlyResolvedMineIds: string[];
-}
+// Re-export under the legacy name for the bell call site that wanted a
+// more descriptive type alias. Same shape — keeps the two consumers
+// (badge + Mine-tab section) intention-revealing without two types.
+export type ApprovalsBellSummary = ApprovalsCountResponse;
 
 // Spring Data Page<T> envelope — same shape as GET /work-orders. The list
 // endpoint returns this; callers that don't paginate get the first page
@@ -156,15 +150,15 @@ export const approvalsApi = {
     return response.data;
   },
   getCount: async (params?: ApprovalCountParams): Promise<number> => {
-    const response = await apiClient.get<ApprovalCountResponse>('/work-orders/approvals/count', {
-      params: toQuery(params),
-    });
-    return response.data.count;
+    const response = await apiClient.get<ApprovalsCountResponse>(
+      '/work-orders/approvals/count',
+      { params: toQuery(params) },
+    );
+    return response.data.pendingForMe;
   },
-  // No-filter call returns the multi-number bell summary. Used by the
-  // topbar bell to drive both the badge math (pendingForMe +
-  // recentlyResolvedMine) and the Mine tab's "Recently resolved"
-  // section.
+  // Full bell-summary envelope. Used by the topbar bell to drive both
+  // the badge math (pendingForMe + recentlyResolvedMine) and the Mine
+  // tab's "Recently resolved" section gate.
   getBellSummary: async (): Promise<ApprovalsBellSummary> => {
     const response = await apiClient.get<ApprovalsBellSummary>('/work-orders/approvals/count');
     return response.data;
