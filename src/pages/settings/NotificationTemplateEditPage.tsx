@@ -59,11 +59,19 @@ type FormData = {
   htmlBodyTemplate: string;
 };
 
+// 400 response shape from PUT /notification-templates/{id} per the BE
+// walkthrough: each `unknown` entry carries the field it appeared in so
+// we can point the user at the right place. `missing` and `wrong_scope`
+// stay as plain names.
+type UnknownVarHit = { name: string; usedIn: 'SUBJECT' | 'BODY' };
 type SaveError = {
   missing?: string[];
-  unknown?: string[];
+  unknown?: UnknownVarHit[];
   wrong_scope?: string[];
 };
+
+const fieldLabel = (f: 'SUBJECT' | 'BODY'): string =>
+  f === 'SUBJECT' ? 'subject' : 'body';
 
 function isSaveError(value: unknown): value is { errors: SaveError } {
   if (!value || typeof value !== 'object') return false;
@@ -238,15 +246,16 @@ export default function NotificationTemplateEditPage() {
           resp.data.errors;
         setSaveErrors(resp.data.errors);
         const firstMissing = missing[0];
+        const firstUnknown = unknown[0];
         if (firstMissing) {
           showError(
             "Couldn't save",
             `Required variable {{${firstMissing}}} is missing`
           );
-        } else if (unknown[0]) {
+        } else if (firstUnknown) {
           showError(
             "Couldn't save",
-            `Unknown variable {{${unknown[0]}}}`
+            `Unknown variable {{${firstUnknown.name}}} in ${fieldLabel(firstUnknown.usedIn)}`
           );
         } else if (wrong_scope[0]) {
           showError(
@@ -408,11 +417,11 @@ export default function NotificationTemplateEditPage() {
                       is missing.
                     </li>
                   ))}
-                  {saveErrors?.unknown?.map((name) => (
-                    <li key={`unknown-${name}`}>
+                  {saveErrors?.unknown?.map((hit) => (
+                    <li key={`unknown-${hit.usedIn}-${hit.name}`}>
                       Unknown variable{' '}
-                      <code className="font-mono text-fg-strong">{`{{${name}}}`}</code>
-                      .
+                      <code className="font-mono text-fg-strong">{`{{${hit.name}}}`}</code>{' '}
+                      in {fieldLabel(hit.usedIn)}.
                     </li>
                   ))}
                   {saveErrors?.wrong_scope?.map((name) => (
