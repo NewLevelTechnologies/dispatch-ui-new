@@ -10,6 +10,7 @@ import {
   CheckIcon,
   ClockIcon,
   InboxIcon,
+  LockOpenIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import {
@@ -28,6 +29,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { LoadingState } from '../components/ui/LoadingState';
 import { StatusChip } from '../components/ui/StatusChip';
+import { useApprovalsVisible } from '../hooks/useApprovalsVisible';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { extractApiError, showError, showSuccess } from '../lib/toast';
 
@@ -110,7 +112,9 @@ export default function ApprovalsPage() {
 
   const tabParam = searchParams.get('tab') as TabId | null;
   const woFilter = searchParams.get('wo');
+  const idDeepLink = searchParams.get('id');
   const currentTab: TabId = TAB_IDS.includes(tabParam as TabId) ? (tabParam as TabId) : 'pending';
+  const approvalsVisible = useApprovalsVisible();
 
   const setCurrentTab = useCallback(
     (tab: TabId) => {
@@ -183,7 +187,10 @@ export default function ApprovalsPage() {
     });
   }, [requests, currentTab]);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // `?id=` deep-link (e.g., from the bell popover's resolved-mine click)
+  // takes precedence on first render. Once the user picks something else,
+  // we hand control back to `selectedId`.
+  const [selectedId, setSelectedId] = useState<string | null>(idDeepLink);
 
   // Derive the effective selection from state + the current list. When
   // the stored id has dropped out (resolved, filtered, tab changed), fall
@@ -262,6 +269,29 @@ export default function ApprovalsPage() {
     },
   });
 
+  // Auto mark-seen: when the user opens a resolved request they
+  // originally created, fire mark-seen so the bell's recently-resolved
+  // count decrements on the next poll. Idempotent server-side; safe to
+  // fire on every detail mount.
+  const currentUserId = currentUser?.id;
+  const selectedRequestId = selectedRequest?.id;
+  const selectedRequestStatus = selectedRequest?.status;
+  const selectedRequesterId = selectedRequest?.requester.id;
+  useEffect(() => {
+    if (!selectedRequestId || !currentUserId) return;
+    if (selectedRequestStatus === 'PENDING') return;
+    if (selectedRequesterId !== currentUserId) return;
+    approvalsApi.markSeen(selectedRequestId).then(
+      () => {
+        queryClient.invalidateQueries({ queryKey: ['approvals', 'bell-summary'] });
+      },
+      () => {
+        // Best-effort. A failed call leaves the bell badge until the
+        // 24h server window expires; not worth a toast.
+      },
+    );
+  }, [selectedRequestId, selectedRequestStatus, selectedRequesterId, currentUserId, queryClient]);
+
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'pending', label: t('approvals.tabs.pending'), count: pendingCount },
     { id: 'my-requests', label: t('approvals.tabs.myRequests'), count: myRequestsCount },
@@ -274,6 +304,29 @@ export default function ApprovalsPage() {
   // Mobile collapses to single-pane: rail by default, detail fills the
   // screen when an item is selected. Desktop renders both regardless.
   const showDetail = !!selectedRequest;
+
+  // OPEN-mode tenant with zero history: render a dedicated empty state
+  // instead of the inbox. The page stays reachable (no route guard) so
+  // a stale bookmark from when the tenant was STRICT still resolves to
+  // *something* useful — and the action links straight to the toggle.
+  if (!approvalsVisible) {
+    return (
+      <AppLayout>
+        <div className="flex flex-1 items-center justify-center px-6 py-12">
+          <EmptyState
+            icon={<LockOpenIcon className="size-10 text-fg-dim" />}
+            title={t('approvals.empty.openMode.title')}
+            description={t('approvals.empty.openMode.description')}
+            action={
+              <Button outline href="/settings/work-orders/workflows">
+                {t('approvals.empty.openMode.action')}
+              </Button>
+            }
+          />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout flush>

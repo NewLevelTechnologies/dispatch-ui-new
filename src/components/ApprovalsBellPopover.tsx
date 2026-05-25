@@ -11,7 +11,7 @@
 // desktop affordance. See AppLayout for the breakpoint switch.
 // ─────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +28,7 @@ import {
 import {
   approvalsApi,
   type ApprovalRequest,
+  type ApprovalsBellSummary,
 } from '../api';
 import { Avatar } from './ui/Avatar';
 import { Button } from './catalyst/button';
@@ -84,12 +85,12 @@ function fallbackText(value: string | null | undefined, fallback: string): strin
 // ─── Public component ──────────────────────────────────────────
 
 interface Props {
-  /** Pending count for the "For me" tab, polled by AppLayout. Drives the
-   *  badge on the bell. */
-  pendingCount: number;
+  /** Bell badge — sum of pendingForMe + recentlyResolvedMine. Polled
+   *  by AppLayout via the bell-summary query. */
+  badgeCount: number;
 }
 
-export default function ApprovalsBellPopover({ pendingCount }: Props) {
+export default function ApprovalsBellPopover({ badgeCount }: Props) {
   const { t } = useTranslation();
 
   return (
@@ -97,19 +98,19 @@ export default function ApprovalsBellPopover({ pendingCount }: Props) {
       {({ open, close }) => (
         <>
           <PopoverButton
-            aria-label={t('approvals.nav.bellAria', { count: pendingCount })}
+            aria-label={t('approvals.nav.bellAria', { count: badgeCount })}
             className={clsx(
               'relative grid size-8 shrink-0 cursor-pointer place-items-center rounded-md text-fg-muted hover:bg-bg-hover hover:text-fg-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500',
               open && 'bg-bg-active text-fg-strong',
             )}
           >
             <BellIcon className="size-[18px]" />
-            {pendingCount > 0 && (
+            {badgeCount > 0 && (
               <span
                 aria-hidden
                 className="absolute -top-px -right-px inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full border-2 border-bg bg-accent-500 px-[3px] font-mono text-[9.5px] font-bold leading-none text-white"
               >
-                {pendingCount > 99 ? '99+' : pendingCount}
+                {badgeCount > 99 ? '99+' : badgeCount}
               </span>
             )}
           </PopoverButton>
@@ -147,7 +148,9 @@ export default function ApprovalsBellPopover({ pendingCount }: Props) {
 // ─── Inner content (mounted only while the popover is open) ────
 
 function PopoverContent({ onDismiss }: { onDismiss: () => void }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<BellTab>('forMe');
   // null = no explicit pick (auto-expand first row).
   // 'collapsed' = user collapsed deliberately; leave nothing expanded.
@@ -179,9 +182,53 @@ function PopoverContent({ onDismiss }: { onDismiss: () => void }) {
     queryFn: () => approvalsApi.list(listParams),
   });
 
+  // Mine tab: also surface requester-side resolutions from the last 24h
+  // that haven't been marked seen yet. Subscribes to the bell summary
+  // cache that AppLayout already polls — no duplicate request.
+  const { data: summary } = useQuery<ApprovalsBellSummary>({
+    queryKey: ['approvals', 'bell-summary'],
+    queryFn: () => approvalsApi.getBellSummary(),
+    staleTime: 30_000,
+  });
+
+  const resolvedMineKey = useMemo(
+    () =>
+      [
+        'approvals',
+        'list',
+        { requestedByMe: true, status: ['APPROVED', 'REJECTED', 'EXPIRED'] as const },
+      ] as const,
+    [],
+  );
+  const { data: resolvedMine = [] } = useQuery({
+    queryKey: resolvedMineKey,
+    queryFn: () =>
+      approvalsApi.list({
+        requestedByMe: true,
+        status: ['APPROVED', 'REJECTED', 'EXPIRED'],
+      }),
+    enabled: tab === 'mine' && (summary?.recentlyResolvedMine ?? 0) > 0,
+  });
+
+  // Intersect against the summary's id list so we render exactly the
+  // server's notion of "recent + unseen" — even if the list endpoint
+  // returns more (e.g., a tenant with lots of resolved history).
+  const recentlyResolvedItems = useMemo<ApprovalRequest[]>(() => {
+    if (tab !== 'mine') return [];
+    const idSet = new Set(summary?.recentlyResolvedMineIds ?? []);
+    if (idSet.size === 0) return [];
+    return resolvedMine
+      .filter((r) => idSet.has(r.id))
+      .sort((a, b) => {
+        const ar = a.respondedAt ? new Date(a.respondedAt).getTime() : 0;
+        const br = b.respondedAt ? new Date(b.respondedAt).getTime() : 0;
+        return br - ar;
+      });
+  }, [tab, summary?.recentlyResolvedMineIds, resolvedMine]);
+
   // Sort by expiry asc — most urgent first — mirroring the inbox's
-  // pending sort order. Resolved tabs don't apply here (popover only
-  // surfaces PENDING).
+  // pending sort order. The resolved section is rendered separately
+  // above the pending rows on Mine tab.
   const sortedRequests = useMemo(
     () =>
       [...requests].sort(
@@ -231,27 +278,74 @@ function PopoverContent({ onDismiss }: { onDismiss: () => void }) {
     [queryClient, listKey, sortedRequests],
   );
 
+  const markSeenMutation = useMutation({
+    mutationFn: (id: string) => approvalsApi.markSeen(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['approvals', 'bell-summary'] });
+    },
+    // Best-effort: a failed mark-seen still navigates and lets the
+    // inbox's detail-mount mark-seen retry. No toast on error.
+  });
+
+  const handleResolvedClick = useCallback(
+    (id: string) => {
+      markSeenMutation.mutate(id);
+      onDismiss();
+      navigate(`/approvals?tab=all&id=${id}`);
+    },
+    [markSeenMutation, onDismiss, navigate],
+  );
+
+  const headerPillCount =
+    tab === 'forMe'
+      ? sortedRequests.length
+      : sortedRequests.length + recentlyResolvedItems.length;
+
+  // Mine tab is "empty" only when BOTH pending-mine and the resolved
+  // section are empty — otherwise we show what we have.
+  const showEmpty =
+    !isLoading &&
+    !error &&
+    sortedRequests.length === 0 &&
+    recentlyResolvedItems.length === 0;
+
   return (
     <>
-      <Header tab={tab} setTab={handleTabChange} count={sortedRequests.length} />
+      <Header tab={tab} setTab={handleTabChange} count={headerPillCount} />
 
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
           <ListLoading />
         ) : error ? (
           <ListError />
-        ) : sortedRequests.length === 0 ? (
+        ) : showEmpty ? (
           <EmptyAllClear />
         ) : (
-          sortedRequests.map((req) => (
-            <RequestRow
-              key={req.id}
-              request={req}
-              expanded={req.id === expandedId}
-              onToggle={() => handleToggle(req.id)}
-              onResolved={() => handleResolved(req.id)}
-            />
-          ))
+          <>
+            {tab === 'mine' && recentlyResolvedItems.length > 0 && (
+              <>
+                <div className="px-3.5 pt-2 pb-1 text-[10px] font-semibold tracking-[0.08em] text-fg-muted uppercase">
+                  {t('approvals.bell.recentlyResolved')}
+                </div>
+                {recentlyResolvedItems.map((req) => (
+                  <ResolvedRow
+                    key={req.id}
+                    request={req}
+                    onClick={() => handleResolvedClick(req.id)}
+                  />
+                ))}
+              </>
+            )}
+            {sortedRequests.map((req) => (
+              <RequestRow
+                key={req.id}
+                request={req}
+                expanded={req.id === expandedId}
+                onToggle={() => handleToggle(req.id)}
+                onResolved={() => handleResolved(req.id)}
+              />
+            ))}
+          </>
         )}
       </div>
 
@@ -393,6 +487,88 @@ function RequestRow({
       )}
     </div>
   );
+}
+
+// Compact row for the Mine tab's "Recently resolved" section. No
+// expand-to-act — resolved requests can't be acted on. Click → mark
+// seen + open the request in the full inbox.
+function ResolvedRow({
+  request,
+  onClick,
+}: {
+  request: ApprovalRequest;
+  onClick: () => void;
+}) {
+  const { t } = useTranslation();
+  const responderName = request.respondedBy
+    ? `${request.respondedBy.firstName ?? ''} ${request.respondedBy.lastName ?? ''}`.trim() ||
+      'Unknown user'
+    : 'Unknown user';
+  const when = request.respondedAt ?? request.requestedAt;
+  const resolution = resolutionChip(request.status);
+  if (!resolution) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="grid w-full cursor-pointer grid-cols-[22px_1fr_auto] gap-[9px] border-b border-border-soft px-3.5 py-2.5 text-left outline-none hover:bg-bg-hover focus-visible:bg-bg-hover"
+    >
+      <Avatar name={responderName} size="sm" />
+
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[12.5px] font-semibold text-fg-strong">{responderName}</span>
+          <span className="text-[12px] text-fg-muted">{resolution.verb}</span>
+          <span className="ml-auto font-mono text-[10px] text-fg-dim">{relativeTime(when)}</span>
+        </div>
+
+        <div className="mt-0.5 inline-flex items-center gap-1">
+          <span
+            className={clsx(
+              'inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-[1px] text-[10px] font-semibold',
+              resolution.chipClass,
+            )}
+          >
+            {t(resolution.labelKey)}
+          </span>
+        </div>
+
+        <div className="mt-1 font-mono text-[10.5px] text-fg-muted">
+          <span className="font-medium text-fg-strong">{request.workOrder.displayId}</span>
+          <span> · {fallbackText(request.workOrder.customerName, 'Unknown customer')}</span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function resolutionChip(status: ApprovalRequest['status']):
+  | { labelKey: string; verb: string; chipClass: string }
+  | null {
+  switch (status) {
+    case 'APPROVED':
+      return {
+        labelKey: 'approvals.bell.statusApproved',
+        verb: 'approved your request',
+        chipClass:
+          'bg-[color-mix(in_oklch,var(--color-success-500)_14%,var(--color-bg-elev))] text-success-500',
+      };
+    case 'REJECTED':
+      return {
+        labelKey: 'approvals.bell.statusRejected',
+        verb: 'rejected your request',
+        chipClass:
+          'bg-[color-mix(in_oklch,var(--color-danger-500)_14%,var(--color-bg-elev))] text-danger-500',
+      };
+    case 'EXPIRED':
+      return {
+        labelKey: 'approvals.bell.statusExpired',
+        verb: 'request expired',
+        chipClass: 'bg-bg-active text-fg-muted',
+      };
+    default:
+      return null;
+  }
 }
 
 // 1px-bordered pill with a 5px dot — smaller than the standard

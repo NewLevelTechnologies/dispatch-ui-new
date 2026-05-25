@@ -81,8 +81,24 @@ export interface ApprovalCountParams {
   workOrderId?: string;
 }
 
+// Legacy single-count envelope. Backends that haven't shipped the
+// relevance-flags update still return this shape from /count when called
+// with explicit filters; the FE keeps reading it for the count-by-filter
+// fallback path.
 export interface ApprovalCountResponse {
   count: number;
+}
+
+// Bell-summary envelope from /count with no filter params. Returns the
+// four numbers the topbar bell + Mine tab need in a single call, plus
+// the ids of recently-resolved requests so the popover can render them
+// without a follow-up list fetch. See
+// handoff/backend-approvals-relevance-flags.md.
+export interface ApprovalsBellSummary {
+  pendingForMe: number;
+  pendingMine: number;
+  recentlyResolvedMine: number;
+  recentlyResolvedMineIds: string[];
 }
 
 // Spring Data Page<T> envelope — same shape as GET /work-orders. The list
@@ -144,6 +160,20 @@ export const approvalsApi = {
       params: toQuery(params),
     });
     return response.data.count;
+  },
+  // No-filter call returns the multi-number bell summary. Used by the
+  // topbar bell to drive both the badge math (pendingForMe +
+  // recentlyResolvedMine) and the Mine tab's "Recently resolved"
+  // section.
+  getBellSummary: async (): Promise<ApprovalsBellSummary> => {
+    const response = await apiClient.get<ApprovalsBellSummary>('/work-orders/approvals/count');
+    return response.data;
+  },
+  // Mark a single resolved request as seen by the requester. 204; safe
+  // to call multiple times. Decrements `recentlyResolvedMine` on the
+  // next poll.
+  markSeen: async (id: string): Promise<void> => {
+    await apiClient.post(`/work-orders/approvals/${id}/mark-seen`);
   },
   approve: async (id: string, request: ApproveApprovalRequest = {}): Promise<ApprovalRequest> => {
     const response = await apiClient.post<ApprovalRequest>(`/work-orders/approvals/${id}/approve`, request);

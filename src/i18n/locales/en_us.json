@@ -184,6 +184,11 @@
       "noResults": {
         "title": "No approvals match this filter",
         "description": "Try a different tab."
+      },
+      "openMode": {
+        "title": "Approvals don't fire in Open mode",
+        "description": "Approval requests are only created when workflow enforcement is set to Strict. Open mode allows any status transition without gates.",
+        "action": "Configure workflows →"
       }
     },
     "errors": {
@@ -195,7 +200,11 @@
       "loading": "Loading…",
       "notePlaceholder": "Note to requester (required to reject)…",
       "preferences": "Preferences",
+      "recentlyResolved": "Recently resolved",
       "requestedApproval": "requested approval",
+      "statusApproved": "Approved",
+      "statusExpired": "Expired",
+      "statusRejected": "Rejected",
       "tabs": {
         "forMe": "For me",
         "mine": "Mine"

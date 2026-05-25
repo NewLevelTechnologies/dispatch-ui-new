@@ -291,6 +291,7 @@ export {
   type ApprovalsPage,
   type ListApprovalsParams,
   type ApprovalCountParams,
+  type ApprovalsBellSummary,
   type ApproveApprovalRequest,
   type RejectApprovalRequest,
 } from './approvalsApi';
