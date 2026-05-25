@@ -1720,6 +1720,58 @@ vi.mock('react-i18next', () => {
     'settings.workflows.panel.savedCreate': 'Transition added',
     'settings.workflows.panel.savedUpdate': 'Transition updated',
     'settings.workflows.panel.savedDelete': 'Transition removed',
+
+    // Approvals inbox / WO callout
+    'approvals.title': 'Approvals',
+    'approvals.subtitle':
+      'Work item transitions waiting on your sign-off · expiries auto-reject if untouched',
+    'approvals.filteredByWorkOrder': 'Filtered by work order',
+    'approvals.tabs.pending': 'Pending',
+    'approvals.tabs.myRequests': 'My requests',
+    'approvals.tabs.all': 'All',
+    'approvals.tabs.approved': 'Approved',
+    'approvals.tabs.rejected': 'Rejected',
+    'approvals.tabs.expired': 'Expired',
+    'approvals.rail.countLabel': '{{count}} Pending',
+    'approvals.expiringIn': 'Expires in {{time}}',
+    'approvals.detail.header': '{{name}} requested an approval',
+    'approvals.detail.workflowName': '{{workflow}} workflow',
+    'approvals.detail.workOrder': 'Work order',
+    'approvals.detail.workItem': 'Work item',
+    'approvals.detail.reasonFromRequester': 'Reason from requester',
+    'approvals.detail.notApprover':
+      "You don't have the capability to approve this transition.",
+    'approvals.detail.by': 'by {{name}}',
+    'approvals.action.approve': 'Approve',
+    'approvals.action.reject': 'Reject',
+    'approvals.action.reasonOptional':
+      'Add a note (optional on approve, required on reject)',
+    'approvals.action.reasonRequired': 'Reason required to reject',
+    'approvals.action.notePlaceholder':
+      'A note to {{requesterName}} — visible in the audit log…',
+    'approvals.action.nextPrev': 'Next / Prev',
+    'approvals.empty.allClear.title': 'All clear',
+    'approvals.empty.allClear.description': 'No approvals waiting on you right now.',
+    'approvals.empty.noResults.title': 'No approvals match this filter',
+    'approvals.empty.noResults.description': 'Try a different tab.',
+    'approvals.errors.couldNotLoad': "Couldn't load approvals",
+    'approvals.callout.title': 'Approval pending',
+    'approvals.callout.requestedBy': 'Requested by {{name}} {{time}}',
+    'approvals.callout.viewInQueue': 'View in queue →',
+    'approvals.callout.viewAllInQueue': 'View all {{count}} in queue →',
+    'approvals.callout.rejectTitle': 'Reject this approval?',
+    'approvals.callout.rejectMessage':
+      'Provide a reason — the requester will see it in the audit log.',
+    'approvals.nav.pendingCount': '{{count}} pending approvals',
+    'approvals.nav.bellAria': 'Approvals — {{count}} pending',
+    'approvals.notifications.approved': 'Approved · {{transition}}',
+    'approvals.notifications.rejected': 'Rejected · {{transition}}',
+    'approvals.notifications.errorApprove': "Couldn't approve",
+    'approvals.notifications.errorReject': "Couldn't reject",
+    'common.id': 'ID',
+    'common.customer': 'Customer',
+    'common.serviceLocation': 'Service location',
+    'common.clear': 'Clear',
   };
 
   return {
