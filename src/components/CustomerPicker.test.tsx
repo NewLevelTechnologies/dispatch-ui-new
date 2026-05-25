@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import CustomerPicker from './CustomerPicker';
@@ -96,6 +96,14 @@ describe('CustomerPicker', () => {
     ).not.toBeInTheDocument();
   });
 
+  // Note on typing: the picker's onFocus schedules an inputRef.select()
+  // via requestAnimationFrame to make a fresh typing session replace any
+  // resting selection. Under suite load that rAF can fire BETWEEN
+  // userEvent.type()'s per-character keystrokes, selecting the in-progress
+  // text and letting the next char replace it — the input ends up holding
+  // only the last typed character and the test sees no API call. Driving
+  // the query with fireEvent.change is the equivalent of "the user pasted
+  // the full term": one onChange event, no race with the rAF.
   it('renders results and selects one — calling onChange and clearing the typed query', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -120,7 +128,7 @@ describe('CustomerPicker', () => {
     renderWithProviders(<CustomerPicker value={null} onChange={onChange} />);
     const input = screen.getByRole('textbox') as HTMLInputElement;
     await user.click(input);
-    await user.type(input, 'acme');
+    fireEvent.change(input, { target: { value: 'acme' } });
 
     // The debounce settles (300ms), the listbox renders both rows.
     const row = await screen.findByRole('option', { name: /acme plumbing/i }, { timeout: 5000 });
@@ -142,9 +150,10 @@ describe('CustomerPicker', () => {
     });
 
     renderWithProviders(<CustomerPicker value={null} onChange={vi.fn()} />);
-    const input = screen.getByRole('textbox');
+    const input = screen.getByRole('textbox') as HTMLInputElement;
     await user.click(input);
-    await user.type(input, 'zzz');
+    // Drive the query in one shot — see the rAF-vs-keystrokes note above.
+    fireEvent.change(input, { target: { value: 'zzz' } });
 
     expect(
       await screen.findByText(/no customers match/i, undefined, { timeout: 5000 }),

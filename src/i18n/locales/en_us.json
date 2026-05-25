@@ -1401,17 +1401,29 @@
         "email": "Email",
         "sms": "SMS"
       },
+      "clearFilters": "Clear filters",
       "description": "Customize email and SMS notification templates for your organization. Templates use Mustache syntax (e.g. {{customer_name}}) for variable substitution.",
       "empty": "No notification templates found.",
+      "emptyDescription": "Templates are seeded automatically — if you're seeing this, something hasn't been provisioned yet.",
       "errorLoad": "Failed to load notification templates.",
       "errorLoadDetail": "Failed to load template details",
       "errorRevert": "Failed to revert template to default",
+      "filter": {
+        "allChannels": "All channels",
+        "allStatuses": "All statuses",
+        "channel": "Channel",
+        "status": "Status"
+      },
+      "footerCount": "Showing {{count}} of {{total}} templates",
       "loading": "Loading templates...",
       "nounPlural": "templates",
+      "searchPlaceholder": "Search templates…",
+      "subtitle": "Customize the email and SMS messages sent to customers. Use Mustache variables like",
+      "summary": "customized · {{systemDefault}} on system defaults",
       "versionShort": "v{{version}}",
       "status": {
         "customized": "Customized",
-        "systemDefault": "System Default"
+        "systemDefault": "System default"
       },
       "table": {
         "channel": "Channel",

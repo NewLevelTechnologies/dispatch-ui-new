@@ -28,7 +28,7 @@ describe('SettingsLayout', () => {
     const links = within(rail).getAllByRole('link').map((a) => a.getAttribute('href'));
     expect(links).toContain('/settings/company-profile');
     expect(links).toContain('/settings/terminology');
-    expect(links).toContain('/settings/notification-templates');
+    expect(links).toContain('/settings/notifications');
     expect(links).toContain('/settings/dispatch-regions');
     expect(links).toContain('/settings/work-orders/types');
     expect(links).toContain('/settings/work-orders/divisions');

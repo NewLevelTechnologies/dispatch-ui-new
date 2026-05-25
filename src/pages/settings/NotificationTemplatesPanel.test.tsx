@@ -6,121 +6,108 @@ import apiClient from '../../api/client';
 
 vi.mock('../../api/client');
 
+const navigateSpy = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => navigateSpy,
+  };
+});
+
 const mockTemplates = [
   {
     id: 'tpl-1',
-    type: 'INVOICE_CREATED',
-    displayName: 'Invoice Created',
+    notificationTypeKey: 'invoice_sent',
+    displayName: 'Invoice Sent',
     channel: 'EMAIL',
     subject: 'Your invoice is ready',
     isSystemTemplate: true,
+    hasHtmlBody: false,
+    tenantId: null,
     version: 1,
+    isActive: true,
   },
   {
     id: 'tpl-2',
-    type: 'WORK_ORDER_COMPLETED',
+    notificationTypeKey: 'work_order_completed',
     displayName: 'Work Order Completed',
     channel: 'SMS',
     subject: null,
     isSystemTemplate: false,
+    hasHtmlBody: false,
+    tenantId: 'tenant-1',
     version: 3,
+    isActive: true,
+  },
+  // PUSH should be filtered out client-side — the stubbed FAILED channel.
+  {
+    id: 'tpl-3',
+    notificationTypeKey: 'never_shown',
+    displayName: 'Push Notification',
+    channel: 'PUSH',
+    subject: null,
+    isSystemTemplate: true,
+    hasHtmlBody: false,
+    tenantId: null,
+    version: 1,
+    isActive: true,
   },
 ];
 
 describe('NotificationTemplatesPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: { templates: mockTemplates } });
+    navigateSpy.mockReset();
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { templates: mockTemplates },
+    });
   });
 
   it('renders templates with channel and status', async () => {
     renderWithProviders(<NotificationTemplatesPanel />);
 
     await waitFor(() => {
-      expect(screen.getByText('Invoice Created')).toBeInTheDocument();
+      expect(screen.getByText('Invoice Sent')).toBeInTheDocument();
     });
     expect(screen.getByText('Work Order Completed')).toBeInTheDocument();
-    expect(screen.getByText('System Default')).toBeInTheDocument();
+    expect(screen.getByText('System default')).toBeInTheDocument();
     expect(screen.getByText('Customized')).toBeInTheDocument();
     expect(screen.getByText(/your invoice is ready/i)).toBeInTheDocument();
   });
 
-  it('shows a Customize link for system templates and an Edit link for customized', async () => {
+  it('filters PUSH templates out of the list', async () => {
     renderWithProviders(<NotificationTemplatesPanel />);
 
-    await waitFor(() => expect(screen.getByText('Invoice Created')).toBeInTheDocument());
-
-    expect(screen.getByRole('button', { name: /^customize$/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Invoice Sent')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Push Notification')).not.toBeInTheDocument();
   });
 
-  it('renders empty state when no templates', async () => {
+  it('navigates to the edit page when a row is clicked', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NotificationTemplatesPanel />);
+
+    await waitFor(() =>
+      expect(screen.getByText('Invoice Sent')).toBeInTheDocument()
+    );
+
+    await user.click(screen.getByText('Invoice Sent'));
+
+    expect(navigateSpy).toHaveBeenCalledWith('/settings/notifications/tpl-1');
+  });
+
+  it('shows the empty state when the catalog is empty', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: { templates: [] } });
     renderWithProviders(<NotificationTemplatesPanel />);
 
     await waitFor(() => {
-      expect(screen.getByText(/no notification templates/i)).toBeInTheDocument();
+      expect(screen.getByText(/no templates yet/i)).toBeInTheDocument();
     });
   });
 
-  it('opens the editor when Customize is clicked (calls getById)', async () => {
-    const user = userEvent.setup();
-    const fullTemplate = {
-      id: 'tpl-1',
-      type: 'INVOICE_CREATED',
-      displayName: 'Invoice Created',
-      channel: 'EMAIL',
-      subject: 'Your invoice is ready',
-      bodyText: 'Hi {{customer_name}}',
-      bodyHtml: null,
-      variables: [],
-      isSystemTemplate: true,
-      version: 1,
-    };
-    vi.mocked(apiClient.get).mockImplementation((url: string) => {
-      if (url.includes('/notification-templates/tpl-1')) {
-        return Promise.resolve({ data: fullTemplate });
-      }
-      return Promise.resolve({ data: { templates: mockTemplates } });
-    });
-
-    renderWithProviders(<NotificationTemplatesPanel />);
-
-    await waitFor(() => expect(screen.getByText('Invoice Created')).toBeInTheDocument());
-
-    await user.click(screen.getByRole('button', { name: /^customize$/i }));
-
-    await waitFor(() => {
-      expect(apiClient.get).toHaveBeenCalledWith('/notification-templates/tpl-1');
-    });
-  });
-
-  it('surfaces an alert when getById fails on customize', async () => {
-    const user = userEvent.setup();
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    vi.mocked(apiClient.get).mockImplementation((url: string) => {
-      if (url.includes('/notification-templates/tpl-1')) {
-        return Promise.reject(new Error('not found'));
-      }
-      return Promise.resolve({ data: { templates: mockTemplates } });
-    });
-
-    renderWithProviders(<NotificationTemplatesPanel />);
-
-    await waitFor(() => expect(screen.getByText('Invoice Created')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: /^customize$/i }));
-
-    await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalled();
-    });
-
-    alertSpy.mockRestore();
-    consoleSpy.mockRestore();
-  });
-
-  it('surfaces API error message on load failure', async () => {
+  it('surfaces an error state on load failure with a retry action', async () => {
     const error = Object.assign(new Error('fail'), {
       response: { data: { message: 'Templates service down' } },
     });
@@ -130,6 +117,18 @@ describe('NotificationTemplatesPanel', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Templates service down')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
+  });
+
+  it('surfaces the customized summary on the toolbar when overrides exist', async () => {
+    renderWithProviders(<NotificationTemplatesPanel />);
+
+    await waitFor(() => {
+      // 1 customized + 1 system default after PUSH filter
+      expect(
+        screen.getByText(/1 on system defaults/i)
+      ).toBeInTheDocument();
     });
   });
 });

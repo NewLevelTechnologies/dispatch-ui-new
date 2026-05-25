@@ -33,7 +33,7 @@ export default function SettingsLayout() {
         { label: t('settings.nav.businessDefaults'), to: '/settings/business-defaults', soon: true },
         { label: t('settings.nav.modulesFeatures'), to: '/settings/modules-features', soon: true },
         { label: t('settings.nav.terminology'), to: '/settings/terminology' },
-        { label: t('settings.nav.notificationTemplates'), to: '/settings/notification-templates' },
+        { label: t('settings.nav.notificationTemplates'), to: '/settings/notifications' },
       ],
     },
     {
