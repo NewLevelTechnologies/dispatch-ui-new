@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { useAuthenticator } from '@aws-amplify/ui-react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useGlossary } from '../contexts/GlossaryContext';
 import {
@@ -24,7 +25,10 @@ import {
   EllipsisHorizontalIcon,
   LifebuoyIcon,
   ArrowRightStartOnRectangleIcon,
+  BellIcon,
+  CheckBadgeIcon,
 } from '@heroicons/react/24/outline';
+import { approvalsApi } from '../api';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarHeading, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
 import { Navbar } from './catalyst/navbar';
@@ -41,7 +45,7 @@ const ENV_BADGE: Record<string, { label: string; className: string }> = {
 };
 
 export default function AppLayout({ children, flush }: { children: React.ReactNode; flush?: boolean }) {
-  const { user, signOut } = useAuthenticator((context) => [context.user]);
+  const { user, signOut, authStatus } = useAuthenticator((context) => [context.user, context.authStatus]);
   const location = useLocation();
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -67,17 +71,38 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
   // Permission checks for navigation visibility
   const canViewSettings = useHasAnyCapability('VIEW_SETTINGS');
 
+  // Pending approvals assigned to me — drives the sidebar badge AND the
+  // topbar bell. Polls every 60s and refetches on window focus so a
+  // newly-assigned request surfaces without a manual reload.
+  const { data: pendingApprovalCount = 0 } = useQuery({
+    queryKey: ['approvals', 'count', { assignedToMe: true, status: 'PENDING' }],
+    queryFn: async () => {
+      try {
+        return await approvalsApi.getCount({ assignedToMe: true, status: 'PENDING' });
+      } catch {
+        const list = await approvalsApi.list({ assignedToMe: true, status: 'PENDING' });
+        return list.length;
+      }
+    },
+    enabled: authStatus === 'authenticated',
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    staleTime: 30_000,
+  });
+
   const envKey = (import.meta.env.VITE_ENV || '').toLowerCase();
   const envBadge = ENV_BADGE[envKey];
 
   const isCurrent = (href: string) =>
     href === '/dashboard' ? location.pathname === href : location.pathname.startsWith(href);
 
-  const mainNavigation = [
+  type MainNavItem = { name: string; href: string; icon: typeof HomeIcon; badge?: number };
+  const mainNavigation: MainNavItem[] = [
     { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
     { name: getName('customer', true), href: '/customers', icon: UserGroupIcon },
     { name: getName('service_location', true), href: '/service-locations', icon: MapPinIcon },
     { name: getName('work_order', true), href: '/work-orders', icon: ClipboardDocumentListIcon },
+    { name: t('approvals.title'), href: '/approvals', icon: CheckBadgeIcon, badge: pendingApprovalCount },
   ];
 
   const equipmentNavigation = [
@@ -160,6 +185,14 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                   >
                     <item.icon data-slot="icon" />
                     <span>{item.name}</span>
+                    {item.badge != null && item.badge > 0 && (
+                      <span
+                        aria-label={t('approvals.nav.pendingCount', { count: item.badge })}
+                        className="ml-auto inline-flex h-[18px] min-w-[20px] items-center justify-center rounded-full bg-accent-500 px-1.5 font-mono text-[10px] font-semibold text-white"
+                      >
+                        {item.badge > 99 ? '99+' : item.badge}
+                      </span>
+                    )}
                   </SidebarItem>
                 );
               })}
@@ -354,6 +387,21 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
             <span className="text-fg-dim">{t('common.search')}</span>
             <span aria-hidden className="ml-auto rounded border border-border bg-bg px-1.5 py-px font-mono text-[10px]">{'⌘K'}</span>
           </div>
+          <Link
+            to="/approvals?tab=pending"
+            aria-label={t('approvals.nav.bellAria', { count: pendingApprovalCount })}
+            className="relative grid size-8 shrink-0 place-items-center rounded-md text-fg-muted hover:bg-bg-hover hover:text-fg-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+          >
+            <BellIcon className="size-[18px]" />
+            {pendingApprovalCount > 0 && (
+              <span
+                aria-hidden
+                className="absolute -top-px -right-px inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full border-2 border-bg bg-accent-500 px-[3px] font-mono text-[9.5px] font-bold leading-none text-white"
+              >
+                {pendingApprovalCount > 99 ? '99+' : pendingApprovalCount}
+              </span>
+            )}
+          </Link>
         </Navbar>
       }
     >
