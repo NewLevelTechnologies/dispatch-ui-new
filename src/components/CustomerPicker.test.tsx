@@ -95,4 +95,59 @@ describe('CustomerPicker', () => {
       screen.queryByText(/type to search|type at least/i),
     ).not.toBeInTheDocument();
   });
+
+  it('renders results and selects one — calling onChange and clearing the typed query', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        content: [
+          standard,
+          {
+            id: 'c-2',
+            name: 'Quill Warranty',
+            type: 'BILLING_ONLY',
+            displayMode: 'STANDARD',
+          },
+        ],
+        totalElements: 2,
+        totalPages: 1,
+        number: 0,
+        size: 25,
+      },
+    });
+
+    renderWithProviders(<CustomerPicker value={null} onChange={onChange} />);
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    await user.click(input);
+    await user.type(input, 'acme');
+
+    // The debounce settles (300ms), the listbox renders both rows.
+    const row = await screen.findByRole('option', { name: /acme plumbing/i }, { timeout: 5000 });
+    const billingOnlyRow = screen.getByRole('option', { name: /quill warranty/i });
+    expect(billingOnlyRow).toBeInTheDocument();
+    // The badge span is the second child of the BILLING_ONLY <li>.
+    expect(billingOnlyRow.children.length).toBe(2);
+
+    // Selecting calls onChange and snaps the visible input back to the
+    // selection (query cleared).
+    await user.click(row);
+    expect(onChange).toHaveBeenCalledWith(standard);
+  });
+
+  it('shows the no-results message when search returns an empty page', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 },
+    });
+
+    renderWithProviders(<CustomerPicker value={null} onChange={vi.fn()} />);
+    const input = screen.getByRole('textbox');
+    await user.click(input);
+    await user.type(input, 'zzz');
+
+    expect(
+      await screen.findByText(/no customers match/i, undefined, { timeout: 5000 }),
+    ).toBeInTheDocument();
+  });
 });
