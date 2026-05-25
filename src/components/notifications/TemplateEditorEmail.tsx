@@ -2,16 +2,30 @@
 // Email channel editor: Subject card + Body card with Plain/HTML toggle.
 // Variable strip lives under each editor field so the chips stay close
 // to the cursor they'll insert into.
+//
+// Plain-text tab uses a textarea (it's plain text — no syntax to surface).
+// HTML tab uses a CodeMirror wrapper so the source gets syntax highlighting,
+// bracket matching, and inline {{var}} chip decoration that matches the
+// preview pane.
 
-import { useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useMemo, useRef, useState } from 'react';
 import { Card } from '../catalyst/card';
 import { Field } from '../catalyst/fieldset';
 import { Input } from '../catalyst/input';
 import { Textarea } from '../catalyst/textarea';
+import { Text } from '../catalyst/text';
 import { ToggleGroup, ToggleGroupOption } from '../ui/ToggleGroup';
 import { VariableStrip } from './VariableStrip';
+import type { HtmlCodeEditorHandle } from './HtmlCodeEditor';
 import { insertAtCursor, variablesForScope } from '../../lib/templateEditor';
 import type { NotificationTemplateVariable } from '../../api';
+
+// CodeMirror + the HTML language pack are sizable (~400 KB pre-gzip).
+// They only matter when the user actually opens the HTML body tab, so
+// keep them in a separate chunk and Suspend on first reveal.
+const HtmlCodeEditor = lazy(() =>
+  import('./HtmlCodeEditor').then((m) => ({ default: m.HtmlCodeEditor }))
+);
 
 export type EmailEditorForm = {
   subject: string;
@@ -29,7 +43,8 @@ type BodyTab = 'plain' | 'html';
 
 export function TemplateEditorEmail({ form, onChange, variables }: Props) {
   const subjectRef = useRef<HTMLInputElement>(null);
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const plainBodyRef = useRef<HTMLTextAreaElement>(null);
+  const htmlEditorRef = useRef<HtmlCodeEditorHandle>(null);
   const [bodyTab, setBodyTab] = useState<BodyTab>('plain');
 
   const subjectChips = useMemo(
@@ -43,6 +58,16 @@ export function TemplateEditorEmail({ form, onChange, variables }: Props) {
 
   const update = (patch: Partial<EmailEditorForm>) => {
     onChange({ ...form, ...patch });
+  };
+
+  const insertIntoBody = (name: string) => {
+    if (bodyTab === 'html') {
+      htmlEditorRef.current?.insertAtCursor(`{{${name}}}`);
+      return;
+    }
+    insertAtCursor(plainBodyRef, name, (next) =>
+      update({ bodyTemplate: next })
+    );
   };
 
   return (
@@ -87,36 +112,43 @@ export function TemplateEditorEmail({ form, onChange, variables }: Props) {
         }
         className="mb-3"
       >
-        <Field size="xs">
-          <Textarea
-            ref={bodyRef}
-            rows={12}
-            className="font-mono text-[12px] leading-[1.55]"
-            value={
-              bodyTab === 'plain' ? form.bodyTemplate : form.htmlBodyTemplate
+        {bodyTab === 'plain' ? (
+          <Field size="xs">
+            <Textarea
+              ref={plainBodyRef}
+              rows={12}
+              className="font-mono text-[12px] leading-[1.55]"
+              value={form.bodyTemplate}
+              onChange={(e) => update({ bodyTemplate: e.target.value })}
+              aria-label="Plain-text body"
+            />
+          </Field>
+        ) : (
+          <Suspense
+            fallback={
+              <div
+                className="flex items-center justify-center rounded-md border border-border bg-bg-elev"
+                style={{ minHeight: '266px' }}
+              >
+                <Text size="sm" tone="muted">
+                  Loading editor…
+                </Text>
+              </div>
             }
-            onChange={(e) =>
-              update(
-                bodyTab === 'plain'
-                  ? { bodyTemplate: e.target.value }
-                  : { htmlBodyTemplate: e.target.value }
-              )
-            }
-            aria-label={bodyTab === 'plain' ? 'Plain-text body' : 'HTML body'}
-          />
-        </Field>
+          >
+            <HtmlCodeEditor
+              ref={htmlEditorRef}
+              value={form.htmlBodyTemplate}
+              onChange={(next) => update({ htmlBodyTemplate: next })}
+              ariaLabel="HTML body"
+              minLines={14}
+            />
+          </Suspense>
+        )}
         <VariableStrip
           hint="Insert variable"
           chips={bodyChips}
-          onInsert={(name) =>
-            insertAtCursor(bodyRef, name, (next) =>
-              update(
-                bodyTab === 'plain'
-                  ? { bodyTemplate: next }
-                  : { htmlBodyTemplate: next }
-              )
-            )
-          }
+          onInsert={insertIntoBody}
         />
       </Card>
     </>
