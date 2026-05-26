@@ -102,6 +102,13 @@ export const tenantSettingsApi = {
     );
     return response.data;
   },
+
+  // Removes the tenant logo. No request body; returns the full updated settings
+  // with all logo* URLs nulled out. Safe to call when no logo is set.
+  deleteLogo: async (): Promise<TenantSettings> => {
+    const response = await apiClient.delete<TenantSettings>('/tenant-settings/logo');
+    return response.data;
+  },
 };
 
 export default tenantSettingsApi;
