@@ -14,6 +14,7 @@ import { Button } from '../../components/catalyst/button';
 import { Input } from '../../components/catalyst/input';
 import { Card } from '../../components/ui/Card';
 import { SettingsPageHeader } from '../../components/settings/SettingsPageHeader';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 
 export default function TerminologyPanel() {
   const queryClient = useQueryClient();
@@ -80,6 +81,14 @@ export default function TerminologyPanel() {
 
   const handleResetToDefaults = () => {
     setGlossaryCustomizations({});
+  };
+
+  const handleGlossaryReset = (entityCode: string) => {
+    setGlossaryCustomizations((prev) => {
+      const updated = { ...prev };
+      delete updated[entityCode];
+      return updated;
+    });
   };
 
   if (isLoading) {
@@ -183,18 +192,22 @@ export default function TerminologyPanel() {
         // Edit mode: full list with placeholder = default
         return (
           <Card className="overflow-hidden">
-            <div className="grid grid-cols-[1fr_minmax(220px,1.2fr)_minmax(220px,1.2fr)] border-b border-border bg-bg-elev-2 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-fg-muted">
+            <div className="grid grid-cols-[1fr_minmax(220px,1.2fr)_minmax(220px,1.2fr)_2.25rem] border-b border-border bg-bg-elev-2 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-fg-muted">
               <div>{t('tenantSettings.glossary.entity')}</div>
               <div>{t('tenantSettings.glossary.singularForm')}</div>
               <div>{t('tenantSettings.glossary.pluralForm')}</div>
+              <div />
             </div>
             <div className="divide-y divide-border-soft">
               {availableEntities.map((entity) => {
                 const customization = glossaryCustomizations[entity.code];
+                const isCustomized = Boolean(
+                  customization?.singular?.trim() || customization?.plural?.trim(),
+                );
                 return (
                   <div
                     key={entity.code}
-                    className="grid grid-cols-[1fr_minmax(220px,1.2fr)_minmax(220px,1.2fr)] items-start gap-x-4 px-4 py-3"
+                    className="grid grid-cols-[1fr_minmax(220px,1.2fr)_minmax(220px,1.2fr)_2.25rem] items-start gap-x-4 px-4 py-3"
                   >
                     <div>
                       <div className="text-[13px] font-semibold text-fg-strong">
@@ -225,6 +238,19 @@ export default function TerminologyPanel() {
                         }
                         placeholder={entity.defaultPlural}
                       />
+                    </div>
+                    <div className="flex justify-end pt-1.5">
+                      {isCustomized && (
+                        <button
+                          type="button"
+                          onClick={() => handleGlossaryReset(entity.code)}
+                          title={t('tenantSettings.glossary.resetToDefault')}
+                          aria-label={t('tenantSettings.glossary.resetToDefault')}
+                          className="inline-flex size-7 items-center justify-center rounded text-fg-muted hover:text-fg-strong hover:bg-bg-elev-2 transition-colors"
+                        >
+                          <ArrowPathIcon className="size-4" aria-hidden="true" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
