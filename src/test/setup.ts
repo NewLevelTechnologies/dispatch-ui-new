@@ -1226,6 +1226,7 @@ vi.mock('react-i18next', () => {
     'settings.terminology.groupEquipment': 'Equipment',
     'settings.terminology.groupMoney': 'Money',
     'settings.terminology.groupOperations': 'Operations',
+    'settings.terminology.groupOther': 'Other',
     'settings.terminology.groupPeople': 'People',
     'settings.terminology.groupWork': 'Work',
     'settings.terminology.noChanges': 'No changes',

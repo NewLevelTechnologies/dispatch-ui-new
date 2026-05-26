@@ -92,7 +92,7 @@ export const PRESETS: Preset[] = [
     Icon: WrenchScrewdriverIcon,
     overrides: {
       work_order: { singular: 'Repair', plural: 'Repairs' },
-      service_location: { singular: 'Home', plural: 'Homes' },
+      service_location: { singular: 'Address', plural: 'Addresses' },
       equipment: { singular: 'Appliance', plural: 'Appliances' },
       dispatch: { singular: 'Service Call', plural: 'Service Calls' },
     },
@@ -148,12 +148,13 @@ export const PRESETS: Preset[] = [
   {
     id: 'property',
     label: 'Property Maintenance',
-    blurb: 'Task-based vocabulary for in-house maintenance teams across a property portfolio.',
+    blurb: 'Maintenance-request vocabulary for in-house teams across a tenant-occupied property portfolio.',
     Icon: HomeModernIcon,
     overrides: {
-      work_order: { singular: 'Task', plural: 'Tasks' },
+      customer: { singular: 'Tenant', plural: 'Tenants' },
+      work_order: { singular: 'Maintenance Request', plural: 'Maintenance Requests' },
       technician: { singular: 'Maintenance Tech', plural: 'Maintenance Techs' },
-      service_location: { singular: 'Property', plural: 'Properties' },
+      service_location: { singular: 'Unit', plural: 'Units' },
       equipment: { singular: 'Asset', plural: 'Assets' },
     },
   },
@@ -180,7 +181,18 @@ export function pluralize(s: string): string {
 
 // Entity-code → group bucket. Used by the page to render six grouped
 // cards instead of one long flat list. The eyebrow labels live in i18n.
-export type GroupId = 'customer' | 'work' | 'people' | 'equipment' | 'operations' | 'money';
+// 'other' is a catch-all bucket for entity codes the backend returns that
+// aren't in ENTITY_GROUP below. No entity maps to it statically; it only
+// appears when the FE registry has drifted behind the BE. See the
+// bucketing logic in TerminologyPanel.
+export type GroupId =
+  | 'customer'
+  | 'work'
+  | 'people'
+  | 'equipment'
+  | 'operations'
+  | 'money'
+  | 'other';
 
 export const GROUP_ORDER: GroupId[] = [
   'customer',
@@ -189,6 +201,7 @@ export const GROUP_ORDER: GroupId[] = [
   'equipment',
   'operations',
   'money',
+  'other',
 ];
 
 export const ENTITY_GROUP: Record<string, GroupId> = {
