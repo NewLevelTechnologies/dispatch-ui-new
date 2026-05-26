@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { ArrowPathIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, ArrowRightIcon, CheckIcon } from '@heroicons/react/24/outline';
 import {
   glossaryApi,
   tenantSettingsApi,
@@ -91,6 +91,49 @@ function countCustomized(form: FormState): number {
   return Object.keys(form).filter((c) => isRowCustomized(form, c)).length;
 }
 
+// View-model for the apply-preset confirmation. Spelled out so the
+// dialog can make the merge model visible in plain English:
+//   · `definedLabels` — entities this preset has its own names for
+//   · `keptLabels`    — entities currently customized that the preset
+//                       does NOT touch (kept untouched on apply)
+//   · `replaced`      — entities currently customized AND in the preset
+//                       (the only fields that lose a value), with a
+//                       before→after diff
+interface PresetDialogData {
+  preset: Preset;
+  targetCount: number;
+  definedLabels: string[];
+  keptLabels: string[];
+  replaced: { code: string; label: string; from: string; to: string }[];
+}
+
+function buildPresetDialogData(
+  preset: Preset,
+  form: FormState,
+  labelFor: (code: string) => string,
+): PresetDialogData {
+  const targets = Object.keys(preset.overrides);
+  const targetSet = new Set(targets);
+  const replaced = targets
+    .filter((code) => isRowCustomized(form, code))
+    .map((code) => ({
+      code,
+      label: labelFor(code),
+      from: form[code]?.singular.trim() || form[code]?.plural.trim() || '',
+      to: preset.overrides[code].singular,
+    }));
+  const keptLabels = Object.keys(form)
+    .filter((code) => !targetSet.has(code) && isRowCustomized(form, code))
+    .map(labelFor);
+  return {
+    preset,
+    targetCount: targets.length,
+    definedLabels: targets.map(labelFor),
+    keptLabels,
+    replaced,
+  };
+}
+
 // Group display name resolved via i18n. Defined here (not as a literal
 // map) so the eyebrow labels stay translatable.
 function groupLabel(t: (k: string) => string, g: GroupId): string {
@@ -153,6 +196,16 @@ export default function TerminologyPanel() {
 
   const dirty = useMemo(() => !sameForm(form, baseline), [form, baseline]);
   const customCount = useMemo(() => countCustomized(form), [form]);
+
+  // Built when a preset chip is clicked. Memoized so the dialog's
+  // captured copy stays a stable reference through its close animation
+  // (the modal blocks edits, so `form` can't change while it's open).
+  const presetDialogData = useMemo(() => {
+    if (!pendingPreset || !entitiesQuery.data) return null;
+    const labelFor = (code: string) =>
+      entitiesQuery.data.find((e) => e.code === code)?.defaultSingular ?? code;
+    return buildPresetDialogData(pendingPreset, form, labelFor);
+  }, [pendingPreset, form, entitiesQuery.data]);
 
   const saveMutation = useMutation({
     mutationFn: (glossary: Glossary) => tenantSettingsApi.updateSettings({ glossary }),
@@ -405,12 +458,7 @@ export default function TerminologyPanel() {
 
       {/* Apply-preset confirmation */}
       <ApplyPresetDialog
-        preset={pendingPreset}
-        overwriteCount={
-          pendingPreset
-            ? countOverwrites(form, pendingPreset)
-            : 0
-        }
+        data={presetDialogData}
         onCancel={() => setPendingPreset(null)}
         onConfirm={(p) => handleApplyPreset(p)}
       />
@@ -427,18 +475,6 @@ export default function TerminologyPanel() {
       />
     </div>
   );
-}
-
-// Count how many of `form`'s currently-customized rows would be replaced
-// by applying `preset`. We only count rows that are BOTH currently
-// customized AND in the preset's overrides — that's what the warning
-// callout's copy promises ("N customized names will be replaced").
-function countOverwrites(form: FormState, preset: Preset): number {
-  let count = 0;
-  for (const code of Object.keys(preset.overrides)) {
-    if (isRowCustomized(form, code)) count++;
-  }
-  return count;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -594,71 +630,111 @@ function EntityRow({
 }
 
 // ─────────────────────────────────────────────────────────────────
-// ApplyPresetDialog — confirms a preset before merging into form
-// state. On clean (no customizations) shows a muted "nothing to
-// overwrite" note. With customizations shows a warning Callout with
-// the count.
+// ApplyPresetDialog — confirms a preset before merging into form state.
+// Makes the merge model visible in plain English: what the preset
+// defines, what stays untouched, and a before→after diff for the
+// fields that actually change.
 // ─────────────────────────────────────────────────────────────────
 function ApplyPresetDialog({
-  preset,
-  overwriteCount,
+  data,
   onCancel,
   onConfirm,
 }: {
-  preset: Preset | null;
-  overwriteCount: number;
+  data: PresetDialogData | null;
   onCancel: () => void;
   onConfirm: (p: Preset) => void;
 }) {
   const { t } = useTranslation();
-  const open = preset !== null;
-  // The dialog stays mounted across opens so the body can read `preset`
-  // through the close animation. The captured `preset` is the
-  // most-recently-non-null value, refreshed every render where the prop
-  // is non-null — without this, the content vanishes mid-fade when the
-  // parent resets `preset` to `null` on confirm/cancel.
-  const [captured, setCaptured] = useState<Preset | null>(preset);
+  const open = data !== null;
+  // The dialog stays mounted across opens so the body can read `data`
+  // through the close animation. The captured value is the
+  // most-recently-non-null data — without this, the content vanishes
+  // mid-fade when the parent resets `data` to `null` on confirm/cancel.
+  const [captured, setCaptured] = useState<PresetDialogData | null>(data);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: capture the most-recent non-null preset for stable rendering during the dialog's close animation
-    if (preset) setCaptured(preset);
-  }, [preset]);
-  const p = captured;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: capture the most-recent non-null data for stable rendering during the dialog's close animation
+    if (data) setCaptured(data);
+  }, [data]);
+  const d = captured;
 
   return (
     <Dialog open={open} onClose={onCancel} size="md">
-      {p && (
+      {d && (
         <>
           <DialogTitle>
-            {t('settings.terminology.applyPresetConfirmTitle', { name: p.label })}
+            {t('settings.terminology.applyPresetConfirmTitle', { name: d.preset.label })}
           </DialogTitle>
           <DialogDescription>
             {t('settings.terminology.applyPresetSubline')}
           </DialogDescription>
           <DialogBody>
-            <Text size="sm" tone="muted">{p.blurb}</Text>
-            <div className="mt-3">
-              {overwriteCount > 0 ? (
-                <Callout kind="warning">
-                  {/* Manual pluralization: i18n mock in tests doesn't
-                      route through i18next's plural detection, so we
-                      pick the key based on count rather than rely on
-                      automatic _other resolution. */}
-                  {overwriteCount === 1
-                    ? t('settings.terminology.overwriteCount', { count: overwriteCount })
-                    : t('settings.terminology.overwriteCount_other', { count: overwriteCount })}
-                </Callout>
-              ) : (
+            {d.targetCount === 0 ? (
+              // HVAC (and any future no-op preset) — applying changes
+              // nothing. Point the admin at Reset to defaults instead.
+              <Text size="sm" tone="muted">
+                {t('settings.terminology.presetMatchesDefaults', { name: d.preset.label })}
+              </Text>
+            ) : (
+              <div className="space-y-2.5">
                 <Text size="sm" tone="muted">
-                  {t('settings.terminology.cleanNote', { label: p.label })}
+                  {t('settings.terminology.presetDefines', {
+                    name: d.preset.label,
+                    entities: d.definedLabels.join(', '),
+                  })}
                 </Text>
-              )}
-            </div>
+                <Text size="sm" tone="muted">
+                  {d.keptLabels.length > 0
+                    ? t('settings.terminology.presetKept', {
+                        entities: d.keptLabels.join(', '),
+                      })
+                    : t('settings.terminology.presetKeptGeneric')}
+                </Text>
+
+                {d.replaced.length > 0 ? (
+                  <Callout kind="warning">
+                    <div className="font-medium text-fg-strong">
+                      {/* Manual count→key pick: the i18n test mock doesn't
+                          run i18next's plural resolution, so choose the
+                          singular/plural key explicitly. */}
+                      {d.replaced.length === 1
+                        ? t('settings.terminology.presetReplaceIntro_one', {
+                            count: d.replaced.length,
+                            total: d.targetCount,
+                          })
+                        : t('settings.terminology.presetReplaceIntro', {
+                            count: d.replaced.length,
+                            total: d.targetCount,
+                          })}
+                    </div>
+                    <ul className="mt-1.5 space-y-1">
+                      {d.replaced.map((r) => (
+                        <li
+                          key={r.code}
+                          className="flex flex-wrap items-center gap-x-1.5 text-[11.5px]"
+                        >
+                          <span className="font-semibold text-fg-strong">{r.label}</span>
+                          <span className="text-fg-muted">
+                            {t('settings.terminology.presetWas', { value: r.from })}
+                          </span>
+                          <ArrowRightIcon className="size-3 text-fg-muted" aria-hidden="true" />
+                          <span className="font-semibold text-accent-700">{r.to}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Callout>
+                ) : (
+                  <Text size="sm" tone="muted">
+                    {t('settings.terminology.presetNothingCustomized')}
+                  </Text>
+                )}
+              </div>
+            )}
           </DialogBody>
           <DialogActions>
             <Button plain size="xs" onClick={onCancel}>
               {t('common.cancel')}
             </Button>
-            <Button color="accent" size="xs" onClick={() => onConfirm(p)}>
+            <Button color="accent" size="xs" onClick={() => onConfirm(d.preset)}>
               {t('settings.terminology.applyPreset')}
             </Button>
           </DialogActions>

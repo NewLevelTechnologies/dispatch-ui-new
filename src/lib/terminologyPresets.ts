@@ -100,10 +100,10 @@ export const PRESETS: Preset[] = [
   {
     id: 'landscaping',
     label: 'Landscaping',
-    blurb: 'Visit-based vocabulary for recurring outdoor service crews.',
+    blurb: 'Job-based work with crew visits for recurring outdoor service.',
     Icon: SunIcon,
     overrides: {
-      work_order: { singular: 'Visit', plural: 'Visits' },
+      work_order: { singular: 'Job', plural: 'Jobs' },
       technician: { singular: 'Crew Member', plural: 'Crew Members' },
       service_location: { singular: 'Property', plural: 'Properties' },
       dispatch: { singular: 'Visit', plural: 'Visits' },

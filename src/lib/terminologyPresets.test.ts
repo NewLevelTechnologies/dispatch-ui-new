@@ -52,6 +52,21 @@ describe('PRESETS', () => {
     expect(p.overrides.equipment).toEqual({ singular: 'Fixture', plural: 'Fixtures' });
     expect(p.overrides.dispatch).toEqual({ singular: 'Service Call', plural: 'Service Calls' });
   });
+
+  // Two distinct entities sharing a name within one preset (e.g. Work
+  // Order and Dispatch both "Visit") is confusing — guard against it.
+  it('no two entities collide on a name within a single preset', () => {
+    for (const p of PRESETS) {
+      const singulars = Object.values(p.overrides).map((o) => o.singular);
+      const plurals = Object.values(p.overrides).map((o) => o.plural);
+      expect(new Set(singulars).size, `${p.id} has duplicate singular overrides`).toBe(
+        singulars.length
+      );
+      expect(new Set(plurals).size, `${p.id} has duplicate plural overrides`).toBe(
+        plurals.length
+      );
+    }
+  });
 });
 
 describe('entity grouping', () => {

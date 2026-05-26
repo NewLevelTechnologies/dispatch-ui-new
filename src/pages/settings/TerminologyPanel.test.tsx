@@ -220,9 +220,13 @@ describe('TerminologyPanel', () => {
 
     await user.click(screen.getByRole('button', { name: /^Plumbing/i }));
 
-    // Confirm dialog appears with the preset name and the clean note.
+    // Confirm dialog appears with the preset name, the "defines" line,
+    // and (since nothing is customized) the no-overwrite note.
     await screen.findByText(/Apply Plumbing preset\?/i);
-    expect(screen.getByText(/Currently on defaults/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Plumbing has its own names for/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/None of these are customized yet/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /^apply preset$/i }));
 
@@ -252,8 +256,13 @@ describe('TerminologyPanel', () => {
 
     await user.click(screen.getByRole('button', { name: /^Plumbing/i }));
 
-    // Warning callout: "2 customized names will be replaced"
-    await screen.findByText(/2 customized names will be replaced/i);
+    // Warning callout: "2 of those 5 are currently customized and will be replaced"
+    await screen.findByText(/2 of those 5 are currently customized and will be replaced/i);
+    // The before→after diff names the changing entities and their new values.
+    expect(screen.getByText(/\(currently Service Call\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/\(currently Tech\)/i)).toBeInTheDocument();
+    // "Plumber" (the new technician value) only exists in the dialog yet.
+    expect(screen.getByText('Plumber')).toBeInTheDocument();
 
     // Cancel leaves prior customizations alone.
     await user.click(screen.getByRole('button', { name: /^cancel$/i }));
