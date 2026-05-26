@@ -8,6 +8,9 @@ import { type NotificationChannel } from './notificationApi';
 // can be removed.
 export type VariableScope = 'SUBJECT' | 'BODY';
 
+// Who a template's notifications go to: CUSTOMER-facing vs INTERNAL staff.
+export type NotificationAudience = 'CUSTOMER' | 'INTERNAL';
+
 export interface NotificationTemplateVariable {
   name: string;
   description: string;
@@ -27,6 +30,7 @@ export interface NotificationTemplate {
   notificationTypeKey: string;
   displayName: string;
   channel: NotificationChannel;
+  audience: NotificationAudience;
   tenantId: string | null;
   isSystemTemplate: boolean;
   subject?: string | null;
@@ -46,6 +50,7 @@ export interface NotificationTemplateListItem {
   notificationTypeKey: string;
   displayName: string;
   channel: NotificationChannel;
+  audience: NotificationAudience;
   tenantId: string | null;
   isSystemTemplate: boolean;
   subject?: string | null;
