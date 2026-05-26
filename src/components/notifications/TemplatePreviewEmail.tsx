@@ -1,3 +1,4 @@
+/* eslint-disable i18next/no-literal-string -- dense visual preview; copy stays inline. Translation pass lives in a follow-up. */
 // Email preview — inbox-card mockup with From / To / Subject header + body.
 // The card sits on an elevated pane (`bg-bg-elev-2`) so the email surface
 // (`bg-bg-elev`) visually rises out of it.
@@ -44,6 +45,10 @@ export function TemplatePreviewEmail({
           {renderWithHighlights(body, sample)}
         </div>
       </div>
+      <p className="mt-2.5 text-[10.5px] leading-[1.5] text-fg-dim">
+        Customers on clients that block remote content see plain-text only —
+        make sure the message reads correctly without HTML formatting.
+      </p>
     </div>
   );
 }

@@ -3,8 +3,15 @@ import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../test/utils';
 import CompanyProfilePanel from './CompanyProfilePanel';
 import apiClient from '../../api/client';
+import { showError, showSuccess } from '../../lib/toast';
 
 vi.mock('../../api/client');
+// Keep extractApiError real (the load-error Callout depends on it); spy on the
+// toast lanes so we can assert success/error feedback.
+vi.mock('../../lib/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/toast')>();
+  return { ...actual, showSuccess: vi.fn(), showError: vi.fn() };
+});
 
 const mockSettings = {
   tenantId: 't-1',
@@ -34,72 +41,106 @@ const mockSettings = {
   updatedAt: '2026-03-27T10:30:00Z',
 };
 
+// Identity is the first card, Operating second, Branding third — each has its
+// own Edit button, so scope clicks by index.
+const editButtons = () => screen.getAllByRole('button', { name: /^(edit|complete identity)$/i });
+
 describe('CompanyProfilePanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockSettings });
   });
 
-  it('renders Company Profile heading and identity values in view mode', async () => {
+  it('renders heading and identity values in view mode', async () => {
     renderWithProviders(<CompanyProfilePanel />);
-    await waitFor(() => expect(screen.getByRole('heading', { name: /company profile/i })).toBeInTheDocument());
-    expect(screen.getByText('Acme HVAC')).toBeInTheDocument();
-    expect(screen.getByText(/123 Main/)).toBeInTheDocument();
-    expect(screen.getByText(/Springfield, IL 62701/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+    expect(screen.getByRole('heading', { name: /company profile/i })).toBeInTheDocument();
     expect(screen.getByText('Acme')).toBeInTheDocument();
     expect(screen.getByText('Comfort First')).toBeInTheDocument();
+    expect(screen.getByText(/123 Main/)).toBeInTheDocument();
+    expect(screen.getByText(/Springfield, IL 62701/)).toBeInTheDocument();
+    expect(screen.getByText('info@acme.com')).toBeInTheDocument();
   });
 
-  it('renders Logo section in view mode', async () => {
+  it('renders the reporting timezone with human label and IANA zone', async () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
-    expect(screen.getByText('Logo')).toBeInTheDocument();
+    expect(screen.getByText('Reporting timezone')).toBeInTheDocument();
+    expect(screen.getByText('Central Time')).toBeInTheDocument();
+    expect(screen.getByText('America/Chicago')).toBeInTheDocument();
   });
 
-  it('does not show non-identity sections (Business Settings, Branding colors, Feature Flags)', async () => {
+  it('renders the branding empty state when no logo is set', async () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
-    expect(screen.queryByText(/Business Settings/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Feature Flags/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Primary Color/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Secondary Color/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Timezone/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/No logo set yet/i)).toBeInTheDocument();
+  });
+
+  it('does not show cut surfaces (Business Defaults, Modules & Features, tax rate)', async () => {
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+    expect(screen.queryByText(/Business Defaults/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Modules & Features/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Default Tax Rate/i)).not.toBeInTheDocument();
   });
 
-  it('switches to edit mode on Edit click and back on Cancel', async () => {
+  it('edits Identity and reverts on Cancel', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /edit/i }));
+    await user.click(editButtons()[0]);
     expect(screen.getByDisplayValue('Acme HVAC')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
 
+    const cityInput = screen.getByDisplayValue('Springfield');
+    await user.clear(cityInput);
+    await user.type(cityInput, 'Shelbyville');
+
     await user.click(screen.getByRole('button', { name: /cancel/i }));
-    expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument();
+    // Back in view mode with the original value.
+    expect(screen.getByText(/Springfield, IL 62701/)).toBeInTheDocument();
   });
 
-  it('submits update with modified company name', async () => {
+  it('saves Identity with the modified company name', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.put).mockResolvedValue({
-      data: { ...mockSettings, companyName: 'New Name' },
-    });
+    vi.mocked(apiClient.put).mockResolvedValue({ data: { ...mockSettings, companyName: 'New Name' } });
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /edit/i }));
-
+    await user.click(editButtons()[0]);
     const nameInput = screen.getByDisplayValue('Acme HVAC');
     await user.clear(nameInput);
     await user.type(nameInput, 'New Name');
-
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => {
       expect(apiClient.put).toHaveBeenCalledWith(
         expect.stringContaining('/tenant'),
         expect.objectContaining({ companyName: 'New Name' }),
+      );
+    });
+    expect(showSuccess).toHaveBeenCalled();
+  });
+
+  it('saves the reporting timezone independently', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({
+      data: { ...mockSettings, timezone: 'America/New_York' },
+    });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    // Operating card is the second Edit button.
+    await user.click(editButtons()[1]);
+    const tzSelect = screen.getByRole('combobox');
+    await user.selectOptions(tzSelect, 'America/New_York');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith(
+        expect.stringContaining('/tenant'),
+        expect.objectContaining({ timezone: 'America/New_York' }),
       );
     });
   });
@@ -110,110 +151,47 @@ describe('CompanyProfilePanel', () => {
     expect(screen.getByText(/loading settings/i)).toBeInTheDocument();
   });
 
-  it('shows error state on fetch failure', async () => {
-    vi.mocked(apiClient.get).mockRejectedValue(new Error('Network error'));
-    renderWithProviders(<CompanyProfilePanel />);
-    await waitFor(() => {
-      expect(screen.getByText(/error loading tenant settings/i)).toBeInTheDocument();
-    });
-  });
-
-  it('surfaces API error message on load failure', async () => {
+  it('surfaces the API error message on load failure', async () => {
     const error = Object.assign(new Error('fail'), {
       response: { data: { message: 'Token expired' } },
     });
     vi.mocked(apiClient.get).mockRejectedValue(error);
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => {
+      expect(screen.getByText("Couldn't load company profile")).toBeInTheDocument();
       expect(screen.getByText('Token expired')).toBeInTheDocument();
     });
   });
 
-  it('rejects logo file larger than 5MB', async () => {
+  it('uploads a valid logo on Save', async () => {
     const user = userEvent.setup();
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { message: 'ok', urls: { original: 'https://x/logo.png' } },
+    });
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: /edit/i }));
 
+    // Branding is the third Edit button.
+    await user.click(editButtons()[2]);
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const bigFile = new File(['x'.repeat(6 * 1024 * 1024)], 'logo.png', { type: 'image/png' });
-    await user.upload(fileInput, bigFile);
-
-    expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/file size/i));
-    alertSpy.mockRestore();
-  });
-
-  it('uploads a valid logo and calls the upload endpoint', async () => {
-    vi.mocked(apiClient.post).mockResolvedValue({
-      data: { ...mockSettings, logoOriginalUrl: 'https://x/logo.png' },
-    });
-    const user = userEvent.setup();
-    renderWithProviders(<CompanyProfilePanel />);
-    await waitFor(() =>
-      expect(screen.getByText('Acme HVAC')).toBeInTheDocument(),
-    );
-    await user.click(screen.getByRole('button', { name: /edit/i }));
-
-    const fileInput = document.querySelector(
-      'input[type="file"]',
-    ) as HTMLInputElement;
     const goodFile = new File(['x'], 'logo.png', { type: 'image/png' });
     await user.upload(fileInput, goodFile);
-
-    await waitFor(() => {
-      expect(apiClient.post).toHaveBeenCalled();
-    });
-  });
-
-  it('updates address fields on edit', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<CompanyProfilePanel />);
-    await waitFor(() =>
-      expect(screen.getByText('Acme HVAC')).toBeInTheDocument(),
-    );
-    await user.click(screen.getByRole('button', { name: /edit/i }));
-
-    const cityInput = screen.getByDisplayValue('Springfield');
-    await user.clear(cityInput);
-    await user.type(cityInput, 'Shelbyville');
-    expect(cityInput).toHaveValue('Shelbyville');
-  });
-
-  it('reverts edits when Cancel is clicked', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<CompanyProfilePanel />);
-    await waitFor(() =>
-      expect(screen.getByText('Acme HVAC')).toBeInTheDocument(),
-    );
-    await user.click(screen.getByRole('button', { name: /edit/i }));
-
-    const cityInput = screen.getByDisplayValue('Springfield');
-    await user.clear(cityInput);
-    await user.type(cityInput, 'Shelbyville');
-
-    await user.click(screen.getByRole('button', { name: /cancel/i }));
-
-    // Back in view mode — old city is shown.
-    await user.click(screen.getByRole('button', { name: /edit/i }));
-    expect(screen.getByDisplayValue('Springfield')).toBeInTheDocument();
-  });
-
-  it('shows alert when update API rejects', async () => {
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-    vi.mocked(apiClient.put).mockRejectedValue(new Error('boom'));
-    const user = userEvent.setup();
-    renderWithProviders(<CompanyProfilePanel />);
-    await waitFor(() =>
-      expect(screen.getByText('Acme HVAC')).toBeInTheDocument(),
-    );
-    await user.click(screen.getByRole('button', { name: /edit/i }));
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
-    await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalled();
-    });
-    alertSpy.mockRestore();
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalled());
+  });
+
+  it('rejects a logo larger than 1MB without uploading', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    await user.click(editButtons()[2]);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const bigFile = new File(['x'.repeat(2 * 1024 * 1024)], 'logo.png', { type: 'image/png' });
+    await user.upload(fileInput, bigFile);
+
+    expect(showError).toHaveBeenCalled();
+    expect(apiClient.post).not.toHaveBeenCalled();
   });
 });

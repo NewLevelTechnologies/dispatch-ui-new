@@ -29,6 +29,15 @@ export interface TenantSettings {
   phone?: string | null;
   email?: string | null;
   timezone: string;
+  // Provenance for the reporting timezone, surfaced as a recovery affordance
+  // on Company Profile (auto-detected on signup vs. deliberately set by an
+  // admin). Backend-pending — these are not yet returned by /tenant-settings;
+  // the UI degrades to a neutral hint until they land. `timezoneSetBy === null`
+  // signals an auto-detected zone; a non-null `timezoneSetByName` + `timezoneSetAt`
+  // signals a manual change.
+  timezoneSetBy?: string | null;
+  timezoneSetByName?: string | null;
+  timezoneSetAt?: string | null;
   defaultTaxRate?: number | null;
   invoiceTerms?: string | null;
   enableOnlineBooking: boolean;
