@@ -761,7 +761,7 @@ function Footer({ tab, onDismiss }: { tab: BellTab; onDismiss: () => void }) {
       <Link
         to={`/approvals?tab=${inboxTab}`}
         onClick={onDismiss}
-        className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-accent-700 hover:underline"
+        className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-fg-accent hover:underline"
       >
         {t('approvals.bell.viewAll')}
         <ArrowRightIcon className="size-3" />

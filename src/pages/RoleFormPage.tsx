@@ -447,7 +447,7 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
               subtitle={
                 <>
                   {t('roles.form.capabilitySubtitle')}{' '}
-                  <span className="font-medium text-accent-700">
+                  <span className="font-medium text-fg-accent">
                     {t('roles.form.capabilityHelpLink')}
                   </span>
                 </>
@@ -487,7 +487,7 @@ export default function RoleFormPage({ mode }: RoleFormPageProps) {
                   This is a built-in role.{' '}
                   <Link
                     to="/settings/access/roles"
-                    className="font-medium text-accent-700 hover:underline"
+                    className="font-medium text-fg-accent hover:underline"
                   >
                     Restore defaults
                   </Link>{' '}

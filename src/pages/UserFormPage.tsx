@@ -328,7 +328,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                   Pick one role for most users. Multiple roles combine their capabilities.{' '}
                   <Link
                     to="/settings/access/roles"
-                    className="font-medium text-accent-700 hover:underline"
+                    className="font-medium text-fg-accent hover:underline"
                   >
                     Manage roles →
                   </Link>
@@ -477,7 +477,7 @@ function RoleMultiSelect({
           No roles match "{query}".{' '}
           <Link
             to="/settings/access/roles"
-            className="font-medium text-accent-700 hover:underline"
+            className="font-medium text-fg-accent hover:underline"
           >
             Create role →
           </Link>
@@ -615,7 +615,7 @@ function CapabilityPreview({
           <span className="font-semibold text-fg-strong">{byArea.length || '—'}</span> areas
         </span>
         <span className="flex-1" />
-        <span className="text-[10.5px] font-medium text-accent-700">
+        <span className="text-[10.5px] font-medium text-fg-accent">
           {open ? 'Hide' : 'Show'} details
         </span>
       </button>
@@ -664,7 +664,7 @@ function RegionMultiSelect({
         No active dispatch regions configured.{' '}
         <Link
           to="/settings/dispatch-regions"
-          className="font-medium text-accent-700 hover:underline"
+          className="font-medium text-fg-accent hover:underline"
         >
           Manage regions →
         </Link>

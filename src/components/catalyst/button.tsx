@@ -209,8 +209,8 @@ const styles = {
     //  · Text + icon at accent-700 (deep) for weight against the tinted bg.
     //  · Dark mode unchanged — already crisp at 18% fill.
     'accent-soft': [
-      'text-accent-700 [--btn-bg:color-mix(in_oklch,var(--color-accent-500)_20%,transparent)] [--btn-border:color-mix(in_oklch,var(--color-accent-500)_30%,transparent)] [--btn-hover-overlay:color-mix(in_oklch,var(--color-accent-500)_25%,transparent)]',
-      'dark:text-accent-300 dark:[--btn-bg:color-mix(in_oklch,var(--color-accent-500)_18%,transparent)] dark:[--btn-border:color-mix(in_oklch,var(--color-accent-500)_40%,transparent)]',
+      'text-fg-accent [--btn-bg:color-mix(in_oklch,var(--color-accent-500)_20%,transparent)] [--btn-border:color-mix(in_oklch,var(--color-accent-500)_30%,transparent)] [--btn-hover-overlay:color-mix(in_oklch,var(--color-accent-500)_25%,transparent)]',
+      'dark:[--btn-bg:color-mix(in_oklch,var(--color-accent-500)_18%,transparent)] dark:[--btn-border:color-mix(in_oklch,var(--color-accent-500)_40%,transparent)]',
       // Flat look — kill the solid base's inset shadow + highlight.
       'before:shadow-none after:shadow-none',
       '[--btn-icon:var(--color-accent-700)] dark:[--btn-icon:var(--color-accent-300)]',

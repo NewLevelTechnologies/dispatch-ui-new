@@ -29,6 +29,7 @@
   --color-fg-strong: var(--fg-strong);
   --color-fg-muted: var(--fg-muted);
   --color-fg-dim: var(--fg-dim);
+  --color-fg-accent: var(--fg-accent);
 
   /* Borders */
   --color-border: var(--border);

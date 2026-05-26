@@ -188,7 +188,7 @@ export function VersionHistoryRail({
                             <button
                               type="button"
                               onClick={() => setPendingRestore(v)}
-                              className="bg-transparent p-0 text-[11.5px] font-semibold text-accent-700 hover:underline"
+                              className="bg-transparent p-0 text-[11.5px] font-semibold text-fg-accent hover:underline"
                             >
                               Restore
                             </button>
