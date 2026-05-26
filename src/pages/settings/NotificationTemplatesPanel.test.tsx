@@ -21,6 +21,7 @@ const mockTemplates = [
     notificationTypeKey: 'invoice_sent',
     displayName: 'Invoice Sent',
     channel: 'EMAIL',
+    audience: 'CUSTOMER',
     subject: 'Your invoice is ready',
     isSystemTemplate: true,
     hasHtmlBody: false,
@@ -33,6 +34,7 @@ const mockTemplates = [
     notificationTypeKey: 'work_order_completed',
     displayName: 'Work Order Completed',
     channel: 'SMS',
+    audience: 'INTERNAL',
     subject: null,
     isSystemTemplate: false,
     hasHtmlBody: false,
@@ -46,6 +48,7 @@ const mockTemplates = [
     notificationTypeKey: 'never_shown',
     displayName: 'Push Notification',
     channel: 'PUSH',
+    audience: 'CUSTOMER',
     subject: null,
     isSystemTemplate: true,
     hasHtmlBody: false,
@@ -74,6 +77,9 @@ describe('NotificationTemplatesPanel', () => {
     expect(screen.getByText('System default')).toBeInTheDocument();
     expect(screen.getByText('Customized')).toBeInTheDocument();
     expect(screen.getByText(/your invoice is ready/i)).toBeInTheDocument();
+    // Audience surfaces per row: tpl-1 CUSTOMER, tpl-2 INTERNAL.
+    expect(screen.getByText('Customer')).toBeInTheDocument();
+    expect(screen.getByText('Internal')).toBeInTheDocument();
   });
 
   it('filters PUSH templates out of the list', async () => {

@@ -38,9 +38,11 @@ import { extractApiError } from '../../lib/toast';
 
 type ChannelValue = '' | 'EMAIL' | 'SMS';
 type StatusValue = '' | 'system' | 'custom';
+type AudienceValue = '' | 'CUSTOMER' | 'INTERNAL';
 
 const CHANNEL_VALUES: ChannelValue[] = ['EMAIL', 'SMS'];
 const STATUS_VALUES: StatusValue[] = ['system', 'custom'];
+const AUDIENCE_VALUES: AudienceValue[] = ['CUSTOMER', 'INTERNAL'];
 
 function readChannel(raw: string | null): ChannelValue {
   return CHANNEL_VALUES.includes(raw as ChannelValue)
@@ -49,6 +51,11 @@ function readChannel(raw: string | null): ChannelValue {
 }
 function readStatus(raw: string | null): StatusValue {
   return STATUS_VALUES.includes(raw as StatusValue) ? (raw as StatusValue) : '';
+}
+function readAudience(raw: string | null): AudienceValue {
+  return AUDIENCE_VALUES.includes(raw as AudienceValue)
+    ? (raw as AudienceValue)
+    : '';
 }
 
 export default function NotificationTemplatesPanel() {
@@ -61,6 +68,7 @@ export default function NotificationTemplatesPanel() {
   const urlSearch = searchParams.get('search') ?? '';
   const channelFilter = readChannel(searchParams.get('channel'));
   const statusFilter = readStatus(searchParams.get('status'));
+  const audienceFilter = readAudience(searchParams.get('audience'));
 
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   useEffect(() => {
@@ -73,6 +81,7 @@ export default function NotificationTemplatesPanel() {
       search?: string;
       channel?: ChannelValue;
       status?: StatusValue;
+      audience?: AudienceValue;
     },
     options: { replace?: boolean } = {}
   ) => {
@@ -88,6 +97,10 @@ export default function NotificationTemplatesPanel() {
     if (updates.status !== undefined) {
       if (updates.status) next.set('status', updates.status);
       else next.delete('status');
+    }
+    if (updates.audience !== undefined) {
+      if (updates.audience) next.set('audience', updates.audience);
+      else next.delete('audience');
     }
     setSearchParams(next, { replace: options.replace ?? false });
   };
@@ -116,6 +129,7 @@ export default function NotificationTemplatesPanel() {
     const q = deferredSearch.trim().toLowerCase();
     return templates.filter((tpl) => {
       if (channelFilter && tpl.channel !== channelFilter) return false;
+      if (audienceFilter && tpl.audience !== audienceFilter) return false;
       if (statusFilter === 'system' && !tpl.isSystemTemplate) return false;
       if (statusFilter === 'custom' && tpl.isSystemTemplate) return false;
       if (q) {
@@ -125,7 +139,7 @@ export default function NotificationTemplatesPanel() {
       }
       return true;
     });
-  }, [templates, deferredSearch, channelFilter, statusFilter]);
+  }, [templates, deferredSearch, channelFilter, audienceFilter, statusFilter]);
 
   const customizedCount = useMemo(
     () => templates?.filter((tpl) => !tpl.isSystemTemplate).length ?? 0,
@@ -164,6 +178,13 @@ export default function NotificationTemplatesPanel() {
       ? t('settings.notificationTemplates.status.systemDefault')
       : v === 'custom'
         ? t('settings.notificationTemplates.status.customized')
+        : '';
+
+  const audienceLabel = (v: AudienceValue): string =>
+    v === 'CUSTOMER'
+      ? t('settings.notificationTemplates.audience.customer')
+      : v === 'INTERNAL'
+        ? t('settings.notificationTemplates.audience.internal')
         : '';
 
   // Subtitle is explanatory copy + a Mustache chip example. The customized
@@ -223,6 +244,23 @@ export default function NotificationTemplatesPanel() {
             </ChipListboxOption>
             <ChipListboxOption value="SMS">
               {channelLabel('SMS')}
+            </ChipListboxOption>
+          </FilterChipListbox>
+
+          <FilterChipListbox
+            label={t('settings.notificationTemplates.filter.audience')}
+            ariaLabel={t('settings.notificationTemplates.filter.audience')}
+            value={audienceFilter || null}
+            displayValue={audienceFilter ? audienceLabel(audienceFilter) : null}
+            resetLabel={t('settings.notificationTemplates.filter.allAudiences')}
+            onChange={(v) => updateFilters({ audience: readAudience(v) })}
+            onClear={() => updateFilters({ audience: '' })}
+          >
+            <ChipListboxOption value="CUSTOMER">
+              {audienceLabel('CUSTOMER')}
+            </ChipListboxOption>
+            <ChipListboxOption value="INTERNAL">
+              {audienceLabel('INTERNAL')}
             </ChipListboxOption>
           </FilterChipListbox>
 
@@ -316,6 +354,9 @@ export default function NotificationTemplatesPanel() {
                       <th style={{ width: 90 }}>
                         {t('settings.notificationTemplates.table.channel')}
                       </th>
+                      <th style={{ width: 100 }}>
+                        {t('settings.notificationTemplates.table.audience')}
+                      </th>
                       <th>
                         {t('settings.notificationTemplates.table.template')}
                       </th>
@@ -351,6 +392,11 @@ export default function NotificationTemplatesPanel() {
                                 <span>{channelLabel('SMS')}</span>
                               </>
                             )}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="text-fg-muted">
+                            {audienceLabel(tpl.audience)}
                           </span>
                         </td>
                         <td className="strong">
