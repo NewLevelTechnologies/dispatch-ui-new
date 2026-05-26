@@ -30,8 +30,6 @@ export default function SettingsLayout() {
       label: t('settings.sections.organization'),
       items: [
         { label: t('settings.nav.companyProfile'), to: '/settings/company-profile' },
-        { label: t('settings.nav.businessDefaults'), to: '/settings/business-defaults', soon: true },
-        { label: t('settings.nav.modulesFeatures'), to: '/settings/modules-features', soon: true },
         { label: t('settings.nav.terminology'), to: '/settings/terminology' },
         { label: t('settings.nav.notificationTemplates'), to: '/settings/notifications' },
       ],

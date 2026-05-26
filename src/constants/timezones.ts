@@ -17,6 +17,32 @@ export const US_TIMEZONES: TimezoneOption[] = [
   { value: 'Pacific/Honolulu', label: 'Hawaii Time (UTC-10)' },
 ];
 
+// Curated tenant reporting-timezone list for Company Profile.
+//
+// Human label leads; the IANA zone is the stored + displayed identifier.
+// Deliberately NO numeric GMT offsets in the labels — an offset like "GMT-5"
+// is wrong half the year under DST (Eastern is GMT-4 Mar–Nov). The human
+// label ("Eastern Time") + IANA zone ("America/New_York") are sufficient; if a
+// live offset is ever needed, derive it from Intl.DateTimeFormat at render
+// time, never hardcode. US-only for v1 (international zones come later).
+export const REPORTING_TIMEZONES: TimezoneOption[] = [
+  { value: 'America/New_York', label: 'Eastern Time' },
+  { value: 'America/Chicago', label: 'Central Time' },
+  { value: 'America/Denver', label: 'Mountain Time' },
+  { value: 'America/Phoenix', label: 'Mountain Time (Arizona, no DST)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time' },
+  { value: 'America/Anchorage', label: 'Alaska Time' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time' },
+];
+
+// Human label for a stored IANA zone. Falls back to the raw zone when it's not
+// in the curated list (e.g. a zone set before this list existed) so the value
+// is never hidden from the admin.
+export function reportingTimezoneLabel(value?: string | null): string | null {
+  if (!value) return null;
+  return REPORTING_TIMEZONES.find((tz) => tz.value === value)?.label ?? value;
+}
+
 // All common timezones (for more comprehensive support)
 export const ALL_TIMEZONES: TimezoneOption[] = [
   // Universal

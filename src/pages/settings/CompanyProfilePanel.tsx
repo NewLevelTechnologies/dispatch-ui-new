@@ -1,438 +1,578 @@
-import { useState, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
+/* eslint-disable i18next/no-literal-string -- dense v1.5 settings surface; same convention as AccountSettingsPage. This panel edits the tenant's own company record (not a glossary entity), so copy lives inline rather than routing through getName()/t(). */
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PatternFormat } from 'react-number-format';
 import {
+  EnvelopeIcon,
+  GlobeAltIcon,
+  ArrowUpTrayIcon,
+} from '@heroicons/react/24/outline';
+import {
   tenantSettingsApi,
-  getApiErrorMessage,
+  type TenantSettings,
   type UpdateTenantSettingsRequest,
 } from '../../api';
 import { useHasCapability } from '../../hooks/useCurrentUser';
-import { Text } from '../../components/catalyst/text';
+import { PageHead } from '../../components/ui/PageHead';
+import { EditableCard } from '../../components/ui/EditableCard';
+import { Callout } from '../../components/ui/Callout';
+import { Field, Label, Description } from '../../components/catalyst/fieldset';
 import { Input } from '../../components/catalyst/input';
 import { Select } from '../../components/catalyst/select';
+import { Button } from '../../components/catalyst/button';
+import { Text } from '../../components/catalyst/text';
+import { dense } from '../../components/ui/dense';
 import { US_STATES } from '../../constants/states';
-import { SettingsPageHeader } from '../../components/settings/SettingsPageHeader';
-import { SettingsSection } from '../../components/settings/SettingsSection';
-import { FieldLabel, FieldValue } from '../../components/settings/FieldLabel';
+import { REPORTING_TIMEZONES, reportingTimezoneLabel } from '../../constants/timezones';
+import { showSuccess, showError, extractApiError } from '../../lib/toast';
 
-type CompanyFormData = Pick<
-  UpdateTenantSettingsRequest,
-  | 'companyName'
-  | 'companyNameShort'
-  | 'companySlogan'
-  | 'streetAddress'
-  | 'city'
-  | 'state'
-  | 'zipCode'
-  | 'phone'
-  | 'email'
->;
-
-function emptyForm(): CompanyFormData {
-  return {
-    companyName: '',
-    companyNameShort: '',
-    companySlogan: '',
-    streetAddress: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    phone: '',
-    email: '',
-  };
+// ──────────────────────────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────────────────────────
+function formatDate(value?: string | null): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function formatLogoFilename(url?: string | null): string | null {
+// Phone is stored as raw digits and rendered formatted, so dirty-tracking
+// compares like-for-like (react-number-format reformats its value prop, which
+// would otherwise read as a spurious edit on mount).
+function stripPhoneDigits(value?: string | null): string {
+  return (value ?? '').replace(/\D/g, '');
+}
+function formatPhoneDisplay(value?: string | null): string {
+  const d = stripPhoneDigits(value);
+  if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  return value ?? '';
+}
+
+function logoFilenameFromUrl(url?: string | null): string | null {
   if (!url) return null;
   try {
-    const path = new URL(url).pathname;
-    const segment = path.split('/').filter(Boolean).pop();
+    const segment = new URL(url).pathname.split('/').filter(Boolean).pop();
     return segment ? decodeURIComponent(segment) : null;
   } catch {
     return null;
   }
 }
 
-function formatLogoMeta(updatedAt?: string | null): string | null {
-  if (!updatedAt) return null;
-  const date = new Date(updatedAt);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+// Key/value pair for the view-mode body of each card. The DS has no 2-column
+// KV grid primitive (DataRow is row-oriented for `padding="none"` cards), so
+// this small presentational helper stays local to the panel.
+function Kv({
+  label,
+  children,
+  span2,
+  empty,
+}: {
+  label: string;
+  children: ReactNode;
+  span2?: boolean;
+  empty?: boolean;
+}) {
+  return (
+    <div className={span2 ? 'min-w-0 sm:col-span-2' : 'min-w-0'}>
+      {/* 10.5px uppercase micro-label — below the Text scale, kept inline per
+          the DS "keep inline" guidance for micro labels. */}
+      <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-fg-muted">
+        {label}
+      </div>
+      <Text as="div" size="sm" tone={empty ? 'dim' : 'strong'} className={empty ? 'mt-1 italic' : 'mt-1'}>
+        {children}
+      </Text>
+    </div>
+  );
 }
 
+// ──────────────────────────────────────────────────────────────────
+// Panel — fetch + loading/error + the three editable cards
+// ──────────────────────────────────────────────────────────────────
 export default function CompanyProfilePanel() {
-  const queryClient = useQueryClient();
-  const { t } = useTranslation();
   const canEdit = useHasCapability('EDIT_SETTINGS');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState<CompanyFormData>(emptyForm);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ['tenant-settings'],
     queryFn: () => tenantSettingsApi.getSettings(),
   });
 
+  return (
+    <>
+      <PageHead
+        title="Company Profile"
+        sub="Your business identity, operating settings, and branding. These appear on customer-facing documents (invoices, quotes, dispatch emails) and in the app header."
+      />
+
+      {isLoading || !settings ? (
+        error ? (
+          <Callout kind="danger" title="Couldn't load company profile">
+            {extractApiError(error) ?? (error as Error).message}
+          </Callout>
+        ) : (
+          <Text tone="muted">Loading settings…</Text>
+        )
+      ) : (
+        <div className="flex max-w-[920px] flex-col gap-3.5">
+          <IdentityCard settings={settings} canEdit={canEdit} />
+          <OperatingCard settings={settings} canEdit={canEdit} />
+          <BrandingCard settings={settings} canEdit={canEdit} />
+        </div>
+      )}
+    </>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Card 1 — Identity
+// ──────────────────────────────────────────────────────────────────
+type IdentityForm = {
+  companyName: string;
+  companyNameShort: string;
+  companySlogan: string;
+  streetAddress: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  phone: string;
+  email: string;
+};
+
+function buildIdentityForm(s: TenantSettings): IdentityForm {
+  return {
+    companyName: s.companyName ?? '',
+    companyNameShort: s.companyNameShort ?? '',
+    companySlogan: s.companySlogan ?? '',
+    streetAddress: s.streetAddress ?? '',
+    city: s.city ?? '',
+    state: s.state ?? '',
+    zipCode: s.zipCode ?? '',
+    phone: stripPhoneDigits(s.phone),
+    email: s.email ?? '',
+  };
+}
+
+function IdentityCard({ settings, canEdit }: { settings: TenantSettings; canEdit: boolean }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<IdentityForm>(() => buildIdentityForm(settings));
+
+  // Re-sync from server when settings change and we're not mid-edit (after a
+  // save here, or a refetch from elsewhere). In-progress edits are never
+  // clobbered because the sync is gated on `!editing`.
   useEffect(() => {
-    if (settings) {
+    if (!editing) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFormData({
-        companyName: settings.companyName ?? '',
-        companyNameShort: settings.companyNameShort ?? '',
-        companySlogan: settings.companySlogan ?? '',
-        streetAddress: settings.streetAddress ?? '',
-        city: settings.city ?? '',
-        state: settings.state ?? '',
-        zipCode: settings.zipCode ?? '',
-        phone: settings.phone ?? '',
-        email: settings.email ?? '',
-      });
+      setForm(buildIdentityForm(settings));
     }
-  }, [settings]);
+  }, [settings, editing]);
 
-  const updateMutation = useMutation({
-    mutationFn: (data: UpdateTenantSettingsRequest) => tenantSettingsApi.updateSettings(data),
+  const initial = useMemo(() => buildIdentityForm(settings), [settings]);
+  const dirty = (Object.keys(form) as (keyof IdentityForm)[]).some((k) => form[k] !== initial[k]);
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const payload: UpdateTenantSettingsRequest = {
+        companyName: form.companyName.trim(),
+        companyNameShort: form.companyNameShort.trim() || null,
+        companySlogan: form.companySlogan.trim() || null,
+        streetAddress: form.streetAddress.trim() || null,
+        city: form.city.trim() || null,
+        state: form.state || null,
+        zipCode: form.zipCode.trim() || null,
+        phone: form.phone.trim() || null,
+        email: form.email.trim() || null,
+      };
+      return tenantSettingsApi.updateSettings(payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
-      setIsEditing(false);
+      setEditing(false);
+      showSuccess('Company profile saved');
     },
-    onError: (error: unknown) => {
-      alert(getApiErrorMessage(error) || t('tenantSettings.messages.errorUpdateSettings'));
-    },
+    onError: (err: unknown) => showError("Couldn't save changes", extractApiError(err)),
   });
 
-  const uploadLogoMutation = useMutation({
-    mutationFn: (file: File) => tenantSettingsApi.uploadLogo(file),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
-      setLogoFile(null);
-      setLogoPreview(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    },
-    onError: (error: unknown) => {
-      alert(getApiErrorMessage(error) || t('tenantSettings.messages.errorUploadLogo'));
-    },
-  });
-
-  const handleChange = (field: keyof CompanyFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleSave = () => {
-    updateMutation.mutate(formData);
-  };
-
+  const set = (k: keyof IdentityForm, v: string) => setForm((p) => ({ ...p, [k]: v }));
   const handleCancel = () => {
-    if (settings) {
-      setFormData({
-        companyName: settings.companyName ?? '',
-        companyNameShort: settings.companyNameShort ?? '',
-        companySlogan: settings.companySlogan ?? '',
-        streetAddress: settings.streetAddress ?? '',
-        city: settings.city ?? '',
-        state: settings.state ?? '',
-        zipCode: settings.zipCode ?? '',
-        phone: settings.phone ?? '',
-        email: settings.email ?? '',
-      });
-    }
-    setLogoFile(null);
-    setLogoPreview(null);
-    setIsEditing(false);
+    setForm(buildIdentityForm(settings));
+    setEditing(false);
   };
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert(t('tenantSettings.messages.fileSizeTooLarge'));
-      return;
-    }
-    if (!['image/png', 'image/jpeg', 'image/svg+xml'].includes(file.type)) {
-      alert(t('tenantSettings.messages.invalidFileType'));
-      return;
-    }
-    setLogoFile(file);
-    const reader = new FileReader();
-    reader.onloadend = () => setLogoPreview(reader.result as string);
-    reader.readAsDataURL(file);
-    uploadLogoMutation.mutate(file);
-  };
-
-  const handleLogoRemove = () => {
-    setLogoFile(null);
-    setLogoPreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const triggerLogoPicker = () => {
-    fileInputRef.current?.click();
-  };
-
-  if (isLoading) {
-    return <Text className="text-fg-muted">{t('tenantSettings.messages.loadingSettings')}</Text>;
-  }
-
-  if (error) {
-    return (
-      <Text className="text-danger-500">
-        {getApiErrorMessage(error) || t('tenantSettings.messages.errorLoadingSettings')}
-      </Text>
-    );
-  }
-
-  const cityStateZip = [
-    settings?.city,
-    [settings?.state, settings?.zipCode].filter(Boolean).join(' '),
-  ]
+  const isEmpty = !settings.companyName;
+  const cityStateZip = [settings.city, [settings.state, settings.zipCode].filter(Boolean).join(' ')]
     .filter(Boolean)
     .join(', ');
 
-  const logoUrl = logoPreview || settings?.logoThumbnailUrl;
-  const logoName = logoFile?.name || formatLogoFilename(settings?.logoOriginalUrl) || formatLogoFilename(settings?.logoThumbnailUrl);
-  const logoMeta = formatLogoMeta(settings?.updatedAt);
+  return (
+    <EditableCard
+      title="Identity"
+      subtitle="Name and contact info shown on invoices, quotes, and customer-facing emails."
+      editing={editing}
+      onEdit={canEdit ? () => setEditing(true) : () => {}}
+      onCancel={handleCancel}
+      onSave={() => saveMutation.mutate()}
+      saving={saveMutation.isPending}
+      saveDisabled={!dirty || saveMutation.isPending}
+      editLabel={isEmpty ? 'Complete identity' : 'Edit'}
+    >
+      {editing ? (
+        <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
+          <Field size="xs">
+            <Label size="xs" required>Company name</Label>
+            <Input size="xs" value={form.companyName} onChange={(e) => set('companyName', e.target.value)} placeholder="Pinecrest HVAC" />
+          </Field>
+          <Field size="xs">
+            <Label size="xs" hint="used in tight spaces">Short name</Label>
+            <Input size="xs" value={form.companyNameShort} onChange={(e) => set('companyNameShort', e.target.value)} placeholder="Pinecrest" />
+          </Field>
+
+          <Field size="xs" className="sm:col-span-2">
+            <Label size="xs" hint="optional">Slogan</Label>
+            <Input size="xs" value={form.companySlogan} onChange={(e) => set('companySlogan', e.target.value)} placeholder="(optional)" />
+            <Description size="xs">Appears on invoice + quote headers when set.</Description>
+          </Field>
+
+          <Field size="xs" className="sm:col-span-2">
+            <Label size="xs" required>Street address</Label>
+            <Input size="xs" value={form.streetAddress} onChange={(e) => set('streetAddress', e.target.value)} placeholder="123 Main St" />
+          </Field>
+
+          <Field size="xs">
+            <Label size="xs">City</Label>
+            <Input size="xs" value={form.city} onChange={(e) => set('city', e.target.value)} placeholder="Atlanta" />
+          </Field>
+          <div className="grid grid-cols-[120px_1fr] gap-3">
+            <Field size="xs">
+              <Label size="xs">State</Label>
+              <Select className={dense.select} value={form.state} onChange={(e) => set('state', e.target.value)}>
+                <option value="">—</option>
+                {US_STATES.map((st) => (
+                  <option key={st} value={st}>{st}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field size="xs">
+              <Label size="xs">ZIP</Label>
+              <Input size="xs" inputMode="numeric" value={form.zipCode} onChange={(e) => set('zipCode', e.target.value)} placeholder="30318" />
+            </Field>
+          </div>
+
+          <Field size="xs">
+            <Label size="xs" required>Phone</Label>
+            <PatternFormat
+              format="(###) ###-####"
+              mask="_"
+              customInput={Input}
+              size="xs"
+              type="tel"
+              value={form.phone}
+              onValueChange={(values) => set('phone', values.value)}
+              placeholder="(404) 555-0100"
+            />
+          </Field>
+          <Field size="xs">
+            <Label size="xs" required>Email</Label>
+            <Input size="xs" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="hello@example.com" />
+          </Field>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
+          <Kv label="Company name" empty={isEmpty}>
+            {settings.companyName || 'Set your company name'}
+          </Kv>
+          <Kv label="Short name" empty={!settings.companyNameShort}>
+            {settings.companyNameShort || '—'}
+          </Kv>
+
+          {(settings.companySlogan || isEmpty) && (
+            <Kv label="Slogan" span2 empty={!settings.companySlogan}>
+              {settings.companySlogan || 'Not set'}
+            </Kv>
+          )}
+
+          <Kv label="Address" span2 empty={!settings.streetAddress}>
+            {settings.streetAddress ? (
+              <>
+                {settings.streetAddress}
+                {cityStateZip && (
+                  <>
+                    <br />
+                    {cityStateZip}
+                  </>
+                )}
+              </>
+            ) : (
+              'Set your business address'
+            )}
+          </Kv>
+
+          <Kv label="Phone" empty={!settings.phone}>
+            {settings.phone ? formatPhoneDisplay(settings.phone) : 'Set phone'}
+          </Kv>
+          <Kv label="Email" empty={!settings.email}>
+            {settings.email ? (
+              <span className="inline-flex items-center gap-1.5">
+                <EnvelopeIcon className="size-3.5 text-fg-muted" />
+                {settings.email}
+              </span>
+            ) : (
+              'Set email'
+            )}
+          </Kv>
+        </div>
+      )}
+    </EditableCard>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Card 2 — Operating (reporting timezone)
+// ──────────────────────────────────────────────────────────────────
+function OperatingCard({ settings, canEdit }: { settings: TenantSettings; canEdit: boolean }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [timezone, setTimezone] = useState(settings.timezone);
+
+  useEffect(() => {
+    if (!editing) setTimezone(settings.timezone);
+  }, [settings.timezone, editing]);
+
+  // Browser-detected zone. Offered as an explicit override only — the
+  // authoritative source is the business address (resolved BE-side). Hidden
+  // when it already matches the current selection.
+  const detectedZone = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const dirty = timezone !== settings.timezone;
+
+  const saveMutation = useMutation({
+    mutationFn: () => tenantSettingsApi.updateSettings({ timezone }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
+      setEditing(false);
+      showSuccess('Reporting timezone saved');
+    },
+    onError: (err: unknown) => showError("Couldn't save changes", extractApiError(err)),
+  });
+
+  const handleCancel = () => {
+    setTimezone(settings.timezone);
+    setEditing(false);
+  };
+
+  // Provenance line — the recovery affordance. Renders real data only:
+  //   • manual change → "Last changed by {name}, {date}" (BE-pending fields)
+  //   • BE-confirmed auto-detect (timezoneSetBy === null) → "Auto-detected…"
+  //   • neither known yet → a neutral recovery hint (no fabricated history)
+  // The provenance fields don't exist on the tenant-settings endpoint yet;
+  // see PR notes for the BE ask. This lights up automatically once they land.
+  const provenance: ReactNode = (() => {
+    if (settings.timezoneSetByName && settings.timezoneSetAt) {
+      return (
+        <>
+          Last changed by <span className="text-fg">{settings.timezoneSetByName}</span>
+          {formatDate(settings.timezoneSetAt) ? `, ${formatDate(settings.timezoneSetAt)}` : ''}
+        </>
+      );
+    }
+    if (settings.timezoneSetBy === null && settings.zipCode) {
+      return `Auto-detected on signup from your business address (${settings.zipCode}). Change if your business operates from a different timezone.`;
+    }
+    return 'Change this if your business operates from a different timezone.';
+  })();
 
   return (
-    <div>
-      <SettingsPageHeader
-        title={t('settings.companyProfile.title')}
-        description={t('settings.companyProfile.description')}
-        editing={isEditing}
-        canEdit={canEdit}
-        onEdit={() => setIsEditing(true)}
-        onCancel={handleCancel}
-        onSave={handleSave}
-        saving={updateMutation.isPending}
-      />
-
-      <div className="grid grid-cols-2 gap-4">
-        {/* ── Company card ─────────────────────────────────────── */}
-        <SettingsSection title="Company">
-          {!isEditing ? (
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
-              <div className="col-span-2">
-                <FieldLabel>{t('tenantSettings.form.companyName')}</FieldLabel>
-                <FieldValue>{settings?.companyName || '—'}</FieldValue>
-              </div>
-              <div>
-                <FieldLabel>{t('tenantSettings.form.companyNameShort')}</FieldLabel>
-                <FieldValue>{settings?.companyNameShort || '—'}</FieldValue>
-              </div>
-              <div>
-                <FieldLabel>{t('tenantSettings.form.companySlogan')}</FieldLabel>
-                <FieldValue>{settings?.companySlogan || '—'}</FieldValue>
-              </div>
-              <div className="col-span-2">
-                <FieldLabel>{t('tenantSettings.form.address')}</FieldLabel>
-                <FieldValue>
-                  {settings?.streetAddress ? (
-                    <>
-                      {settings.streetAddress}
-                      {cityStateZip && (
-                        <>
-                          <br />
-                          {cityStateZip}
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    '—'
-                  )}
-                </FieldValue>
-              </div>
-              <div>
-                <FieldLabel>{t('tenantSettings.form.phone')}</FieldLabel>
-                <FieldValue>{settings?.phone || '—'}</FieldValue>
-              </div>
-              <div>
-                <FieldLabel>{t('tenantSettings.form.email')}</FieldLabel>
-                <FieldValue>{settings?.email || '—'}</FieldValue>
-              </div>
-            </dl>
-          ) : (
-            <div className="grid grid-cols-2 gap-x-3 gap-y-3">
-              <div className="col-span-2">
-                <FieldLabel required>{t('tenantSettings.form.companyName')}</FieldLabel>
-                <Input
-                  name="companyName"
-                  value={formData.companyName || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    handleChange('companyName', e.target.value)
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <FieldLabel hint={t('settings.companyProfile.shortNameHint')}>
-                  {t('tenantSettings.form.companyNameShort')}
-                </FieldLabel>
-                <Input
-                  name="companyNameShort"
-                  value={formData.companyNameShort || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    handleChange('companyNameShort', e.target.value)
-                  }
-                />
-              </div>
-              <div>
-                <FieldLabel>{t('tenantSettings.form.companySlogan')}</FieldLabel>
-                <Input
-                  name="companySlogan"
-                  value={formData.companySlogan || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    handleChange('companySlogan', e.target.value)
-                  }
-                />
-              </div>
-              <div className="col-span-2">
-                <FieldLabel>{t('tenantSettings.form.address')}</FieldLabel>
-                <Input
-                  name="streetAddress"
-                  value={formData.streetAddress || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    handleChange('streetAddress', e.target.value)
-                  }
-                  placeholder={t('tenantSettings.form.streetAddress')}
-                />
-              </div>
-              <div className="col-span-2 grid grid-cols-6 gap-3">
-                <div className="col-span-3">
-                  <Input
-                    name="city"
-                    value={formData.city || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      handleChange('city', e.target.value)
-                    }
-                    placeholder={t('tenantSettings.form.city')}
-                  />
-                </div>
-                <div className="col-span-1">
-                  <Select
-                    name="state"
-                    value={formData.state || ''}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                      handleChange('state', e.target.value)
-                    }
-                  >
-                    <option value="">{t('tenantSettings.form.state')}</option>
-                    {US_STATES.map((state) => (
-                      <option key={state} value={state}>
-                        {state}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="col-span-2">
-                  <Input
-                    name="zipCode"
-                    value={formData.zipCode || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      handleChange('zipCode', e.target.value)
-                    }
-                    placeholder={t('tenantSettings.form.zipCode')}
-                  />
-                </div>
-              </div>
-              <div>
-                <FieldLabel>{t('tenantSettings.form.phone')}</FieldLabel>
-                <PatternFormat
-                  format="(###) ###-####"
-                  mask="_"
-                  customInput={Input}
-                  name="phone"
-                  value={formData.phone || ''}
-                  onValueChange={(values) => handleChange('phone', values.formattedValue)}
-                />
-              </div>
-              <div>
-                <FieldLabel>{t('tenantSettings.form.email')}</FieldLabel>
-                <Input
-                  name="email"
-                  type="email"
-                  value={formData.email || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    handleChange('email', e.target.value)
-                  }
-                />
-              </div>
-            </div>
+    <EditableCard
+      title="Operating"
+      subtitle="Time settings that drive your business day. Affects scheduling, invoice aging, end-of-day reports, and 'today' rollups. Customer-facing job times follow each job's service location."
+      editing={editing}
+      onEdit={canEdit ? () => setEditing(true) : () => {}}
+      onCancel={handleCancel}
+      onSave={() => saveMutation.mutate()}
+      saving={saveMutation.isPending}
+      saveDisabled={!dirty || saveMutation.isPending}
+    >
+      {editing ? (
+        <div className="max-w-[460px]">
+          <Field size="xs">
+            <Label size="xs" required>Reporting timezone</Label>
+            <Select className={dense.select} value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+              {REPORTING_TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value}>{tz.label} · {tz.value}</option>
+              ))}
+            </Select>
+            <Description size="xs">
+              Defines your business day. Changing it shifts which work orders count as "today," when invoice aging clocks tick over, and how scheduled reports group by date.
+            </Description>
+          </Field>
+          {detectedZone && detectedZone !== timezone && (
+            <Button plain size="xs" type="button" className="mt-1.5" onClick={() => setTimezone(detectedZone)}>
+              <GlobeAltIcon className="size-3" />
+              Use my device timezone ({detectedZone})
+            </Button>
           )}
-        </SettingsSection>
-
-        {/* ── Logo card ────────────────────────────────────────── */}
-        <SettingsSection
-          title={t('settings.companyProfile.logo')}
-          subtitle={isEditing ? t('settings.companyProfile.logoSection') : undefined}
-        >
-          <div className="flex items-start gap-4">
-            <div
-              className="grid h-[88px] w-[88px] shrink-0 place-items-center overflow-hidden rounded-md border border-border bg-bg-elev-2"
-              style={{ backgroundColor: logoUrl ? undefined : undefined }}
-            >
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt={t('tenantSettings.form.logo')}
-                  className="h-full w-full object-contain"
-                />
-              ) : (
-                <span className="text-[10.5px] text-fg-dim">{t('settings.companyProfile.logoNone')}</span>
-              )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2">
+          <Kv label="Reporting timezone">
+            <span className="inline-flex items-center gap-1.5">
+              <GlobeAltIcon className="size-3.5 text-fg-muted" />
+              {reportingTimezoneLabel(settings.timezone)}
+            </span>
+            <Text as="div" size="xs" tone="muted" className="ml-[19px]">{settings.timezone}</Text>
+            {/* 10.5px provenance / recovery hint — micro-metadata in fg-dim, kept inline. */}
+            <div className="mt-1.5 max-w-[380px] text-[10.5px] leading-[1.45] text-fg-dim">
+              {provenance}
             </div>
+          </Kv>
+        </div>
+      )}
+    </EditableCard>
+  );
+}
 
-            <div className="min-w-0 flex-1">
-              {isEditing ? (
-                <>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={triggerLogoPicker}
-                      className="text-[12.5px] font-semibold text-fg-strong hover:text-fg-accent"
-                      disabled={uploadLogoMutation.isPending}
-                    >
-                      {uploadLogoMutation.isPending ? t('common.saving') : t('settings.companyProfile.logoReplace')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleLogoRemove}
-                      className="text-[12.5px] font-semibold text-fg-muted hover:text-fg-strong"
-                      disabled={uploadLogoMutation.isPending || !logoUrl}
-                    >
-                      {t('settings.companyProfile.logoRemove')}
-                    </button>
-                  </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/svg+xml"
-                    onChange={handleLogoChange}
-                    className="hidden"
-                  />
-                  <p className="mt-2 text-[11px] text-fg-dim leading-snug">
-                    {t('settings.companyProfile.logoHelperLong')}
-                  </p>
-                </>
-              ) : (
-                <div className="space-y-0.5">
-                  <div className="text-[13px] font-medium text-fg-strong truncate">
-                    {logoName || (logoUrl ? t('settings.companyProfile.logoUploaded') : '—')}
-                  </div>
-                  {logoUrl && logoMeta && (
-                    <div className="text-[11px] text-fg-dim">
-                      {t('settings.companyProfile.logoUploadedAt', { date: logoMeta })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </SettingsSection>
-      </div>
+// ──────────────────────────────────────────────────────────────────
+// Card 3 — Branding (logo)
+//
+// Upload/replace use the existing POST /tenant-settings/logo endpoint. The
+// file is held locally in edit mode and uploaded on Save (so it follows the
+// per-card Save model). There is no DELETE endpoint yet, so removing a saved
+// logo is intentionally not offered here — see PR notes for the BE ask.
+// ──────────────────────────────────────────────────────────────────
+const LOGO_MAX_BYTES = 1 * 1024 * 1024;
+const LOGO_MIME_TYPES = ['image/png', 'image/svg+xml'];
 
+function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit: boolean }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const savedLogoUrl = settings.logoThumbnailUrl ?? settings.logoMediumUrl ?? null;
+  const savedFilename =
+    logoFilenameFromUrl(settings.logoOriginalUrl) ?? logoFilenameFromUrl(savedLogoUrl);
+  const uploadedAt = formatDate(settings.updatedAt);
+
+  const dirty = file !== null;
+
+  const uploadMutation = useMutation({
+    mutationFn: (f: File) => tenantSettingsApi.uploadLogo(f),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
+      clearSelection();
+      setEditing(false);
+      showSuccess('Logo updated');
+    },
+    onError: (err: unknown) => showError("Couldn't upload logo", extractApiError(err)),
+  });
+
+  function clearSelection() {
+    setFile(null);
+    setPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = e.target.files?.[0];
+    e.target.value = '';
+    if (!picked) return;
+    if (!LOGO_MIME_TYPES.includes(picked.type)) {
+      showError("Couldn't use that file", 'Logo must be a PNG or SVG.');
+      return;
+    }
+    if (picked.size > LOGO_MAX_BYTES) {
+      showError("Couldn't use that file", 'Logo must be 1 MB or smaller.');
+      return;
+    }
+    setFile(picked);
+    const reader = new FileReader();
+    reader.onloadend = () => setPreview(reader.result as string);
+    reader.readAsDataURL(picked);
+  };
+
+  const handleCancel = () => {
+    clearSelection();
+    setEditing(false);
+  };
+
+  const shownLogoUrl = preview ?? savedLogoUrl;
+
+  const logoBox = shownLogoUrl ? (
+    <img
+      src={shownLogoUrl}
+      alt="Company logo"
+      className="size-16 shrink-0 rounded-lg border border-border bg-bg-elev-2 object-contain"
+    />
+  ) : (
+    <div className="grid size-16 shrink-0 place-items-center rounded-lg border border-dashed border-border bg-bg-elev-2 text-center text-[10px] leading-tight text-fg-dim">
+      No
+      <br />
+      logo
     </div>
+  );
+
+  return (
+    <EditableCard
+      title="Branding"
+      subtitle="Your logo. Appears in the app header and on customer-facing email + PDF templates."
+      editing={editing}
+      onEdit={canEdit ? () => setEditing(true) : () => {}}
+      onCancel={handleCancel}
+      onSave={() => file && uploadMutation.mutate(file)}
+      saving={uploadMutation.isPending}
+      saveDisabled={!dirty || uploadMutation.isPending}
+    >
+      {editing ? (
+        <div className="flex items-center gap-4">
+          {logoBox}
+          <div className="min-w-0 flex-1">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={LOGO_MIME_TYPES.join(',')}
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <Button outline size="xs" type="button" onClick={() => fileInputRef.current?.click()}>
+              <ArrowUpTrayIcon className="size-3.5" />
+              {savedLogoUrl ? 'Replace logo' : 'Upload logo'}
+            </Button>
+            <Text size="xs" tone="muted" className="mt-1.5 leading-[1.5]">
+              PNG or SVG recommended · transparent background · square or wide formats · max 1 MB.
+            </Text>
+            {file && (
+              <Text size="xs" tone="dim" className="mt-1.5">{file.name} — save to apply</Text>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-[18px]">
+          {logoBox}
+          <div className="min-w-0">
+            {savedLogoUrl ? (
+              <>
+                <Text as="div" size="sm" tone="strong" className="truncate font-medium">
+                  {savedFilename ?? 'Logo uploaded'}
+                </Text>
+                {uploadedAt && (
+                  <Text as="div" size="xs" tone="muted" className="mt-0.5">Uploaded {uploadedAt}</Text>
+                )}
+              </>
+            ) : (
+              <Text size="sm" tone="muted">
+                No logo set yet. Your initials will be used as a fallback in the meantime.
+              </Text>
+            )}
+          </div>
+        </div>
+      )}
+    </EditableCard>
   );
 }

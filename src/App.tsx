@@ -35,8 +35,6 @@ import RoleDetailPage from './pages/RoleDetailPage';
 import { RoleAddPage, RoleEditPage } from './pages/RoleFormPage';
 import SettingsLayout from './pages/settings/SettingsLayout';
 import CompanyProfilePanel from './pages/settings/CompanyProfilePanel';
-import BusinessDefaultsPanel from './pages/settings/BusinessDefaultsPanel';
-import ModulesFeaturesPanel from './pages/settings/ModulesFeaturesPanel';
 import TerminologyPanel from './pages/settings/TerminologyPanel';
 import NotificationTemplatesPanel from './pages/settings/NotificationTemplatesPanel';
 import NotificationTemplateEditPage from './pages/settings/NotificationTemplateEditPage';
@@ -189,8 +187,6 @@ function App() {
         <Route index element={<Navigate to="/settings/company-profile" replace />} />
         <Route path="general" element={<Navigate to="/settings/company-profile" replace />} />
         <Route path="company-profile" element={<CompanyProfilePanel />} />
-        <Route path="business-defaults" element={<BusinessDefaultsPanel />} />
-        <Route path="modules-features" element={<ModulesFeaturesPanel />} />
         <Route path="terminology" element={<TerminologyPanel />} />
         <Route path="notifications" element={<NotificationTemplatesPanel />} />
         <Route path="notifications/:id" element={<NotificationTemplateEditPage />} />
