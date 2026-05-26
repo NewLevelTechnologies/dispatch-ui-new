@@ -259,6 +259,7 @@ export {
   type NotificationTemplate,
   type NotificationTemplateListItem,
   type NotificationTemplateVariable,
+  type NotificationAudience,
   type VariableScope,
   type CreateNotificationTemplateRequest,
   type UpdateNotificationTemplateRequest,

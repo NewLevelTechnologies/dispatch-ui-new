@@ -1397,6 +1397,10 @@
         "customize": "Customize",
         "edit": "Edit"
       },
+      "audience": {
+        "customer": "Customer",
+        "internal": "Internal"
+      },
       "channel": {
         "email": "Email",
         "sms": "SMS"
@@ -1409,8 +1413,10 @@
       "errorLoadDetail": "Failed to load template details",
       "errorRevert": "Failed to revert template to default",
       "filter": {
+        "allAudiences": "All audiences",
         "allChannels": "All channels",
         "allStatuses": "All statuses",
+        "audience": "Audience",
         "channel": "Channel",
         "status": "Status"
       },
@@ -1426,6 +1432,7 @@
         "systemDefault": "System default"
       },
       "table": {
+        "audience": "Audience",
         "channel": "Channel",
         "status": "Status",
         "subject": "Subject",

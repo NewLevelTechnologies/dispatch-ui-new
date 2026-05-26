@@ -14,7 +14,7 @@ export const flags = {
 
   // BE PR-2: POST /notification-templates/{id}/send-test. While false,
   // the Send test button is suppressed entirely from the editor header.
-  notificationTestSend: false,
+  notificationTestSend: true,
 } as const;
 
 export type FeatureFlag = keyof typeof flags;
