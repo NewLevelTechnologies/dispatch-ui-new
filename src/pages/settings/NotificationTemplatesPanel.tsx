@@ -288,7 +288,7 @@ export default function NotificationTemplatesPanel() {
               tone="muted"
               className="ml-auto whitespace-nowrap"
             >
-              <span className="font-semibold text-accent-700">
+              <span className="font-semibold text-fg-accent">
                 {customizedCount}
               </span>{' '}
               {t('settings.notificationTemplates.summary', {
@@ -442,7 +442,7 @@ export default function NotificationTemplatesPanel() {
                         </td>
                         <td className="right">
                           {canEdit && (
-                            <span className="text-[11.5px] font-semibold text-accent-700">
+                            <span className="text-[11.5px] font-semibold text-fg-accent">
                               {tpl.isSystemTemplate
                                 ? t(
                                     'settings.notificationTemplates.action.customize'

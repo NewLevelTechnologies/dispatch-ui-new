@@ -391,7 +391,7 @@ export default function CompanyProfilePanel() {
                     <button
                       type="button"
                       onClick={triggerLogoPicker}
-                      className="text-[12.5px] font-semibold text-fg-strong hover:text-accent-700 dark:hover:text-accent-300"
+                      className="text-[12.5px] font-semibold text-fg-strong hover:text-fg-accent"
                       disabled={uploadLogoMutation.isPending}
                     >
                       {uploadLogoMutation.isPending ? t('common.saving') : t('settings.companyProfile.logoReplace')}

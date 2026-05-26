@@ -51,7 +51,7 @@ export function renderWithHighlights(
         className={clsx(
           'rounded-[3px] px-[3px] font-medium',
           v !== undefined
-            ? 'bg-accent-500/14 text-accent-700'
+            ? 'bg-accent-500/14 text-fg-accent'
             : 'bg-warning-500/18 text-warning-500'
         )}
       >

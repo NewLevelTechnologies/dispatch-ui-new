@@ -172,7 +172,7 @@ export default function WorkOrderApprovalsCallout({ workOrderId }: Props) {
               <span className="text-fg-dim">·</span>
               <Link
                 to={`/approvals?tab=pending&wo=${workOrderId}`}
-                className="text-accent-700 hover:underline"
+                className="text-fg-accent hover:underline"
               >
                 {additionalCount > 0
                   ? t('approvals.callout.viewAllInQueue', { count: additionalCount + 1 })

@@ -83,6 +83,7 @@
   --fg-strong: oklch(15% 0.012 80);
   --fg-muted:  oklch(50% 0.012 80);
   --fg-dim:    oklch(64% 0.01 80);
+  --fg-accent: var(--accent-700);
 
   --border:        oklch(91% 0.008 80);
   --border-strong: oklch(86% 0.01 80);
@@ -114,6 +115,7 @@
   --fg-strong:  oklch(99% 0.003 250);     /*                  was 98% */
   --fg-muted:   oklch(80% 0.010 250);     /*                  was 75% */
   --fg-dim:     oklch(70% 0.010 250);     /*                  was 66% */
+  --fg-accent:  var(--accent-300);
 
   /* Borders — more present so cards read as cards */
   --border:        oklch(32% 0.012 250);  /*                  was 28% */

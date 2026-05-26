@@ -354,7 +354,7 @@ export default function ApprovalsPage() {
               className={clsx(
                 '-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3.5 py-2 text-[12.5px] font-semibold whitespace-nowrap transition-colors',
                 currentTab === tab.id
-                  ? 'border-accent-500 text-accent-700'
+                  ? 'border-accent-500 text-fg-accent'
                   : 'text-fg-muted hover:text-fg-strong',
               )}
             >
@@ -635,7 +635,7 @@ function DetailPane({
               <button
                 type="button"
                 onClick={onOpenWorkOrder}
-                className="cursor-pointer text-accent-700 hover:underline"
+                className="cursor-pointer text-fg-accent hover:underline"
               >
                 <Code>{request.workOrder.displayId}</Code>
               </button>

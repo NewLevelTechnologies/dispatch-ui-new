@@ -379,7 +379,7 @@ function RolesAndRegionsCard({
           <span className="text-fg-dim">·</span>
           <button
             onClick={() => setOpen(!open)}
-            className="font-medium text-accent-700 hover:underline"
+            className="font-medium text-fg-accent hover:underline"
           >
             {open ? 'Hide details' : 'View detailed permissions'}
           </button>

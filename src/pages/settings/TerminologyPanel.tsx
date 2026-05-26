@@ -504,7 +504,7 @@ function PresetChip({
         'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12px] font-medium transition-colors',
         'disabled:cursor-not-allowed disabled:opacity-50',
         selected
-          ? 'border-accent-500/35 bg-accent-500/10 text-accent-700'
+          ? 'border-accent-500/35 bg-accent-500/10 text-fg-accent'
           : 'border-border bg-bg-elev text-fg-strong hover:bg-bg-hover',
       ].join(' ')}
     >
@@ -717,7 +717,7 @@ function ApplyPresetDialog({
                             {t('settings.terminology.presetWas', { value: r.from })}
                           </span>
                           <ArrowRightIcon className="size-3 text-fg-muted" aria-hidden="true" />
-                          <span className="font-semibold text-accent-700">{r.to}</span>
+                          <span className="font-semibold text-fg-accent">{r.to}</span>
                         </li>
                       ))}
                     </ul>
