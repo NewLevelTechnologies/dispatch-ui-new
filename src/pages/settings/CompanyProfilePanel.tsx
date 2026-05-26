@@ -6,6 +6,7 @@ import {
   EnvelopeIcon,
   GlobeAltIcon,
   ArrowUpTrayIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import {
   tenantSettingsApi,
@@ -440,10 +441,12 @@ function OperatingCard({ settings, canEdit }: { settings: TenantSettings; canEdi
 // ──────────────────────────────────────────────────────────────────
 // Card 3 — Branding (logo)
 //
-// Upload/replace use the existing POST /tenant-settings/logo endpoint. The
-// file is held locally in edit mode and uploaded on Save (so it follows the
-// per-card Save model). There is no DELETE endpoint yet, so removing a saved
-// logo is intentionally not offered here — see PR notes for the BE ask.
+// Upload/replace use POST /tenant-settings/logo; removal uses DELETE
+// /tenant-settings/logo. Both are staged in edit mode (file held locally, or a
+// removal flagged) and applied on Save, so the card keeps its per-card Save
+// model — Cancel backs out of a pending upload *or* removal without touching
+// the server. Upload and removal are mutually exclusive: choosing one clears
+// the other.
 // ──────────────────────────────────────────────────────────────────
 const LOGO_MAX_BYTES = 1 * 1024 * 1024;
 const LOGO_MIME_TYPES = ['image/png', 'image/svg+xml'];
@@ -453,6 +456,9 @@ function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit
   const [editing, setEditing] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  // Staged removal of the saved logo, applied on Save (mutually exclusive with
+  // a staged file upload). Cancel/clear resets it.
+  const [removeRequested, setRemoveRequested] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const savedLogoUrl = settings.logoThumbnailUrl ?? settings.logoMediumUrl ?? null;
@@ -460,7 +466,7 @@ function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit
     logoFilenameFromUrl(settings.logoOriginalUrl) ?? logoFilenameFromUrl(savedLogoUrl);
   const uploadedAt = formatDate(settings.updatedAt);
 
-  const dirty = file !== null;
+  const dirty = file !== null || removeRequested;
 
   const uploadMutation = useMutation({
     mutationFn: (f: File) => tenantSettingsApi.uploadLogo(f),
@@ -473,9 +479,23 @@ function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit
     onError: (err: unknown) => showError("Couldn't upload logo", extractApiError(err)),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => tenantSettingsApi.deleteLogo(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
+      clearSelection();
+      setEditing(false);
+      showSuccess('Logo removed');
+    },
+    onError: (err: unknown) => showError("Couldn't remove logo", extractApiError(err)),
+  });
+
+  const saving = uploadMutation.isPending || deleteMutation.isPending;
+
   function clearSelection() {
     setFile(null);
     setPreview(null);
+    setRemoveRequested(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -491,10 +511,19 @@ function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit
       showError("Couldn't use that file", 'Logo must be 1 MB or smaller.');
       return;
     }
+    setRemoveRequested(false);
     setFile(picked);
     const reader = new FileReader();
     reader.onloadend = () => setPreview(reader.result as string);
     reader.readAsDataURL(picked);
+  };
+
+  // Flag the saved logo for removal, discarding any staged upload.
+  const handleRequestRemove = () => {
+    setFile(null);
+    setPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    setRemoveRequested(true);
   };
 
   const handleCancel = () => {
@@ -502,7 +531,12 @@ function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit
     setEditing(false);
   };
 
-  const shownLogoUrl = preview ?? savedLogoUrl;
+  const handleSave = () => {
+    if (removeRequested) deleteMutation.mutate();
+    else if (file) uploadMutation.mutate(file);
+  };
+
+  const shownLogoUrl = removeRequested ? null : (preview ?? savedLogoUrl);
 
   const logoBox = shownLogoUrl ? (
     <img
@@ -525,9 +559,9 @@ function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit
       editing={editing}
       onEdit={canEdit ? () => setEditing(true) : () => {}}
       onCancel={handleCancel}
-      onSave={() => file && uploadMutation.mutate(file)}
-      saving={uploadMutation.isPending}
-      saveDisabled={!dirty || uploadMutation.isPending}
+      onSave={handleSave}
+      saving={saving}
+      saveDisabled={!dirty || saving}
     >
       {editing ? (
         <div className="flex items-center gap-4">
@@ -540,15 +574,31 @@ function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit
               className="hidden"
               onChange={handleFileChange}
             />
-            <Button outline size="xs" type="button" onClick={() => fileInputRef.current?.click()}>
-              <ArrowUpTrayIcon className="size-3.5" />
-              {savedLogoUrl ? 'Replace logo' : 'Upload logo'}
-            </Button>
-            <Text size="xs" tone="muted" className="mt-1.5 leading-[1.5]">
-              PNG or SVG recommended · transparent background · square or wide formats · max 1 MB.
-            </Text>
-            {file && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button outline size="xs" type="button" onClick={() => fileInputRef.current?.click()}>
+                <ArrowUpTrayIcon className="size-3.5" />
+                {savedLogoUrl && !removeRequested ? 'Replace logo' : 'Upload logo'}
+              </Button>
+              {savedLogoUrl &&
+                (removeRequested ? (
+                  <Button plain size="xs" type="button" onClick={() => setRemoveRequested(false)}>
+                    Keep current logo
+                  </Button>
+                ) : (
+                  <Button plain size="xs" type="button" onClick={handleRequestRemove}>
+                    <TrashIcon className="size-3.5" />
+                    Remove
+                  </Button>
+                ))}
+            </div>
+            {removeRequested ? (
+              <Text size="xs" tone="dim" className="mt-1.5">Logo will be removed — save to apply.</Text>
+            ) : file ? (
               <Text size="xs" tone="dim" className="mt-1.5">{file.name} — save to apply</Text>
+            ) : (
+              <Text size="xs" tone="muted" className="mt-1.5 leading-[1.5]">
+                PNG or SVG recommended · transparent background · square or wide formats · max 1 MB.
+              </Text>
             )}
           </div>
         </div>

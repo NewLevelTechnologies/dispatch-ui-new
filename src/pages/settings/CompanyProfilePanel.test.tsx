@@ -41,6 +41,12 @@ const mockSettings = {
   updatedAt: '2026-03-27T10:30:00Z',
 };
 
+const mockSettingsWithLogo = {
+  ...mockSettings,
+  logoOriginalUrl: 'https://x/acme-logo.png',
+  logoThumbnailUrl: 'https://x/acme-logo-thumb.png',
+};
+
 // Identity is the first card, Operating second, Branding third — each has its
 // own Edit button, so scope clicks by index.
 const editButtons = () => screen.getAllByRole('button', { name: /^(edit|complete identity)$/i });
@@ -193,5 +199,50 @@ describe('CompanyProfilePanel', () => {
 
     expect(showError).toHaveBeenCalled();
     expect(apiClient.post).not.toHaveBeenCalled();
+  });
+
+  it('does not offer Remove when no logo is set', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    await user.click(editButtons()[2]);
+    expect(screen.queryByRole('button', { name: /^remove$/i })).not.toBeInTheDocument();
+  });
+
+  it('removes a saved logo on Save via DELETE', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSettingsWithLogo });
+    vi.mocked(apiClient.delete).mockResolvedValue({
+      data: { ...mockSettingsWithLogo, logoOriginalUrl: null, logoThumbnailUrl: null },
+    });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    await user.click(editButtons()[2]);
+    await user.click(screen.getByRole('button', { name: /^remove$/i }));
+    expect(screen.getByText(/logo will be removed/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(apiClient.delete).toHaveBeenCalledWith(expect.stringContaining('/tenant-settings/logo'));
+    });
+    expect(showSuccess).toHaveBeenCalled();
+  });
+
+  it('backs out of a staged removal with Keep current logo', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSettingsWithLogo });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    await user.click(editButtons()[2]);
+    await user.click(screen.getByRole('button', { name: /^remove$/i }));
+    expect(screen.getByText(/logo will be removed/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /keep current logo/i }));
+    expect(screen.queryByText(/logo will be removed/i)).not.toBeInTheDocument();
+    expect(apiClient.delete).not.toHaveBeenCalled();
   });
 });
