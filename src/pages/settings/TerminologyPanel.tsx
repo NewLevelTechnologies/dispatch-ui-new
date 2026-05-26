@@ -150,6 +150,8 @@ function groupLabel(t: (k: string) => string, g: GroupId): string {
       return t('settings.terminology.groupOperations');
     case 'money':
       return t('settings.terminology.groupMoney');
+    case 'other':
+      return t('settings.terminology.groupOther');
   }
 }
 
@@ -206,6 +208,41 @@ export default function TerminologyPanel() {
       entitiesQuery.data.find((e) => e.code === code)?.defaultSingular ?? code;
     return buildPresetDialogData(pendingPreset, form, labelFor);
   }, [pendingPreset, form, entitiesQuery.data]);
+
+  // Bucket the backend's entity list into the display groups. The
+  // entity list is server-driven but the group map is static, so any code
+  // we don't recognize (FE registry drift behind the BE) falls into a
+  // catch-all "Other" group rather than silently disappearing — and we
+  // warn so it shows up in dev/console.
+  const byGroup = useMemo(() => {
+    const buckets: Record<GroupId, EntityInfo[]> = {
+      customer: [],
+      work: [],
+      people: [],
+      equipment: [],
+      operations: [],
+      money: [],
+      other: [],
+    };
+    const unmapped: string[] = [];
+    for (const e of entitiesQuery.data ?? []) {
+      const g = ENTITY_GROUP[e.code];
+      if (g) {
+        buckets[g].push(e);
+      } else {
+        buckets.other.push(e);
+        unmapped.push(e.code);
+      }
+    }
+    if (unmapped.length > 0) {
+      console.warn(
+        `[Terminology] Unmapped entity code(s) rendered under "Other": ${unmapped.join(
+          ', '
+        )}. Add them to ENTITY_GROUP in terminologyPresets.ts.`
+      );
+    }
+    return buckets;
+  }, [entitiesQuery.data]);
 
   const saveMutation = useMutation({
     mutationFn: (glossary: Glossary) => tenantSettingsApi.updateSettings({ glossary }),
@@ -302,21 +339,6 @@ export default function TerminologyPanel() {
         />
       </div>
     );
-  }
-
-  const entities = entitiesQuery.data;
-  // Bucket entities by group so we can render six grouped cards.
-  const byGroup: Record<GroupId, EntityInfo[]> = {
-    customer: [],
-    work: [],
-    people: [],
-    equipment: [],
-    operations: [],
-    money: [],
-  };
-  for (const e of entities) {
-    const g = ENTITY_GROUP[e.code];
-    if (g) byGroup[g].push(e);
   }
 
   return (
