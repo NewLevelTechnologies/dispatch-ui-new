@@ -10,6 +10,7 @@ import { Card } from '../catalyst/card';
 import { Field } from '../catalyst/fieldset';
 import { Textarea } from '../catalyst/textarea';
 import { VariableStrip } from './VariableStrip';
+import { Callout } from '../ui/Callout';
 import {
   insertAtCursor,
   resolveBody,
@@ -72,31 +73,44 @@ export function TemplateEditorSms({
   );
 
   return (
-    <Card
-      title="Message"
-      subtitle="Tap a variable chip to insert. SMS providers segment past 160 characters."
-      action={<SmsCounter raw={form.bodyTemplate.length} resolved={resolved.length} />}
-      className="mb-3"
-    >
-      <Field size="xs">
-        <Textarea
-          ref={bodyRef}
-          rows={6}
-          className="font-mono text-[12px] leading-[1.55]"
-          value={form.bodyTemplate}
-          onChange={(e) => onChange({ bodyTemplate: e.target.value })}
-          aria-label="SMS message"
+    <>
+      <Card
+        title="Message"
+        subtitle="Tap a variable chip to insert. SMS providers segment past 160 characters."
+        action={<SmsCounter raw={form.bodyTemplate.length} resolved={resolved.length} />}
+        className="mb-3"
+      >
+        <Field size="xs">
+          <Textarea
+            ref={bodyRef}
+            rows={6}
+            className="font-mono text-[12px] leading-[1.55]"
+            value={form.bodyTemplate}
+            onChange={(e) => onChange({ bodyTemplate: e.target.value })}
+            aria-label="SMS message"
+          />
+        </Field>
+        <VariableStrip
+          hint="Insert variable"
+          chips={bodyChips}
+          onInsert={(name) =>
+            insertAtCursor(bodyRef, name, (next) =>
+              onChange({ bodyTemplate: next })
+            )
+          }
         />
-      </Field>
-      <VariableStrip
-        hint="Insert variable"
-        chips={bodyChips}
-        onInsert={(name) =>
-          insertAtCursor(bodyRef, name, (next) =>
-            onChange({ bodyTemplate: next })
-          )
-        }
-      />
-    </Card>
+      </Card>
+
+      {/* Line-break guidance. Static, always-on note for now. The better
+          future shape is proactive validation: detect when the message
+          actually contains a line break (\n) and surface this only then,
+          instead of showing it unconditionally — where it's just noise for
+          the common single-line case. Wire that in when the editor grows
+          real lint rules. */}
+      <Callout kind="info" title="Line breaks in SMS">
+        Carriers don't always honor them. Single-line messages deliver more
+        reliably across iOS, Android, and feature phones.
+      </Callout>
+    </>
   );
 }

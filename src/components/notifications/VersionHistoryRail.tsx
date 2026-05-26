@@ -8,11 +8,13 @@
 // tweak from there or just navigate away (the rollback is already
 // persisted server-side).
 
-import { Fragment, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import {
-  Transition,
-  TransitionChild,
+  Dialog,
+  DialogBackdrop,
+  DialogPanel,
+  DialogTitle,
 } from '@headlessui/react';
 import { ClockIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -74,7 +76,7 @@ export function VersionHistoryRail({
   const versions = useMemo<TemplateVersion[]>(() => {
     const list = history?.versions ?? [];
     // Newest first — server may already do this, but enforce so the
-    // "current" highlight + diff block land predictably.
+    // "current" highlight lands predictably.
     return [...list].sort((a, b) => b.version - a.version);
   }, [history]);
 
@@ -97,29 +99,32 @@ export function VersionHistoryRail({
 
   return (
     <>
-      <Transition show={open} as={Fragment}>
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-20 w-full max-sm:w-full sm:w-[380px]">
-          <TransitionChild
-            as={Fragment}
-            enter="transition transform duration-200 ease-out"
-            enterFrom="translate-x-full"
-            enterTo="translate-x-0"
-            leave="transition transform duration-150 ease-in"
-            leaveFrom="translate-x-0"
-            leaveTo="translate-x-full"
-          >
-            <aside
+      {/* Slide-over rendered through Headless UI's portal so it anchors to the
+          viewport, not the editor's centered (`max-w-screen-xl`, `mx-auto`)
+          content pane — `position: absolute; right: 0` inside that pane left
+          the rail floating short of the screen edge. Dialog also gives us the
+          scrim, focus trap, Escape, and click-outside-to-close for free. */}
+      <Dialog open={open} onClose={onClose}>
+        <DialogBackdrop
+          transition
+          className="fixed inset-0 bg-zinc-950/25 transition duration-200 data-closed:opacity-0 data-enter:ease-out data-leave:ease-in dark:bg-zinc-950/40"
+        />
+        <div className="fixed inset-0 overflow-hidden">
+          <div className="absolute inset-y-0 right-0 flex max-w-full">
+            <DialogPanel
+              transition
               className={clsx(
-                'pointer-events-auto flex h-full flex-col overflow-hidden border-l border-border bg-bg-elev',
-                'sm:shadow-[-12px_0_32px_-16px_rgba(0,0,0,0.2)]'
+                'flex h-full w-screen flex-col overflow-hidden border-l border-border bg-bg-elev sm:w-[380px]',
+                'shadow-[-12px_0_32px_-16px_rgba(0,0,0,0.2)]',
+                'transition duration-200 will-change-transform data-closed:translate-x-full data-enter:ease-out data-leave:ease-in'
               )}
             >
               <header className="flex items-center gap-2.5 border-b border-border px-4 py-3">
                 <ClockIcon className="size-3.5 text-fg-muted" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13.5px] font-bold text-fg-strong">
+                  <DialogTitle className="text-[13.5px] font-bold text-fg-strong">
                     Version history
-                  </div>
+                  </DialogTitle>
                   <Text size="xs" tone="muted" className="truncate">
                     {template.displayName} · {versions.length} version
                     {versions.length === 1 ? '' : 's'}
@@ -205,10 +210,10 @@ export function VersionHistoryRail({
                   })
                 )}
               </div>
-            </aside>
-          </TransitionChild>
+            </DialogPanel>
+          </div>
         </div>
-      </Transition>
+      </Dialog>
 
       <ConfirmDialog
         isOpen={!!pendingRestore}
