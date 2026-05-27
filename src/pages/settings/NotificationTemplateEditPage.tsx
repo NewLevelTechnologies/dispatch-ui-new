@@ -354,7 +354,7 @@ export default function NotificationTemplateEditPage() {
         className="flex min-h-0 flex-1 flex-col"
       >
         <div className="flex-1 overflow-y-auto px-7 pb-6 pt-5 max-lg:px-4">
-          <div className="mx-auto max-w-[1200px]">
+          <div className="max-w-[1200px]">
             <Link
               to="/settings/notifications"
               className="mb-2.5 inline-flex items-center gap-1 text-[11.5px] text-fg-muted hover:text-fg-strong"

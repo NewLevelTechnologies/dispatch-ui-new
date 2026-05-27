@@ -125,7 +125,7 @@ export default function RoleDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-[980px]">
+      <div className="max-w-[980px]">
         <LoadingState
           label={t('common.actions.loading', { entities: t('entities.role') })}
         />
@@ -135,7 +135,7 @@ export default function RoleDetailPage() {
 
   if (error || !role) {
     return (
-      <div className="mx-auto max-w-[980px] p-2">
+      <div className="max-w-[980px] p-2">
         <Callout kind="danger">
           {t('common.actions.errorLoading', { entities: t('entities.role') })}
           {error && `: ${(error as Error).message}`}
@@ -155,7 +155,7 @@ export default function RoleDetailPage() {
   const grantedCaps = new Set(role.capabilities ?? []);
 
   return (
-    <div className="mx-auto max-w-[980px]">
+    <div className="max-w-[980px]">
       <Link
         to="/settings/access/roles"
         className="mb-2.5 inline-flex items-center gap-1 text-[11.5px] text-fg-muted hover:text-fg-strong"
