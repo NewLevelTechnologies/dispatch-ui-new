@@ -345,7 +345,7 @@ export default function TerminologyPanel() {
     <div className="-mx-6 -my-6 flex h-[calc(100svh-52px)] min-h-0 flex-col max-lg:-mx-4 max-lg:-my-4">
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto px-7 pb-6 pt-5 max-lg:px-4">
-        <div className="mx-auto max-w-[920px]">
+        <div className="max-w-[920px]">
           <PageHead
             title={t('settings.terminology.title')}
             sub={t('settings.terminology.description')}

@@ -152,7 +152,7 @@ export default function UserDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[980px]">
+    <div className="max-w-[980px]">
       <Link
         to="/settings/access/users"
         className="mb-2.5 inline-flex items-center gap-1 text-[11.5px] text-fg-muted hover:text-fg-strong"
