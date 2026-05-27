@@ -116,7 +116,7 @@ export default function WorkflowEditorPage() {
       </Link>
 
       {workflow && (
-        <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="mb-4 flex items-start justify-between gap-4 max-sm:flex-col max-sm:gap-3">
           <div className="min-w-0">
             <Heading level={1} size="page-sm" className="m-0 flex items-center gap-2.5">
               <span

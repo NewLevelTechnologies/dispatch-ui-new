@@ -362,7 +362,7 @@ export default function NotificationTemplateEditPage() {
               ← All notification templates
             </Link>
 
-            <div className="mb-3.5 flex flex-wrap items-end gap-3">
+            <div className="mb-3.5 flex flex-wrap items-end gap-3 max-sm:flex-col max-sm:items-stretch max-sm:gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2.5">
                   <Heading level={1} size="page-md" className="m-0">
@@ -391,18 +391,24 @@ export default function NotificationTemplateEditPage() {
                   )}
                 </Text>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
+              <div className="flex shrink-0 items-center gap-1.5 max-sm:w-full">
                 <Button
                   type="button"
                   outline
                   size="xs"
+                  className="max-sm:flex-1"
                   onClick={() => setHistoryOpen(true)}
                 >
                   <ClockIcon className="size-3.5" />
                   History
                 </Button>
                 {flags.notificationTestSend && (
-                  <SendTestMenu template={template} draft={form} sampleId={sampleId} />
+                  <SendTestMenu
+                    template={template}
+                    draft={form}
+                    sampleId={sampleId}
+                    className="max-sm:flex-1"
+                  />
                 )}
               </div>
             </div>
@@ -501,24 +507,25 @@ export default function NotificationTemplateEditPage() {
         </div>
 
         <div
-          className="flex flex-shrink-0 flex-wrap items-center gap-2 border-t border-border bg-bg-elev px-7 py-3 max-lg:px-4"
+          className="flex flex-shrink-0 flex-wrap items-center gap-2 border-t border-border bg-bg-elev px-7 py-3 max-lg:px-4 max-sm:flex-col max-sm:items-stretch"
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
           <Button
             type="button"
             plain
             size="xs"
+            className="max-sm:order-3 max-sm:self-center"
             onClick={() => setResetOpen(true)}
             disabled={!canEdit || template.isSystemTemplate || resetMutation.isPending}
           >
             Reset to system default
           </Button>
-          <span className="flex-1" />
+          <span className="flex-1 max-sm:hidden" />
           <Text
             as="span"
             size="xs"
             tone={dirty ? 'default' : 'dim'}
-            className={`max-sm:basis-full ${dirty ? 'text-warning-500' : ''}`}
+            className={`max-sm:order-4 max-sm:text-center ${dirty ? 'text-warning-500' : ''}`}
           >
             {dirty ? 'Unsaved changes' : 'No changes'}
           </Text>
@@ -526,6 +533,7 @@ export default function NotificationTemplateEditPage() {
             type="button"
             plain
             size="xs"
+            className="max-sm:order-2 max-sm:w-full"
             href="/settings/notifications"
           >
             Cancel
@@ -534,6 +542,7 @@ export default function NotificationTemplateEditPage() {
             type="submit"
             color="accent"
             size="xs"
+            className="max-sm:order-1 max-sm:w-full"
             disabled={!canEdit || !dirty || saveMutation.isPending}
           >
             {saveMutation.isPending ? 'Saving…' : 'Save changes'}

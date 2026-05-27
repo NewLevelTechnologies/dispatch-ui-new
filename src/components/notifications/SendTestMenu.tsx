@@ -45,9 +45,10 @@ type Props = {
   template: NotificationTemplate;
   draft: Draft;
   sampleId?: string | null;
+  className?: string;
 };
 
-export function SendTestMenu({ template, draft, sampleId }: Props) {
+export function SendTestMenu({ template, draft, sampleId, className }: Props) {
   const { data: currentUser } = useCurrentUser();
   const [otherOpen, setOtherOpen] = useState(false);
   const [otherRecipient, setOtherRecipient] = useState('');
@@ -89,7 +90,7 @@ export function SendTestMenu({ template, draft, sampleId }: Props) {
   return (
     <>
       <Dropdown>
-        <DropdownButton as={Button} outline size="xs">
+        <DropdownButton as={Button} outline size="xs" className={className}>
           <PaperAirplaneIcon className="size-3.5" />
           Send test
           <ChevronDownIcon className="ml-0.5 size-3" />

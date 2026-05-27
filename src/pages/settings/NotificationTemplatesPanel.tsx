@@ -6,6 +6,7 @@ import {
   EnvelopeIcon,
   ChatBubbleLeftIcon,
   BellAlertIcon,
+  FunnelIcon,
 } from '@heroicons/react/24/outline';
 import {
   notificationTemplateApi,
@@ -20,6 +21,7 @@ import {
   FilterChipListbox,
   ChipListboxOption,
 } from '../../components/ui/FilterChipListbox';
+import { FiltersSheet } from '../../components/ui/FiltersSheet';
 import { ListFooter } from '../../components/ui/ListFooter';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
@@ -71,10 +73,15 @@ export default function NotificationTemplatesPanel() {
   const audienceFilter = readAudience(searchParams.get('audience'));
 
   const [searchQuery, setSearchQuery] = useState(urlSearch);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   useEffect(() => {
     setSearchQuery(urlSearch);
   }, [urlSearch]);
   const deferredSearch = useDeferredValue(searchQuery);
+
+  const activeFilterCount = [channelFilter, audienceFilter, statusFilter].filter(
+    Boolean
+  ).length;
 
   const updateFilters = (
     updates: {
@@ -208,6 +215,51 @@ export default function NotificationTemplatesPanel() {
     });
   })();
 
+  // The filter chips render in two places: inline on the desktop toolbar, and
+  // stacked inside the mobile FiltersSheet. Defined once so the two stay in sync.
+  const filterControls = (
+    <>
+      <FilterChipListbox
+        label={t('settings.notificationTemplates.filter.channel')}
+        ariaLabel={t('settings.notificationTemplates.filter.channel')}
+        value={channelFilter || null}
+        displayValue={channelFilter ? channelLabel(channelFilter) : null}
+        resetLabel={t('settings.notificationTemplates.filter.allChannels')}
+        onChange={(v) => updateFilters({ channel: readChannel(v) })}
+        onClear={() => updateFilters({ channel: '' })}
+      >
+        <ChipListboxOption value="EMAIL">{channelLabel('EMAIL')}</ChipListboxOption>
+        <ChipListboxOption value="SMS">{channelLabel('SMS')}</ChipListboxOption>
+      </FilterChipListbox>
+
+      <FilterChipListbox
+        label={t('settings.notificationTemplates.filter.audience')}
+        ariaLabel={t('settings.notificationTemplates.filter.audience')}
+        value={audienceFilter || null}
+        displayValue={audienceFilter ? audienceLabel(audienceFilter) : null}
+        resetLabel={t('settings.notificationTemplates.filter.allAudiences')}
+        onChange={(v) => updateFilters({ audience: readAudience(v) })}
+        onClear={() => updateFilters({ audience: '' })}
+      >
+        <ChipListboxOption value="CUSTOMER">{audienceLabel('CUSTOMER')}</ChipListboxOption>
+        <ChipListboxOption value="INTERNAL">{audienceLabel('INTERNAL')}</ChipListboxOption>
+      </FilterChipListbox>
+
+      <FilterChipListbox
+        label={t('settings.notificationTemplates.filter.status')}
+        ariaLabel={t('settings.notificationTemplates.filter.status')}
+        value={statusFilter || null}
+        displayValue={statusFilter ? statusLabel(statusFilter) : null}
+        resetLabel={t('settings.notificationTemplates.filter.allStatuses')}
+        onChange={(v) => updateFilters({ status: readStatus(v) })}
+        onClear={() => updateFilters({ status: '' })}
+      >
+        <ChipListboxOption value="system">{statusLabel('system')}</ChipListboxOption>
+        <ChipListboxOption value="custom">{statusLabel('custom')}</ChipListboxOption>
+      </FilterChipListbox>
+    </>
+  );
+
   return (
     <>
       <PageHead
@@ -217,6 +269,7 @@ export default function NotificationTemplatesPanel() {
 
       {templates && templates.length > 0 && (
         <ListToolbar
+          className="max-sm:flex-col max-sm:items-stretch"
           search={
             <ListSearch
               placeholder={t(
@@ -230,63 +283,32 @@ export default function NotificationTemplatesPanel() {
             />
           }
         >
-          <FilterChipListbox
-            label={t('settings.notificationTemplates.filter.channel')}
-            ariaLabel={t('settings.notificationTemplates.filter.channel')}
-            value={channelFilter || null}
-            displayValue={channelFilter ? channelLabel(channelFilter) : null}
-            resetLabel={t('settings.notificationTemplates.filter.allChannels')}
-            onChange={(v) => updateFilters({ channel: readChannel(v) })}
-            onClear={() => updateFilters({ channel: '' })}
-          >
-            <ChipListboxOption value="EMAIL">
-              {channelLabel('EMAIL')}
-            </ChipListboxOption>
-            <ChipListboxOption value="SMS">
-              {channelLabel('SMS')}
-            </ChipListboxOption>
-          </FilterChipListbox>
+          {/* Desktop: chips inline. `contents` keeps them as direct toolbar
+              flex items so desktop layout is unchanged; hidden below sm. */}
+          <div className="contents max-sm:hidden">{filterControls}</div>
 
-          <FilterChipListbox
-            label={t('settings.notificationTemplates.filter.audience')}
-            ariaLabel={t('settings.notificationTemplates.filter.audience')}
-            value={audienceFilter || null}
-            displayValue={audienceFilter ? audienceLabel(audienceFilter) : null}
-            resetLabel={t('settings.notificationTemplates.filter.allAudiences')}
-            onChange={(v) => updateFilters({ audience: readAudience(v) })}
-            onClear={() => updateFilters({ audience: '' })}
+          {/* Mobile: single Filters button that opens the bottom sheet */}
+          <Button
+            outline
+            size="xs"
+            className="sm:hidden"
+            onClick={() => setFiltersOpen(true)}
           >
-            <ChipListboxOption value="CUSTOMER">
-              {audienceLabel('CUSTOMER')}
-            </ChipListboxOption>
-            <ChipListboxOption value="INTERNAL">
-              {audienceLabel('INTERNAL')}
-            </ChipListboxOption>
-          </FilterChipListbox>
-
-          <FilterChipListbox
-            label={t('settings.notificationTemplates.filter.status')}
-            ariaLabel={t('settings.notificationTemplates.filter.status')}
-            value={statusFilter || null}
-            displayValue={statusFilter ? statusLabel(statusFilter) : null}
-            resetLabel={t('settings.notificationTemplates.filter.allStatuses')}
-            onChange={(v) => updateFilters({ status: readStatus(v) })}
-            onClear={() => updateFilters({ status: '' })}
-          >
-            <ChipListboxOption value="system">
-              {statusLabel('system')}
-            </ChipListboxOption>
-            <ChipListboxOption value="custom">
-              {statusLabel('custom')}
-            </ChipListboxOption>
-          </FilterChipListbox>
+            <FunnelIcon className="size-3.5" />
+            {t('settings.notificationTemplates.filter.filters')}
+            {activeFilterCount > 0 && (
+              <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[10px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
 
           {customizedCount > 0 && (
             <Text
               as="span"
               size="xs"
               tone="muted"
-              className="ml-auto whitespace-nowrap"
+              className="ml-auto whitespace-nowrap max-sm:hidden"
             >
               <span className="font-semibold text-fg-accent">
                 {customizedCount}
@@ -299,6 +321,18 @@ export default function NotificationTemplatesPanel() {
           )}
         </ListToolbar>
       )}
+
+      <FiltersSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title={t('settings.notificationTemplates.filter.filters')}
+        onClearAll={clearFilters}
+        clearAllLabel={t('settings.notificationTemplates.clearFilters')}
+        clearAllDisabled={activeFilterCount === 0 && !searchQuery}
+        doneLabel={t('common.done')}
+      >
+        {filterControls}
+      </FiltersSheet>
 
       <div className="mt-4">
         <Card>
