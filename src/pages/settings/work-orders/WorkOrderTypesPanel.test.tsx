@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../../test/utils';
 import WorkOrderTypesPanel from './WorkOrderTypesPanel';
 import apiClient from '../../../api/client';
@@ -170,6 +170,207 @@ describe('WorkOrderTypesPanel', () => {
         '/work-orders/config/types/reorder',
         { orderedIds: ['t2', 't1'] }
       );
+    });
+  });
+
+  it('moves a row up from the kebab', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: TWO_TYPES_ENVELOPE });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: [] });
+    const user = userEvent.setup();
+    renderWithProviders(<WorkOrderTypesPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Installation')).toBeInTheDocument();
+    });
+
+    // Second row (Installation) → Move up swaps it ahead of Service Call.
+    const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(moreButtons[1]);
+    const moveUp = await screen.findByRole('menuitem', { name: /move up/i });
+    await user.click(moveUp);
+
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/work-orders/config/types/reorder',
+        { orderedIds: ['t2', 't1'] }
+      );
+    });
+  });
+
+  it('deletes a type through the confirm dialog', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: TWO_TYPES_ENVELOPE });
+    vi.mocked(apiClient.delete).mockResolvedValue({ data: undefined });
+    const user = userEvent.setup();
+    renderWithProviders(<WorkOrderTypesPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Service Call')).toBeInTheDocument();
+    });
+
+    const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(moreButtons[0]);
+    await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+
+    await screen.findByText(/delete "service call"\?/i);
+    const confirmButtons = screen.getAllByRole('button', { name: /^delete$/i });
+    await user.click(confirmButtons[confirmButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(apiClient.delete).toHaveBeenCalledWith(
+        '/work-orders/config/types/t1'
+      );
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/delete "service call"\?/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('surfaces an error when the delete fails', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: TWO_TYPES_ENVELOPE });
+    vi.mocked(apiClient.delete).mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+    renderWithProviders(<WorkOrderTypesPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Service Call')).toBeInTheDocument();
+    });
+
+    const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(moreButtons[0]);
+    await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+
+    await screen.findByText(/delete "service call"\?/i);
+    const confirmButtons = screen.getAllByRole('button', { name: /^delete$/i });
+    await user.click(confirmButtons[confirmButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(apiClient.delete).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/delete "service call"\?/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('reorders rows via drag-and-drop, posting the new id order', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: TWO_TYPES_ENVELOPE });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: [] });
+    renderWithProviders(<WorkOrderTypesPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Service Call')).toBeInTheDocument();
+    });
+
+    const firstRow = screen.getByText('Service Call').closest('tr')!;
+    const secondRow = screen.getByText('Installation').closest('tr')!;
+
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: vi.fn(),
+      getData: vi.fn(),
+      types: [],
+      files: [],
+      items: [],
+    };
+
+    fireEvent.dragStart(firstRow, { dataTransfer });
+    fireEvent.dragOver(secondRow, { dataTransfer });
+    fireEvent.dragLeave(secondRow, { dataTransfer });
+    fireEvent.dragOver(secondRow, { dataTransfer });
+    fireEvent.drop(secondRow, { dataTransfer });
+    fireEvent.dragEnd(firstRow, { dataTransfer });
+
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/work-orders/config/types/reorder',
+        { orderedIds: ['t2', 't1'] }
+      );
+    });
+  });
+
+  it('refetches when a drag reorder fails', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: TWO_TYPES_ENVELOPE });
+    vi.mocked(apiClient.post).mockRejectedValue(new Error('nope'));
+    renderWithProviders(<WorkOrderTypesPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Service Call')).toBeInTheDocument();
+    });
+    expect(apiClient.get).toHaveBeenCalledTimes(1);
+
+    const firstRow = screen.getByText('Service Call').closest('tr')!;
+    const secondRow = screen.getByText('Installation').closest('tr')!;
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: vi.fn(),
+      getData: vi.fn(),
+      types: [],
+      files: [],
+      items: [],
+    };
+
+    fireEvent.dragStart(firstRow, { dataTransfer });
+    fireEvent.dragOver(secondRow, { dataTransfer });
+    fireEvent.drop(secondRow, { dataTransfer });
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalled());
+    await waitFor(() => expect(apiClient.get).toHaveBeenCalledTimes(2));
+  });
+
+  it('shows an error state and retries on demand', async () => {
+    vi.mocked(apiClient.get).mockRejectedValueOnce(new Error('load failed'));
+    const user = userEvent.setup();
+    renderWithProviders(<WorkOrderTypesPanel />);
+
+    const tryAgain = await screen.findByRole('button', { name: /try again/i });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: TWO_TYPES_ENVELOPE });
+    await user.click(tryAgain);
+
+    await waitFor(() => {
+      expect(screen.getByText('Service Call')).toBeInTheDocument();
+    });
+  });
+
+  it('closes the create dialog on cancel', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: TWO_TYPES_ENVELOPE });
+    const user = userEvent.setup();
+    renderWithProviders(<WorkOrderTypesPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Service Call')).toBeInTheDocument();
+    });
+    const addButton = screen
+      .getAllByRole('button')
+      .find((b) => /^add /i.test(b.textContent ?? ''));
+    await user.click(addButton!);
+
+    await screen.findByText(/add work order type/i);
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/add work order type/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('closes the delete confirmation on cancel', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: TWO_TYPES_ENVELOPE });
+    const user = userEvent.setup();
+    renderWithProviders(<WorkOrderTypesPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Service Call')).toBeInTheDocument();
+    });
+
+    const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(moreButtons[0]);
+    await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+
+    await screen.findByText(/delete "service call"\?/i);
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/delete "service call"\?/i)).not.toBeInTheDocument();
     });
   });
 });
