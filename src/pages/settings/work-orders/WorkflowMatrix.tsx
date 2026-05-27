@@ -50,8 +50,8 @@ export function WorkflowMatrix({ workflow, statuses, onCellClick }: WorkflowMatr
           gridTemplateRows: `${COL_HEAD_PX}px repeat(${statuses.length}, ${CELL_PX}px)`,
         }}
       >
-        {/* Corner */}
-        <div className="border-r border-b border-border bg-bg-elev-2" />
+        {/* Corner — sticky-left below lg so it anchors with the row labels */}
+        <div className="border-r border-b border-border bg-bg-elev-2 max-lg:sticky max-lg:left-0 max-lg:z-20" />
 
         {/* Column headers (rotated vertical) */}
         {statuses.map((s) => (
@@ -73,7 +73,7 @@ export function WorkflowMatrix({ workflow, statuses, onCellClick }: WorkflowMatr
         {/* Body rows */}
         {statuses.map((from) => (
           <Fragment key={`row-${from.id}`}>
-            <div className="border-r border-border border-b border-border-soft bg-bg-elev-2 px-2.5 flex items-center gap-2 text-[11.5px] font-semibold text-fg-strong min-h-9">
+            <div className="border-r border-border border-b border-border-soft bg-bg-elev-2 px-2.5 flex items-center gap-2 text-[11.5px] font-semibold text-fg-strong min-h-9 max-lg:sticky max-lg:left-0 max-lg:z-10">
               <span
                 aria-hidden
                 className="size-2 rounded-full shrink-0"

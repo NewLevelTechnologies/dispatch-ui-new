@@ -334,22 +334,28 @@ function TransitionEditForm({
           )}
         </FieldGroup>
       </SlideOverBody>
-      <SlideOverFooter>
+      <SlideOverFooter className="max-sm:flex-col max-sm:items-stretch">
         {existing && canEdit && (
           <Button
             outline="red"
             size="xs"
             onClick={() => setConfirmDeleteOpen(true)}
-            className="mr-auto"
+            className="mr-auto max-sm:order-3 max-sm:mr-0 max-sm:w-full"
             disabled={deleteMutation.isPending}
           >
             {t('settings.workflows.panel.deleteTransition')}
           </Button>
         )}
-        <Button plain size="xs" onClick={onClose}>
+        <Button plain size="xs" onClick={onClose} className="max-sm:order-2 max-sm:w-full">
           {t('common.cancel')}
         </Button>
-        <Button color="accent" size="xs" onClick={handleSave} disabled={saveDisabled}>
+        <Button
+          color="accent"
+          size="xs"
+          onClick={handleSave}
+          disabled={saveDisabled}
+          className="max-sm:order-1 max-sm:w-full"
+        >
           {createMutation.isPending || updateMutation.isPending
             ? t('common.saving')
             : t('common.save')}

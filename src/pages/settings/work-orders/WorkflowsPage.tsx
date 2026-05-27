@@ -53,10 +53,13 @@ function WorkflowRow({ workflow, canEdit, onOpen, onReset }: WorkflowRowProps) {
   return (
     <div
       onClick={onOpen}
-      className="grid grid-cols-[12px_1fr_auto_auto_26px] items-center gap-4 px-4 py-3.5 border-b border-border-soft last:border-b-0 cursor-pointer hover:bg-bg-hover"
+      className="grid grid-cols-[12px_1fr_auto_auto_26px] items-center gap-4 px-4 py-3.5 border-b border-border-soft last:border-b-0 cursor-pointer hover:bg-bg-hover max-sm:grid-cols-[12px_1fr_26px] max-sm:gap-x-2 max-sm:gap-y-1"
     >
-      <span className="size-2.5 rounded-full" style={{ background: accent }} />
-      <div className="min-w-0">
+      <span
+        className="size-2.5 rounded-full max-sm:col-start-1 max-sm:row-start-1"
+        style={{ background: accent }}
+      />
+      <div className="min-w-0 max-sm:col-start-2 max-sm:row-start-1">
         <div className="flex items-center gap-2">
           <Text size="sm" tone="strong" as="span" className="font-semibold text-[14px]">
             {workflow.workOrderType.name}
@@ -66,18 +69,25 @@ function WorkflowRow({ workflow, canEdit, onOpen, onReset }: WorkflowRowProps) {
           )}
         </div>
       </div>
-      <Text size="xs" tone="muted" as="span" className="tabular-nums">
-        {t('settings.workflows.row.transitionCount', { count: workflow.transitionCount })}
-      </Text>
-      {workflow.approvalGateCount > 0 ? (
-        <Pill tone="warning" className="text-[10.5px]">
-          <LockClosedIcon className="size-3 mr-0.5" />
-          {t('settings.workflows.row.approvalCount', { count: workflow.approvalGateCount })}
-        </Pill>
-      ) : (
-        <span />
-      )}
-      <div onClick={(e) => e.stopPropagation()}>
+      {/* Metadata: `contents` keeps the count + gate as direct grid items on
+          desktop (pixel-stable); below sm they stack onto their own row. */}
+      <div className="sm:contents max-sm:col-start-2 max-sm:row-start-2 max-sm:flex max-sm:items-center max-sm:gap-2">
+        <Text size="xs" tone="muted" as="span" className="tabular-nums">
+          {t('settings.workflows.row.transitionCount', { count: workflow.transitionCount })}
+        </Text>
+        {workflow.approvalGateCount > 0 ? (
+          <Pill tone="warning" className="text-[10.5px]">
+            <LockClosedIcon className="size-3 mr-0.5" />
+            {t('settings.workflows.row.approvalCount', { count: workflow.approvalGateCount })}
+          </Pill>
+        ) : (
+          <span />
+        )}
+      </div>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="max-sm:col-start-3 max-sm:row-start-1"
+      >
         <Dropdown>
           <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
             <EllipsisVerticalIcon className="size-4" />

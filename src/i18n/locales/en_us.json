@@ -57,6 +57,7 @@
     "deleting": "Deleting...",
     "disable": "Disable",
     "disabled": "Disabled",
+    "done": "Done",
     "edit": "Edit",
     "enable": "Enable",
     "enabled": "Enabled",
@@ -1402,6 +1403,7 @@
         "allStatuses": "All statuses",
         "audience": "Audience",
         "channel": "Channel",
+        "filters": "Filters",
         "status": "Status"
       },
       "footerCount": "Showing {{count}} of {{total}} templates",
@@ -1437,6 +1439,7 @@
       "types": "Types",
       "workflows": "Workflows"
     },
+    "openNav": "Open settings menu",
     "planned": "Planned",
     "resetDefaults": "Reset to defaults",
     "saveChanges": "Save changes",
