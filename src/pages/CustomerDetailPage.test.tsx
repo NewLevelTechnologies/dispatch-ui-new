@@ -7,7 +7,7 @@ import type { Customer } from '../api';
 
 vi.mock('../api/client');
 
-const mockSimpleCustomer: Customer = {
+const mockResidentialCustomer: Customer = {
   id: '1',
   name: 'John Doe',
   email: 'john@example.com',
@@ -72,13 +72,13 @@ const mockSimpleCustomer: Customer = {
   version: 0,
 };
 
-const mockStandardCustomer: Customer = {
-  ...mockSimpleCustomer,
+const mockCommercialCustomer: Customer = {
+  ...mockResidentialCustomer,
   category: 'COMMERCIAL',
   serviceLocations: [
-    ...mockSimpleCustomer.serviceLocations,
+    ...mockResidentialCustomer.serviceLocations,
     {
-      ...mockSimpleCustomer.serviceLocations[0],
+      ...mockResidentialCustomer.serviceLocations[0],
       id: 'loc-2',
       locationName: 'Branch Office',
     },
@@ -106,7 +106,7 @@ describe('CustomerDetailPage', () => {
   });
 
   it('displays simple view for homeowner', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -119,7 +119,7 @@ describe('CustomerDetailPage', () => {
   });
 
   it('displays standard view for business', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCommercialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -131,7 +131,7 @@ describe('CustomerDetailPage', () => {
 
   it('opens edit dialog when edit button is clicked', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -148,7 +148,7 @@ describe('CustomerDetailPage', () => {
 
   it('opens add location dialog when add location is clicked', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -166,9 +166,9 @@ describe('CustomerDetailPage', () => {
 
   it('uses table layout for customers with many locations', async () => {
     const customerWithManyLocations: Customer = {
-      ...mockStandardCustomer,
+      ...mockCommercialCustomer,
       serviceLocations: Array.from({ length: 10 }, (_, i) => ({
-        ...mockSimpleCustomer.serviceLocations[0],
+        ...mockResidentialCustomer.serviceLocations[0],
         id: `loc-${i}`,
         locationName: `Location ${i}`,
       })),
@@ -189,9 +189,9 @@ describe('CustomerDetailPage', () => {
   it('filters locations in table view', async () => {
     const user = userEvent.setup();
     const customerWithManyLocations: Customer = {
-      ...mockStandardCustomer,
+      ...mockCommercialCustomer,
       serviceLocations: Array.from({ length: 10 }, (_, i) => ({
-        ...mockSimpleCustomer.serviceLocations[0],
+        ...mockResidentialCustomer.serviceLocations[0],
         id: `loc-${i}`,
         locationName: `Location ${i}`,
       })),
@@ -213,7 +213,7 @@ describe('CustomerDetailPage', () => {
   });
 
   it('uses table layout for standard customers regardless of location count', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCommercialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -226,7 +226,7 @@ describe('CustomerDetailPage', () => {
 
   it('displays payment terms badges for standard customers', async () => {
     const customerWithTerms: Customer = {
-      ...mockStandardCustomer,
+      ...mockCommercialCustomer,
       paymentTermsDays: 30,
       requiresPurchaseOrder: true,
       contractPricingTier: 'GOLD',
@@ -245,7 +245,7 @@ describe('CustomerDetailPage', () => {
 
   it('displays customer with notes', async () => {
     const customerWithNotes: Customer = {
-      ...mockSimpleCustomer,
+      ...mockResidentialCustomer,
       notes: 'VIP customer - handle with care',
     };
 
@@ -258,7 +258,7 @@ describe('CustomerDetailPage', () => {
   });
 
   it('displays clickable email and phone links', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -274,10 +274,10 @@ describe('CustomerDetailPage', () => {
 
   it('displays location with site contact information', async () => {
     const customerWithContact: Customer = {
-      ...mockStandardCustomer,
+      ...mockCommercialCustomer,
       serviceLocations: [
         {
-          ...mockSimpleCustomer.serviceLocations[0],
+          ...mockResidentialCustomer.serviceLocations[0],
           siteContactName: 'Jane Manager',
           siteContactPhone: '5559999999',
           siteContactEmail: 'jane@example.com',
@@ -297,7 +297,7 @@ describe('CustomerDetailPage', () => {
 
   it('displays customer without phone number', async () => {
     const customerNoPhone: Customer = {
-      ...mockSimpleCustomer,
+      ...mockResidentialCustomer,
       phone: undefined,
     };
 
@@ -311,12 +311,12 @@ describe('CustomerDetailPage', () => {
 
   it('displays location with address line 2', async () => {
     const customerWithApt: Customer = {
-      ...mockSimpleCustomer,
+      ...mockResidentialCustomer,
       serviceLocations: [
         {
-          ...mockSimpleCustomer.serviceLocations[0],
+          ...mockResidentialCustomer.serviceLocations[0],
           address: {
-            ...mockSimpleCustomer.serviceLocations[0].address,
+            ...mockResidentialCustomer.serviceLocations[0].address,
             streetAddressLine2: 'Apt 5B',
           },
         },
@@ -333,7 +333,7 @@ describe('CustomerDetailPage', () => {
 
   it('closes add location dialog on close', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -358,7 +358,7 @@ describe('CustomerDetailPage', () => {
 
   it('closes edit dialog on close', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -382,7 +382,7 @@ describe('CustomerDetailPage', () => {
 
   it('displays tax exempt badge', async () => {
     const customerTaxExempt: Customer = {
-      ...mockStandardCustomer,
+      ...mockCommercialCustomer,
       taxExempt: true,
     };
 
@@ -397,19 +397,19 @@ describe('CustomerDetailPage', () => {
   it('filters locations by address', async () => {
     const user = userEvent.setup();
     const customerWithManyLocations: Customer = {
-      ...mockStandardCustomer,
+      ...mockCommercialCustomer,
       serviceLocations: [
         {
-          ...mockSimpleCustomer.serviceLocations[0],
+          ...mockResidentialCustomer.serviceLocations[0],
           id: 'loc-1',
           locationName: 'Boston Office',
-          address: { ...mockSimpleCustomer.serviceLocations[0].address, city: 'Boston' },
+          address: { ...mockResidentialCustomer.serviceLocations[0].address, city: 'Boston' },
         },
         ...Array.from({ length: 9 }, (_, i) => ({
-          ...mockSimpleCustomer.serviceLocations[0],
+          ...mockResidentialCustomer.serviceLocations[0],
           id: `loc-${i + 2}`,
           locationName: `Location ${i + 2}`,
-          address: { ...mockSimpleCustomer.serviceLocations[0].address, city: 'Cambridge' },
+          address: { ...mockResidentialCustomer.serviceLocations[0].address, city: 'Cambridge' },
         })),
       ],
     };
@@ -432,9 +432,9 @@ describe('CustomerDetailPage', () => {
   it('filters locations by contact name', async () => {
     const user = userEvent.setup();
     const customerWithManyLocations: Customer = {
-      ...mockStandardCustomer,
+      ...mockCommercialCustomer,
       serviceLocations: Array.from({ length: 10 }, (_, i) => ({
-        ...mockSimpleCustomer.serviceLocations[0],
+        ...mockResidentialCustomer.serviceLocations[0],
         id: `loc-${i}`,
         locationName: `Location ${i}`,
         siteContactName: i === 5 ? 'Jane Doe' : 'John Smith',
@@ -459,9 +459,9 @@ describe('CustomerDetailPage', () => {
   it('clears location filter when search is cleared', async () => {
     const user = userEvent.setup();
     const customerWithManyLocations: Customer = {
-      ...mockStandardCustomer,
+      ...mockCommercialCustomer,
       serviceLocations: Array.from({ length: 10 }, (_, i) => ({
-        ...mockSimpleCustomer.serviceLocations[0],
+        ...mockResidentialCustomer.serviceLocations[0],
         id: `loc-${i}`,
         locationName: `Location ${i}`,
       })),
@@ -490,7 +490,7 @@ describe('CustomerDetailPage', () => {
 
   it('displays additional contacts section', async () => {
     const customerWithContacts: Customer = {
-      ...mockSimpleCustomer,
+      ...mockResidentialCustomer,
       additionalContacts: [
         {
           id: 'contact-1',
@@ -518,7 +518,7 @@ describe('CustomerDetailPage', () => {
   });
 
   it('shows add additional contact button for simple customers', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -529,7 +529,7 @@ describe('CustomerDetailPage', () => {
   });
 
   it('shows add additional contact button for standard customers', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCommercialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -541,7 +541,7 @@ describe('CustomerDetailPage', () => {
 
   it('opens add contact dialog when button is clicked', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -557,7 +557,7 @@ describe('CustomerDetailPage', () => {
   });
 
   it('displays compact stats bar for simple customers', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -570,7 +570,7 @@ describe('CustomerDetailPage', () => {
   });
 
   it('displays large numbers for standard customers', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCommercialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -583,7 +583,7 @@ describe('CustomerDetailPage', () => {
 
   it('switches to work-orders tab', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -600,7 +600,7 @@ describe('CustomerDetailPage', () => {
 
   it('switches to financial tab', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -617,7 +617,7 @@ describe('CustomerDetailPage', () => {
 
   it('switches to equipment tab', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -634,7 +634,7 @@ describe('CustomerDetailPage', () => {
 
   it('switches to activity tab', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -660,7 +660,7 @@ describe('CustomerDetailPage', () => {
       if (url.includes('/notification-types')) {
         return Promise.resolve({ data: [] });
       }
-      return Promise.resolve({ data: mockSimpleCustomer });
+      return Promise.resolve({ data: mockResidentialCustomer });
     });
     renderWithProviders(<CustomerDetailPage />);
 
@@ -687,7 +687,7 @@ describe('CustomerDetailPage', () => {
           ],
         });
       }
-      return Promise.resolve({ data: mockStandardCustomer });
+      return Promise.resolve({ data: mockCommercialCustomer });
     });
 
     renderWithProviders(<CustomerDetailPage />);
@@ -712,7 +712,7 @@ describe('CustomerDetailPage', () => {
           ],
         });
       }
-      return Promise.resolve({ data: mockStandardCustomer });
+      return Promise.resolve({ data: mockCommercialCustomer });
     });
 
     renderWithProviders(<CustomerDetailPage />, {
@@ -740,7 +740,7 @@ describe('CustomerDetailPage', () => {
   });
 
   it('displays back button in normal view', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -765,9 +765,9 @@ describe('CustomerDetailPage', () => {
 
   it('does not show table for simple customers with few locations', async () => {
     const simpleWith3Locations: Customer = {
-      ...mockSimpleCustomer,
+      ...mockResidentialCustomer,
       serviceLocations: Array.from({ length: 3 }, (_, i) => ({
-        ...mockSimpleCustomer.serviceLocations[0],
+        ...mockResidentialCustomer.serviceLocations[0],
         id: `loc-${i}`,
         locationName: `Location ${i}`,
       })),
@@ -786,9 +786,9 @@ describe('CustomerDetailPage', () => {
 
   it('renders successfully with multiple locations for simple customers', async () => {
     const simpleWithManyLocations: Customer = {
-      ...mockSimpleCustomer,
+      ...mockResidentialCustomer,
       serviceLocations: Array.from({ length: 6 }, (_, i) => ({
-        ...mockSimpleCustomer.serviceLocations[0],
+        ...mockResidentialCustomer.serviceLocations[0],
         id: `loc-${i}`,
         locationName: `Location ${i}`,
       })),
@@ -807,9 +807,9 @@ describe('CustomerDetailPage', () => {
 
   it('renders successfully with few locations for simple customers', async () => {
     const simpleWith3Locations: Customer = {
-      ...mockSimpleCustomer,
+      ...mockResidentialCustomer,
       serviceLocations: Array.from({ length: 3 }, (_, i) => ({
-        ...mockSimpleCustomer.serviceLocations[0],
+        ...mockResidentialCustomer.serviceLocations[0],
         id: `loc-${i}`,
         locationName: `Location ${i}`,
       })),
@@ -828,9 +828,9 @@ describe('CustomerDetailPage', () => {
 
   it('displays add location card in card layout view', async () => {
     const simpleWith3Locations: Customer = {
-      ...mockSimpleCustomer,
+      ...mockResidentialCustomer,
       serviceLocations: Array.from({ length: 3 }, (_, i) => ({
-        ...mockSimpleCustomer.serviceLocations[0],
+        ...mockResidentialCustomer.serviceLocations[0],
         id: `loc-${i}`,
         locationName: `Location ${i}`,
       })),
@@ -850,10 +850,10 @@ describe('CustomerDetailPage', () => {
 
   it('renders locations with access instructions for standard customers', async () => {
     const standardWithAccessInstructions: Customer = {
-      ...mockStandardCustomer,
+      ...mockCommercialCustomer,
       serviceLocations: [
         {
-          ...mockStandardCustomer.serviceLocations[0],
+          ...mockCommercialCustomer.serviceLocations[0],
           accessInstructions: 'Gate code: 1234',
         },
       ],
@@ -872,10 +872,10 @@ describe('CustomerDetailPage', () => {
 
   it('displays inactive location badge', async () => {
     const customerWithInactiveLocation: Customer = {
-      ...mockStandardCustomer,
+      ...mockCommercialCustomer,
       serviceLocations: [
         {
-          ...mockSimpleCustomer.serviceLocations[0],
+          ...mockResidentialCustomer.serviceLocations[0],
           status: 'INACTIVE',
         },
       ],
@@ -896,7 +896,7 @@ describe('CustomerDetailPage', () => {
       if (url.includes('/dispatch-regions')) {
         return Promise.resolve({ data: { id: 'region-1', name: 'North Region' } });
       }
-      return Promise.resolve({ data: mockSimpleCustomer });
+      return Promise.resolve({ data: mockResidentialCustomer });
     });
 
     renderWithProviders(<CustomerDetailPage />);
@@ -912,7 +912,7 @@ describe('CustomerDetailPage', () => {
 
   it('shows "new work order" button in work orders tab', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -929,7 +929,7 @@ describe('CustomerDetailPage', () => {
 
   it('shows "add equipment" button in equipment tab', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -945,7 +945,7 @@ describe('CustomerDetailPage', () => {
   });
 
   it('displays billing address for standard customers', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCommercialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -957,7 +957,7 @@ describe('CustomerDetailPage', () => {
   });
 
   it('shows add location button in table header for standard customers', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCommercialCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
@@ -971,10 +971,10 @@ describe('CustomerDetailPage', () => {
 
   it('renders locations with site contact for standard customers', async () => {
     const standardWithContact: Customer = {
-      ...mockStandardCustomer,
+      ...mockCommercialCustomer,
       serviceLocations: [
         {
-          ...mockStandardCustomer.serviceLocations[0],
+          ...mockCommercialCustomer.serviceLocations[0],
           siteContactName: 'Jane Manager',
           siteContactEmail: 'jane@location.com',
         },
@@ -1001,7 +1001,7 @@ describe('CustomerDetailPage', () => {
       if (url.includes('/notification-types')) {
         return Promise.resolve({ data: [] });
       }
-      return Promise.resolve({ data: mockSimpleCustomer });
+      return Promise.resolve({ data: mockResidentialCustomer });
     });
     renderWithProviders(<CustomerDetailPage />);
 
@@ -1028,7 +1028,7 @@ describe('CustomerDetailPage', () => {
   describe('shouldShowAdditionalContacts logic', () => {
     it('shows additional contacts for simple customer with contacts', async () => {
       const simpleWithContacts: Customer = {
-        ...mockSimpleCustomer,
+        ...mockResidentialCustomer,
         additionalContacts: [
           {
             id: 'contact-1',
@@ -1056,7 +1056,7 @@ describe('CustomerDetailPage', () => {
 
     it('shows additional contacts for simple customer with email', async () => {
       const simpleWithEmail: Customer = {
-        ...mockSimpleCustomer,
+        ...mockResidentialCustomer,
         email: 'customer@example.com',
         additionalContacts: [],
       };
@@ -1074,7 +1074,7 @@ describe('CustomerDetailPage', () => {
 
     it('shows additional contacts for simple customer with phone', async () => {
       const simpleWithPhone: Customer = {
-        ...mockSimpleCustomer,
+        ...mockResidentialCustomer,
         phone: '5551234567',
         additionalContacts: [],
       };
@@ -1092,7 +1092,7 @@ describe('CustomerDetailPage', () => {
 
     it('shows additional contacts for standard customer always', async () => {
       const standardNoContactsNoPhoneEmail: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         phone: undefined,
         additionalContacts: [],
       };
@@ -1111,7 +1111,7 @@ describe('CustomerDetailPage', () => {
 
   describe('Standard customer overview tab', () => {
     it('displays locations table in overview tab for standard customers', async () => {
-      vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockCommercialCustomer });
       renderWithProviders(<CustomerDetailPage />);
 
       await waitFor(() => {
@@ -1124,7 +1124,7 @@ describe('CustomerDetailPage', () => {
     });
 
     it('shows add location button in table header for standard customers', async () => {
-      vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockCommercialCustomer });
       renderWithProviders(<CustomerDetailPage />);
 
       await waitFor(() => {
@@ -1137,7 +1137,7 @@ describe('CustomerDetailPage', () => {
     });
 
     it('displays location count for standard customers', async () => {
-      vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockCommercialCustomer });
       renderWithProviders(<CustomerDetailPage />);
 
       await waitFor(() => {
@@ -1150,9 +1150,9 @@ describe('CustomerDetailPage', () => {
 
     it('displays search input for standard customers with 5+ locations', async () => {
       const standardWith5Locations: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         serviceLocations: Array.from({ length: 5 }, (_, i) => ({
-          ...mockStandardCustomer.serviceLocations[0],
+          ...mockCommercialCustomer.serviceLocations[0],
           id: `loc-${i}`,
           locationName: `Location ${i}`,
         })),
@@ -1172,9 +1172,9 @@ describe('CustomerDetailPage', () => {
     it('filters locations by search in standard view', async () => {
       const user = userEvent.setup();
       const standardWith5Locations: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         serviceLocations: Array.from({ length: 5 }, (_, i) => ({
-          ...mockStandardCustomer.serviceLocations[0],
+          ...mockCommercialCustomer.serviceLocations[0],
           id: `loc-${i}`,
           locationName: `Location ${i}`,
         })),
@@ -1203,10 +1203,10 @@ describe('CustomerDetailPage', () => {
 
     it('displays unnamed location when locationName is null', async () => {
       const standardWithUnnamed: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         serviceLocations: [
           {
-            ...mockStandardCustomer.serviceLocations[0],
+            ...mockCommercialCustomer.serviceLocations[0],
             locationName: null,
           },
         ],
@@ -1225,10 +1225,10 @@ describe('CustomerDetailPage', () => {
 
     it('displays dash when location has no site contact', async () => {
       const standardNoContact: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         serviceLocations: [
           {
-            ...mockStandardCustomer.serviceLocations[0],
+            ...mockCommercialCustomer.serviceLocations[0],
             siteContactName: null,
             siteContactPhone: null,
           },
@@ -1249,10 +1249,10 @@ describe('CustomerDetailPage', () => {
 
     it('displays location with only site contact name', async () => {
       const standardNameOnly: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         serviceLocations: [
           {
-            ...mockStandardCustomer.serviceLocations[0],
+            ...mockCommercialCustomer.serviceLocations[0],
             siteContactName: 'Site Manager',
             siteContactPhone: null,
           },
@@ -1272,7 +1272,7 @@ describe('CustomerDetailPage', () => {
 
     it('shows notes section for standard customers with notes', async () => {
       const standardWithNotes: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         notes: 'Important customer notes here',
       };
 
@@ -1289,7 +1289,7 @@ describe('CustomerDetailPage', () => {
 
     it('displays additional contacts for standard customers', async () => {
       const standardWithContacts: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         additionalContacts: [
           {
             id: 'contact-1',
@@ -1347,7 +1347,7 @@ describe('CustomerDetailPage', () => {
           return Promise.resolve({ data: [] });
         }
         if (url.match(/^\/customers\/[^/]+$/)) {
-          return Promise.resolve({ data: mockSimpleCustomer });
+          return Promise.resolve({ data: mockResidentialCustomer });
         }
         if (url.includes('/dispatch-regions')) {
           return Promise.resolve({ data: [] });
@@ -1482,7 +1482,7 @@ describe('CustomerDetailPage', () => {
           return Promise.resolve({ data: [] });
         }
         if (url.includes('/customers/')) {
-          return Promise.resolve({ data: mockSimpleCustomer });
+          return Promise.resolve({ data: mockResidentialCustomer });
         }
         if (url.includes('/dispatch-regions')) {
           return Promise.resolve({ data: [] });
@@ -1520,7 +1520,7 @@ describe('CustomerDetailPage', () => {
   describe('Tab navigation and interaction', () => {
     it('switches to all tabs for simple customer', async () => {
       const user = userEvent.setup();
-      vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
       renderWithProviders(<CustomerDetailPage />);
 
       await waitFor(() => {
@@ -1561,7 +1561,7 @@ describe('CustomerDetailPage', () => {
 
     it('switches to all tabs for standard customer', async () => {
       const user = userEvent.setup();
-      vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockCommercialCustomer });
       renderWithProviders(<CustomerDetailPage />);
 
       await waitFor(() => {
@@ -1602,19 +1602,19 @@ describe('CustomerDetailPage', () => {
     it('filters locations by state', async () => {
       const user = userEvent.setup();
       const customerWithManyLocations: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         serviceLocations: [
           {
-            ...mockSimpleCustomer.serviceLocations[0],
+            ...mockResidentialCustomer.serviceLocations[0],
             id: 'loc-1',
             locationName: 'MA Office',
-            address: { ...mockSimpleCustomer.serviceLocations[0].address, state: 'MA' },
+            address: { ...mockResidentialCustomer.serviceLocations[0].address, state: 'MA' },
           },
           ...Array.from({ length: 9 }, (_, i) => ({
-            ...mockSimpleCustomer.serviceLocations[0],
+            ...mockResidentialCustomer.serviceLocations[0],
             id: `loc-${i + 2}`,
             locationName: `Location ${i + 2}`,
-            address: { ...mockSimpleCustomer.serviceLocations[0].address, state: 'NY' },
+            address: { ...mockResidentialCustomer.serviceLocations[0].address, state: 'NY' },
           })),
         ],
       };
@@ -1637,9 +1637,9 @@ describe('CustomerDetailPage', () => {
     it('filters locations by contact phone', async () => {
       const user = userEvent.setup();
       const customerWithManyLocations: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         serviceLocations: Array.from({ length: 10 }, (_, i) => ({
-          ...mockSimpleCustomer.serviceLocations[0],
+          ...mockResidentialCustomer.serviceLocations[0],
           id: `loc-${i}`,
           locationName: `Location ${i}`,
           siteContactPhone: i === 3 ? '5551234567' : '5559999999',
@@ -1665,13 +1665,13 @@ describe('CustomerDetailPage', () => {
     it('filters locations by street address', async () => {
       const user = userEvent.setup();
       const customerWithManyLocations: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         serviceLocations: Array.from({ length: 10 }, (_, i) => ({
-          ...mockSimpleCustomer.serviceLocations[0],
+          ...mockResidentialCustomer.serviceLocations[0],
           id: `loc-${i}`,
           locationName: `Location ${i}`,
           address: {
-            ...mockSimpleCustomer.serviceLocations[0].address,
+            ...mockResidentialCustomer.serviceLocations[0].address,
             streetAddress: i === 2 ? '999 Unique St' : '123 Main St',
           },
         })),
@@ -1695,9 +1695,9 @@ describe('CustomerDetailPage', () => {
     it('shows empty table when search does not match', async () => {
       const user = userEvent.setup();
       const customerWithManyLocations: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         serviceLocations: Array.from({ length: 10 }, (_, i) => ({
-          ...mockSimpleCustomer.serviceLocations[0],
+          ...mockResidentialCustomer.serviceLocations[0],
           id: `loc-${i}`,
           locationName: `Location ${i}`,
         })),
@@ -1724,7 +1724,7 @@ describe('CustomerDetailPage', () => {
 
   describe('Dispatch region display', () => {
     it('does not fetch dispatch region for standard customers', async () => {
-      vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockCommercialCustomer });
       renderWithProviders(<CustomerDetailPage />);
 
       await waitFor(() => {
@@ -1741,7 +1741,7 @@ describe('CustomerDetailPage', () => {
   describe('Additional edge cases', () => {
     it('handles simple customer with no email or phone but with location', async () => {
       const simpleNoContact: Customer = {
-        ...mockSimpleCustomer,
+        ...mockResidentialCustomer,
         phone: undefined,
       };
 
@@ -1758,9 +1758,9 @@ describe('CustomerDetailPage', () => {
 
     it('handles customer with billing address line 2', async () => {
       const customerWithBillingLine2: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         billingAddress: {
-          ...mockStandardCustomer.billingAddress,
+          ...mockCommercialCustomer.billingAddress,
           streetAddressLine2: 'Suite 100',
         },
       };
@@ -1778,7 +1778,7 @@ describe('CustomerDetailPage', () => {
 
     it('renders payment terms of 0 days correctly', async () => {
       const customerNetZero: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         paymentTermsDays: 0,
       };
 
@@ -1795,10 +1795,10 @@ describe('CustomerDetailPage', () => {
 
     it('renders location with site contact name but no phone', async () => {
       const customerContactNoPhone: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         serviceLocations: [
           {
-            ...mockStandardCustomer.serviceLocations[0],
+            ...mockCommercialCustomer.serviceLocations[0],
             siteContactName: 'Jane Manager',
             siteContactPhone: null,
           },
@@ -1818,7 +1818,7 @@ describe('CustomerDetailPage', () => {
 
     it('handles tab change via TabNavigation component', async () => {
       const user = userEvent.setup();
-      vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
       renderWithProviders(<CustomerDetailPage />);
 
       await waitFor(() => {
@@ -1845,9 +1845,9 @@ describe('CustomerDetailPage', () => {
     it('handles search input onChange for location filtering', async () => {
       const user = userEvent.setup();
       const customerWith6Locations: Customer = {
-        ...mockStandardCustomer,
+        ...mockCommercialCustomer,
         serviceLocations: Array.from({ length: 6 }, (_, i) => ({
-          ...mockSimpleCustomer.serviceLocations[0],
+          ...mockResidentialCustomer.serviceLocations[0],
           id: `loc-${i}`,
           locationName: `Location ${i}`,
         })),
