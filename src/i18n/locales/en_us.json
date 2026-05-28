@@ -257,6 +257,11 @@
     "title": "Additional Contacts"
   },
   "customers": {
+    "category": {
+      "billingOnly": "Bill-only",
+      "commercial": "Commercial",
+      "residential": "Residential"
+    },
     "description": "Manage your customer database",
     "detail": {
       "addEquipment": "Add Equipment",
@@ -290,11 +295,6 @@
       "taxCert": "Tax Cert #",
       "taxExemptBadge": "Tax Exempt",
       "viewDetails": "View Details →"
-    },
-    "displayMode": {
-      "billingOnly": "Bill-only",
-      "simple": "Simple",
-      "standard": "Standard"
     },
     "filter": {
       "allStatuses": "All Statuses"

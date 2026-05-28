@@ -108,7 +108,7 @@ export default function InvoiceDialog({
             id: defaultCustomer.id,
             name: defaultCustomer.name,
             type: 'STANDARD',
-            displayMode: 'STANDARD',
+            category: 'COMMERCIAL',
           }
         : null,
     );

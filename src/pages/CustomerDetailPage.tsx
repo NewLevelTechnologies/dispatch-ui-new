@@ -276,8 +276,8 @@ export default function CustomerDetailPage() {
   // Count opted-in preferences
   const notificationOptInCount = preferences.filter((pref) => pref.optIn).length;
 
-  // Fetch dispatch region for SIMPLE mode (primary location only)
-  const primaryLocationRegionId = customer?.displayMode === 'SIMPLE' ? customer.serviceLocations[0]?.dispatchRegionId : undefined;
+  // Fetch dispatch region for RESIDENTIAL category (primary location only)
+  const primaryLocationRegionId = customer?.category === 'RESIDENTIAL' ? customer.serviceLocations[0]?.dispatchRegionId : undefined;
   const { data: dispatchRegion } = useQuery({
     queryKey: ['dispatch-regions', primaryLocationRegionId],
     queryFn: () => dispatchRegionApi.getById(primaryLocationRegionId!),
@@ -331,17 +331,17 @@ export default function CustomerDetailPage() {
     );
   }
 
-  const isSimple = customer.displayMode === 'SIMPLE';
-  const isBillingOnly = customer.displayMode === 'BILLING_ONLY';
+  const isResidential = customer.category === 'RESIDENTIAL';
+  const isBillingOnly = customer.category === 'BILLING_ONLY';
   const primaryLocation = customer.serviceLocations[0];
 
   // Determine if we should show additional contacts section
   const shouldShowAdditionalContacts = () => {
-    if (isSimple) {
-      // For SIMPLE mode: show if contacts exist OR customer has primary contact info
+    if (isResidential) {
+      // For RESIDENTIAL category: show if contacts exist OR customer has primary contact info
       return customer.additionalContacts.length > 0 || customer.email || customer.phone;
     }
-    // For STANDARD / BILLING_ONLY: always show
+    // For COMMERCIAL / BILLING_ONLY: always show
     return true;
   };
 
@@ -369,8 +369,8 @@ export default function CustomerDetailPage() {
           </Button>
         </div>
 
-        {isSimple ? (
-          /* SIMPLE VIEW - Homeowner */
+        {isResidential ? (
+          /* RESIDENTIAL VIEW - Homeowner */
           <div>
             {/* Header - Compact */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -531,7 +531,7 @@ export default function CustomerDetailPage() {
             </div>
           </div>
         ) : (
-          /* STANDARD VIEW - Business/Landlord */
+          /* COMMERCIAL VIEW - Business/Landlord */
           <div>
             {/* Header - Business */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -654,7 +654,7 @@ export default function CustomerDetailPage() {
             <div className="mt-4">
               {activeTab === 'overview' && (
                 <>
-                  {/* Two-column layout for STANDARD (locations + contacts/notes);
+                  {/* Two-column layout for COMMERCIAL (locations + contacts/notes);
                       BILLING_ONLY skips the locations column entirely. */}
                   <div className={`grid grid-cols-1 gap-6 ${isBillingOnly ? '' : 'lg:grid-cols-3'}`}>
               {!isBillingOnly && (
@@ -693,7 +693,7 @@ export default function CustomerDetailPage() {
                 </div>
               )}
 
-              {/* TABLE LAYOUT - STANDARD customers always use table */}
+              {/* TABLE LAYOUT - COMMERCIAL customers always use table */}
               <div className="mt-2">
                 <Table dense className="[--gutter:theme(spacing.1)] text-sm">
                   <TableHead>
@@ -744,7 +744,7 @@ export default function CustomerDetailPage() {
               </div>
               )}
 
-              {/* Right column - Contacts & Notes (1/3 width for STANDARD,
+              {/* Right column - Contacts & Notes (1/3 width for COMMERCIAL,
                   full width for BILLING_ONLY since the locations column is hidden) */}
               <div className="space-y-4">
                 {/* Additional Contacts */}

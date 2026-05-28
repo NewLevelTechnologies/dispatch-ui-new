@@ -66,7 +66,7 @@ const mockSimpleCustomer: Customer = {
   taxExemptCertificate: null,
   notes: null,
   status: 'ACTIVE',
-  displayMode: 'SIMPLE',
+  category: 'RESIDENTIAL',
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
   version: 0,
@@ -74,7 +74,7 @@ const mockSimpleCustomer: Customer = {
 
 const mockStandardCustomer: Customer = {
   ...mockSimpleCustomer,
-  displayMode: 'STANDARD',
+  category: 'COMMERCIAL',
   serviceLocations: [
     ...mockSimpleCustomer.serviceLocations,
     {
