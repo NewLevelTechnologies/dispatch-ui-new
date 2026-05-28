@@ -1,9 +1,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // FilterChipListbox — single- or multi-select filter chip used above list tables.
 //
-// Empty state shows "+ Label" with a neutral border. Set state shows
-// "Label: Value ×" with an accent-tinted background. Clicking the body opens
-// a Listbox popover; × is a sibling button that clears.
+// Empty state shows "Label ▾" with a neutral border + muted chevron.
+// Set state shows "Label: Value ×" with an accent-tinted background.
+// Clicking the body opens a Listbox popover; × is a sibling button that clears.
+//
+// The chevron is the picker affordance — universal "opens a menu" cue from
+// native <select>. The label stays at full text weight so the empty chip
+// doesn't read as disabled. `+` was intentionally swapped out because
+// (a) `text-fg-dim + label` looked disabled, and (b) `+` is creation language
+// that confuses filter intent.
 //
 // Listbox (not Menu) is the correct primitive: screen readers announce
 // "<option>, selected" for the currently-applied filter via aria-selected,
@@ -56,6 +62,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { ReactNode } from 'react';
 import * as Headless from '@headlessui/react';
+import { ChevronDownIcon } from '@heroicons/react/20/solid';
 import clsx from 'clsx';
 
 type BaseProps = {
@@ -111,7 +118,7 @@ export function FilterChipListbox(props: Props) {
           {isSet ? (
             <span className="font-semibold text-fg-strong">{displayValue}</span>
           ) : (
-            <span className="text-fg-dim">+</span>
+            <ChevronDownIcon className="size-3 text-fg-muted" aria-hidden="true" />
           )}
         </Headless.ListboxButton>
         {isSet && onClear && (

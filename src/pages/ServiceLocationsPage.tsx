@@ -2,19 +2,21 @@ import { useEffect, useState, useDeferredValue } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
-import { customerApi, dispatchRegionApi, type ServiceLocation } from '../api';
+import { EllipsisVerticalIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { customerApi, dispatchRegionApi, type ServiceLocation, type TagSummary } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import { formatPhone } from '../utils/formatPhone';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
+import { extractApiError, showError } from '../lib/toast';
 import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
-import { ViewTabs } from '../components/ui/Tabs';
+import { CustomerTypeMark } from '../components/ui/CustomerTypeMark';
+import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
@@ -23,6 +25,37 @@ import IconButton from '../components/IconButton';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
+import { LoadingState } from '../components/ui/LoadingState';
+import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
+
+const PAGE_SIZE = 50;
+
+type CategoryFilter = '' | 'COMMERCIAL' | 'RESIDENTIAL';
+
+function readCategory(raw: string | null): CategoryFilter {
+  return raw === 'COMMERCIAL' || raw === 'RESIDENTIAL' ? raw : '';
+}
+
+function readBool(raw: string | null): boolean {
+  return raw === 'true' || raw === '1';
+}
+
+// Compact "last service" — Today / Yest / 3d / 2w / 6mo / 2y. Different scale
+// than utils/formatRelativeTime (which targets minute/hour resolution); this
+// one is for a column where day-week-month granularity is what a CSR scans.
+function formatLastService(iso?: string | null): string {
+  if (!iso) return '';
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+  const days = Math.max(0, Math.floor((Date.now() - then) / 86_400_000));
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yest';
+  if (days < 7) return `${days}d`;
+  if (days < 30) return `${Math.round(days / 7)}w`;
+  if (days < 365) return `${Math.round(days / 30)}mo`;
+  return `${Math.round(days / 365)}y`;
+}
 
 export default function ServiceLocationsPage() {
   const navigate = useNavigate();
@@ -34,93 +67,106 @@ export default function ServiceLocationsPage() {
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocation | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
-  // Read filters from URL
+  // URL-driven filter state
   const urlSearch = searchParams.get('search') ?? '';
-  const page = parseInt(searchParams.get('page') || '1', 10);
-  const statusFilter = searchParams.get('status') || 'all';
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const regionId = searchParams.get('region') ?? '';
+  const categoryFilter = readCategory(searchParams.get('category'));
+  const liveFilter = readBool(searchParams.get('live'));
+  const openJobsFilter = readBool(searchParams.get('openJobs'));
+  const overdueFilter = readBool(searchParams.get('overdue'));
+  const inactiveFilter = readBool(searchParams.get('inactive'));
 
-  // Local input state mirrors the URL but lets typing feel instant. The sync
-  // effect below keeps it aligned with the URL when navigation happens externally
-  // (back/forward, deep link).
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   useEffect(() => {
     setSearchQuery(urlSearch);
   }, [urlSearch]);
   const deferredSearch = useDeferredValue(searchQuery);
 
-  // Tenant config — dispatch regions for the filter dropdown and chip lookup
   const { data: regions } = useQuery({
     queryKey: ['dispatch-regions'],
     queryFn: () => dispatchRegionApi.getAll(),
   });
   const activeRegions = (Array.isArray(regions) ? regions : []).filter((r) => r.isActive !== false);
 
-  // Permission checks
   const canAddServiceLocations = useHasCapability('ADD_SERVICE_LOCATIONS');
   const canEditServiceLocations = useHasCapability('EDIT_SERVICE_LOCATIONS');
   const canCloseServiceLocations = useHasCapability('CLOSE_SERVICE_LOCATIONS');
 
-  // Update URL when search/filter changes. Pass `replace: true` for high-frequency
-  // updates (typing) so the back button doesn't have to step through every keystroke.
-  // Default values (page=1, status=all) are omitted to keep URLs clean.
   const updateFilters = (
-    updates: { search?: string; status?: string; region?: string },
+    updates: {
+      search?: string;
+      region?: string;
+      category?: CategoryFilter;
+      live?: boolean;
+      openJobs?: boolean;
+      overdue?: boolean;
+      inactive?: boolean;
+      page?: number;
+    },
     options: { replace?: boolean } = {}
   ) => {
-    const newParams = new URLSearchParams(searchParams);
-    if (updates.search !== undefined) {
-      if (updates.search) {
-        newParams.set('search', updates.search);
-      } else {
-        newParams.delete('search');
-      }
-      newParams.delete('page'); // Reset to page 1 (the default) on filter change
+    const next = new URLSearchParams(searchParams);
+    const setOrDelete = (key: string, value: string | undefined) => {
+      if (value) next.set(key, value);
+      else next.delete(key);
+      if (key !== 'page') next.delete('page');
+    };
+
+    if (updates.search !== undefined) setOrDelete('search', updates.search || undefined);
+    if (updates.region !== undefined) setOrDelete('region', updates.region || undefined);
+    if (updates.category !== undefined) setOrDelete('category', updates.category || undefined);
+    if (updates.live !== undefined) setOrDelete('live', updates.live ? 'true' : undefined);
+    if (updates.openJobs !== undefined) setOrDelete('openJobs', updates.openJobs ? 'true' : undefined);
+    if (updates.overdue !== undefined) setOrDelete('overdue', updates.overdue ? 'true' : undefined);
+    if (updates.inactive !== undefined) setOrDelete('inactive', updates.inactive ? 'true' : undefined);
+    if (updates.page !== undefined) {
+      if (updates.page <= 1) next.delete('page');
+      else next.set('page', String(updates.page));
     }
-    if (updates.status !== undefined) {
-      if (updates.status === 'all') {
-        newParams.delete('status');
-      } else {
-        newParams.set('status', updates.status);
-      }
-      newParams.delete('page');
-    }
-    if (updates.region !== undefined) {
-      if (updates.region) {
-        newParams.set('region', updates.region);
-      } else {
-        newParams.delete('region');
-      }
-      newParams.delete('page');
-    }
-    setSearchParams(newParams, { replace: options.replace ?? false });
+    setSearchParams(next, { replace: options.replace ?? false });
   };
 
-  // Build a relative href that preserves all current filters but jumps to a
-  // specific page (omitting the page param when it would be the default).
   const pageHref = (target: number): string => {
     const next = new URLSearchParams(searchParams);
     if (target <= 1) next.delete('page');
-    else next.set('page', target.toString());
+    else next.set('page', String(target));
     const qs = next.toString();
     return qs ? `?${qs}` : '?';
   };
 
-  // Fetch paginated service locations
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['service-locations', page, statusFilter, deferredSearch, regionId],
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: [
+      'service-locations',
+      page,
+      deferredSearch,
+      regionId,
+      categoryFilter,
+      liveFilter,
+      openJobsFilter,
+      overdueFilter,
+      inactiveFilter,
+    ],
     queryFn: () => customerApi.getAllServiceLocationsPaginated({
       page,
-      limit: 50,
-      status: statusFilter === 'all' ? undefined : (statusFilter as 'ACTIVE' | 'INACTIVE' | 'CLOSED'),
+      limit: PAGE_SIZE,
       search: deferredSearch || undefined,
       dispatchRegionId: regionId || undefined,
+      category: categoryFilter || undefined,
+      techOnSite: liveFilter || undefined,
+      hasOpenJobs: openJobsFilter || undefined,
+      pmOverdue: overdueFilter || undefined,
+      // Inactive chip narrows to status=INACTIVE only; the default view keeps
+      // showing ACTIVE rows alongside closed/inactive ones until BE adds a
+      // dedicated "exclude closed by default" toggle.
+      status: inactiveFilter ? 'INACTIVE' : undefined,
     }),
   });
 
-  const locations = data?.content || [];
-  const totalLocations = data?.totalElements || 0;
-  const totalPages = data?.totalPages || 0;
+  const locations = data?.content ?? [];
+  const totalLocations = data?.totalElements ?? 0;
+  const totalPages = data?.totalPages ?? 0;
+  const counts = data?.counts;
 
   const closeLocationMutation = useMutation({
     mutationFn: (locationId: string) =>
@@ -138,11 +184,11 @@ export default function ServiceLocationsPage() {
       queryClient.invalidateQueries({ queryKey: ['service-locations'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
     },
-    onError: (error: unknown) => {
-      const errorMessage = error instanceof Error && 'response' in error
-        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
-        : undefined;
-      alert(errorMessage || t('common.form.errorDelete', { entity: getName('service_location') }));
+    onError: (err: unknown) => {
+      showError(
+        t('common.form.errorDelete', { entity: getName('service_location') }),
+        extractApiError(err) ?? undefined
+      );
     },
   });
 
@@ -153,7 +199,6 @@ export default function ServiceLocationsPage() {
   };
 
   const handleEdit = async (locationId: string, customerId: string) => {
-    // Fetch full location details for editing
     const location = await customerApi.getServiceLocationById(locationId);
     setSelectedLocation(location);
     setSelectedCustomerId(customerId);
@@ -178,29 +223,37 @@ export default function ServiceLocationsPage() {
     setSelectedCustomerId(null);
   };
 
-  const PAGE_SIZE = 50;
   const showingStart = totalLocations === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const showingEnd = Math.min(page * PAGE_SIZE, totalLocations);
 
-  const statusViewTabs = [
-    { id: 'all', label: t('serviceLocations.filter.allStatuses') },
-    { id: 'ACTIVE', label: t('serviceLocations.status.active') },
-    { id: 'INACTIVE', label: t('serviceLocations.status.inactive') },
-    { id: 'CLOSED', label: t('serviceLocations.status.closed') },
-  ];
+  const headerTotal = counts?.total ?? totalLocations;
+  const headerActive = counts?.active;
+  const headerCustomerCount = counts?.customerCount;
+  const locationNoun =
+    headerTotal === 1
+      ? getName('service_location').toLowerCase()
+      : getName('service_location', true).toLowerCase();
+  const customerNounPlural = getName('customer', true).toLowerCase();
+  const subtitle = (() => {
+    if (headerTotal === 0 && !isLoading) return null;
+    const parts: string[] = [`${headerTotal.toLocaleString()} ${locationNoun}`];
+    if (typeof headerActive === 'number') {
+      parts.push(`${headerActive.toLocaleString()} ${t('common.active').toLowerCase()}`);
+    }
+    if (typeof headerCustomerCount === 'number') {
+      parts.push(`across ${headerCustomerCount.toLocaleString()} ${customerNounPlural}`);
+    }
+    return parts.join(' · ');
+  })();
 
-  const locationNoun = totalLocations === 1
-    ? getName('service_location').toLowerCase()
-    : getName('service_location', true).toLowerCase();
-  const subtitle = totalLocations > 0
-    ? (statusFilter === 'ACTIVE'
-        ? `${totalLocations.toLocaleString()} ${t('serviceLocations.status.active').toLowerCase()} ${locationNoun}`
-        : statusFilter === 'INACTIVE'
-          ? `${totalLocations.toLocaleString()} ${t('serviceLocations.status.inactive').toLowerCase()} ${locationNoun}`
-          : statusFilter === 'CLOSED'
-            ? `${totalLocations.toLocaleString()} ${t('serviceLocations.status.closed').toLowerCase()} ${locationNoun}`
-            : `${totalLocations.toLocaleString()} ${locationNoun}`)
-    : null;
+  const hasFilters = Boolean(
+    deferredSearch || regionId || categoryFilter
+    || liveFilter || openJobsFilter || overdueFilter || inactiveFilter
+  );
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSearchParams(new URLSearchParams(), { replace: false });
+  };
 
   return (
     <AppLayout>
@@ -229,6 +282,55 @@ export default function ServiceLocationsPage() {
             />
           }
         >
+          <FilterChipRow>
+            <FilterChip
+              label={t('serviceLocations.filter.live')}
+              count={counts?.live}
+              tone="info"
+              active={liveFilter}
+              onToggle={() => updateFilters({ live: !liveFilter })}
+            />
+            <FilterChip
+              label={t('serviceLocations.filter.openJobs')}
+              count={counts?.openJobs}
+              tone="info"
+              active={openJobsFilter}
+              onToggle={() => updateFilters({ openJobs: !openJobsFilter })}
+            />
+            <FilterChip
+              label={t('serviceLocations.filter.overdue')}
+              count={counts?.overdue}
+              tone="warning"
+              active={overdueFilter}
+              onToggle={() => updateFilters({ overdue: !overdueFilter })}
+            />
+            <FilterChip
+              label={t('serviceLocations.filter.inactive')}
+              count={counts?.inactive}
+              active={inactiveFilter}
+              onToggle={() => updateFilters({ inactive: !inactiveFilter })}
+            />
+            <FilterChip
+              label={t('serviceLocations.filter.commercial')}
+              count={counts?.commercial}
+              active={categoryFilter === 'COMMERCIAL'}
+              onToggle={() =>
+                updateFilters({
+                  category: categoryFilter === 'COMMERCIAL' ? '' : 'COMMERCIAL',
+                })
+              }
+            />
+            <FilterChip
+              label={t('serviceLocations.filter.residential')}
+              count={counts?.residential}
+              active={categoryFilter === 'RESIDENTIAL'}
+              onToggle={() =>
+                updateFilters({
+                  category: categoryFilter === 'RESIDENTIAL' ? '' : 'RESIDENTIAL',
+                })
+              }
+            />
+          </FilterChipRow>
           {activeRegions.length > 0 && (
             <FilterChipListbox
               label={t('serviceLocations.filter.region')}
@@ -246,178 +348,208 @@ export default function ServiceLocationsPage() {
           )}
         </ListToolbar>
 
-        <ViewTabs
-          className="mb-3"
-          value={statusFilter}
-          onChange={(id) => updateFilters({ status: id })}
-          tabs={statusViewTabs}
-        />
+        <Card>
+          <CardBody flush>
+            {isLoading ? (
+              <LoadingState
+                label={t('common.actions.loading', { entities: getName('service_location', true) })}
+              />
+            ) : error ? (
+              <ErrorState
+                title={t('common.actions.couldNotLoad', { entities: getName('service_location', true) })}
+                description={extractApiError(error) ?? (error as Error).message}
+                action={
+                  <Button outline onClick={() => refetch()}>
+                    {t('common.actions.tryAgain')}
+                  </Button>
+                }
+              />
+            ) : locations.length === 0 ? (
+              hasFilters ? (
+                <EmptyState
+                  icon={<MapPinIcon className="size-10 text-fg-dim" />}
+                  title={t('common.actions.noMatchFilters', { entities: getName('service_location', true) })}
+                  description={t('common.actions.tryAdjustingFilters')}
+                  action={
+                    <Button outline onClick={clearFilters}>
+                      {t('users.filter.clearFilters')}
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  icon={<MapPinIcon className="size-10 text-fg-dim" />}
+                  title={t('common.actions.noEntitiesYet', { entities: getName('service_location', true) })}
+                  action={
+                    canAddServiceLocations ? (
+                      <Button color="accent" onClick={handleAdd}>
+                        {t('common.actions.add', { entity: getName('service_location') })}
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              )
+            ) : (
+              <>
+                <DenseTable>
+                  <DenseTHead>
+                    <tr>
+                      <th>{getName('service_location')}</th>
+                      <th>{t('serviceLocations.table.region')}</th>
+                      <th>{t('common.form.status')}</th>
+                      <th>{t('serviceLocations.table.lastService')}</th>
+                      <th>{t('serviceLocations.table.contact')}</th>
+                      <th>{t('serviceLocations.table.tags')}</th>
+                      <th style={{ width: 40 }}></th>
+                    </tr>
+                  </DenseTHead>
+                  <tbody>
+                    {locations.map((location) => {
+                      const category =
+                        location.customerCategory === 'RESIDENTIAL' ? 'RESIDENTIAL' : 'COMMERCIAL';
+                      // Name-led for both types. Commercial locations have an
+                      // org-assigned label; residential locations borrow the
+                      // owning customer's name as the headline. The address
+                      // is supporting info either way.
+                      const headline = location.locationName || location.customerName;
+                      const street = [location.address.streetAddress, location.address.streetAddressLine2]
+                        .filter(Boolean).join(' ');
+                      const stateZip = [location.address.state, location.address.zipCode].filter(Boolean).join(' ');
+                      const addressLine = [titleCaseAddress(street), titleCaseAddress(location.address.city), stateZip]
+                        .filter(Boolean).join(', ');
+                      const rowTint = location.techOnSite
+                        ? 'bg-[color-mix(in_oklch,var(--info-500)_4%,var(--bg-elev))]'
+                        : location.pmOverdue
+                          ? 'bg-[color-mix(in_oklch,var(--warning-500)_4%,var(--bg-elev))]'
+                          : '';
+                      const lastSvc = formatLastService(location.lastServiceAt);
 
-        {isLoading && (
-          <Card>
-            <CardBody>
-              <p className="text-center text-[12.5px] text-fg-muted">
-                {t('common.actions.loading', { entities: getName('service_location', true) })}
-              </p>
-            </CardBody>
-          </Card>
-        )}
-
-        {error && (
-          <Card className="border-danger-500/40 bg-danger-100/40">
-            <CardBody>
-              <p className="text-[12.5px] text-danger-500">
-                {t('common.actions.errorLoading', { entities: getName('service_location', true) })}: {(error as Error).message}
-              </p>
-            </CardBody>
-          </Card>
-        )}
-
-        {totalLocations === 0 && !isLoading && (
-          <Card>
-            <CardBody>
-              <p className="text-[12.5px] text-fg-muted">
-                {deferredSearch || statusFilter !== 'all'
-                  ? t('common.actions.noMatchSearch', { entities: getName('service_location', true) })
-                  : t('common.actions.notFound', { entities: getName('service_location', true) })}
-              </p>
-              {canAddServiceLocations && !deferredSearch && statusFilter === 'all' && (
-                <Button color="accent" className="mt-2" onClick={handleAdd}>
-                  {t('common.actions.addFirst', { entity: getName('service_location') })}
-                </Button>
-              )}
-            </CardBody>
-          </Card>
-        )}
-
-        {locations.length > 0 && (
-          <Card>
-            <CardBody flush>
-              <DenseTable>
-                <DenseTHead>
-                  <tr>
-                    <th>{t('common.form.name')}</th>
-                    <th>{t('serviceLocations.table.address')}</th>
-                    <th>{t('serviceLocations.table.contact')}</th>
-                    <th>{t('serviceLocations.table.lastService')}</th>
-                    <th>{t('common.form.status')}</th>
-                    <th></th>
-                  </tr>
-                </DenseTHead>
-                <tbody>
-                  {locations.map((location) => {
-                    const street = [location.address.streetAddress, location.address.streetAddressLine2]
-                      .filter(Boolean).join(' ');
-                    const stateZip = [location.address.state, location.address.zipCode].filter(Boolean).join(' ');
-                    return (
-                      <DenseRow
-                        key={location.id}
-                        className="cursor-pointer"
-                        onClick={() => navigate(`/service-locations/${location.id}`)}
-                      >
-                        <td className="strong">
-                          {location.locationName || (
-                            <span className="muted italic">{t('serviceLocations.detail.unnamedLocation')}</span>
-                          )}
-                        </td>
-                        <td>
-                          <CellStack>
-                            <CellTop>{titleCaseAddress(street)}</CellTop>
-                            <CellSub>
-                              {[titleCaseAddress(location.address.city), stateZip].filter(Boolean).join(', ')}
-                            </CellSub>
-                          </CellStack>
-                        </td>
-                        <td>
-                          {location.siteContactName || location.siteContactPhone ? (
-                            <CellStack>
-                              {location.siteContactName && <CellTop>{location.siteContactName}</CellTop>}
-                              {location.siteContactPhone && (
-                                <CellSub>
-                                  <a
-                                    href={`tel:${location.siteContactPhone}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="hover:underline"
-                                  >
-                                    {formatPhone(location.siteContactPhone)}
-                                  </a>
-                                </CellSub>
-                              )}
-                            </CellStack>
-                          ) : (
-                            <span className="muted">-</span>
-                          )}
-                        </td>
-                        <td className="muted">{t('serviceLocations.table.neverServiced')}</td>
-                        <td>
-                          {location.status === 'ACTIVE' ? (
-                            // Pill recedes when 100% of the list is Active
-                            // (.pill.success is already a soft 12% mix on bg-elev).
-                            <Pill tone="success">
-                              {t(`serviceLocations.status.${location.status.toLowerCase()}`)}
-                            </Pill>
-                          ) : (
-                            <span
-                              className={
-                                location.status === 'INACTIVE'
-                                  ? 'text-fg-muted'
-                                  : 'text-fg-dim'
-                              }
-                            >
-                              {t(`serviceLocations.status.${location.status.toLowerCase()}`)}
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          {(canEditServiceLocations || canCloseServiceLocations) && (
-                            <Dropdown>
-                              <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
-                                <EllipsisVerticalIcon className="size-4" />
-                              </DropdownButton>
-                              <DropdownMenu anchor="bottom end">
-                                <DropdownItem onClick={() => navigate(`/service-locations/${location.id}`)}>
-                                  <DropdownLabel>{t('common.view')}</DropdownLabel>
-                                </DropdownItem>
-                                {canEditServiceLocations && (
-                                  <DropdownItem onClick={() => handleEdit(location.id, location.customerId)}>
-                                    <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                                  </DropdownItem>
+                      return (
+                        <DenseRow
+                          key={location.id}
+                          className={`cursor-pointer ${rowTint}`}
+                          onClick={(e: React.MouseEvent) => {
+                            const target = e.target as HTMLElement;
+                            if (target.closest('[role="menu"]') || target.closest('button[aria-label]') || target.closest('a')) return;
+                            navigate(`/service-locations/${location.id}`);
+                          }}
+                        >
+                          <td>
+                            <div className="flex items-center gap-2">
+                              <CustomerTypeMark category={category} />
+                              <CellStack>
+                                <CellTop>
+                                  <span className="font-semibold text-fg-strong">{headline}</span>
+                                </CellTop>
+                                <CellSub>{addressLine}</CellSub>
+                              </CellStack>
+                            </div>
+                          </td>
+                          <td>
+                            {location.dispatchRegionName ? (
+                              <span className="font-mono text-[11.5px] text-fg-muted">
+                                {location.dispatchRegionName}
+                              </span>
+                            ) : (
+                              <span className="text-fg-dim">—</span>
+                            )}
+                          </td>
+                          <td>
+                            {location.status === 'ACTIVE' ? (
+                              <Pill tone="success" dot live inline>
+                                {t('serviceLocations.status.active')}
+                              </Pill>
+                            ) : (
+                              <Pill tone="neutral" dot inline>
+                                {t(`serviceLocations.status.${location.status.toLowerCase()}`)}
+                              </Pill>
+                            )}
+                          </td>
+                          <td>
+                            {lastSvc ? (
+                              <span className="text-[11.5px] text-fg-muted">{lastSvc}</span>
+                            ) : (
+                              <span className="text-[11px] text-fg-dim">
+                                {t('serviceLocations.table.newCustomer')}
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            {location.siteContactName || location.siteContactPhone ? (
+                              <CellStack>
+                                {location.siteContactName && <CellTop>{location.siteContactName}</CellTop>}
+                                {location.siteContactPhone && (
+                                  <CellSub>
+                                    <a
+                                      href={`tel:${location.siteContactPhone}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="font-mono hover:underline"
+                                    >
+                                      {formatPhone(location.siteContactPhone)}
+                                    </a>
+                                  </CellSub>
                                 )}
-                                {canCloseServiceLocations && (
-                                  <>
-                                    {location.status !== 'CLOSED' && (
-                                      <DropdownItem onClick={() => handleClose(location.id, location.locationName || '', location.address.streetAddress)}>
-                                        <DropdownLabel>{t('serviceLocations.actions.close')}</DropdownLabel>
+                              </CellStack>
+                            ) : (
+                              <span className="text-fg-dim">—</span>
+                            )}
+                          </td>
+                          <td>
+                            <TagList tags={location.tags} />
+                          </td>
+                          <td className="right">
+                            {(canEditServiceLocations || canCloseServiceLocations) && (
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Dropdown>
+                                  <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                                    <EllipsisVerticalIcon className="size-4" />
+                                  </DropdownButton>
+                                  <DropdownMenu anchor="bottom end">
+                                    <DropdownItem onClick={() => navigate(`/service-locations/${location.id}`)}>
+                                      <DropdownLabel>{t('common.view')}</DropdownLabel>
+                                    </DropdownItem>
+                                    {canEditServiceLocations && (
+                                      <DropdownItem onClick={() => handleEdit(location.id, location.customerId)}>
+                                        <DropdownLabel>{t('common.edit')}</DropdownLabel>
                                       </DropdownItem>
                                     )}
-                                    <DropdownItem onClick={() => handleDelete(location.id, location.locationName || '', location.address.streetAddress)}>
-                                      <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                                    </DropdownItem>
-                                  </>
-                                )}
-                              </DropdownMenu>
-                            </Dropdown>
-                          )}
-                        </td>
-                      </DenseRow>
-                    );
-                  })}
-                </tbody>
-              </DenseTable>
+                                    {canCloseServiceLocations && (
+                                      <>
+                                        {location.status !== 'CLOSED' && (
+                                          <DropdownItem onClick={() => handleClose(location.id, location.locationName || '', location.address.streetAddress)}>
+                                            <DropdownLabel>{t('serviceLocations.actions.close')}</DropdownLabel>
+                                          </DropdownItem>
+                                        )}
+                                        <DropdownItem onClick={() => handleDelete(location.id, location.locationName || '', location.address.streetAddress)}>
+                                          <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                        </DropdownItem>
+                                      </>
+                                    )}
+                                  </DropdownMenu>
+                                </Dropdown>
+                              </div>
+                            )}
+                          </td>
+                        </DenseRow>
+                      );
+                    })}
+                  </tbody>
+                </DenseTable>
 
-              <ListFooter
-                page={page}
-                totalPages={totalPages}
-                pageHref={pageHref}
-                left={t('common.pagination.showing', {
-                  start: showingStart,
-                  end: showingEnd,
-                  total: totalLocations.toLocaleString(),
-                })}
-              />
-            </CardBody>
-          </Card>
-        )}
+                <ListFooter
+                  page={page}
+                  totalPages={totalPages}
+                  pageHref={pageHref}
+                  left={t('common.pagination.showing', {
+                    start: showingStart,
+                    end: showingEnd,
+                    total: totalLocations.toLocaleString(),
+                  })}
+                />
+              </>
+            )}
+          </CardBody>
+        </Card>
       </div>
 
       <ServiceLocationFormDialog
@@ -427,5 +559,28 @@ export default function ServiceLocationsPage() {
         customerId={selectedCustomerId}
       />
     </AppLayout>
+  );
+}
+
+function TagList({ tags }: { tags?: TagSummary[] }) {
+  if (!tags || tags.length === 0) return <span className="text-fg-dim">—</span>;
+  const visible = tags.slice(0, 2);
+  const overflow = tags.slice(2);
+  return (
+    <div className="flex flex-wrap gap-1">
+      {visible.map((tag) => (
+        <span
+          key={tag.id}
+          className="inline-flex max-w-[140px] items-center truncate rounded-full border border-border-soft bg-bg-active px-2 py-[1px] text-[10.5px] font-medium text-fg-muted"
+        >
+          {tag.name}
+        </span>
+      ))}
+      {overflow.length > 0 && (
+        <span title={overflow.map((tag) => tag.name).join(', ')}>
+          <Pill tone="neutral">+{overflow.length}</Pill>
+        </span>
+      )}
+    </div>
   );
 }

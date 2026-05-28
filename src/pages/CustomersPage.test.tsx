@@ -153,14 +153,18 @@ describe('CustomersPage', () => {
     expect(screen.getByRole('button', { name: /add customer/i })).toBeInTheDocument();
   });
 
-  it('displays loading state while fetching customers', () => {
+  it('displays loading state while fetching customers', async () => {
     vi.mocked(apiClient.get).mockImplementation(
       () => new Promise(() => {}) // Never resolves
     );
 
     renderWithProviders(<CustomersPage />);
 
-    expect(screen.getByText('Loading customers...')).toBeInTheDocument();
+    // LoadingState renders after a 250 ms delay to avoid flashing on fast queries.
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/loading customers/i)).toBeInTheDocument();
   });
 
   it('displays customers in a table', async () => {
@@ -184,7 +188,7 @@ describe('CustomersPage', () => {
     renderWithProviders(<CustomersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/error loading customers/i)).toBeInTheDocument();
+      expect(screen.getByText(/couldn't load customers/i)).toBeInTheDocument();
     });
   });
 
@@ -194,7 +198,7 @@ describe('CustomersPage', () => {
     renderWithProviders(<CustomersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('No customers found')).toBeInTheDocument();
+      expect(screen.getByText(/no customers yet/i)).toBeInTheDocument();
     });
   });
 
@@ -205,17 +209,22 @@ describe('CustomersPage', () => {
     renderWithProviders(<CustomersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('No customers found')).toBeInTheDocument();
+      expect(screen.getByText(/no customers yet/i)).toBeInTheDocument();
     });
 
-    const addButton = screen.getByRole('button', { name: /add customer/i });
+    // Empty state renders an extra Add Customer button alongside the header
+    // one — either opens the dialog, so just click the first.
+    const addButton = screen.getAllByRole('button', { name: /add customer/i })[0];
     await user.click(addButton);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getAllByText('Add Customer').length).toBeGreaterThan(0);
   });
 
-  it('displays customer location count', { timeout: 10000 }, async () => {
+  // The redesigned row shows the location count as a sub line only when the
+  // customer has more than one location — single-location customers don't
+  // need the count surfaced because each row already implies one.
+  it('displays customer location count for customers with multiple locations', { timeout: 10000 }, async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomersListResponse });
 
     renderWithProviders(<CustomersPage />);
@@ -224,28 +233,7 @@ describe('CustomersPage', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/1 location/i)).toBeInTheDocument();
     expect(screen.getByText(/2 locations/i)).toBeInTheDocument();
-  });
-
-  it('displays dash when no service locations exist', async () => {
-    const responseWithNoLocations = {
-      ...mockCustomersListResponse,
-      content: [{
-        ...mockCustomersListResponse.content[0],
-        serviceLocationCount: 0,
-      }],
-    };
-
-    vi.mocked(apiClient.get).mockResolvedValue({ data: responseWithNoLocations });
-
-    renderWithProviders(<CustomersPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText('None')).toBeInTheDocument();
   });
 
   it('opens edit dialog when edit button is clicked', async () => {
@@ -462,29 +450,7 @@ describe('CustomersPage', () => {
     expect(searchInput).toHaveValue('NonExistent');
   });
 
-  it('displays payment terms badges', async () => {
-    const customersWithTerms = {
-      ...mockCustomersListResponse,
-      content: [{
-        ...mockCustomersListResponse.content[0],
-        paymentTermsDays: 30,
-        requiresPurchaseOrder: true,
-        contractPricingTier: 'Gold',
-      }],
-    };
-
-    vi.mocked(apiClient.get).mockResolvedValue({ data: customersWithTerms });
-
-    renderWithProviders(<CustomersPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Net-30')).toBeInTheDocument();
-      expect(screen.getByText('PO')).toBeInTheDocument();
-      expect(screen.getByText('Gold')).toBeInTheDocument();
-    });
-  });
-
-  it('displays business icon for COMMERCIAL category', async () => {
+  it('displays commercial type mark for COMMERCIAL category', async () => {
     const businessCustomer = {
       ...mockCustomersListResponse,
       content: [{
@@ -501,31 +467,8 @@ describe('CustomersPage', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    const businessIcon = screen.getByTitle('Business');
-    expect(businessIcon).toBeInTheDocument();
-  });
-
-  it('displays INACTIVE status badge correctly', async () => {
-    const inactiveCustomer = {
-      ...mockCustomersListResponse,
-      content: [{
-        ...mockCustomersListResponse.content[0],
-        status: 'INACTIVE' as const,
-      }],
-      totalElements: 1,
-      numberOfElements: 1,
-    };
-
-    vi.mocked(apiClient.get).mockResolvedValue({ data: inactiveCustomer });
-
-    renderWithProviders(<CustomersPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
-    });
-
-    const badges = screen.getAllByText(/inactive/i);
-    expect(badges.length).toBeGreaterThan(0);
+    const mark = screen.getByTitle('Commercial');
+    expect(mark).toBeInTheDocument();
   });
 
   it('displays billing address', async () => {

@@ -86,6 +86,14 @@ export interface Pageable {
   unpaged: boolean;
 }
 
+// Tag summary shape — matches feature/customer-tags backend.
+// Color is a hex string ('#3b82f6' etc.); confirm with backend if format changes.
+export interface TagSummary {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface CustomerListDto {
   id: string;
   name: string;
@@ -104,6 +112,27 @@ export interface CustomerListDto {
   contractPricingTier?: string | null;
   status: CustomerStatus;
   category: CustomerCategory;
+  // Denormalized read fields synced via events from finance + job services.
+  // Optional on the FE so the page renders before the BE flags land.
+  hasOpenBalance?: boolean;
+  hasAgedBalance?: boolean;
+  hasOpenJobs?: boolean;
+  openJobsCount?: number;
+  lastServiceAt?: string | null;
+  tags?: TagSummary[];
+}
+
+// Chip counts envelope on list responses. Reflects the search-filtered set
+// ignoring the chip currently being counted, so e.g. "Commercial 487" does
+// not drop to zero when Commercial is the active filter.
+export interface CustomerListCounts {
+  total?: number;
+  active?: number;
+  commercial?: number;
+  residential?: number;
+  openBalance?: number;
+  openJobs?: number;
+  aged?: number;
 }
 
 export interface CustomerListResponse {
@@ -117,6 +146,7 @@ export interface CustomerListResponse {
   first: boolean;
   last: boolean;
   empty: boolean;
+  counts?: CustomerListCounts;
 }
 
 export interface CustomerSearchResult {
@@ -154,6 +184,27 @@ export interface ServiceLocationListDto {
   status: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
   createdAt: string;
   updatedAt: string;
+  // Denormalized read fields synced via events from job + agreement + dispatch
+  // services. Optional on the FE so the page renders before the BE flags land.
+  dispatchRegionId?: string | null;
+  dispatchRegionName?: string | null;
+  hasOpenJobs?: boolean;
+  pmOverdue?: boolean;
+  techOnSite?: boolean;
+  lastServiceAt?: string | null;
+  tags?: TagSummary[];
+}
+
+export interface ServiceLocationListCounts {
+  total?: number;
+  active?: number;
+  customerCount?: number;
+  live?: number;
+  openJobs?: number;
+  overdue?: number;
+  inactive?: number;
+  commercial?: number;
+  residential?: number;
 }
 
 export interface ServiceLocationListResponse {
@@ -167,6 +218,7 @@ export interface ServiceLocationListResponse {
   first: boolean;
   last: boolean;
   empty: boolean;
+  counts?: ServiceLocationListCounts;
 }
 
 // Service Location Detail DTO - for detail views
@@ -310,14 +362,29 @@ export const customerApi = {
     status?: 'ACTIVE' | 'INACTIVE';
     search?: string;
     sort?: string;     // e.g., "name,desc"
+    // List filters — backend default-excludes BILLING_ONLY; pass category to
+    // narrow further. Booleans flip on the denormalized fields.
+    category?: 'COMMERCIAL' | 'RESIDENTIAL';
+    hasOpenBalance?: boolean;
+    hasAgedBalance?: boolean;
+    hasOpenJobs?: boolean;
   }): Promise<CustomerListResponse> => {
-    const apiParams = {
+    const apiParams: Record<string, string | number | boolean | undefined> = {
       page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
       limit: params?.limit,
       status: params?.status,
       search: params?.search,
       sort: params?.sort,
+      category: params?.category,
+      hasOpenBalance: params?.hasOpenBalance || undefined,
+      hasAgedBalance: params?.hasAgedBalance || undefined,
+      hasOpenJobs: params?.hasOpenJobs || undefined,
     };
+    // Strip empty values so the URL stays clean.
+    for (const key of Object.keys(apiParams)) {
+      const v = apiParams[key];
+      if (v === undefined || v === '' || v === null) delete apiParams[key];
+    }
     const response = await apiClient.get<CustomerListResponse>('/customers', {
       params: apiParams,
     });
@@ -420,14 +487,23 @@ export const customerApi = {
     search?: string;
     dispatchRegionId?: string;
     sort?: string;
+    // Denormalized boolean filters from job/agreement/dispatch events.
+    techOnSite?: boolean;
+    hasOpenJobs?: boolean;
+    pmOverdue?: boolean;
+    category?: 'COMMERCIAL' | 'RESIDENTIAL';
   }): Promise<ServiceLocationListResponse> => {
-    const apiParams: Record<string, string | number | undefined> = {
+    const apiParams: Record<string, string | number | boolean | undefined> = {
       page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
       limit: params?.limit,
       status: params?.status,
       search: params?.search,
       dispatchRegionId: params?.dispatchRegionId,
       sort: params?.sort,
+      techOnSite: params?.techOnSite || undefined,
+      hasOpenJobs: params?.hasOpenJobs || undefined,
+      pmOverdue: params?.pmOverdue || undefined,
+      category: params?.category,
     };
     // Strip empty values so we don't send ?dispatchRegionId= etc.
     for (const key of Object.keys(apiParams)) {

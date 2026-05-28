@@ -44,11 +44,14 @@ export {
   type Pageable,
   type CustomerListDto,
   type CustomerListResponse,
+  type CustomerListCounts,
   type CustomerSearchResult,
   type CustomerSearchResponse,
   type ServiceLocationListDto,
   type ServiceLocationListResponse,
+  type ServiceLocationListCounts,
   type ServiceLocationDetailDto,
+  type TagSummary,
 } from './customerApi';
 
 // Contact API
