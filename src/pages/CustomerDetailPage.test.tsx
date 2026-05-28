@@ -126,7 +126,7 @@ describe('CustomerDetailPage', () => {
       expect(screen.getByText(/john doe/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/service locations \(2\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/^locations \(2\)/i)).toBeInTheDocument();
   });
 
   it('opens edit dialog when edit button is clicked', async () => {
@@ -156,11 +156,11 @@ describe('CustomerDetailPage', () => {
     });
 
     // Button now says "Add Service Location" (from glossary)
-    const addButton = screen.getByRole('button', { name: /add service location/i });
+    const addButton = screen.getByRole('button', { name: /add location/i });
     await user.click(addButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Create Service Location')).toBeInTheDocument();
+      expect(screen.getByText('Create Location')).toBeInTheDocument();
     });
   });
 
@@ -178,7 +178,7 @@ describe('CustomerDetailPage', () => {
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/service locations \(10\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/^locations \(10\)/i)).toBeInTheDocument();
     });
 
     // Should show table instead of cards
@@ -201,7 +201,7 @@ describe('CustomerDetailPage', () => {
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/service locations \(10\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/^locations \(10\)/i)).toBeInTheDocument();
     });
 
     const searchInput = screen.getByPlaceholderText(/search locations/i);
@@ -217,7 +217,7 @@ describe('CustomerDetailPage', () => {
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/service locations \(2\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/^locations \(2\)/i)).toBeInTheDocument();
     });
 
     // Standard customers always use table layout (more CSR-friendly)
@@ -341,18 +341,18 @@ describe('CustomerDetailPage', () => {
     });
 
     // Button now says "Add Service Location" (from glossary)
-    const addButton = screen.getByRole('button', { name: /add service location/i });
+    const addButton = screen.getByRole('button', { name: /add location/i });
     await user.click(addButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Create Service Location')).toBeInTheDocument();
+      expect(screen.getByText('Create Location')).toBeInTheDocument();
     });
 
     const cancelButton = screen.getByRole('button', { name: /cancel/i });
     await user.click(cancelButton);
 
     await waitFor(() => {
-      expect(screen.queryByText('Create Service Location')).not.toBeInTheDocument();
+      expect(screen.queryByText('Create Location')).not.toBeInTheDocument();
     });
   });
 
@@ -418,7 +418,7 @@ describe('CustomerDetailPage', () => {
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/service locations \(10\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/^locations \(10\)/i)).toBeInTheDocument();
     });
 
     const searchInput = screen.getByPlaceholderText(/search locations/i);
@@ -445,7 +445,7 @@ describe('CustomerDetailPage', () => {
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/service locations \(10\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/^locations \(10\)/i)).toBeInTheDocument();
     });
 
     const searchInput = screen.getByPlaceholderText(/search locations/i);
@@ -471,7 +471,7 @@ describe('CustomerDetailPage', () => {
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/service locations \(10\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/^locations \(10\)/i)).toBeInTheDocument();
     });
 
     const searchInput = screen.getByPlaceholderText(/search locations/i);
@@ -844,7 +844,7 @@ describe('CustomerDetailPage', () => {
     });
 
     // Should show add location button (in header)
-    const addButtons = screen.getAllByText(/add service location/i);
+    const addButtons = screen.getAllByText(/add location/i);
     expect(addButtons.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -965,7 +965,7 @@ describe('CustomerDetailPage', () => {
     });
 
     // Should show add button in table header (not just in header area)
-    const addButtons = screen.getAllByRole('button', { name: /add service location/i });
+    const addButtons = screen.getAllByRole('button', { name: /add location/i });
     expect(addButtons.length).toBeGreaterThan(0);
   });
 
@@ -1132,7 +1132,7 @@ describe('CustomerDetailPage', () => {
       });
 
       // Multiple add buttons should exist (one in header, one in table section)
-      const addButtons = screen.getAllByRole('button', { name: /add service location/i });
+      const addButtons = screen.getAllByRole('button', { name: /add location/i });
       expect(addButtons.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -1145,7 +1145,7 @@ describe('CustomerDetailPage', () => {
       });
 
       // Should show location count
-      expect(screen.getByText(/service locations \(2\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/^locations \(2\)/i)).toBeInTheDocument();
     });
 
     it('displays search input for standard customers with 5+ locations', async () => {
@@ -1469,7 +1469,7 @@ describe('CustomerDetailPage', () => {
 
       // Customer picker is hidden (locked); service-location picker is visible.
       expect(screen.queryByLabelText(/^customer/i)).not.toBeInTheDocument();
-      expect(screen.getByLabelText(/service location/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Location \*$/)).toBeInTheDocument();
       expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
     });
   });
@@ -1623,7 +1623,7 @@ describe('CustomerDetailPage', () => {
       renderWithProviders(<CustomerDetailPage />);
 
       await waitFor(() => {
-        expect(screen.getByText(/service locations \(10\)/i)).toBeInTheDocument();
+        expect(screen.getByText(/^locations \(10\)/i)).toBeInTheDocument();
       });
 
       const searchInput = screen.getByPlaceholderText(/search locations/i);
@@ -1650,7 +1650,7 @@ describe('CustomerDetailPage', () => {
       renderWithProviders(<CustomerDetailPage />);
 
       await waitFor(() => {
-        expect(screen.getByText(/service locations \(10\)/i)).toBeInTheDocument();
+        expect(screen.getByText(/^locations \(10\)/i)).toBeInTheDocument();
       });
 
       const searchInput = screen.getByPlaceholderText(/search locations/i);
@@ -1681,7 +1681,7 @@ describe('CustomerDetailPage', () => {
       renderWithProviders(<CustomerDetailPage />);
 
       await waitFor(() => {
-        expect(screen.getByText(/service locations \(10\)/i)).toBeInTheDocument();
+        expect(screen.getByText(/^locations \(10\)/i)).toBeInTheDocument();
       });
 
       const searchInput = screen.getByPlaceholderText(/search locations/i);
@@ -1707,7 +1707,7 @@ describe('CustomerDetailPage', () => {
       renderWithProviders(<CustomerDetailPage />);
 
       await waitFor(() => {
-        expect(screen.getByText(/service locations \(10\)/i)).toBeInTheDocument();
+        expect(screen.getByText(/^locations \(10\)/i)).toBeInTheDocument();
       });
 
       const searchInput = screen.getByPlaceholderText(/search locations/i);

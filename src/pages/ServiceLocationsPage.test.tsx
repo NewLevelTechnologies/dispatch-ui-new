@@ -78,10 +78,10 @@ describe('ServiceLocationsPage', () => {
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Service Locations' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Locations' })).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('button', { name: /add service location/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add location/i })).toBeInTheDocument();
   });
 
   it('displays service locations in table', async () => {
@@ -104,7 +104,7 @@ describe('ServiceLocationsPage', () => {
 
     renderWithProviders(<ServiceLocationsPage />);
 
-    expect(screen.getByText(/loading service locations/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading locations/i)).toBeInTheDocument();
   });
 
   it('displays error state', async () => {
@@ -114,7 +114,7 @@ describe('ServiceLocationsPage', () => {
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/error loading service locations/i)).toBeInTheDocument();
+      expect(screen.getByText(/error loading locations/i)).toBeInTheDocument();
     });
   });
 
@@ -126,7 +126,7 @@ describe('ServiceLocationsPage', () => {
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/no service locations found/i)).toBeInTheDocument();
+      expect(screen.getByText(/no locations found/i)).toBeInTheDocument();
     });
   });
 
@@ -177,10 +177,10 @@ describe('ServiceLocationsPage', () => {
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Service Locations' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Locations' })).toBeInTheDocument();
     });
 
-    const addButton = screen.getByRole('button', { name: /add service location/i });
+    const addButton = screen.getByRole('button', { name: /add location/i });
     await user.click(addButton);
 
     // Dialog should open (check for dialog content)
@@ -260,7 +260,7 @@ describe('ServiceLocationsPage', () => {
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('2 service locations')).toBeInTheDocument();
+      expect(screen.getByText('2 locations')).toBeInTheDocument();
     });
   });
 
@@ -297,7 +297,7 @@ describe('ServiceLocationsPage', () => {
 
     await waitFor(() => {
       // Subtitle reflects the filtered set: "2 active service locations".
-      expect(screen.getByText(/2 active service locations/i)).toBeInTheDocument();
+      expect(screen.getByText(/2 active locations/i)).toBeInTheDocument();
     });
 
     const activeTab = screen.getByRole('tab', { name: /^active$/i });
@@ -326,7 +326,7 @@ describe('ServiceLocationsPage', () => {
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/no service locations found/i)).toBeInTheDocument();
+      expect(screen.getByText(/no locations found/i)).toBeInTheDocument();
     });
 
     // Should show "add first" button (using regex to match partial text)
@@ -343,7 +343,7 @@ describe('ServiceLocationsPage', () => {
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/no service locations found/i)).toBeInTheDocument();
+      expect(screen.getByText(/no locations found/i)).toBeInTheDocument();
     });
 
     const addFirstButton = screen.getByRole('button', { name: /add your first/i });
@@ -380,11 +380,11 @@ describe('ServiceLocationsPage', () => {
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Service Locations' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Locations' })).toBeInTheDocument();
     });
 
     // Open dialog
-    const addButton = screen.getByRole('button', { name: /add service location/i });
+    const addButton = screen.getByRole('button', { name: /add location/i });
     await user.click(addButton);
 
     await waitFor(() => {
@@ -571,7 +571,7 @@ describe('ServiceLocationsPage', () => {
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/1 service location$/i)).toBeInTheDocument();
+      expect(screen.getByText(/1 location$/i)).toBeInTheDocument();
     });
   });
 });
