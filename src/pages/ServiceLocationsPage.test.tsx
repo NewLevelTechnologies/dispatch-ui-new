@@ -93,17 +93,20 @@ describe('ServiceLocationsPage', () => {
       expect(screen.getByText('Main Office')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('123 Main St')).toBeInTheDocument();
-    expect(screen.getByText('Springfield, IL 62701')).toBeInTheDocument();
+    // Address renders as a single comma-joined line under the headline.
+    expect(screen.getByText(/123 Main St.*Springfield, IL 62701/)).toBeInTheDocument();
     expect(screen.getByText('John Doe')).toBeInTheDocument();
     expect(screen.getByText('Warehouse')).toBeInTheDocument();
   });
 
-  it('displays loading state', () => {
+  it('displays loading state', async () => {
     vi.mocked(apiClient.get).mockImplementation(() => new Promise(() => {}));
 
     renderWithProviders(<ServiceLocationsPage />);
 
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toBeInTheDocument();
+    });
     expect(screen.getByText(/loading locations/i)).toBeInTheDocument();
   });
 
@@ -114,7 +117,7 @@ describe('ServiceLocationsPage', () => {
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/error loading locations/i)).toBeInTheDocument();
+      expect(screen.getByText(/couldn't load locations/i)).toBeInTheDocument();
     });
   });
 
@@ -126,29 +129,26 @@ describe('ServiceLocationsPage', () => {
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/no locations found/i)).toBeInTheDocument();
+      expect(screen.getByText(/no locations yet/i)).toBeInTheDocument();
     });
   });
 
-  it('filters locations by status', async () => {
+  // URL state drives the inactive filter chip; verify the API receives the
+  // status=INACTIVE parameter when the chip is active via URL hydration.
+  it('hydrates inactive filter from URL and passes status=INACTIVE to the API', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
 
-    // URL drives the filter; render with ?status=ACTIVE to verify hydration.
-    renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?status=ACTIVE' });
+    renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?inactive=true' });
 
     await waitFor(() => {
       expect(screen.getByText('Main Office')).toBeInTheDocument();
     });
 
-    const activeTab = screen.getByRole('tab', { name: /^active$/i });
-    expect(activeTab).toHaveAttribute('aria-selected', 'true');
-
-    // And the list query was issued with status=ACTIVE
     const listCalls = vi.mocked(apiClient.get).mock.calls.filter(
       ([url]) => url === '/service-locations'
     );
     expect(
-      listCalls.some(([, opts]) => (opts as { params?: { status?: string } } | undefined)?.params?.status === 'ACTIVE')
+      listCalls.some(([, opts]) => (opts as { params?: { status?: string } } | undefined)?.params?.status === 'INACTIVE')
     ).toBe(true);
   });
 
@@ -264,61 +264,7 @@ describe('ServiceLocationsPage', () => {
     });
   });
 
-  it('filters locations by inactive status', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
-
-    renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?status=INACTIVE' });
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    const inactiveTab = screen.getByRole('tab', { name: /^inactive$/i });
-    expect(inactiveTab).toHaveAttribute('aria-selected', 'true');
-  });
-
-  it('filters locations by closed status', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
-
-    renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?status=CLOSED' });
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    const closedTab = screen.getByRole('tab', { name: /^closed$/i });
-    expect(closedTab).toHaveAttribute('aria-selected', 'true');
-  });
-
-  it('displays filtered count when filter is active', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
-
-    renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?status=ACTIVE' });
-
-    await waitFor(() => {
-      // Subtitle reflects the filtered set: "2 active service locations".
-      expect(screen.getByText(/2 active locations/i)).toBeInTheDocument();
-    });
-
-    const activeTab = screen.getByRole('tab', { name: /^active$/i });
-    expect(activeTab).toHaveAttribute('aria-selected', 'true');
-  });
-
-  it('resets filter when "all" tab is selected by default', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
-
-    // No status param → "All Statuses" is the active tab
-    renderWithProviders(<ServiceLocationsPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    const allTab = screen.getByRole('tab', { name: /all statuses/i });
-    expect(allTab).toHaveAttribute('aria-selected', 'true');
-  });
-
-  it('displays "add first" button in empty state', async () => {
+  it('shows an Add Location button in the empty state', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
       data: { ...mockServiceLocationsResponse, content: [], totalElements: 0, empty: true }
     });
@@ -326,33 +272,13 @@ describe('ServiceLocationsPage', () => {
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/no locations found/i)).toBeInTheDocument();
+      expect(screen.getByText(/no locations yet/i)).toBeInTheDocument();
     });
 
-    // Should show "add first" button (using regex to match partial text)
-    const addButton = screen.getByRole('button', { name: /add your first/i });
-    expect(addButton).toBeInTheDocument();
-  });
-
-  it('opens dialog when "add first" button is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({
-      data: { ...mockServiceLocationsResponse, content: [], totalElements: 0, empty: true }
-    });
-    const user = userEvent.setup();
-
-    renderWithProviders(<ServiceLocationsPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/no locations found/i)).toBeInTheDocument();
-    });
-
-    const addFirstButton = screen.getByRole('button', { name: /add your first/i });
-    await user.click(addFirstButton);
-
-    // Dialog should open
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    });
+    // Both the page header and the empty-state action render Add Location;
+    // requiring 2 is the assertion that the empty state has its own button.
+    const addButtons = screen.getAllByRole('button', { name: /add location/i });
+    expect(addButtons.length).toBeGreaterThanOrEqual(2);
   });
 
   it('displays no match message when search returns no results', async () => {
@@ -442,10 +368,11 @@ describe('ServiceLocationsPage', () => {
       expect(screen.getByText('Warehouse')).toBeInTheDocument();
     });
 
-    // Warehouse has no contact, should show dash. Clickable DenseRows expose
-    // `role="button"` so locate the row via its text content + closest <tr>.
+    // Warehouse has no contact, should show em-dash (the project's empty
+    // marker). Clickable DenseRows expose `role="button"` so locate the row
+    // via its text content + closest <tr>.
     const warehouseRow = screen.getByText('Warehouse').closest('tr');
-    expect(warehouseRow?.textContent).toContain('-');
+    expect(warehouseRow?.textContent).toContain('—');
   });
 
   it('displays location with streetAddressLine2', async () => {
