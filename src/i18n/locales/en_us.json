@@ -257,6 +257,8 @@
     "title": "Additional Contacts"
   },
   "customers": {
+    "agedBadge": "91+ aged",
+    "agedBadgeAria": "Has invoices aged 91 or more days",
     "category": {
       "billingOnly": "Bill-only",
       "commercial": "Commercial",
@@ -297,11 +299,20 @@
       "viewDetails": "View Details →"
     },
     "filter": {
-      "allStatuses": "All Statuses"
+      "aged": "91+ aged",
+      "allStatuses": "All Statuses",
+      "commercial": "Commercial",
+      "openBalance": "Open balance",
+      "openJobs": "Open jobs",
+      "residential": "Residential"
     },
     "search": {
-      "placeholder": "Search by name, phone, or email…"
+      "placeholder": "Search by name, address, phone, contact…"
     },
+    "subtitle": {
+      "totalActive": "{{total}} total · {{active}} active"
+    },
+    "viewPayers": "View {{entities, lowercase}} →",
     "form": {
       "accessInstructionsOptional": "Access Instructions (optional)",
       "accessInstructionsPlaceholder": "e.g., Use back entrance, gate code 1234",
@@ -323,6 +334,10 @@
     },
     "table": {
       "billingAddress": "Billing Address",
+      "contact": "Contact",
+      "customer": "Customer",
+      "jobsCount_one": "{{count}} job",
+      "jobsCount_other": "{{count}} jobs",
       "location": "Location",
       "locationName": "Location Name",
       "locationAddress": "Address",
@@ -331,6 +346,8 @@
       "locationsCount": "{{count}} locations",
       "moreLocations": "+{{count}} more",
       "none": "None",
+      "openJobs": "Open jobs",
+      "tags": "Tags",
       "terms": "Terms",
       "type": "Type"
     },
@@ -460,10 +477,19 @@
     "filter": {
       "allRegions": "All regions",
       "allStatuses": "All statuses",
-      "region": "Region"
+      "commercial": "Commercial",
+      "inactive": "Inactive",
+      "live": "Tech on site",
+      "openJobs": "Open jobs",
+      "overdue": "Visit overdue",
+      "region": "Region",
+      "residential": "Residential"
     },
     "search": {
-      "placeholder": "Search by name or address…"
+      "placeholder": "Search by address, customer, contact, phone…"
+    },
+    "subtitle": {
+      "totalActiveAcrossCustomers": "{{total}} total · {{active}} active · across {{customers}} customers"
     },
     "status": {
       "active": "Active",
@@ -475,9 +501,13 @@
       "contact": "Contact",
       "customer": "Customer",
       "equipment": "Equipment",
-      "lastService": "Last Service",
+      "lastService": "Last service",
+      "location": "Location",
       "locationName": "Location Name",
       "neverServiced": "Never",
+      "newCustomer": "New customer",
+      "region": "Region",
+      "tags": "Tags",
       "type": "Type"
     },
     "tabs": {
