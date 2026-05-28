@@ -363,6 +363,8 @@
     "inventory": "Inventory",
     "invoice": "Invoice",
     "invoices": "Invoices",
+    "payer": "Payer",
+    "payers": "Payers",
     "payment": "Payment",
     "payments": "Payments",
     "quote": "Quote",

@@ -274,6 +274,8 @@ vi.mock('react-i18next', () => {
     'entities.inventory': 'Inventory',
     'entities.invoice': 'Invoice',
     'entities.invoices': 'Invoices',
+    'entities.payer': 'Payer',
+    'entities.payers': 'Payers',
     'entities.payment': 'Payment',
     'entities.payments': 'Payments',
     'entities.quote': 'Quote',

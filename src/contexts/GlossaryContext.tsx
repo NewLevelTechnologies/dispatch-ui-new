@@ -27,6 +27,7 @@ export const GLOSSARY_DEFAULTS: Record<string, GlossaryEntry> = {
   equipment: { singular: 'Equipment', plural: 'Equipment' },
   equipment_component: { singular: 'Unit', plural: 'Units' },
   invoice: { singular: 'Invoice', plural: 'Invoices' },
+  payer: { singular: 'Payer', plural: 'Payers' },
   payment: { singular: 'Payment', plural: 'Payments' },
   quote: { singular: 'Quote', plural: 'Quotes' },
   route: { singular: 'Route', plural: 'Routes' },
