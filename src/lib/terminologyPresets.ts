@@ -55,7 +55,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'hvac',
     label: 'HVAC',
-    blurb: 'Service-call vocabulary with equipment-centric language. Matches the system defaults.',
+    blurb: 'Equipment-centric, service-call based vocabulary.',
     Icon: FireIcon,
     overrides: {},
   },
@@ -92,7 +92,7 @@ export const PRESETS: Preset[] = [
     Icon: WrenchScrewdriverIcon,
     overrides: {
       work_order: { singular: 'Repair', plural: 'Repairs' },
-      service_location: { singular: 'Address', plural: 'Addresses' },
+      service_location: { singular: 'Property', plural: 'Properties' },
       equipment: { singular: 'Appliance', plural: 'Appliances' },
       dispatch: { singular: 'Service Call', plural: 'Service Calls' },
     },
@@ -118,6 +118,7 @@ export const PRESETS: Preset[] = [
       customer: { singular: 'Account', plural: 'Accounts' },
       work_order: { singular: 'Treatment', plural: 'Treatments' },
       technician: { singular: 'Specialist', plural: 'Specialists' },
+      service_location: { singular: 'Property', plural: 'Properties' },
       equipment: { singular: 'Bait Station', plural: 'Bait Stations' },
     },
   },
@@ -139,6 +140,7 @@ export const PRESETS: Preset[] = [
     blurb: 'Ticket-based vocabulary for managed service providers and IT firms.',
     Icon: ComputerDesktopIcon,
     overrides: {
+      customer: { singular: 'Client', plural: 'Clients' },
       work_order: { singular: 'Ticket', plural: 'Tickets' },
       technician: { singular: 'Engineer', plural: 'Engineers' },
       service_location: { singular: 'Site', plural: 'Sites' },
@@ -151,7 +153,6 @@ export const PRESETS: Preset[] = [
     blurb: 'Maintenance-request vocabulary for in-house teams across a tenant-occupied property portfolio.',
     Icon: HomeModernIcon,
     overrides: {
-      customer: { singular: 'Tenant', plural: 'Tenants' },
       work_order: { singular: 'Maintenance Request', plural: 'Maintenance Requests' },
       technician: { singular: 'Maintenance Tech', plural: 'Maintenance Techs' },
       service_location: { singular: 'Unit', plural: 'Units' },

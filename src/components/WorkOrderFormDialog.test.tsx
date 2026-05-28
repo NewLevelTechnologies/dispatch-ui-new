@@ -56,7 +56,7 @@ describe('WorkOrderFormDialog', () => {
       expect(screen.getByText('Create Work Order')).toBeInTheDocument();
       expect(screen.getByText('Create a new work order record.')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /create/i })).toBeInTheDocument();
-      expect(screen.getByLabelText(/service location/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^location/i)).toBeInTheDocument();
     });
 
     it('shows service location search input', async () => {
@@ -164,7 +164,7 @@ describe('WorkOrderFormDialog', () => {
     it('shows all form fields in create mode', async () => {
       renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
 
-      expect(screen.getByLabelText(/service location/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^location/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/scheduled date/i)).toBeInTheDocument();
       // First work item description replaces the old WO description + internalNotes
       expect(screen.getByLabelText(/first.*description/i)).toBeInTheDocument();

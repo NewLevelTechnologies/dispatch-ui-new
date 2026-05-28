@@ -31,7 +31,7 @@ export const GLOSSARY_DEFAULTS: Record<string, GlossaryEntry> = {
   quote: { singular: 'Quote', plural: 'Quotes' },
   route: { singular: 'Route', plural: 'Routes' },
   schedule: { singular: 'Schedule', plural: 'Schedules' },
-  service_location: { singular: 'Service Location', plural: 'Service Locations' },
+  service_location: { singular: 'Location', plural: 'Locations' },
   technician: { singular: 'Technician', plural: 'Technicians' },
   work_item: { singular: 'Work Item', plural: 'Work Items' },
   work_order: { singular: 'Work Order', plural: 'Work Orders' },

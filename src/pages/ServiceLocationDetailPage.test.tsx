@@ -105,7 +105,7 @@ describe('ServiceLocationDetailPage', () => {
 
     renderDetailPage();
 
-    expect(screen.getByText(/loading service location/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading location/i)).toBeInTheDocument();
   });
 
   it('displays error state when fetch fails', async () => {
@@ -115,7 +115,7 @@ describe('ServiceLocationDetailPage', () => {
     renderDetailPage();
 
     await waitFor(() => {
-      expect(screen.getByText(/error loading service location/i)).toBeInTheDocument();
+      expect(screen.getByText(/error loading location/i)).toBeInTheDocument();
     });
   });
 
@@ -125,7 +125,7 @@ describe('ServiceLocationDetailPage', () => {
     renderDetailPage('non-existent-id');
 
     await waitFor(() => {
-      expect(screen.getByText(/error loading service location/i)).toBeInTheDocument();
+      expect(screen.getByText(/error loading location/i)).toBeInTheDocument();
     });
   });
 
@@ -595,10 +595,10 @@ describe('ServiceLocationDetailPage', () => {
     renderDetailPage();
 
     await waitFor(() => {
-      expect(screen.getByText(/error loading service location/i)).toBeInTheDocument();
+      expect(screen.getByText(/error loading location/i)).toBeInTheDocument();
     });
 
-    const backButton = screen.getByRole('button', { name: /back to service location/i });
+    const backButton = screen.getByRole('button', { name: /back to location/i });
     expect(backButton).toBeInTheDocument();
   });
 
@@ -698,10 +698,10 @@ describe('ServiceLocationDetailPage', () => {
     renderDetailPage();
 
     await waitFor(() => {
-      expect(screen.getByText(/error loading service location/i)).toBeInTheDocument();
+      expect(screen.getByText(/error loading location/i)).toBeInTheDocument();
     });
 
-    const backButton = screen.getByRole('button', { name: /back to service location/i });
+    const backButton = screen.getByRole('button', { name: /back to location/i });
 
     // Verify button exists and is clickable
     expect(backButton).toBeInTheDocument();
@@ -764,7 +764,7 @@ describe('ServiceLocationDetailPage', () => {
       // because the location is locked to the service-location detail page.
       await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
       expect(screen.queryByLabelText(/customer/i)).not.toBeInTheDocument();
-      expect(screen.queryByLabelText(/service location/i)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^Location \*$/)).not.toBeInTheDocument();
       expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
     });
 
