@@ -12,7 +12,7 @@ const mockServiceLocationsResponse = {
       id: 'location-1',
       customerId: 'customer-1',
       customerName: 'Test Customer',
-      customerDisplayMode: 'STANDARD' as const,
+      customerCategory: 'COMMERCIAL' as const,
       locationName: 'Main Office',
       address: {
         streetAddress: '123 Main St',
@@ -36,7 +36,7 @@ const mockServiceLocationsResponse = {
       id: 'location-2',
       customerId: 'customer-1',
       customerName: 'Test Customer',
-      customerDisplayMode: 'STANDARD' as const,
+      customerCategory: 'COMMERCIAL' as const,
       locationName: 'Warehouse',
       address: {
         streetAddress: '456 Oak Ave',

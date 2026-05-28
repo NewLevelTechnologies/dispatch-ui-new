@@ -12,7 +12,7 @@ const standard: CustomerSearchResult = {
   id: 'c-1',
   name: 'Acme Plumbing',
   type: 'STANDARD',
-  displayMode: 'STANDARD',
+  category: 'COMMERCIAL',
 };
 
 describe('CustomerPicker', () => {
@@ -115,7 +115,7 @@ describe('CustomerPicker', () => {
             id: 'c-2',
             name: 'Quill Warranty',
             type: 'BILLING_ONLY',
-            displayMode: 'STANDARD',
+            category: 'BILLING_ONLY',
           },
         ],
         totalElements: 2,

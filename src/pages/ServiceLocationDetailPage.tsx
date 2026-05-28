@@ -144,7 +144,7 @@ export default function ServiceLocationDetailPage() {
   const customer = location ? {
     id: location.customerId,
     name: location.customerName,
-    displayMode: location.customerDisplayMode,
+    category: location.customerCategory,
   } : undefined;
 
   if (isLoading) {

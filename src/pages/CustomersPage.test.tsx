@@ -27,7 +27,7 @@ const mockCustomersListResponse: CustomerListResponse = {
       contractPricingTier: null,
       status: 'ACTIVE',
       type: 'STANDARD',
-      displayMode: 'SIMPLE',
+      category: 'RESIDENTIAL',
     },
     {
       id: '2',
@@ -46,7 +46,7 @@ const mockCustomersListResponse: CustomerListResponse = {
       contractPricingTier: 'Premium',
       status: 'ACTIVE',
       type: 'STANDARD',
-      displayMode: 'STANDARD',
+      category: 'COMMERCIAL',
     },
   ],
   totalElements: 2,
@@ -132,7 +132,7 @@ const mockFullCustomers: Customer[] = [
     taxExemptCertificate: null,
     notes: null,
     status: 'ACTIVE',
-    displayMode: 'SIMPLE',
+    category: 'RESIDENTIAL',
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
     version: 0,
@@ -484,12 +484,12 @@ describe('CustomersPage', () => {
     });
   });
 
-  it('displays business icon for STANDARD display mode', async () => {
+  it('displays business icon for COMMERCIAL category', async () => {
     const businessCustomer = {
       ...mockCustomersListResponse,
       content: [{
         ...mockCustomersListResponse.content[0],
-        displayMode: 'STANDARD' as const,
+        category: 'COMMERCIAL' as const,
       }],
     };
 

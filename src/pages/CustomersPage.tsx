@@ -269,9 +269,9 @@ export default function CustomersPage() {
                         onClick={() => navigate(`/customers/${customer.id}`)}
                       >
                         <td>
-                          {customer.displayMode === 'SIMPLE' ? (
+                          {customer.category === 'RESIDENTIAL' ? (
                             <HomeIcon className="h-4 w-4 text-fg-muted" title="Homeowner" />
-                          ) : customer.displayMode === 'BILLING_ONLY' ? (
+                          ) : customer.category === 'BILLING_ONLY' ? (
                             <CreditCardIcon
                               className="h-4 w-4 text-fg-muted"
                               title={t('customers.detail.billingOnlyBadge')}

@@ -86,7 +86,7 @@ export default function QuoteDialog({
             id: defaultCustomer.id,
             name: defaultCustomer.name,
             type: 'STANDARD',
-            displayMode: 'STANDARD',
+            category: 'COMMERCIAL',
           }
         : null,
     );

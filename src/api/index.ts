@@ -32,7 +32,7 @@ export {
   type ServiceLocationSearchResult,
   type ServiceLocationSearchResponse,
   type AdditionalContact,
-  type CustomerDisplayMode,
+  type CustomerCategory,
   type CustomerStatus,
   type CustomerType,
   type CreateCustomerRequest,

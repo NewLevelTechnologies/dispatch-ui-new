@@ -103,7 +103,7 @@ export interface CustomerListDto {
   requiresPurchaseOrder: boolean;
   contractPricingTier?: string | null;
   status: CustomerStatus;
-  displayMode: CustomerDisplayMode;
+  category: CustomerCategory;
 }
 
 export interface CustomerListResponse {
@@ -123,7 +123,7 @@ export interface CustomerSearchResult {
   id: string;
   name: string;
   type: CustomerType;
-  displayMode: CustomerDisplayMode;
+  category: CustomerCategory;
 }
 
 export interface CustomerSearchResponse {
@@ -143,7 +143,7 @@ export interface ServiceLocationListDto {
   id: string;
   customerId: string;
   customerName: string;
-  customerDisplayMode: CustomerDisplayMode;
+  customerCategory: CustomerCategory;
   locationName?: string | null;
   address: Address;
   siteContactName?: string | null;
@@ -175,7 +175,7 @@ export interface ServiceLocationDetailDto {
   id: string;
   customerId: string;
   customerName: string;
-  customerDisplayMode: CustomerDisplayMode;
+  customerCategory: CustomerCategory;
   dispatchRegionId: string;
   locationName?: string | null;
   address: Address;
@@ -195,7 +195,7 @@ export interface ServiceLocationDetailDto {
 }
 
 export type CustomerType = 'STANDARD' | 'BILLING_ONLY';
-export type CustomerDisplayMode = 'SIMPLE' | 'STANDARD' | 'BILLING_ONLY';
+export type CustomerCategory = 'RESIDENTIAL' | 'COMMERCIAL' | 'BILLING_ONLY';
 export type CustomerStatus = 'ACTIVE' | 'INACTIVE';
 
 export interface Customer {
@@ -214,7 +214,7 @@ export interface Customer {
   taxExemptCertificate?: string | null;
   notes?: string | null;
   status: CustomerStatus;
-  displayMode: CustomerDisplayMode;
+  category: CustomerCategory;
   createdAt: string;
   updatedAt: string;
   version: number;
