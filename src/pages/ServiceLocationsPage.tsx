@@ -190,10 +190,10 @@ export default function ServiceLocationsPage() {
     return statuses.map((s) => s.toUpperCase() as 'ACTIVE' | 'INACTIVE' | 'CLOSED');
   }, [statuses]);
 
-  const apiPremise: PremiseType | undefined =
-    premiseFilter === 'business' ? 'BUSINESS'
-    : premiseFilter === 'residence' ? 'RESIDENCE'
-    : undefined;
+  const apiPremise: 'business' | 'residence' | undefined =
+    premiseFilter === 'business' || premiseFilter === 'residence'
+      ? premiseFilter
+      : undefined;
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
@@ -213,7 +213,7 @@ export default function ServiceLocationsPage() {
       search: deferredSearch || undefined,
       dispatchRegionId: regionId || undefined,
       status: apiStatuses,
-      premiseType: apiPremise,
+      premise: apiPremise,
       techOnSite: liveFilter || undefined,
       hasOpenJobs: openJobsFilter || undefined,
       pmOverdue: overdueFilter || undefined,

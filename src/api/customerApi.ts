@@ -117,11 +117,6 @@ export interface CustomerListDto {
   requiresPurchaseOrder: boolean;
   contractPricingTier?: string | null;
   status: CustomerStatus;
-  // Customer category is being retired (the residential/commercial concept on
-  // customers was wrong). Optional + nullable while the BE migration is in
-  // flight so consumers can read it where the form dialog still does, but
-  // list rendering must not depend on it.
-  category?: CustomerCategory | null;
   // Denormalized read fields synced via events from finance + job services.
   // Optional on the FE so the page renders before the BE flags land.
   hasOpenBalance?: boolean;
@@ -182,13 +177,10 @@ export interface ServiceLocationListDto {
   id: string;
   customerId: string;
   customerName: string;
-  // customerCategory is retiring along with Customer.category; keep optional
-  // until BE removes it from the payload.
-  customerCategory?: CustomerCategory | null;
   locationName?: string | null;
   // Explicit per-location premise — drives the glyph + Business/Residence
-  // filter. Optional until BE migration lands; defaults to BUSINESS visually.
-  premiseType?: PremiseType | null;
+  // filter. Required on BE responses; backfilled from USPS DPV business flag.
+  premiseType: PremiseType;
   address: Address;
   siteContactName?: string | null;
   siteContactPhone?: string | null;
@@ -242,8 +234,7 @@ export interface ServiceLocationDetailDto {
   id: string;
   customerId: string;
   customerName: string;
-  customerCategory?: CustomerCategory | null;
-  premiseType?: PremiseType | null;
+  premiseType: PremiseType;
   dispatchRegionId: string;
   locationName?: string | null;
   address: Address;
@@ -263,7 +254,17 @@ export interface ServiceLocationDetailDto {
 }
 
 export type CustomerType = 'STANDARD' | 'BILLING_ONLY';
+// CustomerCategory is legacy — the residential/commercial concept was wrong
+// for customers (a property-management company owns residential locations).
+// Retained on the type to keep CustomerDetailPage compiling against existing
+// reads; new surfaces should use CustomerShape (computed at read on the
+// detail endpoint) for layout decisions and Location.premiseType for the
+// "what is a tech walking into" question.
 export type CustomerCategory = 'RESIDENTIAL' | 'COMMERCIAL' | 'BILLING_ONLY';
+// Structural shape derived from address topology — single-site, multi-site,
+// or billing-only. Lives on the detail response, never on the list. Drives
+// detail-page render density only.
+export type CustomerShape = 'SINGLE' | 'MULTI' | 'BILLING_ONLY';
 export type CustomerStatus = 'ACTIVE' | 'INACTIVE';
 
 export interface Customer {
@@ -282,9 +283,13 @@ export interface Customer {
   taxExemptCertificate?: string | null;
   notes?: string | null;
   status: CustomerStatus;
-  // Retiring along with the customers-list residential/commercial concept.
-  // Optional until BE migration drops the column.
+  // Legacy — kept optional so CustomerDetailPage's existing reads still
+  // compile while the detail-page migration is in flight. New surfaces use
+  // `shape` below.
   category?: CustomerCategory | null;
+  // Structural shape (SINGLE / MULTI / BILLING_ONLY), computed-at-read on
+  // the detail endpoint. Detail-page render density consumer.
+  shape?: CustomerShape | null;
   createdAt: string;
   updatedAt: string;
   version: number;
@@ -293,6 +298,9 @@ export interface Customer {
 export interface CreateServiceLocationRequest {
   dispatchRegionId: string;
   locationName?: string | null;
+  // Omitting premiseType lets the server seed from the tenant default
+  // (tenantSettings.defaultPremiseType). Provide to override per-location.
+  premiseType?: PremiseType;
   address: {
     streetAddress: string;
     streetAddressLine2?: string | null;
@@ -356,6 +364,8 @@ export interface UpdateBillingAddressRequest {
 export interface UpdateServiceLocationRequest {
   dispatchRegionId?: string;
   locationName?: string | null;
+  // Omit to preserve the existing value.
+  premiseType?: PremiseType;
   siteContactName?: string | null;
   siteContactPhone?: string | null;
   siteContactEmail?: string | null;
@@ -378,7 +388,9 @@ export const customerApi = {
     page?: number;     // 1-indexed for UI, converted to 0-indexed for API
     limit?: number;
     // Status is multi-value — caller passes the array of selected statuses
-    // from the StatusPickerChip. Backend default-excludes BILLING_ONLY.
+    // from the StatusPickerChip. Serialized as a single comma-separated
+    // value on the wire (?status=ACTIVE,INACTIVE) to match the BE contract.
+    // Backend default-excludes BILLING_ONLY; use /customers/payers for those.
     status?: Array<'ACTIVE' | 'INACTIVE'>;
     search?: string;
     sort?: string;     // e.g., "name,desc"
@@ -386,10 +398,13 @@ export const customerApi = {
     hasAgedBalance?: boolean;
     hasOpenJobs?: boolean;
   }): Promise<CustomerListResponse> => {
-    const apiParams: Record<string, string | string[] | number | boolean | undefined> = {
+    const apiParams: Record<string, string | number | boolean | undefined> = {
       page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
       limit: params?.limit,
-      status: params?.status && params.status.length > 0 ? params.status : undefined,
+      status:
+        params?.status && params.status.length > 0
+          ? params.status.join(',')
+          : undefined,
       search: params?.search,
       sort: params?.sort,
       hasOpenBalance: params?.hasOpenBalance || undefined,
@@ -500,7 +515,7 @@ export const customerApi = {
     page?: number;     // 1-indexed for UI
     limit?: number;
     // Status is multi-value — caller passes the array from StatusPickerChip
-    // (e.g. ['ACTIVE', 'INACTIVE']).
+    // (e.g. ['ACTIVE', 'INACTIVE']). Serialized comma-separated on the wire.
     status?: Array<'ACTIVE' | 'INACTIVE' | 'CLOSED'>;
     search?: string;
     dispatchRegionId?: string;
@@ -509,20 +524,24 @@ export const customerApi = {
     techOnSite?: boolean;
     hasOpenJobs?: boolean;
     pmOverdue?: boolean;
-    // premiseType filter is the new Business/Residence axis on Locations.
-    premiseType?: 'BUSINESS' | 'RESIDENCE';
+    // Premise filter is the Business/Residence axis on Locations.
+    // BE param name is `premise` (lowercase value).
+    premise?: 'business' | 'residence';
   }): Promise<ServiceLocationListResponse> => {
-    const apiParams: Record<string, string | string[] | number | boolean | undefined> = {
+    const apiParams: Record<string, string | number | boolean | undefined> = {
       page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
       limit: params?.limit,
-      status: params?.status && params.status.length > 0 ? params.status : undefined,
+      status:
+        params?.status && params.status.length > 0
+          ? params.status.join(',')
+          : undefined,
       search: params?.search,
       dispatchRegionId: params?.dispatchRegionId,
       sort: params?.sort,
       techOnSite: params?.techOnSite || undefined,
       hasOpenJobs: params?.hasOpenJobs || undefined,
       pmOverdue: params?.pmOverdue || undefined,
-      premiseType: params?.premiseType,
+      premise: params?.premise,
     };
     // Strip empty values so we don't send ?dispatchRegionId= etc.
     for (const key of Object.keys(apiParams)) {

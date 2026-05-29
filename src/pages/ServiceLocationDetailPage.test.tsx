@@ -12,7 +12,7 @@ const mockLocation: ServiceLocationDetailDto = {
   id: 'location-1',
   customerId: 'customer-1',
   customerName: 'Test Customer',
-  customerCategory: 'COMMERCIAL' as const,
+  premiseType: 'BUSINESS' as const,
   dispatchRegionId: 'region-1',
   locationName: 'Main Office',
   address: {
