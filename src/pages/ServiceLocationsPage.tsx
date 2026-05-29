@@ -354,6 +354,7 @@ export default function ServiceLocationsPage() {
             selected={statuses}
             onChange={(next) => updateFilters({ status: next as LocationStatusKey[] })}
             allLabel={t('serviceLocations.filter.all')}
+            allShortcutLabel={t('serviceLocations.filter.allStatuses')}
           />
           <FilterChipRow>
             <FilterChip
