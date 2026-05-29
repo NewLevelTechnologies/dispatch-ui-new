@@ -58,7 +58,7 @@ export default function QuotesPage() {
   const { data: customers = [] } = useQuery({
     queryKey: ['quote-form-customers'],
     queryFn: async () => {
-      const page = await customerApi.getAllPaginated({ limit: 200, status: 'ACTIVE' });
+      const page = await customerApi.getAllPaginated({ limit: 200, status: ['ACTIVE'] });
       return page.content;
     },
   });

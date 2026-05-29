@@ -44,7 +44,7 @@ export default function RecurringOrdersPage() {
   const { data: customers = [] } = useQuery({
     queryKey: ['recurring-orders-form-customers'],
     queryFn: async () => {
-      const page = await customerApi.getAllPaginated({ limit: 200, status: 'ACTIVE' });
+      const page = await customerApi.getAllPaginated({ limit: 200, status: ['ACTIVE'] });
       return page.content;
     },
   });

@@ -1,4 +1,4 @@
-import { useEffect, useState, useDeferredValue } from 'react';
+import { useEffect, useMemo, useState, useDeferredValue } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -16,8 +16,8 @@ import IconButton from '../components/IconButton';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
-import { CustomerTypeMark } from '../components/ui/CustomerTypeMark';
 import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
+import { StatusPickerChip } from '../components/ui/StatusPickerChip';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
@@ -31,10 +31,20 @@ import { ErrorState } from '../components/ui/ErrorState';
 // visible on a 1080p monitor without scrolling.
 const PAGE_SIZE = 50;
 
-type CategoryFilter = '' | 'COMMERCIAL' | 'RESIDENTIAL';
+type CustomerStatusKey = 'active' | 'inactive';
+const STATUS_KEYS: readonly CustomerStatusKey[] = ['active', 'inactive'] as const;
+const DEFAULT_STATUSES: CustomerStatusKey[] = ['active'];
 
-function readCategory(raw: string | null): CategoryFilter {
-  return raw === 'COMMERCIAL' || raw === 'RESIDENTIAL' ? raw : '';
+// Parse status multi-param. Default ['active'] when the URL has no status —
+// explicit default visible in the chip, not silent backend filtering. Any
+// unrecognized values are dropped; empty-after-filter falls back to default.
+function readStatuses(params: URLSearchParams): CustomerStatusKey[] {
+  const raw = params.getAll('status');
+  if (raw.length === 0) return DEFAULT_STATUSES;
+  const parsed = raw.filter((v): v is CustomerStatusKey =>
+    (STATUS_KEYS as readonly string[]).includes(v)
+  );
+  return parsed.length > 0 ? parsed : DEFAULT_STATUSES;
 }
 
 function readBool(raw: string | null): boolean {
@@ -50,11 +60,10 @@ export default function CustomersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
-  // URL-driven filter state (same pattern as UsersPage). Default values
-  // (page=1, no filter) are omitted from the URL to keep links clean.
+  // URL-driven filter state (same pattern as UsersPage).
   const urlSearch = searchParams.get('search') ?? '';
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-  const categoryFilter = readCategory(searchParams.get('category'));
+  const statuses = useMemo(() => readStatuses(searchParams), [searchParams]);
   const openBalanceFilter = readBool(searchParams.get('openBalance'));
   const openJobsFilter = readBool(searchParams.get('openJobs'));
   const agedFilter = readBool(searchParams.get('aged'));
@@ -73,7 +82,7 @@ export default function CustomersPage() {
   const updateFilters = (
     updates: {
       search?: string;
-      category?: CategoryFilter;
+      status?: CustomerStatusKey[];
       openBalance?: boolean;
       openJobs?: boolean;
       aged?: boolean;
@@ -82,17 +91,41 @@ export default function CustomersPage() {
     options: { replace?: boolean } = {}
   ) => {
     const next = new URLSearchParams(searchParams);
-    const setOrDelete = (key: string, value: string | undefined) => {
-      if (value) next.set(key, value);
-      else next.delete(key);
-      if (key !== 'page') next.delete('page');
-    };
+    const resetPage = () => next.delete('page');
 
-    if (updates.search !== undefined) setOrDelete('search', updates.search || undefined);
-    if (updates.category !== undefined) setOrDelete('category', updates.category || undefined);
-    if (updates.openBalance !== undefined) setOrDelete('openBalance', updates.openBalance ? 'true' : undefined);
-    if (updates.openJobs !== undefined) setOrDelete('openJobs', updates.openJobs ? 'true' : undefined);
-    if (updates.aged !== undefined) setOrDelete('aged', updates.aged ? 'true' : undefined);
+    if (updates.search !== undefined) {
+      if (updates.search) next.set('search', updates.search);
+      else next.delete('search');
+      resetPage();
+    }
+    if (updates.status !== undefined) {
+      next.delete('status');
+      // Default-active scope stays implicit in the URL; only persist when the
+      // selection diverges. Equal-length + same-members check is fine here
+      // since the set is tiny and order is canonical.
+      const isDefault =
+        updates.status.length === DEFAULT_STATUSES.length &&
+        updates.status.every((s) => DEFAULT_STATUSES.includes(s));
+      if (!isDefault) {
+        for (const s of updates.status) next.append('status', s);
+      }
+      resetPage();
+    }
+    if (updates.openBalance !== undefined) {
+      if (updates.openBalance) next.set('openBalance', 'true');
+      else next.delete('openBalance');
+      resetPage();
+    }
+    if (updates.openJobs !== undefined) {
+      if (updates.openJobs) next.set('openJobs', 'true');
+      else next.delete('openJobs');
+      resetPage();
+    }
+    if (updates.aged !== undefined) {
+      if (updates.aged) next.set('aged', 'true');
+      else next.delete('aged');
+      resetPage();
+    }
     if (updates.page !== undefined) {
       if (updates.page <= 1) next.delete('page');
       else next.set('page', String(updates.page));
@@ -108,12 +141,19 @@ export default function CustomersPage() {
     return qs ? `?${qs}` : '?';
   };
 
+  // Build the API status param: array of upper-case enum values, undefined
+  // when both statuses are selected (BE treats that as "no filter").
+  const apiStatuses = useMemo<Array<'ACTIVE' | 'INACTIVE'> | undefined>(() => {
+    if (statuses.length === STATUS_KEYS.length) return undefined;
+    return statuses.map((s) => s.toUpperCase() as 'ACTIVE' | 'INACTIVE');
+  }, [statuses]);
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
       'customers',
       page,
       deferredSearch,
-      categoryFilter,
+      statuses,
       openBalanceFilter,
       openJobsFilter,
       agedFilter,
@@ -122,7 +162,7 @@ export default function CustomersPage() {
       page,
       limit: PAGE_SIZE,
       search: deferredSearch || undefined,
-      category: categoryFilter || undefined,
+      status: apiStatuses,
       hasOpenBalance: openBalanceFilter || undefined,
       hasOpenJobs: openJobsFilter || undefined,
       hasAgedBalance: agedFilter || undefined,
@@ -170,8 +210,6 @@ export default function CustomersPage() {
     setSelectedCustomer(null);
   };
 
-  // Header subtitle uses server counts when available; falls back to the
-  // current page's total when the BE counts envelope hasn't landed yet.
   const headerTotal = counts?.total ?? totalCustomers;
   const headerActive = counts?.active;
   const customerNoun =
@@ -195,13 +233,23 @@ export default function CustomersPage() {
     );
   })();
 
+  // Whether the current view diverges from the defaults (search, non-active
+  // status scope, or any boolean chip). Drives the two-flavor empty state.
+  const statusesAreDefault =
+    statuses.length === DEFAULT_STATUSES.length &&
+    statuses.every((s) => DEFAULT_STATUSES.includes(s));
   const hasFilters = Boolean(
-    deferredSearch || categoryFilter || openBalanceFilter || openJobsFilter || agedFilter
+    deferredSearch || !statusesAreDefault || openBalanceFilter || openJobsFilter || agedFilter
   );
   const clearFilters = () => {
     setSearchQuery('');
     setSearchParams(new URLSearchParams(), { replace: false });
   };
+
+  const statusOptions = [
+    { id: 'active', label: t('customers.filter.statusActive'), count: counts?.active },
+    { id: 'inactive', label: t('customers.filter.statusInactive'), count: counts?.inactive },
+  ];
 
   return (
     <AppLayout>
@@ -230,27 +278,14 @@ export default function CustomersPage() {
             />
           }
         >
+          <StatusPickerChip
+            label={t('customers.filter.status')}
+            options={statusOptions}
+            selected={statuses}
+            onChange={(next) => updateFilters({ status: next as CustomerStatusKey[] })}
+            allLabel={t('customers.filter.all')}
+          />
           <FilterChipRow>
-            <FilterChip
-              label={t('customers.filter.commercial')}
-              count={counts?.commercial}
-              active={categoryFilter === 'COMMERCIAL'}
-              onToggle={() =>
-                updateFilters({
-                  category: categoryFilter === 'COMMERCIAL' ? '' : 'COMMERCIAL',
-                })
-              }
-            />
-            <FilterChip
-              label={t('customers.filter.residential')}
-              count={counts?.residential}
-              active={categoryFilter === 'RESIDENTIAL'}
-              onToggle={() =>
-                updateFilters({
-                  category: categoryFilter === 'RESIDENTIAL' ? '' : 'RESIDENTIAL',
-                })
-              }
-            />
             <FilterChip
               label={t('customers.filter.openBalance')}
               count={counts?.openBalance}
@@ -330,12 +365,11 @@ export default function CustomersPage() {
                   </DenseTHead>
                   <tbody>
                     {customers.map((customer) => {
-                      const category =
-                        customer.category === 'RESIDENTIAL' ? 'RESIDENTIAL' : 'COMMERCIAL';
+                      const isInactive = customer.status === 'INACTIVE';
                       return (
                         <DenseRow
                           key={customer.id}
-                          className="cursor-pointer"
+                          className={`cursor-pointer ${isInactive ? 'opacity-55' : ''}`}
                           onClick={(e: React.MouseEvent) => {
                             const target = e.target as HTMLElement;
                             if (target.closest('[role="menu"]') || target.closest('button[aria-label]') || target.closest('a')) return;
@@ -343,28 +377,33 @@ export default function CustomersPage() {
                           }}
                         >
                           <td>
-                            <div className="flex items-center gap-2">
-                              <CustomerTypeMark category={category} />
-                              <CellStack>
-                                <CellTop>
-                                  <span className="font-semibold text-fg-strong">{customer.name}</span>
-                                  {customer.hasAgedBalance && (
-                                    <Pill
-                                      tone="warning"
-                                      className="ml-1.5 align-middle text-[9.5px] font-bold uppercase tracking-[0.04em]"
-                                      title={t('customers.agedBadgeAria')}
-                                    >
-                                      {t('customers.agedBadge')}
-                                    </Pill>
-                                  )}
-                                </CellTop>
-                                <CellSub>
-                                  {customer.serviceLocationCount > 1
-                                    ? t('customers.table.locationsCount', { count: customer.serviceLocationCount })
-                                    : null}
-                                </CellSub>
-                              </CellStack>
-                            </div>
+                            <CellStack>
+                              <CellTop>
+                                <span className="font-semibold text-fg-strong">{customer.name}</span>
+                                {customer.hasAgedBalance && (
+                                  <Pill
+                                    tone="warning"
+                                    className="ml-1.5 align-middle text-[9.5px] font-bold uppercase tracking-[0.04em]"
+                                    title={t('customers.agedBadgeAria')}
+                                  >
+                                    {t('customers.agedBadge')}
+                                  </Pill>
+                                )}
+                                {isInactive && (
+                                  <Pill
+                                    tone="neutral"
+                                    className="ml-1.5 align-middle text-[9.5px] font-bold uppercase tracking-[0.04em]"
+                                  >
+                                    {t('customers.inactiveBadge')}
+                                  </Pill>
+                                )}
+                              </CellTop>
+                              <CellSub>
+                                {customer.serviceLocationCount > 1
+                                  ? t('customers.table.locationsCount', { count: customer.serviceLocationCount })
+                                  : null}
+                              </CellSub>
+                            </CellStack>
                           </td>
                           <td>
                             <CellStack>

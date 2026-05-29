@@ -450,26 +450,9 @@ describe('CustomersPage', () => {
     expect(searchInput).toHaveValue('NonExistent');
   });
 
-  it('displays commercial type mark for COMMERCIAL category', async () => {
-    const businessCustomer = {
-      ...mockCustomersListResponse,
-      content: [{
-        ...mockCustomersListResponse.content[0],
-        category: 'COMMERCIAL' as const,
-      }],
-    };
-
-    vi.mocked(apiClient.get).mockResolvedValue({ data: businessCustomer });
-
-    renderWithProviders(<CustomersPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
-    });
-
-    const mark = screen.getByTitle('Commercial');
-    expect(mark).toBeInTheDocument();
-  });
+  // The customer row no longer renders a residential/commercial glyph — the
+  // honest model has premise type per location, not per customer. The mark
+  // moved to the Locations list as PremiseMark and is tested there.
 
   it('displays billing address', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomersListResponse });

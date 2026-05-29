@@ -61,7 +61,7 @@ export default function InvoicesPage() {
   const { data: customers = [] } = useQuery({
     queryKey: ['invoice-form-customers'],
     queryFn: async () => {
-      const page = await customerApi.getAllPaginated({ limit: 200, status: 'ACTIVE' });
+      const page = await customerApi.getAllPaginated({ limit: 200, status: ['ACTIVE'] });
       return page.content;
     },
   });

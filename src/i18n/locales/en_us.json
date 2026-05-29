@@ -300,12 +300,15 @@
     },
     "filter": {
       "aged": "91+ aged",
+      "all": "All",
       "allStatuses": "All Statuses",
-      "commercial": "Commercial",
       "openBalance": "Open balance",
       "openJobs": "Open jobs",
-      "residential": "Residential"
+      "status": "Status",
+      "statusActive": "Active",
+      "statusInactive": "Inactive"
     },
+    "inactiveBadge": "Inactive",
     "search": {
       "placeholder": "Search by name, address, phone, contact…"
     },
@@ -475,15 +478,19 @@
       "uspsValidated": "USPS Validated"
     },
     "filter": {
+      "all": "All",
       "allRegions": "All regions",
       "allStatuses": "All statuses",
-      "commercial": "Commercial",
-      "inactive": "Inactive",
+      "business": "Business",
       "live": "Tech on site",
       "openJobs": "Open jobs",
       "overdue": "Visit overdue",
       "region": "Region",
-      "residential": "Residential"
+      "residence": "Residence",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusClosed": "Closed",
+      "statusInactive": "Inactive"
     },
     "search": {
       "placeholder": "Search by address, customer, contact, phone…"
