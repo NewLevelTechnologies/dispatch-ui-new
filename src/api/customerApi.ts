@@ -412,7 +412,7 @@ export const customerApi = {
       sort: params?.sort,
       hasOpenBalance: params?.hasOpenBalance || undefined,
       hasAgedBalance: params?.hasAgedBalance || undefined,
-      hasOpenJobs: params?.hasOpenJobs || undefined,
+      openJobs: params?.hasOpenJobs || undefined,
       tags:
         params?.tagIds && params.tagIds.length > 0
           ? params.tagIds.join(',')
@@ -550,7 +550,7 @@ export const customerApi = {
       dispatchRegionId: params?.dispatchRegionId,
       sort: params?.sort,
       live: params?.live || undefined,
-      hasOpenJobs: params?.hasOpenJobs || undefined,
+      openJobs: params?.hasOpenJobs || undefined,
       pmOverdue: params?.pmOverdue || undefined,
       premise: params?.premise,
       tags:
