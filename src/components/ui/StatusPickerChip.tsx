@@ -1,18 +1,22 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// StatusPickerChip — multi-select chevron picker for scoping a list by status.
+// StatusPickerChip — single-select chevron picker with an "All" shortcut.
 //
-// A record has exactly one status; a multi-select picker models "which statuses
-// to include in the view." Defaulting to ['active'] is the right scope for both
-// list pages — but it must be *visible*, not silent, otherwise users hit "why
-// can't I find the inactive record I know exists." The chip readout always
-// shows the explicit selection (`Status: Active`, `Status: Active +1`, etc.).
+// A record has exactly one status; the list view scopes to one status at a
+// time or all of them. The picker exposes that directly:
 //
-// Never-empty: deselecting the last option re-selects it. The picker is a
-// scope choice, not an on/off toggle — an empty scope is meaningless here.
+//   - Each status row is a single-pick option (radio-style ✓ on the selected
+//     row). Picking one replaces the scope and closes the popover.
+//   - An "All …" shortcut at the bottom of the popover. One click switches
+//     the view to every status. One click on a single row switches it back.
 //
-// The chevron affordance matches FilterChipListbox: full-weight label + `▾`,
-// never a muted `+`. Selected state uses the accent tint identical to the
-// listbox shell so the two chip styles read as siblings.
+// Defaulting to ['active'] is the right scope for both list pages — but it
+// must be *visible*, not silent, otherwise users hit "why can't I find the
+// inactive record I know exists." The chip readout always shows the explicit
+// selection (`Status: Active`, `Status: All`).
+//
+// Wire shape stays array-based for callers — single pick is `[id]`, "All" is
+// every option's id — so the consumer pages (CustomersPage,
+// ServiceLocationsPage) and the URL serialization don't need to change.
 //
 //   <StatusPickerChip
 //     label="Status"
@@ -30,6 +34,10 @@ import clsx from 'clsx';
 
 type Option = { id: string; label: string; count?: number };
 
+// Sentinel for the "All" row inside Headless.Listbox. The consumer never
+// sees it — onChange maps it back to the full option-id array.
+const ALL_SENTINEL = '__all__';
+
 export function StatusPickerChip({
   label = 'Status',
   ariaLabel,
@@ -37,37 +45,46 @@ export function StatusPickerChip({
   selected,
   onChange,
   allLabel = 'All',
+  allShortcutLabel,
 }: {
   label?: string;
   ariaLabel?: string;
   options: Option[];
   selected: string[];
   onChange: (next: string[]) => void;
-  /** Label used when every option is selected (default "All"). */
+  /** Concise label shown in the chip when every option is selected. Default "All". */
   allLabel?: string;
+  /** Descriptive label for the "All …" shortcut row at the bottom of the popover. Defaults to `allLabel`. */
+  allShortcutLabel?: string;
 }) {
-  // Format the chip readout. Order follows the canonical `options` order so
-  // the headline label is stable regardless of pick order.
+  const allRowLabel = allShortcutLabel ?? allLabel;
+  const allSelected = selected.length === options.length;
   const ordered = options.filter((o) => selected.includes(o.id));
-  const display =
-    ordered.length === options.length
-      ? allLabel
-      : ordered.length === 1
-        ? ordered[0].label
-        : ordered.length > 1
-          ? `${ordered[0].label} +${ordered.length - 1}`
-          : allLabel; // shouldn't happen — never-empty guard below — but render sanely if it does
+  // Chip readout. The +N fallback only fires if somebody hand-edits the URL
+  // to a partial-multi state — the picker UI itself can't reach it anymore.
+  const display = allSelected
+    ? allLabel
+    : ordered.length === 1
+      ? ordered[0].label
+      : ordered.length > 1
+        ? `${ordered[0].label} +${ordered.length - 1}`
+        : allLabel;
+
+  // Headless.Listbox in single-select mode wants a single value. Map "all"
+  // → sentinel; otherwise the first ordered id (with a defensive fallback).
+  const listboxValue: string = allSelected
+    ? ALL_SENTINEL
+    : ordered[0]?.id ?? ALL_SENTINEL;
 
   return (
     <Headless.Listbox
-      multiple
-      value={selected}
-      onChange={(next: string[]) => {
-        // Never empty — a status picker with no scope is meaningless. If the
-        // user just deselected the only remaining option, keep that one
-        // selected.
-        if (next.length === 0) return;
-        onChange(next);
+      value={listboxValue}
+      onChange={(next: string) => {
+        if (next === ALL_SENTINEL) {
+          onChange(options.map((o) => o.id));
+        } else {
+          onChange([next]);
+        }
       }}
     >
       <span
@@ -109,8 +126,9 @@ export function StatusPickerChip({
               'data-selected:bg-bg-active'
             )}
           >
-            {/* Checkmark on the left, identical visual treatment to
-                FilterChipListbox so the two pickers read as one family. */}
+            {/* Single-select ✓ — appears on the currently scoped row. Same
+                visual as FilterChipListbox so the two pickers read as one
+                family; the difference is behavioral (closes on pick). */}
             <svg
               className="size-4 stroke-current text-accent-600 opacity-0 group-data-selected/option:opacity-100"
               viewBox="0 0 16 16"
@@ -132,6 +150,35 @@ export function StatusPickerChip({
             )}
           </Headless.ListboxOption>
         ))}
+        {/* "All …" shortcut row — separated by a soft divider so the user
+            reads it as a meta-action rather than a sibling of the real
+            statuses. Same data-selected styling so the ✓ marks it when
+            every row is in scope. */}
+        <Headless.ListboxOption
+          value={ALL_SENTINEL}
+          className={clsx(
+            'group/option mt-1 grid w-full cursor-default grid-cols-[16px_1fr] items-center gap-2 rounded-md px-3 py-2',
+            'border-t border-border-soft pt-2',
+            'text-[13px] text-fg-muted outline-none',
+            'data-focus:bg-bg-hover',
+            'data-selected:bg-bg-active'
+          )}
+        >
+          <svg
+            className="size-4 stroke-current text-accent-600 opacity-0 group-data-selected/option:opacity-100"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M4 8.5l3 3L12 4"
+              strokeWidth={1.75}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="min-w-0 truncate">{allRowLabel}</span>
+        </Headless.ListboxOption>
       </Headless.ListboxOptions>
     </Headless.Listbox>
   );

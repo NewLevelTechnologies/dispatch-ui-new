@@ -284,6 +284,7 @@ export default function CustomersPage() {
             selected={statuses}
             onChange={(next) => updateFilters({ status: next as CustomerStatusKey[] })}
             allLabel={t('customers.filter.all')}
+            allShortcutLabel={t('customers.filter.allStatuses')}
           />
           <FilterChipRow>
             <FilterChip
