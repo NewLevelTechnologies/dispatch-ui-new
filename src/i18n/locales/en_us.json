@@ -306,7 +306,8 @@
       "openJobs": "Open jobs",
       "status": "Status",
       "statusActive": "Active",
-      "statusInactive": "Inactive"
+      "statusInactive": "Inactive",
+      "tags": "Tags"
     },
     "inactiveBadge": "Inactive",
     "search": {
@@ -490,7 +491,8 @@
       "status": "Status",
       "statusActive": "Active",
       "statusClosed": "Closed",
-      "statusInactive": "Inactive"
+      "statusInactive": "Inactive",
+      "tags": "Tags"
     },
     "search": {
       "placeholder": "Search by address, customer, contact, phone…"

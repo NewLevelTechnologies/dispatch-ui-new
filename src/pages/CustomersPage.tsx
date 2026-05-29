@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, UserGroupIcon } from '@heroicons/react/24/outline';
-import { customerApi, type Customer, type TagSummary } from '../api';
+import { customerApi, tagApi, type Customer, type TagSummary } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
@@ -17,6 +17,7 @@ import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
 import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { StatusPickerChip } from '../components/ui/StatusPickerChip';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
@@ -51,6 +52,20 @@ function readBool(raw: string | null): boolean {
   return raw === 'true' || raw === '1';
 }
 
+// Tag chip display: name for 1, "name1, name2" for 2, "N selected" for 3+.
+// Same pattern as WorkOrdersPage's multi-select filter chips.
+function formatTagDisplayValue(
+  ids: string[],
+  list: { id: string; name: string }[],
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string | null {
+  if (ids.length === 0) return null;
+  const lookup = (id: string) => list.find((x) => x.id === id)?.name ?? id;
+  if (ids.length === 1) return lookup(ids[0]);
+  if (ids.length === 2) return ids.map(lookup).join(', ');
+  return t('common.selectedCount', { count: ids.length });
+}
+
 export default function CustomersPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -67,6 +82,10 @@ export default function CustomersPage() {
   const openBalanceFilter = readBool(searchParams.get('openBalance'));
   const openJobsFilter = readBool(searchParams.get('openJobs'));
   const agedFilter = readBool(searchParams.get('aged'));
+  // Tag filter ids — URL writes repeated `?tag=uuid` params; the API serializes
+  // to comma-separated `?tags=uuid1,uuid2` on the wire. getAll() returns a fresh
+  // array each call, so memoize to keep the query key stable across renders.
+  const tagIds = useMemo(() => searchParams.getAll('tag'), [searchParams]);
 
   // Local input mirrors the URL but lets typing feel instant.
   const [searchQuery, setSearchQuery] = useState(urlSearch);
@@ -86,6 +105,7 @@ export default function CustomersPage() {
       openBalance?: boolean;
       openJobs?: boolean;
       aged?: boolean;
+      tag?: string[];
       page?: number;
     },
     options: { replace?: boolean } = {}
@@ -126,6 +146,11 @@ export default function CustomersPage() {
       else next.delete('aged');
       resetPage();
     }
+    if (updates.tag !== undefined) {
+      next.delete('tag');
+      for (const id of updates.tag) next.append('tag', id);
+      resetPage();
+    }
     if (updates.page !== undefined) {
       if (updates.page <= 1) next.delete('page');
       else next.set('page', String(updates.page));
@@ -148,6 +173,13 @@ export default function CustomersPage() {
     return statuses.map((s) => s.toUpperCase() as 'ACTIVE' | 'INACTIVE');
   }, [statuses]);
 
+  // Tag list for the filter picker. Tenants typically have <50 tags (hard cap
+  // 200), so a single load + client-side filtering in the picker is fine.
+  const { data: tags } = useQuery({
+    queryKey: ['tags'],
+    queryFn: () => tagApi.getAll(),
+  });
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
       'customers',
@@ -157,6 +189,7 @@ export default function CustomersPage() {
       openBalanceFilter,
       openJobsFilter,
       agedFilter,
+      tagIds,
     ],
     queryFn: () => customerApi.getAllPaginated({
       page,
@@ -166,6 +199,7 @@ export default function CustomersPage() {
       hasOpenBalance: openBalanceFilter || undefined,
       hasOpenJobs: openJobsFilter || undefined,
       hasAgedBalance: agedFilter || undefined,
+      tagIds: tagIds.length > 0 ? tagIds : undefined,
     }),
   });
 
@@ -239,7 +273,7 @@ export default function CustomersPage() {
     statuses.length === DEFAULT_STATUSES.length &&
     statuses.every((s) => DEFAULT_STATUSES.includes(s));
   const hasFilters = Boolean(
-    deferredSearch || !statusesAreDefault || openBalanceFilter || openJobsFilter || agedFilter
+    deferredSearch || !statusesAreDefault || openBalanceFilter || openJobsFilter || agedFilter || tagIds.length > 0
   );
   const clearFilters = () => {
     setSearchQuery('');
@@ -307,6 +341,30 @@ export default function CustomersPage() {
               active={agedFilter}
               onToggle={() => updateFilters({ aged: !agedFilter })}
             />
+            {(tags?.length ?? 0) > 0 && (
+              <FilterChipListbox
+                multiple
+                label={t('customers.filter.tags')}
+                ariaLabel={t('customers.filter.tags')}
+                value={tagIds}
+                displayValue={formatTagDisplayValue(tagIds, tags ?? [], t)}
+                onChange={(ids) => updateFilters({ tag: ids })}
+                onClear={() => updateFilters({ tag: [] })}
+              >
+                {(tags ?? []).map((tag) => (
+                  <ChipListboxOption key={tag.id} value={tag.id}>
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className="size-2 rounded-full"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      {tag.name}
+                    </span>
+                  </ChipListboxOption>
+                ))}
+              </FilterChipListbox>
+            )}
           </FilterChipRow>
         </ListToolbar>
 

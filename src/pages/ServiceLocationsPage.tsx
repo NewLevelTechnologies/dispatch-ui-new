@@ -6,6 +6,7 @@ import { EllipsisVerticalIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import {
   customerApi,
   dispatchRegionApi,
+  tagApi,
   type ServiceLocation,
   type TagSummary,
   type PremiseType,
@@ -62,6 +63,20 @@ function readBool(raw: string | null): boolean {
   return raw === 'true' || raw === '1';
 }
 
+// Tag chip display: name for 1, "name1, name2" for 2, "N selected" for 3+.
+// Same pattern as the customers page + WorkOrdersPage filter chips.
+function formatTagDisplayValue(
+  ids: string[],
+  list: { id: string; name: string }[],
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string | null {
+  if (ids.length === 0) return null;
+  const lookup = (id: string) => list.find((x) => x.id === id)?.name ?? id;
+  if (ids.length === 1) return lookup(ids[0]);
+  if (ids.length === 2) return ids.map(lookup).join(', ');
+  return t('common.selectedCount', { count: ids.length });
+}
+
 // Compact "last service" — Today / Yest / 3d / 2w / 6mo / 2y. Different scale
 // than utils/formatRelativeTime (which targets minute/hour resolution); this
 // one is for a column where day-week-month granularity is what a CSR scans.
@@ -97,6 +112,9 @@ export default function ServiceLocationsPage() {
   const liveFilter = readBool(searchParams.get('live'));
   const openJobsFilter = readBool(searchParams.get('openJobs'));
   const overdueFilter = readBool(searchParams.get('overdue'));
+  // Tag filter ids — URL writes repeated `?tag=uuid`; API serializes to
+  // comma-separated `?tags=uuid1,uuid2` on the wire.
+  const tagIds = useMemo(() => searchParams.getAll('tag'), [searchParams]);
 
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   useEffect(() => {
@@ -109,6 +127,13 @@ export default function ServiceLocationsPage() {
     queryFn: () => dispatchRegionApi.getAll(),
   });
   const activeRegions = (Array.isArray(regions) ? regions : []).filter((r) => r.isActive !== false);
+
+  // Tenant tag list — typically <50 tags, so a single load + client-side
+  // filtering in the picker is fine. Shared cache key with CustomersPage.
+  const { data: tags } = useQuery({
+    queryKey: ['tags'],
+    queryFn: () => tagApi.getAll(),
+  });
 
   const canAddServiceLocations = useHasCapability('ADD_SERVICE_LOCATIONS');
   const canEditServiceLocations = useHasCapability('EDIT_SERVICE_LOCATIONS');
@@ -123,6 +148,7 @@ export default function ServiceLocationsPage() {
       live?: boolean;
       openJobs?: boolean;
       overdue?: boolean;
+      tag?: string[];
       page?: number;
     },
     options: { replace?: boolean } = {}
@@ -170,6 +196,11 @@ export default function ServiceLocationsPage() {
       else next.delete('overdue');
       resetPage();
     }
+    if (updates.tag !== undefined) {
+      next.delete('tag');
+      for (const id of updates.tag) next.append('tag', id);
+      resetPage();
+    }
     if (updates.page !== undefined) {
       if (updates.page <= 1) next.delete('page');
       else next.set('page', String(updates.page));
@@ -206,6 +237,7 @@ export default function ServiceLocationsPage() {
       liveFilter,
       openJobsFilter,
       overdueFilter,
+      tagIds,
     ],
     queryFn: () => customerApi.getAllServiceLocationsPaginated({
       page,
@@ -217,6 +249,7 @@ export default function ServiceLocationsPage() {
       live: liveFilter || undefined,
       hasOpenJobs: openJobsFilter || undefined,
       pmOverdue: overdueFilter || undefined,
+      tagIds: tagIds.length > 0 ? tagIds : undefined,
     }),
   });
 
@@ -308,7 +341,7 @@ export default function ServiceLocationsPage() {
     statuses.every((s) => DEFAULT_STATUSES.includes(s));
   const hasFilters = Boolean(
     deferredSearch || regionId || !statusesAreDefault || premiseFilter
-    || liveFilter || openJobsFilter || overdueFilter
+    || liveFilter || openJobsFilter || overdueFilter || tagIds.length > 0
   );
   const clearFilters = () => {
     setSearchQuery('');
@@ -394,6 +427,30 @@ export default function ServiceLocationsPage() {
                 updateFilters({ premise: premiseFilter === 'residence' ? '' : 'residence' })
               }
             />
+            {(tags?.length ?? 0) > 0 && (
+              <FilterChipListbox
+                multiple
+                label={t('serviceLocations.filter.tags')}
+                ariaLabel={t('serviceLocations.filter.tags')}
+                value={tagIds}
+                displayValue={formatTagDisplayValue(tagIds, tags ?? [], t)}
+                onChange={(ids) => updateFilters({ tag: ids })}
+                onClear={() => updateFilters({ tag: [] })}
+              >
+                {(tags ?? []).map((tag) => (
+                  <ChipListboxOption key={tag.id} value={tag.id}>
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className="size-2 rounded-full"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      {tag.name}
+                    </span>
+                  </ChipListboxOption>
+                ))}
+              </FilterChipListbox>
+            )}
           </FilterChipRow>
           {activeRegions.length > 0 && (
             <FilterChipListbox
