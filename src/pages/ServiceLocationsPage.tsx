@@ -1,9 +1,15 @@
-import { useEffect, useState, useDeferredValue } from 'react';
+import { useEffect, useMemo, useState, useDeferredValue } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MapPinIcon } from '@heroicons/react/24/outline';
-import { customerApi, dispatchRegionApi, type ServiceLocation, type TagSummary } from '../api';
+import {
+  customerApi,
+  dispatchRegionApi,
+  type ServiceLocation,
+  type TagSummary,
+  type PremiseType,
+} from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
@@ -15,7 +21,9 @@ import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
-import { CustomerTypeMark } from '../components/ui/CustomerTypeMark';
+import { PremiseMark } from '../components/ui/PremiseMark';
+import { StatusIndicator } from '../components/ui/StatusIndicator';
+import { StatusPickerChip } from '../components/ui/StatusPickerChip';
 import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
@@ -31,10 +39,23 @@ import { ErrorState } from '../components/ui/ErrorState';
 
 const PAGE_SIZE = 50;
 
-type CategoryFilter = '' | 'COMMERCIAL' | 'RESIDENTIAL';
+type LocationStatusKey = 'active' | 'inactive' | 'closed';
+const STATUS_KEYS: readonly LocationStatusKey[] = ['active', 'inactive', 'closed'] as const;
+const DEFAULT_STATUSES: LocationStatusKey[] = ['active'];
 
-function readCategory(raw: string | null): CategoryFilter {
-  return raw === 'COMMERCIAL' || raw === 'RESIDENTIAL' ? raw : '';
+type PremiseFilter = '' | 'business' | 'residence';
+
+function readStatuses(params: URLSearchParams): LocationStatusKey[] {
+  const raw = params.getAll('status');
+  if (raw.length === 0) return DEFAULT_STATUSES;
+  const parsed = raw.filter((v): v is LocationStatusKey =>
+    (STATUS_KEYS as readonly string[]).includes(v)
+  );
+  return parsed.length > 0 ? parsed : DEFAULT_STATUSES;
+}
+
+function readPremise(raw: string | null): PremiseFilter {
+  return raw === 'business' || raw === 'residence' ? raw : '';
 }
 
 function readBool(raw: string | null): boolean {
@@ -71,11 +92,11 @@ export default function ServiceLocationsPage() {
   const urlSearch = searchParams.get('search') ?? '';
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const regionId = searchParams.get('region') ?? '';
-  const categoryFilter = readCategory(searchParams.get('category'));
+  const statuses = useMemo(() => readStatuses(searchParams), [searchParams]);
+  const premiseFilter = readPremise(searchParams.get('premise'));
   const liveFilter = readBool(searchParams.get('live'));
   const openJobsFilter = readBool(searchParams.get('openJobs'));
   const overdueFilter = readBool(searchParams.get('overdue'));
-  const inactiveFilter = readBool(searchParams.get('inactive'));
 
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   useEffect(() => {
@@ -97,29 +118,58 @@ export default function ServiceLocationsPage() {
     updates: {
       search?: string;
       region?: string;
-      category?: CategoryFilter;
+      status?: LocationStatusKey[];
+      premise?: PremiseFilter;
       live?: boolean;
       openJobs?: boolean;
       overdue?: boolean;
-      inactive?: boolean;
       page?: number;
     },
     options: { replace?: boolean } = {}
   ) => {
     const next = new URLSearchParams(searchParams);
-    const setOrDelete = (key: string, value: string | undefined) => {
-      if (value) next.set(key, value);
-      else next.delete(key);
-      if (key !== 'page') next.delete('page');
-    };
+    const resetPage = () => next.delete('page');
 
-    if (updates.search !== undefined) setOrDelete('search', updates.search || undefined);
-    if (updates.region !== undefined) setOrDelete('region', updates.region || undefined);
-    if (updates.category !== undefined) setOrDelete('category', updates.category || undefined);
-    if (updates.live !== undefined) setOrDelete('live', updates.live ? 'true' : undefined);
-    if (updates.openJobs !== undefined) setOrDelete('openJobs', updates.openJobs ? 'true' : undefined);
-    if (updates.overdue !== undefined) setOrDelete('overdue', updates.overdue ? 'true' : undefined);
-    if (updates.inactive !== undefined) setOrDelete('inactive', updates.inactive ? 'true' : undefined);
+    if (updates.search !== undefined) {
+      if (updates.search) next.set('search', updates.search);
+      else next.delete('search');
+      resetPage();
+    }
+    if (updates.region !== undefined) {
+      if (updates.region) next.set('region', updates.region);
+      else next.delete('region');
+      resetPage();
+    }
+    if (updates.status !== undefined) {
+      next.delete('status');
+      const isDefault =
+        updates.status.length === DEFAULT_STATUSES.length &&
+        updates.status.every((s) => DEFAULT_STATUSES.includes(s));
+      if (!isDefault) {
+        for (const s of updates.status) next.append('status', s);
+      }
+      resetPage();
+    }
+    if (updates.premise !== undefined) {
+      if (updates.premise) next.set('premise', updates.premise);
+      else next.delete('premise');
+      resetPage();
+    }
+    if (updates.live !== undefined) {
+      if (updates.live) next.set('live', 'true');
+      else next.delete('live');
+      resetPage();
+    }
+    if (updates.openJobs !== undefined) {
+      if (updates.openJobs) next.set('openJobs', 'true');
+      else next.delete('openJobs');
+      resetPage();
+    }
+    if (updates.overdue !== undefined) {
+      if (updates.overdue) next.set('overdue', 'true');
+      else next.delete('overdue');
+      resetPage();
+    }
     if (updates.page !== undefined) {
       if (updates.page <= 1) next.delete('page');
       else next.set('page', String(updates.page));
@@ -135,31 +185,38 @@ export default function ServiceLocationsPage() {
     return qs ? `?${qs}` : '?';
   };
 
+  const apiStatuses = useMemo<Array<'ACTIVE' | 'INACTIVE' | 'CLOSED'> | undefined>(() => {
+    if (statuses.length === STATUS_KEYS.length) return undefined;
+    return statuses.map((s) => s.toUpperCase() as 'ACTIVE' | 'INACTIVE' | 'CLOSED');
+  }, [statuses]);
+
+  const apiPremise: PremiseType | undefined =
+    premiseFilter === 'business' ? 'BUSINESS'
+    : premiseFilter === 'residence' ? 'RESIDENCE'
+    : undefined;
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
       'service-locations',
       page,
       deferredSearch,
       regionId,
-      categoryFilter,
+      statuses,
+      premiseFilter,
       liveFilter,
       openJobsFilter,
       overdueFilter,
-      inactiveFilter,
     ],
     queryFn: () => customerApi.getAllServiceLocationsPaginated({
       page,
       limit: PAGE_SIZE,
       search: deferredSearch || undefined,
       dispatchRegionId: regionId || undefined,
-      category: categoryFilter || undefined,
+      status: apiStatuses,
+      premiseType: apiPremise,
       techOnSite: liveFilter || undefined,
       hasOpenJobs: openJobsFilter || undefined,
       pmOverdue: overdueFilter || undefined,
-      // Inactive chip narrows to status=INACTIVE only; the default view keeps
-      // showing ACTIVE rows alongside closed/inactive ones until BE adds a
-      // dedicated "exclude closed by default" toggle.
-      status: inactiveFilter ? 'INACTIVE' : undefined,
     }),
   });
 
@@ -246,14 +303,23 @@ export default function ServiceLocationsPage() {
     return parts.join(' · ');
   })();
 
+  const statusesAreDefault =
+    statuses.length === DEFAULT_STATUSES.length &&
+    statuses.every((s) => DEFAULT_STATUSES.includes(s));
   const hasFilters = Boolean(
-    deferredSearch || regionId || categoryFilter
-    || liveFilter || openJobsFilter || overdueFilter || inactiveFilter
+    deferredSearch || regionId || !statusesAreDefault || premiseFilter
+    || liveFilter || openJobsFilter || overdueFilter
   );
   const clearFilters = () => {
     setSearchQuery('');
     setSearchParams(new URLSearchParams(), { replace: false });
   };
+
+  const statusOptions = [
+    { id: 'active', label: t('serviceLocations.filter.statusActive'), count: counts?.active },
+    { id: 'inactive', label: t('serviceLocations.filter.statusInactive'), count: counts?.inactive },
+    { id: 'closed', label: t('serviceLocations.filter.statusClosed'), count: counts?.closed },
+  ];
 
   return (
     <AppLayout>
@@ -282,6 +348,13 @@ export default function ServiceLocationsPage() {
             />
           }
         >
+          <StatusPickerChip
+            label={t('serviceLocations.filter.status')}
+            options={statusOptions}
+            selected={statuses}
+            onChange={(next) => updateFilters({ status: next as LocationStatusKey[] })}
+            allLabel={t('serviceLocations.filter.all')}
+          />
           <FilterChipRow>
             <FilterChip
               label={t('serviceLocations.filter.live')}
@@ -305,29 +378,19 @@ export default function ServiceLocationsPage() {
               onToggle={() => updateFilters({ overdue: !overdueFilter })}
             />
             <FilterChip
-              label={t('serviceLocations.filter.inactive')}
-              count={counts?.inactive}
-              active={inactiveFilter}
-              onToggle={() => updateFilters({ inactive: !inactiveFilter })}
-            />
-            <FilterChip
-              label={t('serviceLocations.filter.commercial')}
-              count={counts?.commercial}
-              active={categoryFilter === 'COMMERCIAL'}
+              label={t('serviceLocations.filter.business')}
+              count={counts?.business}
+              active={premiseFilter === 'business'}
               onToggle={() =>
-                updateFilters({
-                  category: categoryFilter === 'COMMERCIAL' ? '' : 'COMMERCIAL',
-                })
+                updateFilters({ premise: premiseFilter === 'business' ? '' : 'business' })
               }
             />
             <FilterChip
-              label={t('serviceLocations.filter.residential')}
-              count={counts?.residential}
-              active={categoryFilter === 'RESIDENTIAL'}
+              label={t('serviceLocations.filter.residence')}
+              count={counts?.residence}
+              active={premiseFilter === 'residence'}
               onToggle={() =>
-                updateFilters({
-                  category: categoryFilter === 'RESIDENTIAL' ? '' : 'RESIDENTIAL',
-                })
+                updateFilters({ premise: premiseFilter === 'residence' ? '' : 'residence' })
               }
             />
           </FilterChipRow>
@@ -405,12 +468,15 @@ export default function ServiceLocationsPage() {
                   </DenseTHead>
                   <tbody>
                     {locations.map((location) => {
-                      const category =
-                        location.customerCategory === 'RESIDENTIAL' ? 'RESIDENTIAL' : 'COMMERCIAL';
-                      // Name-led for both types. Commercial locations have an
-                      // org-assigned label; residential locations borrow the
-                      // owning customer's name as the headline. The address
-                      // is supporting info either way.
+                      // Premise drives the glyph. Default to BUSINESS when the
+                      // field is missing (BE migration still in flight) — the
+                      // visual remains stable across the rollout window.
+                      const premise: PremiseType =
+                        location.premiseType === 'RESIDENCE' ? 'RESIDENCE' : 'BUSINESS';
+                      // Name-led for both premise types. Locations with an
+                      // org-assigned label use it; locations without one borrow
+                      // the owning customer's name as the headline. Address is
+                      // supporting info either way.
                       const headline = location.locationName || location.customerName;
                       const street = [location.address.streetAddress, location.address.streetAddressLine2]
                         .filter(Boolean).join(' ');
@@ -422,12 +488,16 @@ export default function ServiceLocationsPage() {
                         : location.pmOverdue
                           ? 'bg-[color-mix(in_oklch,var(--warning-500)_4%,var(--bg-elev))]'
                           : '';
+                      const dimmed = location.status === 'INACTIVE' || location.status === 'CLOSED'
+                        ? 'opacity-55'
+                        : '';
                       const lastSvc = formatLastService(location.lastServiceAt);
+                      const statusKey = location.status.toLowerCase() as LocationStatusKey;
 
                       return (
                         <DenseRow
                           key={location.id}
-                          className={`cursor-pointer ${rowTint}`}
+                          className={`cursor-pointer ${rowTint} ${dimmed}`.trim()}
                           onClick={(e: React.MouseEvent) => {
                             const target = e.target as HTMLElement;
                             if (target.closest('[role="menu"]') || target.closest('button[aria-label]') || target.closest('a')) return;
@@ -436,7 +506,7 @@ export default function ServiceLocationsPage() {
                         >
                           <td>
                             <div className="flex items-center gap-2">
-                              <CustomerTypeMark category={category} />
+                              <PremiseMark premise={premise} />
                               <CellStack>
                                 <CellTop>
                                   <span className="font-semibold text-fg-strong">{headline}</span>
@@ -455,15 +525,7 @@ export default function ServiceLocationsPage() {
                             )}
                           </td>
                           <td>
-                            {location.status === 'ACTIVE' ? (
-                              <Pill tone="success" dot live inline>
-                                {t('serviceLocations.status.active')}
-                              </Pill>
-                            ) : (
-                              <Pill tone="neutral" dot inline>
-                                {t(`serviceLocations.status.${location.status.toLowerCase()}`)}
-                              </Pill>
-                            )}
+                            <StatusIndicator status={statusKey} />
                           </td>
                           <td>
                             {lastSvc ? (

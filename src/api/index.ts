@@ -51,6 +51,7 @@ export {
   type ServiceLocationListResponse,
   type ServiceLocationListCounts,
   type ServiceLocationDetailDto,
+  type PremiseType,
   type TagSummary,
 } from './customerApi';
 

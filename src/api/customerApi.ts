@@ -27,12 +27,18 @@ export interface AdditionalContact {
   updatedAt: string;
 }
 
+// Explicit per-location fact: what is a tech walking into. Set by a human,
+// never inferred from address. Backwards-compat: optional until BE migration
+// lands; consumers default to BUSINESS visually.
+export type PremiseType = 'BUSINESS' | 'RESIDENCE';
+
 export interface ServiceLocation {
   id: string;
   customerId: string;
   dispatchRegionId: string;
   locationName?: string | null;
   address: Address;
+  premiseType?: PremiseType | null;
   previousLocationId?: string | null;
   successionDate?: string | null;
   successionType?: string | null;
@@ -111,7 +117,11 @@ export interface CustomerListDto {
   requiresPurchaseOrder: boolean;
   contractPricingTier?: string | null;
   status: CustomerStatus;
-  category: CustomerCategory;
+  // Customer category is being retired (the residential/commercial concept on
+  // customers was wrong). Optional + nullable while the BE migration is in
+  // flight so consumers can read it where the form dialog still does, but
+  // list rendering must not depend on it.
+  category?: CustomerCategory | null;
   // Denormalized read fields synced via events from finance + job services.
   // Optional on the FE so the page renders before the BE flags land.
   hasOpenBalance?: boolean;
@@ -123,13 +133,12 @@ export interface CustomerListDto {
 }
 
 // Chip counts envelope on list responses. Reflects the search-filtered set
-// ignoring the chip currently being counted, so e.g. "Commercial 487" does
-// not drop to zero when Commercial is the active filter.
+// ignoring the chip currently being counted, so e.g. "Active 412" does
+// not drop to zero when Active is the only selected status.
 export interface CustomerListCounts {
   total?: number;
   active?: number;
-  commercial?: number;
-  residential?: number;
+  inactive?: number;
   openBalance?: number;
   openJobs?: number;
   aged?: number;
@@ -153,7 +162,7 @@ export interface CustomerSearchResult {
   id: string;
   name: string;
   type: CustomerType;
-  category: CustomerCategory;
+  category?: CustomerCategory | null;
 }
 
 export interface CustomerSearchResponse {
@@ -173,8 +182,13 @@ export interface ServiceLocationListDto {
   id: string;
   customerId: string;
   customerName: string;
-  customerCategory: CustomerCategory;
+  // customerCategory is retiring along with Customer.category; keep optional
+  // until BE removes it from the payload.
+  customerCategory?: CustomerCategory | null;
   locationName?: string | null;
+  // Explicit per-location premise — drives the glyph + Business/Residence
+  // filter. Optional until BE migration lands; defaults to BUSINESS visually.
+  premiseType?: PremiseType | null;
   address: Address;
   siteContactName?: string | null;
   siteContactPhone?: string | null;
@@ -198,13 +212,14 @@ export interface ServiceLocationListDto {
 export interface ServiceLocationListCounts {
   total?: number;
   active?: number;
+  inactive?: number;
+  closed?: number;
   customerCount?: number;
   live?: number;
   openJobs?: number;
   overdue?: number;
-  inactive?: number;
-  commercial?: number;
-  residential?: number;
+  business?: number;
+  residence?: number;
 }
 
 export interface ServiceLocationListResponse {
@@ -227,7 +242,8 @@ export interface ServiceLocationDetailDto {
   id: string;
   customerId: string;
   customerName: string;
-  customerCategory: CustomerCategory;
+  customerCategory?: CustomerCategory | null;
+  premiseType?: PremiseType | null;
   dispatchRegionId: string;
   locationName?: string | null;
   address: Address;
@@ -266,7 +282,9 @@ export interface Customer {
   taxExemptCertificate?: string | null;
   notes?: string | null;
   status: CustomerStatus;
-  category: CustomerCategory;
+  // Retiring along with the customers-list residential/commercial concept.
+  // Optional until BE migration drops the column.
+  category?: CustomerCategory | null;
   createdAt: string;
   updatedAt: string;
   version: number;
@@ -359,23 +377,21 @@ export const customerApi = {
   getAllPaginated: async (params?: {
     page?: number;     // 1-indexed for UI, converted to 0-indexed for API
     limit?: number;
-    status?: 'ACTIVE' | 'INACTIVE';
+    // Status is multi-value — caller passes the array of selected statuses
+    // from the StatusPickerChip. Backend default-excludes BILLING_ONLY.
+    status?: Array<'ACTIVE' | 'INACTIVE'>;
     search?: string;
     sort?: string;     // e.g., "name,desc"
-    // List filters — backend default-excludes BILLING_ONLY; pass category to
-    // narrow further. Booleans flip on the denormalized fields.
-    category?: 'COMMERCIAL' | 'RESIDENTIAL';
     hasOpenBalance?: boolean;
     hasAgedBalance?: boolean;
     hasOpenJobs?: boolean;
   }): Promise<CustomerListResponse> => {
-    const apiParams: Record<string, string | number | boolean | undefined> = {
+    const apiParams: Record<string, string | string[] | number | boolean | undefined> = {
       page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
       limit: params?.limit,
-      status: params?.status,
+      status: params?.status && params.status.length > 0 ? params.status : undefined,
       search: params?.search,
       sort: params?.sort,
-      category: params?.category,
       hasOpenBalance: params?.hasOpenBalance || undefined,
       hasAgedBalance: params?.hasAgedBalance || undefined,
       hasOpenJobs: params?.hasOpenJobs || undefined,
@@ -483,7 +499,9 @@ export const customerApi = {
   getAllServiceLocationsPaginated: async (params?: {
     page?: number;     // 1-indexed for UI
     limit?: number;
-    status?: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
+    // Status is multi-value — caller passes the array from StatusPickerChip
+    // (e.g. ['ACTIVE', 'INACTIVE']).
+    status?: Array<'ACTIVE' | 'INACTIVE' | 'CLOSED'>;
     search?: string;
     dispatchRegionId?: string;
     sort?: string;
@@ -491,19 +509,20 @@ export const customerApi = {
     techOnSite?: boolean;
     hasOpenJobs?: boolean;
     pmOverdue?: boolean;
-    category?: 'COMMERCIAL' | 'RESIDENTIAL';
+    // premiseType filter is the new Business/Residence axis on Locations.
+    premiseType?: 'BUSINESS' | 'RESIDENCE';
   }): Promise<ServiceLocationListResponse> => {
-    const apiParams: Record<string, string | number | boolean | undefined> = {
+    const apiParams: Record<string, string | string[] | number | boolean | undefined> = {
       page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
       limit: params?.limit,
-      status: params?.status,
+      status: params?.status && params.status.length > 0 ? params.status : undefined,
       search: params?.search,
       dispatchRegionId: params?.dispatchRegionId,
       sort: params?.sort,
       techOnSite: params?.techOnSite || undefined,
       hasOpenJobs: params?.hasOpenJobs || undefined,
       pmOverdue: params?.pmOverdue || undefined,
-      category: params?.category,
+      premiseType: params?.premiseType,
     };
     // Strip empty values so we don't send ?dispatchRegionId= etc.
     for (const key of Object.keys(apiParams)) {

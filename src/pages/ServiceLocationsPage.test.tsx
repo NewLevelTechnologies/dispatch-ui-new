@@ -133,12 +133,13 @@ describe('ServiceLocationsPage', () => {
     });
   });
 
-  // URL state drives the inactive filter chip; verify the API receives the
-  // status=INACTIVE parameter when the chip is active via URL hydration.
-  it('hydrates inactive filter from URL and passes status=INACTIVE to the API', async () => {
+  // URL drives the status picker (multi-value param). With `?status=inactive`
+  // the API call should receive a single-element ['INACTIVE'] array; with no
+  // `status` param the default ['ACTIVE'] scope is applied.
+  it('hydrates status picker from URL and passes the array to the API', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
 
-    renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?inactive=true' });
+    renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?status=inactive' });
 
     await waitFor(() => {
       expect(screen.getByText('Main Office')).toBeInTheDocument();
@@ -148,7 +149,30 @@ describe('ServiceLocationsPage', () => {
       ([url]) => url === '/service-locations'
     );
     expect(
-      listCalls.some(([, opts]) => (opts as { params?: { status?: string } } | undefined)?.params?.status === 'INACTIVE')
+      listCalls.some(([, opts]) => {
+        const status = (opts as { params?: { status?: unknown } } | undefined)?.params?.status;
+        return Array.isArray(status) && status.length === 1 && status[0] === 'INACTIVE';
+      })
+    ).toBe(true);
+  });
+
+  it('applies the default ACTIVE status scope when the URL has no status param', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    const listCalls = vi.mocked(apiClient.get).mock.calls.filter(
+      ([url]) => url === '/service-locations'
+    );
+    expect(
+      listCalls.some(([, opts]) => {
+        const status = (opts as { params?: { status?: unknown } } | undefined)?.params?.status;
+        return Array.isArray(status) && status.length === 1 && status[0] === 'ACTIVE';
+      })
     ).toBe(true);
   });
 
