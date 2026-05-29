@@ -397,6 +397,9 @@ export const customerApi = {
     hasOpenBalance?: boolean;
     hasAgedBalance?: boolean;
     hasOpenJobs?: boolean;
+    // Tag UUIDs — OR semantics within the param. Serialized comma-separated.
+    // Malformed UUIDs return 400 from the BE.
+    tagIds?: string[];
   }): Promise<CustomerListResponse> => {
     const apiParams: Record<string, string | number | boolean | undefined> = {
       page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
@@ -410,6 +413,10 @@ export const customerApi = {
       hasOpenBalance: params?.hasOpenBalance || undefined,
       hasAgedBalance: params?.hasAgedBalance || undefined,
       hasOpenJobs: params?.hasOpenJobs || undefined,
+      tags:
+        params?.tagIds && params.tagIds.length > 0
+          ? params.tagIds.join(',')
+          : undefined,
     };
     // Strip empty values so the URL stays clean.
     for (const key of Object.keys(apiParams)) {
@@ -528,6 +535,9 @@ export const customerApi = {
     // Premise filter is the Business/Residence axis on Locations.
     // BE param name is `premise` (lowercase value).
     premise?: 'business' | 'residence';
+    // Tag UUIDs — OR semantics within the param. Serialized comma-separated.
+    // Malformed UUIDs return 400 from the BE.
+    tagIds?: string[];
   }): Promise<ServiceLocationListResponse> => {
     const apiParams: Record<string, string | number | boolean | undefined> = {
       page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
@@ -543,6 +553,10 @@ export const customerApi = {
       hasOpenJobs: params?.hasOpenJobs || undefined,
       pmOverdue: params?.pmOverdue || undefined,
       premise: params?.premise,
+      tags:
+        params?.tagIds && params.tagIds.length > 0
+          ? params.tagIds.join(',')
+          : undefined,
     };
     // Strip empty values so we don't send ?dispatchRegionId= etc.
     for (const key of Object.keys(apiParams)) {

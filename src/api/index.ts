@@ -288,6 +288,9 @@ export {
   type UpdateDispatchRegionRequest,
 } from './dispatchRegionApi';
 
+// Tag API (tenant tag list, used by customer + service-location filters)
+export { tagApi, type Tag } from './tagApi';
+
 // Approvals API (workflow engine approval requests)
 export {
   approvalsApi,
