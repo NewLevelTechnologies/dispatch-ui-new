@@ -33,6 +33,7 @@ export {
   type ServiceLocationSearchResponse,
   type AdditionalContact,
   type CustomerCategory,
+  type CustomerShape,
   type CustomerStatus,
   type CustomerType,
   type CreateCustomerRequest,

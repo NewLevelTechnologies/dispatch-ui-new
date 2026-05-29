@@ -12,7 +12,7 @@ const mockServiceLocationsResponse = {
       id: 'location-1',
       customerId: 'customer-1',
       customerName: 'Test Customer',
-      customerCategory: 'COMMERCIAL' as const,
+      premiseType: 'BUSINESS' as const,
       locationName: 'Main Office',
       address: {
         streetAddress: '123 Main St',
@@ -36,7 +36,7 @@ const mockServiceLocationsResponse = {
       id: 'location-2',
       customerId: 'customer-1',
       customerName: 'Test Customer',
-      customerCategory: 'COMMERCIAL' as const,
+      premiseType: 'RESIDENCE' as const,
       locationName: 'Warehouse',
       address: {
         streetAddress: '456 Oak Ave',
@@ -133,10 +133,11 @@ describe('ServiceLocationsPage', () => {
     });
   });
 
-  // URL drives the status picker (multi-value param). With `?status=inactive`
-  // the API call should receive a single-element ['INACTIVE'] array; with no
-  // `status` param the default ['ACTIVE'] scope is applied.
-  it('hydrates status picker from URL and passes the array to the API', async () => {
+  // URL drives the status picker; wire format is a single comma-separated
+  // value (?status=ACTIVE,INACTIVE). With `?status=inactive` the API call
+  // should receive `status: "INACTIVE"`; with no `status` param the default
+  // `ACTIVE` scope is applied.
+  it('hydrates status picker from URL and serializes status as a comma-joined string', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
 
     renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?status=inactive' });
@@ -149,10 +150,7 @@ describe('ServiceLocationsPage', () => {
       ([url]) => url === '/service-locations'
     );
     expect(
-      listCalls.some(([, opts]) => {
-        const status = (opts as { params?: { status?: unknown } } | undefined)?.params?.status;
-        return Array.isArray(status) && status.length === 1 && status[0] === 'INACTIVE';
-      })
+      listCalls.some(([, opts]) => (opts as { params?: { status?: string } } | undefined)?.params?.status === 'INACTIVE')
     ).toBe(true);
   });
 
@@ -169,10 +167,7 @@ describe('ServiceLocationsPage', () => {
       ([url]) => url === '/service-locations'
     );
     expect(
-      listCalls.some(([, opts]) => {
-        const status = (opts as { params?: { status?: unknown } } | undefined)?.params?.status;
-        return Array.isArray(status) && status.length === 1 && status[0] === 'ACTIVE';
-      })
+      listCalls.some(([, opts]) => (opts as { params?: { status?: string } } | undefined)?.params?.status === 'ACTIVE')
     ).toBe(true);
   });
 

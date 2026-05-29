@@ -27,7 +27,6 @@ const mockCustomersListResponse: CustomerListResponse = {
       contractPricingTier: null,
       status: 'ACTIVE',
       type: 'STANDARD',
-      category: 'RESIDENTIAL',
     },
     {
       id: '2',
@@ -46,7 +45,6 @@ const mockCustomersListResponse: CustomerListResponse = {
       contractPricingTier: 'Premium',
       status: 'ACTIVE',
       type: 'STANDARD',
-      category: 'COMMERCIAL',
     },
   ],
   totalElements: 2,
