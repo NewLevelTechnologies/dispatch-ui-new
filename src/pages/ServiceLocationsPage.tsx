@@ -214,7 +214,7 @@ export default function ServiceLocationsPage() {
       dispatchRegionId: regionId || undefined,
       status: apiStatuses,
       premise: apiPremise,
-      techOnSite: liveFilter || undefined,
+      live: liveFilter || undefined,
       hasOpenJobs: openJobsFilter || undefined,
       pmOverdue: overdueFilter || undefined,
     }),

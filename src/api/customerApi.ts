@@ -196,7 +196,7 @@ export interface ServiceLocationListDto {
   dispatchRegionName?: string | null;
   hasOpenJobs?: boolean;
   pmOverdue?: boolean;
-  techOnSite?: boolean;
+  techOnSite: boolean;
   lastServiceAt?: string | null;
   tags?: TagSummary[];
 }
@@ -521,7 +521,8 @@ export const customerApi = {
     dispatchRegionId?: string;
     sort?: string;
     // Denormalized boolean filters from job/agreement/dispatch events.
-    techOnSite?: boolean;
+    // `live=true` returns locations with a tech currently on site.
+    live?: boolean;
     hasOpenJobs?: boolean;
     pmOverdue?: boolean;
     // Premise filter is the Business/Residence axis on Locations.
@@ -538,7 +539,7 @@ export const customerApi = {
       search: params?.search,
       dispatchRegionId: params?.dispatchRegionId,
       sort: params?.sort,
-      techOnSite: params?.techOnSite || undefined,
+      live: params?.live || undefined,
       hasOpenJobs: params?.hasOpenJobs || undefined,
       pmOverdue: params?.pmOverdue || undefined,
       premise: params?.premise,
