@@ -46,6 +46,9 @@ export interface TenantSettings {
   enableOnlineBooking: boolean;
   enableSmsNotifications: boolean;
   enableEmailNotifications: boolean;
+  // Tenant-wide AI feature switch. New optional field — absent on older
+  // responses, so the UI treats undefined as off.
+  enableAiFeatures?: boolean;
   // Tenant-wide default applied to new service locations created without an
   // explicit premise. Always present; server defaults to 'BUSINESS'.
   defaultPremiseType: PremiseType;
@@ -71,6 +74,7 @@ export interface UpdateTenantSettingsRequest {
   enableOnlineBooking?: boolean;
   enableSmsNotifications?: boolean;
   enableEmailNotifications?: boolean;
+  enableAiFeatures?: boolean;
   defaultPremiseType?: PremiseType;
   glossary?: Glossary; // Glossary can be updated
 }

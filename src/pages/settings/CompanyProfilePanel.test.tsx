@@ -37,6 +37,7 @@ const mockSettings = {
   enableOnlineBooking: true,
   enableSmsNotifications: false,
   enableEmailNotifications: true,
+  enableAiFeatures: true,
   defaultPremiseType: 'BUSINESS',
   glossary: {},
   updatedAt: '2026-03-27T10:30:00Z',
@@ -172,6 +173,32 @@ describe('CompanyProfilePanel', () => {
       );
     });
     // Timezone was untouched, so the partial PUT must not include it.
+    expect(apiClient.put).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ timezone: expect.anything() }),
+    );
+  });
+
+  it('toggles AI features and saves only that field', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({
+      data: { ...mockSettings, enableAiFeatures: false },
+    });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    // AI features is the fourth (last) Edit button.
+    await user.click(editButtons()[3]);
+    await user.click(screen.getByRole('switch'));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith(
+        expect.stringContaining('/tenant'),
+        expect.objectContaining({ enableAiFeatures: false }),
+      );
+    });
+    // Partial PUT — unrelated fields aren't sent.
     expect(apiClient.put).toHaveBeenCalledWith(
       expect.anything(),
       expect.not.objectContaining({ timezone: expect.anything() }),
