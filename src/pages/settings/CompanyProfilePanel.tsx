@@ -23,6 +23,7 @@ import { Callout } from '../../components/ui/Callout';
 import { ToggleGroup, ToggleGroupOption } from '../../components/ui/ToggleGroup';
 import { PremiseMark } from '../../components/ui/PremiseMark';
 import { Field, Label, Description } from '../../components/catalyst/fieldset';
+import { Switch, SwitchField } from '../../components/catalyst/switch';
 import { Input } from '../../components/catalyst/input';
 import { Select } from '../../components/catalyst/select';
 import { Button } from '../../components/catalyst/button';
@@ -123,6 +124,7 @@ export default function CompanyProfilePanel() {
           <IdentityCard settings={settings} canEdit={canEdit} />
           <OperatingCard settings={settings} canEdit={canEdit} />
           <BrandingCard settings={settings} canEdit={canEdit} />
+          <AiFeaturesCard settings={settings} canEdit={canEdit} />
         </div>
       )}
     </>
@@ -470,6 +472,70 @@ function OperatingCard({ settings, canEdit }: { settings: TenantSettings; canEdi
               {settings.defaultPremiseType === 'BUSINESS' ? 'Business' : 'Residence'}
             </span>
           </Kv>
+        </div>
+      )}
+    </EditableCard>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Card — AI features (tenant-wide enablement toggle)
+// ──────────────────────────────────────────────────────────────────
+function AiFeaturesCard({ settings, canEdit }: { settings: TenantSettings; canEdit: boolean }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  // Absent on older responses — treat undefined as off.
+  const current = settings.enableAiFeatures ?? false;
+  const [enabled, setEnabled] = useState(current);
+
+  useEffect(() => {
+    if (!editing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEnabled(current);
+    }
+  }, [current, editing]);
+
+  const dirty = enabled !== current;
+
+  const saveMutation = useMutation({
+    mutationFn: () => tenantSettingsApi.updateSettings({ enableAiFeatures: enabled }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
+      setEditing(false);
+      showSuccess('AI features saved');
+    },
+    onError: (err: unknown) => showError("Couldn't save changes", extractApiError(err)),
+  });
+
+  const handleCancel = () => {
+    setEnabled(current);
+    setEditing(false);
+  };
+
+  return (
+    <EditableCard
+      title="AI features"
+      subtitle="Turn on AI-assisted tools across the app — smarter summaries, suggestions, and automation."
+      editing={editing}
+      onEdit={canEdit ? () => setEditing(true) : () => {}}
+      onCancel={handleCancel}
+      onSave={() => saveMutation.mutate()}
+      saving={saveMutation.isPending}
+      saveDisabled={!dirty || saveMutation.isPending}
+    >
+      {editing ? (
+        <div className="max-w-[460px]">
+          <SwitchField>
+            <Switch checked={enabled} onChange={setEnabled} disabled={!canEdit} />
+            <Label>Enable AI features</Label>
+            <Description>
+              Allow the app to use AI for summaries, suggestions, and automation.
+            </Description>
+          </SwitchField>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
+          <Kv label="AI features">{current ? 'Enabled' : 'Disabled'}</Kv>
         </div>
       )}
     </EditableCard>
