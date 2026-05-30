@@ -410,8 +410,8 @@ export const customerApi = {
           : undefined,
       search: params?.search,
       sort: params?.sort,
-      hasOpenBalance: params?.hasOpenBalance || undefined,
-      hasAgedBalance: params?.hasAgedBalance || undefined,
+      openBalance: params?.hasOpenBalance || undefined,
+      agedBalance: params?.hasAgedBalance || undefined,
       openJobs: params?.hasOpenJobs || undefined,
       tags:
         params?.tagIds && params.tagIds.length > 0
