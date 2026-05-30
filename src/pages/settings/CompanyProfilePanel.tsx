@@ -23,7 +23,7 @@ import { Callout } from '../../components/ui/Callout';
 import { ToggleGroup, ToggleGroupOption } from '../../components/ui/ToggleGroup';
 import { PremiseMark } from '../../components/ui/PremiseMark';
 import { Field, Label, Description } from '../../components/catalyst/fieldset';
-import { Switch, SwitchField } from '../../components/catalyst/switch';
+import { Switch } from '../../components/catalyst/switch';
 import { Input } from '../../components/catalyst/input';
 import { Select } from '../../components/catalyst/select';
 import { Button } from '../../components/catalyst/button';
@@ -524,14 +524,23 @@ function AiFeaturesCard({ settings, canEdit }: { settings: TenantSettings; canEd
       saveDisabled={!dirty || saveMutation.isPending}
     >
       {editing ? (
-        <div className="max-w-[460px]">
-          <SwitchField>
-            <Switch checked={enabled} onChange={setEnabled} disabled={!canEdit} />
-            <Label>Enable AI features</Label>
-            <Description>
+        // Canonical settings toggle-row scale (matches the destructive-footer /
+        // DataRow pattern): label 13px/600, description 12px/muted, control on
+        // the right — deliberately a clear step below the card header.
+        <div className="flex max-w-[460px] items-start justify-between gap-6">
+          <div className="min-w-0">
+            <div className="text-[13px] font-semibold text-fg-strong">Enable AI features</div>
+            <div className="mt-0.5 text-[12px] text-fg-muted">
               Allow the app to use AI for summaries, suggestions, and automation.
-            </Description>
-          </SwitchField>
+            </div>
+          </div>
+          <Switch
+            checked={enabled}
+            onChange={setEnabled}
+            disabled={!canEdit}
+            aria-label="Enable AI features"
+            className="mt-0.5 shrink-0"
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
