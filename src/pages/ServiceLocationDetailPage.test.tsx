@@ -34,6 +34,14 @@ const mockLocation: ServiceLocationDetailDto = {
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-02T10:30:00Z',
   version: 1,
+  region: { abbreviation: 'AZ-Central', name: 'Arizona Central' },
+  customerStatus: 'ACTIVE' as const,
+  customerType: 'STANDARD' as const,
+  customerPaymentTermsDays: 30,
+  tags: [],
+  techOnSite: false,
+  hasOpenJobs: false,
+  lastServiceAt: null,
 };
 
 describe('ServiceLocationDetailPage', () => {
@@ -100,106 +108,103 @@ describe('ServiceLocationDetailPage', () => {
     });
   };
 
+  // ── States ────────────────────────────────────────────────────────────
   it('displays loading state', () => {
     vi.mocked(apiClient.get).mockImplementation(() => new Promise(() => {}));
-
     renderDetailPage();
-
     expect(screen.getByText(/loading location/i)).toBeInTheDocument();
   });
 
   it('displays error state when fetch fails', async () => {
-    const error = new Error('Network error');
-    vi.mocked(apiClient.get).mockRejectedValue(error);
-
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('Network error'));
     renderDetailPage();
-
     await waitFor(() => {
       expect(screen.getByText(/error loading location/i)).toBeInTheDocument();
     });
   });
 
-  it('displays error state when location not found', async () => {
-    vi.mocked(apiClient.get).mockRejectedValue(new Error('Not found'));
-
-    renderDetailPage('non-existent-id');
-
+  it('displays a back action in the error state', async () => {
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('Network error'));
+    renderDetailPage();
     await waitFor(() => {
       expect(screen.getByText(/error loading location/i)).toBeInTheDocument();
     });
+    expect(screen.getByRole('button', { name: /back to location/i })).toBeInTheDocument();
   });
 
-  it('displays location name and status', async () => {
+  // ── Header ────────────────────────────────────────────────────────────
+  it('displays location headline and status', async () => {
     mockApiResponses();
-
     renderDetailPage();
-
     await waitFor(() => {
       expect(screen.getByText('Main Office')).toBeInTheDocument();
     });
-
-    expect(screen.getByText(/active/i)).toBeInTheDocument();
+    // "Active" appears on both the location status pill and the Billed-to
+    // customer-status pill.
+    expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
   });
 
-  it('displays customer name with link', async () => {
-    mockApiResponses();
-
+  it('falls back to the customer name as headline for an unnamed location', async () => {
+    mockApiResponses({ ...mockLocation, locationName: '' });
     renderDetailPage();
-
     await waitFor(() => {
-      expect(screen.getByText('Test Customer')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Test Customer' })).toBeInTheDocument();
     });
+  });
 
-    const customerLink = screen.getByText('Test Customer');
+  it('displays an inactive status', async () => {
+    mockApiResponses({ ...mockLocation, status: 'INACTIVE' as const });
+    renderDetailPage();
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Inactive')).toBeInTheDocument();
+  });
+
+  it('displays the full address in the header', async () => {
+    mockApiResponses();
+    renderDetailPage();
+    await waitFor(() => {
+      expect(screen.getByText(/123 Main St Suite 100/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Springfield, IL 62701/i)).toBeInTheDocument();
+  });
+
+  // ── Back-link + customer link ───────────────────────────────────────────
+  it('back-link defaults to the parent customer', async () => {
+    mockApiResponses();
+    renderDetailPage();
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+    const backLink = screen.getByRole('link', { name: /test customer/i });
+    expect(backLink).toHaveAttribute('href', '/customers/customer-1');
+  });
+
+  it('links to the parent customer from the Billed-to card', async () => {
+    mockApiResponses();
+    renderDetailPage();
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+    const customerLink = screen.getByRole('link', { name: /open customer/i });
     expect(customerLink).toHaveAttribute('href', '/customers/customer-1');
   });
 
-  it('displays full address', async () => {
-    mockApiResponses();
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('123 Main St')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText('Suite 100')).toBeInTheDocument();
-    expect(screen.getByText(/Springfield, IL 62701/)).toBeInTheDocument();
-  });
-
-  it('displays address validation badges', async () => {
-    mockApiResponses();
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('USPS Validated')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText('Business')).toBeInTheDocument();
-  });
-
+  // ── Overview content ──────────────────────────────────────────────────
   it('displays site contact information', async () => {
     mockApiResponses();
-
     renderDetailPage();
-
     await waitFor(() => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
-
-    const phoneLink = screen.getByText('(555) 123-4567');
-    expect(phoneLink).toHaveAttribute('href', 'tel:5551234567');
-
-    const emailLink = screen.getByText('john@example.com');
-    expect(emailLink).toHaveAttribute('href', 'mailto:john@example.com');
+    expect(screen.getByText('(555) 123-4567')).toHaveAttribute('href', 'tel:5551234567');
+    expect(screen.getByText('john@example.com')).toHaveAttribute('href', 'mailto:john@example.com');
   });
 
   it('displays access instructions', async () => {
     mockApiResponses();
-
     renderDetailPage();
-
     await waitFor(() => {
       expect(screen.getByText('Use side entrance')).toBeInTheDocument();
     });
@@ -207,507 +212,173 @@ describe('ServiceLocationDetailPage', () => {
 
   it('displays notes', async () => {
     mockApiResponses();
-
     renderDetailPage();
-
     await waitFor(() => {
       expect(screen.getByText('Important client')).toBeInTheDocument();
     });
   });
 
-  it('opens edit dialog when edit button is clicked', async () => {
+  it('displays the region label from the payload', async () => {
     mockApiResponses();
-    const user = userEvent.setup();
-
     renderDetailPage();
-
     await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    const editButton = screen.getByRole('button', { name: /edit/i });
-    await user.click(editButton);
-
-    // Dialog should open
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByText('AZ-Central')).toBeInTheDocument();
     });
   });
 
-  it('handles unnamed location', async () => {
-    const unnamedLocation = {
-      ...mockLocation,
-      locationName: '',
-    };
-
-    mockApiResponses(unnamedLocation);
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Unnamed Location')).toBeInTheDocument();
-    });
-  });
-
-  it('hides optional sections when data is missing', async () => {
-    const minimalLocation = {
+  it('renders without crashing for a minimal location', async () => {
+    mockApiResponses({
       ...mockLocation,
       siteContactName: '',
       siteContactPhone: '',
       siteContactEmail: '',
       accessInstructions: '',
       notes: '',
-    };
-
-    mockApiResponses(minimalLocation);
-
+    });
     renderDetailPage();
-
     await waitFor(() => {
       expect(screen.getByText('Main Office')).toBeInTheDocument();
     });
-
-    // Optional sections should not be rendered
-    expect(screen.queryByText('Site Contact')).not.toBeInTheDocument();
-    expect(screen.queryByText('Access Instructions')).not.toBeInTheDocument();
-    expect(screen.queryByText('Notes')).not.toBeInTheDocument();
+    // Empty-state copy stands in for the missing site contact + notes.
+    expect(screen.getByText(/no site contact on file/i)).toBeInTheDocument();
+    expect(screen.getByText(/no notes yet/i)).toBeInTheDocument();
   });
 
-  it('displays additional contacts when present', async () => {
-    const locationWithContacts = {
-      ...mockLocation,
-      additionalContacts: [
-            {
-              id: 'contact-1',
-              name: 'Jane Manager',
-              phone: '5559876543',
-              email: 'jane@example.com',
-              notes: 'Facilities manager',
-              displayOrder: 0,
-              createdAt: '2024-01-01T00:00:00Z',
-              updatedAt: '2024-01-01T00:00:00Z',
-            },
-          ],
-    };
-
-    mockApiResponses(locationWithContacts);
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Jane Manager')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText(/\(555\) 987-6543/i)).toBeInTheDocument();
-    expect(screen.getByText('jane@example.com')).toBeInTheDocument();
-    expect(screen.getByText('Facilities manager')).toBeInTheDocument();
-  });
-
-  it('shows additional contacts section when user can edit', async () => {
-    const minimalLocation = {
-      ...mockLocation,
-      siteContactName: '',
-      siteContactPhone: '',
-      siteContactEmail: '',
-      additionalContacts: [],
-    };
-
-    mockApiResponses(minimalLocation);
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    // Should show add button when user has permission
-    expect(screen.getByRole('button', { name: /add additional contact/i })).toBeInTheDocument();
-  });
-
-  it('shows additional contacts section when site contact exists', async () => {
-    mockApiResponses();
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    // Should show section because siteContactName exists
-    expect(screen.getByRole('button', { name: /add additional contact/i })).toBeInTheDocument();
-  });
-
-  it('opens add contact dialog when button is clicked', async () => {
-    mockApiResponses();
-    const user = userEvent.setup();
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    const addButton = screen.getByRole('button', { name: /add additional contact/i });
-    await user.click(addButton);
-
-    await waitFor(() => {
-      expect(screen.getByText(/create additional contact/i)).toBeInTheDocument();
-    });
-  });
-
+  // ── Tabs ──────────────────────────────────────────────────────────────
   it('displays all tabs', async () => {
     mockApiResponses();
-
     renderDetailPage();
-
     await waitFor(() => {
       expect(screen.getByText('Main Office')).toBeInTheDocument();
     });
-
-    // Check that all tabs are present
-    expect(screen.getByRole('button', { name: /overview/i })).toBeInTheDocument();
-    expect(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /work order/i })).toBeInTheDocument();
-    expect(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /activity/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /overview/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /equipment/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /work order/i })).toBeInTheDocument();
+    // "Visits" tab is glossary-driven from the `dispatch` entity → "Dispatches".
+    expect(screen.getByRole('tab', { name: /dispatch/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /contacts/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /activity/i })).toBeInTheDocument();
   });
 
-  it('switches to work orders tab', async () => {
+  it('switches to the equipment tab', async () => {
     mockApiResponses();
     const user = userEvent.setup();
-
     renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
 
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    // Click on Work Orders tab
-    const workOrdersTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /work order/i });
-    await user.click(workOrdersTab);
-
-    await waitFor(() => {
-      expect(workOrdersTab).toHaveAttribute('aria-current', 'page');
-    });
+    const equipmentTab = screen.getByRole('tab', { name: /equipment/i });
+    await user.click(equipmentTab);
+    await waitFor(() => expect(equipmentTab).toHaveAttribute('aria-selected', 'true'));
   });
 
-  it('scopes work-orders fetch to serviceLocationId only (not customerId)', async () => {
+  it('switches to the work orders tab', async () => {
+    mockApiResponses();
+    const user = userEvent.setup();
+    renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+    const workOrdersTab = screen.getByRole('tab', { name: /work order/i });
+    await user.click(workOrdersTab);
+    await waitFor(() => expect(workOrdersTab).toHaveAttribute('aria-selected', 'true'));
+  });
+
+  it('switches to the activity tab', async () => {
+    mockApiResponses();
+    const user = userEvent.setup();
+    renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+    const activityTab = screen.getByRole('tab', { name: /activity/i });
+    await user.click(activityTab);
+    await waitFor(() => expect(activityTab).toHaveAttribute('aria-selected', 'true'));
+  });
+
+  it('shows the coming-soon stub for the Visits (Dispatches) tab', async () => {
+    mockApiResponses();
+    const user = userEvent.setup();
+    renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('tab', { name: /dispatch/i }));
+    await waitFor(() => expect(screen.getByText(/coming soon/i)).toBeInTheDocument());
+  });
+
+  it('scopes the work-orders fetch to serviceLocationId only (not customerId)', async () => {
     // Regression: passing both customerId and serviceLocationId caused the backend to
-    // return all of the customer's work orders, leaking sibling locations' WOs into
-    // this location's tab. The page must filter by serviceLocationId only.
+    // return all of the customer's work orders, leaking sibling locations' WOs.
     mockApiResponses();
     renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
 
     const calls = vi.mocked(apiClient.get).mock.calls;
-    const workOrdersCall = calls.find(
-      ([url]) => typeof url === 'string' && url === '/work-orders'
-    );
+    const workOrdersCall = calls.find(([url]) => typeof url === 'string' && url === '/work-orders');
     expect(workOrdersCall).toBeDefined();
     const params = (workOrdersCall![1] as { params?: Record<string, unknown> })?.params ?? {};
     expect(params).toHaveProperty('serviceLocationId', 'location-1');
     expect(params).not.toHaveProperty('customerId');
   });
 
-  it('switches to equipment tab', async () => {
+  // ── Header actions / dialogs ────────────────────────────────────────────
+  it('opens the edit dialog from the header', async () => {
     mockApiResponses();
     const user = userEvent.setup();
-
     renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
 
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    // Click on Equipment tab
-    const equipmentTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i });
-    await user.click(equipmentTab);
-
-    await waitFor(() => {
-      expect(equipmentTab).toHaveAttribute('aria-current', 'page');
-    });
+    // Header "Edit" is the first Edit-labelled button (before the right-rail card links).
+    const editButtons = screen.getAllByRole('button', { name: /^edit$/i });
+    await user.click(editButtons[0]);
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
   });
 
-  it('switches to activity tab', async () => {
+  it('closes the edit dialog on cancel', async () => {
     mockApiResponses();
     const user = userEvent.setup();
-
     renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
 
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
+    await user.click(screen.getAllByRole('button', { name: /^edit$/i })[0]);
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
 
-    // Click on Activity tab
-    const activityTab = screen.getByRole('button', { name: /activity/i });
-    await user.click(activityTab);
-
-    await waitFor(() => {
-      expect(activityTab).toHaveAttribute('aria-current', 'page');
-    });
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
-  it('navigates back to service locations when back button is clicked', async () => {
-    mockApiResponses();
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    // Verify back button exists and has correct href
-    const backButtons = screen.getAllByRole('button', { name: /back/i });
-    expect(backButtons[0]).toBeInTheDocument();
-  });
-
-  it('navigates to customer detail when customer name is clicked', async () => {
-    mockApiResponses();
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Customer')).toBeInTheDocument();
-    });
-
-    // Verify customer link exists and has correct href
-    const customerLink = screen.getByText('Test Customer');
-    expect(customerLink).toHaveAttribute('href', '/customers/customer-1');
-  });
-
-  it('displays dispatch region when available', async () => {
-    const locationWithRegion = {
-      ...mockLocation,
-      dispatchRegionId: 'region-1',
-    };
-
-    const mockDispatchRegions = [
-      { id: 'region-1', name: 'North Region', isActive: true },
-    ];
-
-    mockApiResponses(locationWithRegion, mockDispatchRegions);
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('North Region')).toBeInTheDocument();
-    });
-  });
-
-  it('closes edit dialog when onClose is called', async () => {
+  it('opens the new-work-order dialog with the service location pre-selected', async () => {
     mockApiResponses();
     const user = userEvent.setup();
-
     renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
 
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
+    // Header + Jobs-in-flight card both expose a "New Work Order" button; either opens
+    // the same dialog. Click the first.
+    await user.click(screen.getAllByRole('button', { name: /new work order/i })[0]);
 
-    // Open edit dialog
-    const editButton = screen.getByRole('button', { name: /edit/i });
-    await user.click(editButton);
-
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Close dialog (cancel button)
-    const cancelButton = screen.getByRole('button', { name: /cancel/i });
-    await user.click(cancelButton);
-
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    expect(screen.getByDisplayValue(/Main Office.*123 Main St.*Springfield/i)).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /existing customer/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /new customer/i })).not.toBeInTheDocument();
   });
 
-  it('displays empty state in work orders tab', async () => {
+  // ── Lifecycle footer ────────────────────────────────────────────────────
+  it('confirms before closing the location', async () => {
     mockApiResponses();
+    const closeSpy = vi.mocked(apiClient.post).mockResolvedValue({ data: mockLocation });
     const user = userEvent.setup();
-
     renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+    // Footer "Close location" → confirmation dialog → confirm.
+    await user.click(screen.getByRole('button', { name: /^close location$/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /close location/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    // Switch to work orders tab
-    const workOrdersTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /work order/i });
-    await user.click(workOrdersTab);
-
-    await waitFor(() => {
-      // Check for the "no entities yet" message
-      expect(screen.getByText(/no.*work order.*yet/i)).toBeInTheDocument();
+      expect(closeSpy).toHaveBeenCalledWith('/service-locations/location-1/close');
     });
   });
 
-  it('displays empty state in equipment tab', async () => {
-    mockApiResponses();
-    const user = userEvent.setup();
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    // Switch to equipment tab
-    const equipmentTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i });
-    await user.click(equipmentTab);
-
-    await waitFor(() => {
-      // Check for the "no entities yet" message
-      expect(screen.getByText(/no.*equipment.*yet/i)).toBeInTheDocument();
-    });
-  });
-
-  it('displays notification logs in activity tab', async () => {
-    mockApiResponses();
-    const user = userEvent.setup();
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    // Switch to activity tab
-    const activityTab = screen.getByRole('button', { name: /activity/i });
-    await user.click(activityTab);
-
-    await waitFor(() => {
-      // NotificationLogsList component is rendered
-      // The component shows "Recent Notifications" heading from the component itself
-      expect(activityTab).toHaveAttribute('aria-current', 'page');
-    });
-  });
-
-  it('displays back button in error state', async () => {
-    const error = new Error('Network error');
-    vi.mocked(apiClient.get).mockRejectedValue(error);
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText(/error loading location/i)).toBeInTheDocument();
-    });
-
-    const backButton = screen.getByRole('button', { name: /back to location/i });
-    expect(backButton).toBeInTheDocument();
-  });
-
-  it('calls navigate when back button is clicked', async () => {
-    mockApiResponses();
-    const user = userEvent.setup();
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    const backButton = screen.getAllByRole('button', { name: /back/i })[0];
-
-    // Verify button exists and is clickable (navigation is tested in component)
-    expect(backButton).toBeInTheDocument();
-    await user.click(backButton);
-  });
-
-  it('customer link has correct href', async () => {
-    mockApiResponses();
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Customer')).toBeInTheDocument();
-    });
-
-    const customerLink = screen.getByText('Test Customer');
-
-    // Verify link has correct href
-    expect(customerLink).toHaveAttribute('href', '/customers/customer-1');
-  });
-
-  it('displays add button in work orders tab', async () => {
-    mockApiResponses();
-    const user = userEvent.setup();
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    // Switch to work orders tab
-    const workOrdersTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /work order/i });
-    await user.click(workOrdersTab);
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /new work order/i })).toBeInTheDocument();
-    });
-  });
-
-  it('displays add button in equipment tab', async () => {
-    mockApiResponses();
-    const user = userEvent.setup();
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    // Switch to equipment tab
-    const equipmentTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i });
-    await user.click(equipmentTab);
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /add equipment/i })).toBeInTheDocument();
-    });
-  });
-
-
-  it('displays inactive status badge correctly', async () => {
-    const inactiveLocation = {
-      ...mockLocation,
-      status: 'INACTIVE' as const,
-    };
-
-    mockApiResponses(inactiveLocation);
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Main Office')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText(/inactive/i)).toBeInTheDocument();
-  });
-
-  it('back button in error state is clickable', async () => {
-    const error = new Error('Network error');
-    vi.mocked(apiClient.get).mockRejectedValue(error);
-    const user = userEvent.setup();
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      expect(screen.getByText(/error loading location/i)).toBeInTheDocument();
-    });
-
-    const backButton = screen.getByRole('button', { name: /back to location/i });
-
-    // Verify button exists and is clickable
-    expect(backButton).toBeInTheDocument();
-    await user.click(backButton);
-  });
-
+  // ── Equipment tab ────────────────────────────────────────────────────────
   describe('equipment tab', () => {
     const equipmentList = [
       {
@@ -732,36 +403,38 @@ describe('ServiceLocationDetailPage', () => {
       },
     ];
 
-    it('renders equipment in a table when scoped to this service location', async () => {
+    it('renders equipment grouped by type', async () => {
       mockApiResponses(mockLocation, [], equipmentList);
       const user = userEvent.setup();
-
       renderDetailPage();
-
       await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-      await user.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i }));
+      await user.click(screen.getByRole('tab', { name: /equipment/i }));
 
-      await waitFor(() => {
-        expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
-      });
-      expect(screen.getByText('HVAC / Furnace')).toBeInTheDocument();
-      expect(screen.getByText('Carrier C-100')).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
+      expect(screen.getByText('Carrier')).toBeInTheDocument();
+      expect(screen.getByText('C-100')).toBeInTheDocument();
       expect(screen.getByText('Basement')).toBeInTheDocument();
       expect(screen.getByText('Walk-in Cooler')).toBeInTheDocument();
+    });
+
+    it('shows the empty state when there is no equipment', async () => {
+      mockApiResponses();
+      const user = userEvent.setup();
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('tab', { name: /equipment/i }));
+
+      await waitFor(() => expect(screen.getByText(/no.*equipment.*yet/i)).toBeInTheDocument());
     });
 
     it('opens the equipment form dialog in create mode when Add is clicked', async () => {
       mockApiResponses();
       const user = userEvent.setup();
-
       renderDetailPage();
-
       await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-      await user.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i }));
+      await user.click(screen.getByRole('tab', { name: /equipment/i }));
       await user.click(await screen.findByRole('button', { name: /add equipment/i }));
 
-      // Dialog opens. Customer + service-location selectors should NOT be present
-      // because the location is locked to the service-location detail page.
       await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
       expect(screen.queryByLabelText(/customer/i)).not.toBeInTheDocument();
       expect(screen.queryByLabelText(/^Location \*$/)).not.toBeInTheDocument();
@@ -772,68 +445,17 @@ describe('ServiceLocationDetailPage', () => {
       const fullRecord = { ...equipmentList[0], serviceLocationId: 'location-1', status: 'ACTIVE', attributes: '{}' };
       mockApiResponses(mockLocation, [], [fullRecord]);
       const user = userEvent.setup();
-
       renderDetailPage();
-
       await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-      await user.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i }));
+      await user.click(screen.getByRole('tab', { name: /equipment/i }));
       await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
 
-      const moreButtons = screen.getAllByRole('button', { name: /more options/i });
-      await user.click(moreButtons[0]);
+      // Scope to the equipment row — the header also has a "More options" kebab.
+      const row = screen.getByText('Upstairs Furnace').closest('tr')!;
+      await user.click(within(row).getByRole('button', { name: /more options/i }));
       await user.click(await screen.findByRole('menuitem', { name: /edit/i }));
 
       await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
-    });
-
-    it('opens the new-work-order dialog with the service location pre-selected', async () => {
-      mockApiResponses();
-      const user = userEvent.setup();
-
-      renderDetailPage();
-
-      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-
-      // Switch to work orders tab
-      await user.click(
-        within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', {
-          name: /work order/i,
-        })
-      );
-      await user.click(await screen.findByRole('button', { name: /new work order/i }));
-
-      // Dialog opens — the prefilled location's display value should be visible
-      // in the picker input. Picker formats as "{locationName} - {address}".
-      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
-      expect(
-        screen.getByDisplayValue(/Main Office.*123 Main St.*Springfield/i)
-      ).toBeInTheDocument();
-      // The customer-mode toggle is hidden when prefilled — the customer is implied.
-      expect(screen.queryByRole('radio', { name: /existing customer/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole('radio', { name: /new customer/i })).not.toBeInTheDocument();
-    });
-
-    it('clicking the equipment quick-stat switches to the equipment tab', async () => {
-      mockApiResponses(mockLocation, [], equipmentList);
-      const user = userEvent.setup();
-
-      renderDetailPage();
-
-      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-
-      // The quick-stat button shares the "Equipment" name with the tab; pick it
-      // by scoping to the rendered count (2 equipment items in the fixture).
-      const buttons = screen.getAllByRole('button', { name: /equipment/i });
-      // The tab is inside the Tabs nav; the stat is outside of it.
-      const tabsNav = screen.getByRole('navigation', { name: 'Tabs' });
-      const statButton = buttons.find((b) => !tabsNav.contains(b));
-      expect(statButton).toBeTruthy();
-      await user.click(statButton!);
-
-      // Equipment tab is now active — table should render.
-      await waitFor(() => {
-        expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
-      });
     });
 
     it('confirms before deleting and calls the delete endpoint', async () => {
@@ -841,15 +463,14 @@ describe('ServiceLocationDetailPage', () => {
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
       const deleteSpy = vi.mocked(apiClient.delete).mockResolvedValue({ data: undefined });
       const user = userEvent.setup();
-
       renderDetailPage();
-
       await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-      await user.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i }));
+      await user.click(screen.getByRole('tab', { name: /equipment/i }));
       await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
 
-      const moreButtons = screen.getAllByRole('button', { name: /more options/i });
-      await user.click(moreButtons[0]);
+      // Scope to the equipment row — the header also has a "More options" kebab.
+      const row = screen.getByText('Upstairs Furnace').closest('tr')!;
+      await user.click(within(row).getByRole('button', { name: /more options/i }));
       await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
 
       await waitFor(() => {

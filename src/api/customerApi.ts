@@ -251,6 +251,21 @@ export interface ServiceLocationDetailDto {
   createdAt: string;
   updatedAt: string;
   version: number;
+  // Region label, resolved on the payload (no separate dispatch-region fetch
+  // needed). May be null → omit the header region item.
+  region?: { abbreviation?: string | null; name?: string | null } | null;
+  // Parent-customer billing context for the Billed-to mini-card.
+  customerStatus?: CustomerStatus | null;
+  customerType?: CustomerType | null;
+  customerPaymentTermsDays?: number | null;
+  // Tenant tags (id/name/color), same shape as the list DTO.
+  tags?: TagSummary[];
+  // Denormalized operational flags for the attention strip. Booleans only —
+  // the live-tech detail (name/WO/since), open-job counts, PM-overdue, and
+  // equipment flags come from dispatch / work-order / inventory services.
+  techOnSite?: boolean;
+  hasOpenJobs?: boolean;
+  lastServiceAt?: string | null;
 }
 
 export type CustomerType = 'STANDARD' | 'BILLING_ONLY';

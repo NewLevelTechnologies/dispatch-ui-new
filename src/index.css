@@ -60,6 +60,7 @@
   --color-success-100: var(--success-100);
   --color-warning-500: var(--warning-500);
   --color-warning-100: var(--warning-100);
+  --color-warning-fg: var(--warning-fg);
   --color-danger-500: var(--danger-500);
   --color-danger-100: var(--danger-100);
   --color-violet-500: var(--violet-500);
