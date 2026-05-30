@@ -127,6 +127,13 @@ export interface WorkOrderSummary {
   completedDate?: string | null;
   customerOrderNumber?: string | null;
 
+  // Short, backend-derived one-line job blurb for dense list rows. Mechanical
+  // ("first work item + N more") or, for AI-opted-in tenants, an AI-generated
+  // blurb — same field either way, opaque to the FE. Null when the WO has no
+  // work items; render workOrderNumber / type name as the fallback. May upgrade
+  // asynchronously after create/edit, so don't treat it as immutable.
+  summary?: string | null;
+
   // Not-to-exceed cap (currency). Backend stores as BigDecimal; serialized as
   // a JSON number. Null/absent = no cap. Backend rejects negatives.
   notToExceed?: number | null;

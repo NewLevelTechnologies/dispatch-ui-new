@@ -9,7 +9,6 @@ import {
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
 import { getApiErrorMessage } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
-import WorkItemsCell from './WorkItemsCell';
 import {
   Table,
   TableBody,
@@ -161,6 +160,11 @@ export default function WorkOrdersList({
         {items.map((wo) => {
           const priority = wo.priority ?? 'NORMAL';
           const cancelled = wo.lifecycleState === 'CANCELLED';
+          const typeName = safeTypes.find((tp) => tp.id === wo.workOrderTypeId)?.name;
+          // Backend-derived one-line job blurb. Fall back to the type name when a
+          // WO has no work items (null summary); the WO# already has its own
+          // column, so an em-dash — not a duplicated number — is the last resort.
+          const jobLabel = wo.summary || typeName || '—';
           return (
             <TableRow key={wo.id} className={cancelled ? 'opacity-60' : ''}>
               <TableCell className="font-mono text-zinc-500">
@@ -201,13 +205,15 @@ export default function WorkOrdersList({
                 </TableCell>
               )}
               <TableCell>
-                <WorkItemsCell
-                  items={wo.workItems}
-                  totalCount={wo.workItemCount}
-                />
+                <span
+                  className="block max-w-[320px] truncate text-zinc-700 dark:text-zinc-300"
+                  title={jobLabel}
+                >
+                  {jobLabel}
+                </span>
               </TableCell>
               <TableCell className="text-zinc-600 dark:text-zinc-400">
-                {safeTypes.find((tp) => tp.id === wo.workOrderTypeId)?.name ?? '—'}
+                {typeName ?? '—'}
               </TableCell>
               <TableCell>
                 {cancelled ? (
