@@ -37,6 +37,7 @@ const mockSettings = {
   enableOnlineBooking: true,
   enableSmsNotifications: false,
   enableEmailNotifications: true,
+  defaultPremiseType: 'BUSINESS',
   glossary: {},
   updatedAt: '2026-03-27T10:30:00Z',
 };
@@ -149,6 +150,32 @@ describe('CompanyProfilePanel', () => {
         expect.objectContaining({ timezone: 'America/New_York' }),
       );
     });
+  });
+
+  it('saves the default premise type for new locations', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({
+      data: { ...mockSettings, defaultPremiseType: 'RESIDENCE' },
+    });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    // Operating card is the second Edit button.
+    await user.click(editButtons()[1]);
+    await user.click(screen.getByRole('radio', { name: /residence/i }));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith(
+        expect.stringContaining('/tenant'),
+        expect.objectContaining({ defaultPremiseType: 'RESIDENCE' }),
+      );
+    });
+    // Timezone was untouched, so the partial PUT must not include it.
+    expect(apiClient.put).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ timezone: expect.anything() }),
+    );
   });
 
   it('shows loading state while fetching', () => {

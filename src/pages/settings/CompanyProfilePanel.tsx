@@ -7,16 +7,21 @@ import {
   GlobeAltIcon,
   ArrowUpTrayIcon,
   TrashIcon,
+  BuildingOffice2Icon,
+  HomeIcon,
 } from '@heroicons/react/24/outline';
 import {
   tenantSettingsApi,
   type TenantSettings,
   type UpdateTenantSettingsRequest,
+  type PremiseType,
 } from '../../api';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import { PageHead } from '../../components/ui/PageHead';
 import { EditableCard } from '../../components/ui/EditableCard';
 import { Callout } from '../../components/ui/Callout';
+import { ToggleGroup, ToggleGroupOption } from '../../components/ui/ToggleGroup';
+import { PremiseMark } from '../../components/ui/PremiseMark';
 import { Field, Label, Description } from '../../components/catalyst/fieldset';
 import { Input } from '../../components/catalyst/input';
 import { Select } from '../../components/catalyst/select';
@@ -334,10 +339,14 @@ function OperatingCard({ settings, canEdit }: { settings: TenantSettings; canEdi
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [timezone, setTimezone] = useState(settings.timezone);
+  const [premise, setPremise] = useState<PremiseType>(settings.defaultPremiseType);
 
   useEffect(() => {
-    if (!editing) setTimezone(settings.timezone);
-  }, [settings.timezone, editing]);
+    if (!editing) {
+      setTimezone(settings.timezone);
+      setPremise(settings.defaultPremiseType);
+    }
+  }, [settings.timezone, settings.defaultPremiseType, editing]);
 
   // Browser-detected zone. Offered as an explicit override only — the
   // authoritative source is the business address (resolved BE-side). Hidden
@@ -350,20 +359,27 @@ function OperatingCard({ settings, canEdit }: { settings: TenantSettings; canEdi
     }
   }, []);
 
-  const dirty = timezone !== settings.timezone;
+  const dirty = timezone !== settings.timezone || premise !== settings.defaultPremiseType;
 
   const saveMutation = useMutation({
-    mutationFn: () => tenantSettingsApi.updateSettings({ timezone }),
+    // Partial PUT — send only what changed.
+    mutationFn: () => {
+      const payload: UpdateTenantSettingsRequest = {};
+      if (timezone !== settings.timezone) payload.timezone = timezone;
+      if (premise !== settings.defaultPremiseType) payload.defaultPremiseType = premise;
+      return tenantSettingsApi.updateSettings(payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
       setEditing(false);
-      showSuccess('Reporting timezone saved');
+      showSuccess('Operating settings saved');
     },
     onError: (err: unknown) => showError("Couldn't save changes", extractApiError(err)),
   });
 
   const handleCancel = () => {
     setTimezone(settings.timezone);
+    setPremise(settings.defaultPremiseType);
     setEditing(false);
   };
 
@@ -391,7 +407,7 @@ function OperatingCard({ settings, canEdit }: { settings: TenantSettings; canEdi
   return (
     <EditableCard
       title="Operating"
-      subtitle="Time settings that drive your business day. Affects scheduling, invoice aging, end-of-day reports, and 'today' rollups. Customer-facing job times follow each job's service location."
+      subtitle="Defaults that drive your business day — reporting timezone (scheduling, invoice aging, end-of-day reports, 'today' rollups) and the premise type new service locations start as. Customer-facing job times follow each job's service location."
       editing={editing}
       onEdit={canEdit ? () => setEditing(true) : () => {}}
       onCancel={handleCancel}
@@ -400,7 +416,7 @@ function OperatingCard({ settings, canEdit }: { settings: TenantSettings; canEdi
       saveDisabled={!dirty || saveMutation.isPending}
     >
       {editing ? (
-        <div className="max-w-[460px]">
+        <div className="flex max-w-[460px] flex-col gap-4">
           <Field size="xs">
             <Label size="xs" required>Reporting timezone</Label>
             <Select className={dense.select} value={timezone} onChange={(e) => setTimezone(e.target.value)}>
@@ -411,16 +427,32 @@ function OperatingCard({ settings, canEdit }: { settings: TenantSettings; canEdi
             <Description size="xs">
               Defines your business day. Changing it shifts which work orders count as "today," when invoice aging clocks tick over, and how scheduled reports group by date.
             </Description>
+            {detectedZone && detectedZone !== timezone && (
+              <Button plain size="xs" type="button" className="mt-1.5" onClick={() => setTimezone(detectedZone)}>
+                <GlobeAltIcon className="size-3" />
+                Use my device timezone ({detectedZone})
+              </Button>
+            )}
           </Field>
-          {detectedZone && detectedZone !== timezone && (
-            <Button plain size="xs" type="button" className="mt-1.5" onClick={() => setTimezone(detectedZone)}>
-              <GlobeAltIcon className="size-3" />
-              Use my device timezone ({detectedZone})
-            </Button>
-          )}
+          <Field size="xs">
+            <Label size="xs">Default for new service locations</Label>
+            <ToggleGroup<PremiseType> value={premise} onChange={setPremise} aria-label="Default premise type for new service locations" className="mt-1">
+              <ToggleGroupOption value="BUSINESS">
+                <BuildingOffice2Icon className="size-3.5" />
+                Business
+              </ToggleGroupOption>
+              <ToggleGroupOption value="RESIDENCE">
+                <HomeIcon className="size-3.5" />
+                Residence
+              </ToggleGroupOption>
+            </ToggleGroup>
+            <Description size="xs">
+              Applies to new locations only — existing locations keep their current premise. You can override this on any individual location.
+            </Description>
+          </Field>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
           <Kv label="Reporting timezone">
             <span className="inline-flex items-center gap-1.5">
               <GlobeAltIcon className="size-3.5 text-fg-muted" />
@@ -431,6 +463,12 @@ function OperatingCard({ settings, canEdit }: { settings: TenantSettings; canEdi
             <div className="mt-1.5 max-w-[380px] text-[10.5px] leading-[1.45] text-fg-dim">
               {provenance}
             </div>
+          </Kv>
+          <Kv label="New location default">
+            <span className="inline-flex items-center gap-1.5">
+              <PremiseMark premise={settings.defaultPremiseType} />
+              {settings.defaultPremiseType === 'BUSINESS' ? 'Business' : 'Residence'}
+            </span>
           </Kv>
         </div>
       )}
