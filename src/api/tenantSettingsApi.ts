@@ -1,5 +1,8 @@
 // Tenant Settings API Client
 import apiClient from './client';
+// Premise type ('BUSINESS' | 'RESIDENCE') is owned by customerApi (it's a
+// per-location attribute); tenant settings just carry the tenant-wide default.
+import type { PremiseType } from './customerApi';
 
 export interface GlossaryEntry {
   singular: string;
@@ -43,6 +46,9 @@ export interface TenantSettings {
   enableOnlineBooking: boolean;
   enableSmsNotifications: boolean;
   enableEmailNotifications: boolean;
+  // Tenant-wide default applied to new service locations created without an
+  // explicit premise. Always present; server defaults to 'BUSINESS'.
+  defaultPremiseType: PremiseType;
   glossary?: Glossary; // Glossary is part of tenant settings
   updatedAt: string;
 }
@@ -65,6 +71,7 @@ export interface UpdateTenantSettingsRequest {
   enableOnlineBooking?: boolean;
   enableSmsNotifications?: boolean;
   enableEmailNotifications?: boolean;
+  defaultPremiseType?: PremiseType;
   glossary?: Glossary; // Glossary can be updated
 }
 
