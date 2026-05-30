@@ -43,7 +43,6 @@ export function Tabs({
           aria-selected={value === t.id}
           onClick={() => onChange(t.id)}
           className={clsx('tab', value === t.id && 'active')}
-          style={{ all: 'unset', cursor: 'pointer' }}
         >
           {t.label}
           {t.count != null && (

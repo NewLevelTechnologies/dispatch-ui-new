@@ -821,7 +821,7 @@ const KIND_STYLES: Record<Kind, { glyph: string; bg: string; fg: string }> = {
   failed: {
     glyph: '!',
     bg: 'color-mix(in oklch, var(--warning-500) 14%, transparent)',
-    fg: 'oklch(50% 0.16 78)',
+    fg: 'var(--warning-fg)',
   },
   lifecycle: {
     glyph: '+',
@@ -831,7 +831,7 @@ const KIND_STYLES: Record<Kind, { glyph: string; bg: string; fg: string }> = {
   'lifecycle-warn': {
     glyph: '−',
     bg: 'color-mix(in oklch, var(--warning-500) 14%, transparent)',
-    fg: 'oklch(50% 0.16 78)',
+    fg: 'var(--warning-fg)',
   },
 };
 
