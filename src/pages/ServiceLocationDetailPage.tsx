@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string -- dense visual detail page; entity names + major strings go through getName()/t(), but inline glyphs, separators, and short operational labels are kept as literals to keep the dense markup readable (same convention as UserDetailPage). */
 import type React from 'react';
-import { useMemo, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +30,7 @@ import {
   type WorkOrderPriority,
   type WorkOrderSummary,
   type AdditionalContact,
+  type ListEquipmentParams,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -60,7 +61,6 @@ import {
   mockAttention,
   mockUpcomingVisits,
   mockActivityFeed,
-  mockHasOpenWorkOrder,
   type MockTone,
 } from './serviceLocationDetailMocks';
 
@@ -132,6 +132,9 @@ export default function ServiceLocationDetailPage() {
     mutationFn: (equipmentId: string) => equipmentApi.delete(equipmentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment', { serviceLocationId: id }] });
+      // Equipment-tab filter-chip counts (open-WO / warranty) are separate
+      // server-side count queries.
+      queryClient.invalidateQueries({ queryKey: ['equipment-count', id] });
       // WO detail + list caches embed workItems[].equipment summaries.
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
@@ -241,8 +244,7 @@ export default function ServiceLocationDetailPage() {
 
           {activeTab === 'equipment' && (
             <EquipmentTab
-              equipment={equipment}
-              total={equipmentPage?.totalElements ?? equipment.length}
+              serviceLocationId={location.id}
               onAdd={() => {
                 setEditingEquipment(null);
                 setIsEquipmentDialogOpen(true);
@@ -674,14 +676,10 @@ function EquipmentSummaryCard({
     return acc;
   }, [equipment]);
 
-  // A unit's only surfaced state is "has an open work order" — derived from open
-  // WOs (mocked by stable position until WO-1 carries equipment refs on the WO
-  // list). No flagged/attention list: the redesign removed equipment flagging.
-  const openWorkOrderUnits = useMemo(
-    () => equipment.filter((_, i) => mockHasOpenWorkOrder(i)),
-    [equipment]
-  );
-
+  // Pure inventory rollup — count-by-type + "View all". No per-unit / open-WO
+  // line: a location's single open WO (and its equipment) already shows in the
+  // Work orders card directly below, so listing it here too was duplication.
+  // The equipment↔WO link lives in that card's Equipment column + the tab.
   return (
     <Card
       title={<CardTitle icon={<WrenchScrewdriverIcon className="size-3.5" />}>{getName('equipment', true)}</CardTitle>}
@@ -693,37 +691,14 @@ function EquipmentSummaryCard({
           {getName('equipment', true)} not recorded at this site yet.
         </div>
       ) : (
-        <>
-          <div
-            className={`flex flex-wrap items-center gap-4 bg-bg-elev-2 px-3.5 py-2.5 ${openWorkOrderUnits.length > 0 ? 'border-b border-border-soft' : ''}`}
-          >
-            {Object.entries(byType).map(([type, n]) => (
-              <div key={type} className="flex items-center gap-1.5">
-                <span className="font-mono text-[12px] font-bold tabular-nums text-fg-strong">{n}</span>
-                <span className="text-[11.5px] text-fg-muted">{type}</span>
-              </div>
-            ))}
-          </div>
-          {/* Units with an open work order — the one live signal, surfaced as a
-              line each. Derived from open WOs, not a stored flag. */}
-          {openWorkOrderUnits.map((e, i) => (
-            <div
-              key={e.id}
-              className={`grid grid-cols-[110px_1fr_auto] items-center gap-3 px-3.5 py-2 ${i < openWorkOrderUnits.length - 1 ? 'border-b border-border-soft' : ''}`}
-            >
-              <div>
-                <div className="font-mono text-[12px] font-bold text-fg-strong">{e.name}</div>
-                <div className="text-[11px] text-fg-muted">{e.locationOnSite || '—'}</div>
-              </div>
-              <div className="text-[12.5px] font-medium text-fg-strong">
-                {[e.make, e.model].filter(Boolean).join(' ') || e.equipmentTypeName || '—'}
-              </div>
-              <Pill tone="info" dot live>
-                Open work order
-              </Pill>
+        <div className="flex flex-wrap items-center gap-4 bg-bg-elev-2 px-3.5 py-2.5">
+          {Object.entries(byType).map(([type, n]) => (
+            <div key={type} className="flex items-center gap-1.5">
+              <span className="font-mono text-[12px] font-bold tabular-nums text-fg-strong">{n}</span>
+              <span className="text-[11.5px] text-fg-muted">{type}</span>
             </div>
           ))}
-        </>
+        </div>
       )}
     </Card>
   );
@@ -867,8 +842,7 @@ function SiteWorkOrdersCard({
             <thead className="bg-bg-elev-2">
               <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
                 <th className="px-3.5 py-2 font-semibold">{getName('work_order')}</th>
-                {/* Equipment column (count-led) inserts here once WO-1 carries
-                    equipment refs on the WO list projection. */}
+                <th className="px-3.5 py-2 font-semibold">{getName('equipment')}</th>
                 <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
                 {/* Tech column (relevance-resolved) inserts here once WO-2
                     carries primaryTech on the WO row. */}
@@ -930,6 +904,15 @@ function WorkOrderRow({ wo, typeName }: { wo: WorkOrderSummary; typeName?: strin
         <div className="mt-0.5 max-w-[420px] truncate text-[10.5px] text-fg" title={jobLabel}>
           {jobLabel}
         </div>
+      </td>
+      {/* Count-led equipment — label is "RTU-04" (1) or "3 units" (>1); a dash
+          when nothing is linked. Load-bearing since the summary may not name it. */}
+      <td className="px-3.5 py-2">
+        {wo.equip && wo.equip.count > 0 ? (
+          <span className="font-mono text-[11px] text-fg-muted">{wo.equip.label}</span>
+        ) : (
+          <span className="text-[11px] text-fg-dim">—</span>
+        )}
       </td>
       <td className="px-3.5 py-2">
         {cancelled ? (
@@ -1236,20 +1219,20 @@ function NotesCard({ location }: { location: ServiceLocationDetailDto }) {
 
 // ─────────────────────────────────────────────────────────────────────────
 // Equipment tab — search + filter chips → grouped dense table → footer.
-// Identity columns are REAL; health columns (capacity/age/last svc/next PM/
-// warranty/flag) are MOCK until equipment-service carries them.
+// Search and both filter chips are applied SERVER-SIDE (the list endpoint backs
+// search + warrantyExpired + hasOpenWorkOrder), so pagination and counts stay
+// correct. Health columns read off the real EquipmentSummary; Capacity is
+// omitted (no capture path) and Next PM is a dash (no source yet).
 // ─────────────────────────────────────────────────────────────────────────
 type EquipFilter = 'open-wo' | 'warranty' | null;
 
 function EquipmentTab({
-  equipment,
-  total,
+  serviceLocationId,
   onAdd,
   onEdit,
   onDelete,
 }: {
-  equipment: EquipmentSummary[];
-  total: number;
+  serviceLocationId: string;
   onAdd: () => void;
   onEdit: (item: EquipmentSummary) => void;
   onDelete: (item: EquipmentSummary) => void;
@@ -1258,52 +1241,58 @@ function EquipmentTab({
   const { t } = useTranslation();
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<EquipFilter>(null);
+  // Defer the search input so we don't fire a request per keystroke (same
+  // pattern as the global Equipment page).
+  const deferredSearch = useDeferredValue(q.trim());
 
-  // Pair each real unit with its open-WO flag (mock, by stable position, until
-  // WO-1). Every other health field is read straight off the EquipmentSummary.
-  const withOpenWo = useMemo(
-    () => equipment.map((e, i) => ({ e, hasOpenWorkOrder: mockHasOpenWorkOrder(i) })),
-    [equipment]
-  );
+  const listParams: ListEquipmentParams = {
+    serviceLocationId,
+    status: EquipmentStatus.ACTIVE,
+    search: deferredSearch || undefined,
+    warrantyExpired: filter === 'warranty' ? true : undefined,
+    hasOpenWorkOrder: filter === 'open-wo' ? true : undefined,
+    size: 100,
+  };
+  const { data, isLoading } = useQuery({
+    queryKey: ['equipment', listParams],
+    queryFn: () => equipmentApi.list(listParams),
+    enabled: !!serviceLocationId,
+  });
+  const rows = useMemo(() => data?.content ?? [], [data]);
+  const total = data?.totalElements ?? 0;
 
-  // Filters: "Open work order" (the one live state, derived from open WOs) and
-  // "Warranty expired" (a pure field filter on warrantyExpiresAt). No Flagged /
-  // EOL — derived-threshold flagging was cut in the redesign.
-  const counts = useMemo(
-    () => ({
-      openWo: withOpenWo.filter((x) => x.hasOpenWorkOrder).length,
-      warranty: withOpenWo.filter((x) => isWarrantyExpired(x.e.warrantyExpiresAt)).length,
-    }),
-    [withOpenWo]
-  );
-
-  const rows = useMemo(() => {
-    let r = withOpenWo;
-    const needle = q.trim().toLowerCase();
-    if (needle) {
-      r = r.filter(({ e }) =>
-        [e.name, e.equipmentTypeName, e.make, e.model, e.serialNumber, e.locationOnSite]
-          .filter(Boolean)
-          .some((v) => v!.toLowerCase().includes(needle))
-      );
-    }
-    if (filter === 'open-wo') r = r.filter((x) => x.hasOpenWorkOrder);
-    if (filter === 'warranty') r = r.filter((x) => isWarrantyExpired(x.e.warrantyExpiresAt));
-    return r;
-  }, [withOpenWo, q, filter]);
+  // Chip counts come from the server (size:1 → totalElements) so they survive
+  // pagination. Independent of search and of the other chip.
+  const { data: openWoCount } = useQuery({
+    queryKey: ['equipment-count', serviceLocationId, 'open-wo'],
+    queryFn: () =>
+      equipmentApi
+        .list({ serviceLocationId, status: EquipmentStatus.ACTIVE, hasOpenWorkOrder: true, size: 1 })
+        .then((p) => p.totalElements),
+    enabled: !!serviceLocationId,
+  });
+  const { data: warrantyCount } = useQuery({
+    queryKey: ['equipment-count', serviceLocationId, 'warranty'],
+    queryFn: () =>
+      equipmentApi
+        .list({ serviceLocationId, status: EquipmentStatus.ACTIVE, warrantyExpired: true, size: 1 })
+        .then((p) => p.totalElements),
+    enabled: !!serviceLocationId,
+  });
 
   const grouped = useMemo(() => {
-    const acc: Record<string, typeof rows> = {};
-    for (const row of rows) {
-      const type = row.e.equipmentTypeName || 'Other';
-      (acc[type] = acc[type] || []).push(row);
+    const acc: Record<string, EquipmentSummary[]> = {};
+    for (const e of rows) {
+      const type = e.equipmentTypeName || 'Other';
+      (acc[type] = acc[type] || []).push(e);
     }
     return acc;
   }, [rows]);
 
+  const hasFilters = !!deferredSearch || filter !== null;
   const chips: { id: Exclude<EquipFilter, null>; label: string; count: number }[] = [
-    { id: 'open-wo', label: 'Open work order', count: counts.openWo },
-    { id: 'warranty', label: 'Warranty expired', count: counts.warranty },
+    { id: 'open-wo', label: 'Open work order', count: openWoCount ?? 0 },
+    { id: 'warranty', label: 'Warranty expired', count: warrantyCount ?? 0 },
   ];
 
   return (
@@ -1353,7 +1342,6 @@ function EquipmentTab({
         )}
 
         <span className="grow" />
-        <MockBadge />
         <Button color="accent" size="xs" onClick={onAdd}>
           <PlusIcon className="size-4" />
           {t('common.actions.add', { entity: getName('equipment') })}
@@ -1380,16 +1368,22 @@ function EquipmentTab({
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={9} className="px-5 py-10 text-center text-[12px] text-fg-muted">
+                    {t('common.actions.loading', { entities: getName('equipment', true) })}
+                  </td>
+                </tr>
+              ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-5 py-10 text-center">
                     <div className="text-[13px] font-semibold text-fg-strong">
-                      {equipment.length === 0
-                        ? t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })
-                        : 'No equipment matches'}
+                      {hasFilters
+                        ? 'No equipment matches'
+                        : t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
                     </div>
                     <div className="mt-1 text-[12px] text-fg-muted">
-                      {equipment.length === 0 ? 'Add equipment to get started.' : 'Adjust your search or clear filters.'}
+                      {hasFilters ? 'Adjust your search or clear filters.' : 'Add equipment to get started.'}
                     </div>
                   </td>
                 </tr>
@@ -1401,14 +1395,8 @@ function EquipmentTab({
                       <span className="ml-2 font-mono text-[10.5px] tabular-nums text-fg-muted">{items.length}</span>
                     </td>
                   </tr>,
-                  ...items.map(({ e, hasOpenWorkOrder }) => (
-                    <EquipmentRow
-                      key={e.id}
-                      e={e}
-                      hasOpenWorkOrder={hasOpenWorkOrder}
-                      onEdit={onEdit}
-                      onDelete={onDelete}
-                    />
+                  ...items.map((e) => (
+                    <EquipmentRow key={e.id} e={e} onEdit={onEdit} onDelete={onDelete} />
                   )),
                 ])
               )}
@@ -1427,12 +1415,10 @@ function EquipmentTab({
 
 function EquipmentRow({
   e,
-  hasOpenWorkOrder,
   onEdit,
   onDelete,
 }: {
   e: EquipmentSummary;
-  hasOpenWorkOrder: boolean;
   onEdit: (item: EquipmentSummary) => void;
   onDelete: (item: EquipmentSummary) => void;
 }) {
@@ -1442,7 +1428,7 @@ function EquipmentRow({
   const warrantyExpired = isWarrantyExpired(e.warrantyExpiresAt);
   // The only live state is an open work order; tint that row info. No
   // flag/attention tint — equipment flagging was removed in the redesign.
-  const tint = hasOpenWorkOrder ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]' : '';
+  const tint = e.hasOpenWorkOrder ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]' : '';
 
   return (
     <tr
@@ -1457,7 +1443,7 @@ function EquipmentRow({
         <div className="flex items-center gap-2.5">
           <EquipmentThumbnail url={e.profileImageUrl} name={e.name} sizeClass="size-8" fit="contain" />
           <div className="min-w-0">
-            <div className="font-mono text-[12px] font-bold text-fg-strong">{e.name}</div>
+            <div className="truncate font-mono text-[12px] font-bold text-fg-strong">{e.name}</div>
             {e.serialNumber && <div className="truncate text-[11px] text-fg-muted">{e.serialNumber}</div>}
           </div>
         </div>
@@ -1478,7 +1464,7 @@ function EquipmentRow({
         {!e.warrantyExpiresAt ? '—' : warrantyExpired ? 'Expired' : `Thru ${formatWoDate(e.warrantyExpiresAt)}`}
       </td>
       <td className="px-3.5 py-2">
-        {hasOpenWorkOrder ? (
+        {e.hasOpenWorkOrder ? (
           <Pill tone="info" dot live>
             Open work order
           </Pill>

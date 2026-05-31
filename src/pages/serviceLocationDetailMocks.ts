@@ -20,8 +20,6 @@
 //   - Live-tech detail (name / WO / since)  → dispatch / scheduling-service
 //   - Open-job counts                        → work-order-service
 //   - PM-overdue                             → scheduling-service
-//   - Equipment health (capacity/age/last svc/next PM/warranty + open-WO flag)
-//                                            → work-order-service (EQ-1 / WO-1)
 //   - Upcoming / forward visits (count + "Next scheduled" strip)
 //                                            → scheduling-service (AG-2)
 //   - Operational activity feed              → (cross-service feed)
@@ -96,16 +94,3 @@ export const mockActivityFeed: MockActivityEvent[] = [
   { ts: '3 d', glyph: '✓', text: 'Visit completed · WO-4144', sub: 'AHU-2 compressor diagnostic · 1.5h', tone: 'success' },
   { ts: '6 d', glyph: '★', text: 'Equipment baseline updated', sub: 'AHU-2 draw +8% vs Jun baseline · alert set', tone: 'accent' },
 ];
-
-// ── Equipment: open-work-order flag (WO-1) ──────────────────────────────────
-// A unit's only live state is "has an open work order" — derived from open WOs,
-// the redesign removed all other flagging. It isn't in the equipment payload
-// (that's the WO-1 work-order-service pass), so it's mocked by stable position
-// until then. Every OTHER health column — age (installDate), last service
-// (lastServicedAt), warranty (warrantyExpiresAt), thumbnail (profileImageUrl) —
-// now comes from the real EquipmentSummary; see the page. (Capacity has no
-// capture path yet; nextPm has no backend source yet.)
-export function mockHasOpenWorkOrder(index: number): boolean {
-  // ~1 in 5 units, deterministic by position.
-  return index % 5 === 4;
-}

@@ -101,6 +101,10 @@ export interface EquipmentSummary {
   lastServicedAt?: string | null;
   warrantyExpiresAt?: string | null;
   attributes?: string;
+  // True when this unit is referenced by an open work order (active, not
+  // completed, not cancelled). Backend-derived per row — drives the "Open work
+  // order" pill + filter. No FE cross-referencing of the WO list needed.
+  hasOpenWorkOrder?: boolean;
   customerName?: string | null;
   // Populated on the descendants endpoint — lets the UI reconstruct the
   // parent/child tree from a flat array. May be omitted on other endpoints.
@@ -172,6 +176,12 @@ export interface ListEquipmentParams {
   equipmentCategoryId?: string;
   search?: string;
   status?: EquipmentStatus;
+  // Server-side filter flags (default false on the backend; omit to not filter).
+  // warrantyExpired: only units whose warrantyExpiresAt is in the past.
+  // hasOpenWorkOrder: only units referenced by an open (active, not
+  // completed/cancelled) work order. Both paginate + count correctly server-side.
+  warrantyExpired?: boolean;
+  hasOpenWorkOrder?: boolean;
   sortBy?: EquipmentSortField;
   sortDir?: EquipmentSortDirection;
   page?: number;
