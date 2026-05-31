@@ -97,31 +97,15 @@ export const mockActivityFeed: MockActivityEvent[] = [
   { ts: '6 d', glyph: '★', text: 'Equipment baseline updated', sub: 'AHU-2 draw +8% vs Jun baseline · alert set', tone: 'accent' },
 ];
 
-// ── Equipment tab: per-unit health columns ──────────────────────────────────
-// Backend ask EQ-1: work-order-service health fields on equipment — capacity,
-// age, last service, next PM, warranty. Real equipment today carries identity
-// only (name, type, make/model, serial, location-on-site).
-//
-// `hasOpenWorkOrder` is the unit's ONLY live state (the redesign removed all
-// flagging). It is derived from open work orders, not stored — once WO-1
-// (equipment refs on the WO list) lands, derive it from the real WOs and drop
-// this mock field. Mocked here so the "Open work order" pill/filter demo works.
-export interface MockEquipmentHealth {
-  capacity: string;
-  ageYrs: number;
-  lastSvc: string;
-  nextPm: string;
-  warranty: string;
-  hasOpenWorkOrder: boolean;
-}
-const EQUIPMENT_HEALTH_VARIANTS: MockEquipmentHealth[] = [
-  { capacity: '5 ton', ageYrs: 6, lastSvc: '2 mo ago', nextPm: 'Sep 22, 2026', warranty: 'Parts thru Mar 2030', hasOpenWorkOrder: false },
-  { capacity: '5 ton', ageYrs: 11, lastSvc: '3 wk ago', nextPm: 'Sep 22, 2026', warranty: 'Expired', hasOpenWorkOrder: false },
-  { capacity: '3 ton', ageYrs: 6, lastSvc: '5 mo ago', nextPm: 'Sep 22, 2026', warranty: 'Parts thru Mar 2030', hasOpenWorkOrder: false },
-  { capacity: '199 kBTU', ageYrs: 6, lastSvc: '8 mo ago', nextPm: 'Oct 14, 2026', warranty: 'Tank thru Apr 2032', hasOpenWorkOrder: false },
-  { capacity: '5 ton', ageYrs: 6, lastSvc: '5 mo ago', nextPm: 'Sep 22, 2026', warranty: 'Parts thru Mar 2030', hasOpenWorkOrder: true },
-];
-// Deterministic by position so a given row is stable across re-renders.
-export function mockEquipmentHealth(index: number): MockEquipmentHealth {
-  return EQUIPMENT_HEALTH_VARIANTS[index % EQUIPMENT_HEALTH_VARIANTS.length];
+// ── Equipment: open-work-order flag (WO-1) ──────────────────────────────────
+// A unit's only live state is "has an open work order" — derived from open WOs,
+// the redesign removed all other flagging. It isn't in the equipment payload
+// (that's the WO-1 work-order-service pass), so it's mocked by stable position
+// until then. Every OTHER health column — age (installDate), last service
+// (lastServicedAt), warranty (warrantyExpiresAt), thumbnail (profileImageUrl) —
+// now comes from the real EquipmentSummary; see the page. (Capacity has no
+// capture path yet; nextPm has no backend source yet.)
+export function mockHasOpenWorkOrder(index: number): boolean {
+  // ~1 in 5 units, deterministic by position.
+  return index % 5 === 4;
 }

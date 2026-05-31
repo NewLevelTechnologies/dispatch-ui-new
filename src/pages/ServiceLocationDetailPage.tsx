@@ -39,6 +39,7 @@ import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import WorkOrdersList from '../components/WorkOrdersList';
 import NotificationLogsList from '../components/NotificationLogsList';
 import AdditionalContactsList from '../components/AdditionalContactsList';
+import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import ConfirmDialog from '../components/ConfirmDialog';
 import IconButton from '../components/IconButton';
 import { Card } from '../components/catalyst/card';
@@ -53,7 +54,7 @@ import {
   mockAttention,
   mockUpcomingVisits,
   mockActivityFeed,
-  mockEquipmentHealth,
+  mockHasOpenWorkOrder,
   type MockTone,
 } from './serviceLocationDetailMocks';
 
@@ -671,7 +672,7 @@ function EquipmentSummaryCard({
   // WOs (mocked by stable position until WO-1 carries equipment refs on the WO
   // list). No flagged/attention list: the redesign removed equipment flagging.
   const openWorkOrderUnits = useMemo(
-    () => equipment.map((e, i) => ({ e, h: mockEquipmentHealth(i) })).filter((x) => x.h.hasOpenWorkOrder),
+    () => equipment.filter((_, i) => mockHasOpenWorkOrder(i)),
     [equipment]
   );
 
@@ -699,7 +700,7 @@ function EquipmentSummaryCard({
           </div>
           {/* Units with an open work order — the one live signal, surfaced as a
               line each. Derived from open WOs, not a stored flag. */}
-          {openWorkOrderUnits.map(({ e }, i) => (
+          {openWorkOrderUnits.map((e, i) => (
             <div
               key={e.id}
               className={`grid grid-cols-[110px_1fr_auto] items-center gap-3 px-3.5 py-2 ${i < openWorkOrderUnits.length - 1 ? 'border-b border-border-soft' : ''}`}
@@ -750,6 +751,23 @@ const WO_PRIORITY_KEY: Record<WorkOrderPriority, string> = {
 function formatWoDate(iso: string | null | undefined): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// Equipment health derivations over the real EquipmentSummary payload.
+// Age: whole years since installDate (null → unknown). Warranty: expired when
+// warrantyExpiresAt is in the past; null means never under warranty (not
+// "expired"), so it's excluded from the filter and renders as a dash.
+function equipmentAgeYears(installDate?: string | null): number | null {
+  if (!installDate) return null;
+  const then = new Date(installDate).getTime();
+  if (Number.isNaN(then)) return null;
+  return Math.max(0, Math.floor((Date.now() - then) / (365.25 * 24 * 60 * 60 * 1000)));
+}
+
+function isWarrantyExpired(warrantyExpiresAt?: string | null): boolean {
+  if (!warrantyExpiresAt) return false;
+  const t = new Date(warrantyExpiresAt).getTime();
+  return !Number.isNaN(t) && t < Date.now();
 }
 
 const woIsOpen = (wo: WorkOrderSummary) =>
@@ -1138,25 +1156,26 @@ function EquipmentTab({
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<EquipFilter>(null);
 
-  // Pair each real unit with its mock health record once, by stable position.
-  const withHealth = useMemo(
-    () => equipment.map((e, i) => ({ e, h: mockEquipmentHealth(i) })),
+  // Pair each real unit with its open-WO flag (mock, by stable position, until
+  // WO-1). Every other health field is read straight off the EquipmentSummary.
+  const withOpenWo = useMemo(
+    () => equipment.map((e, i) => ({ e, hasOpenWorkOrder: mockHasOpenWorkOrder(i) })),
     [equipment]
   );
 
   // Filters: "Open work order" (the one live state, derived from open WOs) and
-  // "Warranty expired" (a pure field filter). No Flagged / EOL — derived-
-  // threshold flagging was cut in the redesign.
+  // "Warranty expired" (a pure field filter on warrantyExpiresAt). No Flagged /
+  // EOL — derived-threshold flagging was cut in the redesign.
   const counts = useMemo(
     () => ({
-      openWo: withHealth.filter((x) => x.h.hasOpenWorkOrder).length,
-      warranty: withHealth.filter((x) => /expired/i.test(x.h.warranty)).length,
+      openWo: withOpenWo.filter((x) => x.hasOpenWorkOrder).length,
+      warranty: withOpenWo.filter((x) => isWarrantyExpired(x.e.warrantyExpiresAt)).length,
     }),
-    [withHealth]
+    [withOpenWo]
   );
 
   const rows = useMemo(() => {
-    let r = withHealth;
+    let r = withOpenWo;
     const needle = q.trim().toLowerCase();
     if (needle) {
       r = r.filter(({ e }) =>
@@ -1165,10 +1184,10 @@ function EquipmentTab({
           .some((v) => v!.toLowerCase().includes(needle))
       );
     }
-    if (filter === 'open-wo') r = r.filter((x) => x.h.hasOpenWorkOrder);
-    if (filter === 'warranty') r = r.filter((x) => /expired/i.test(x.h.warranty));
+    if (filter === 'open-wo') r = r.filter((x) => x.hasOpenWorkOrder);
+    if (filter === 'warranty') r = r.filter((x) => isWarrantyExpired(x.e.warrantyExpiresAt));
     return r;
-  }, [withHealth, q, filter]);
+  }, [withOpenWo, q, filter]);
 
   const grouped = useMemo(() => {
     const acc: Record<string, typeof rows> = {};
@@ -1243,10 +1262,12 @@ function EquipmentTab({
           <table className="w-full border-collapse text-[12px]">
             <thead className="bg-bg-elev-2">
               <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+                {/* Capacity column omitted — it lives in attributes.capacity
+                    and nothing captures it yet, so it'd be empty for every row.
+                    Restore it once there's a capture path. */}
                 <th className="px-3.5 py-2 font-semibold">{getName('equipment')}</th>
                 <th className="px-3.5 py-2 font-semibold">Make / Model</th>
                 <th className="px-3.5 py-2 font-semibold">Location on site</th>
-                <th className="px-3.5 py-2 font-semibold">Capacity</th>
                 <th className="px-3.5 py-2 text-right font-semibold">Age</th>
                 <th className="px-3.5 py-2 font-semibold">Last service</th>
                 <th className="px-3.5 py-2 font-semibold">Next PM</th>
@@ -1258,7 +1279,7 @@ function EquipmentTab({
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-5 py-10 text-center">
+                  <td colSpan={9} className="px-5 py-10 text-center">
                     <div className="text-[13px] font-semibold text-fg-strong">
                       {equipment.length === 0
                         ? t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })
@@ -1272,13 +1293,19 @@ function EquipmentTab({
               ) : (
                 Object.entries(grouped).flatMap(([type, items]) => [
                   <tr key={`h-${type}`}>
-                    <td colSpan={10} className="border-y border-border-soft bg-bg-elev-2 px-3.5 py-1.5">
+                    <td colSpan={9} className="border-y border-border-soft bg-bg-elev-2 px-3.5 py-1.5">
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-strong">{type}</span>
                       <span className="ml-2 font-mono text-[10.5px] tabular-nums text-fg-muted">{items.length}</span>
                     </td>
                   </tr>,
-                  ...items.map(({ e, h }) => (
-                    <EquipmentRow key={e.id} e={e} h={h} onEdit={onEdit} onDelete={onDelete} />
+                  ...items.map(({ e, hasOpenWorkOrder }) => (
+                    <EquipmentRow
+                      key={e.id}
+                      e={e}
+                      hasOpenWorkOrder={hasOpenWorkOrder}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                    />
                   )),
                 ])
               )}
@@ -1297,21 +1324,22 @@ function EquipmentTab({
 
 function EquipmentRow({
   e,
-  h,
+  hasOpenWorkOrder,
   onEdit,
   onDelete,
 }: {
   e: EquipmentSummary;
-  h: ReturnType<typeof mockEquipmentHealth>;
+  hasOpenWorkOrder: boolean;
   onEdit: (item: EquipmentSummary) => void;
   onDelete: (item: EquipmentSummary) => void;
 }) {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const warrantyExpired = /expired/i.test(h.warranty);
+  const age = equipmentAgeYears(e.installDate);
+  const warrantyExpired = isWarrantyExpired(e.warrantyExpiresAt);
   // The only live state is an open work order; tint that row info. No
   // flag/attention tint — equipment flagging was removed in the redesign.
-  const tint = h.hasOpenWorkOrder ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]' : '';
+  const tint = hasOpenWorkOrder ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]' : '';
 
   return (
     <tr
@@ -1323,21 +1351,31 @@ function EquipmentRow({
       }}
     >
       <td className="px-3.5 py-2">
-        <div className="font-mono text-[12px] font-bold text-fg-strong">{e.name}</div>
-        {e.serialNumber && <div className="text-[11px] text-fg-muted">{e.serialNumber}</div>}
+        <div className="flex items-center gap-2.5">
+          <EquipmentThumbnail url={e.profileImageUrl} name={e.name} sizeClass="size-8" fit="contain" />
+          <div className="min-w-0">
+            <div className="font-mono text-[12px] font-bold text-fg-strong">{e.name}</div>
+            {e.serialNumber && <div className="truncate text-[11px] text-fg-muted">{e.serialNumber}</div>}
+          </div>
+        </div>
       </td>
       <td className="px-3.5 py-2">
         <div className="text-[12px] text-fg">{e.make || '—'}</div>
         {e.model && <div className="font-mono text-[11px] text-fg-muted">{e.model}</div>}
       </td>
       <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{e.locationOnSite || '—'}</td>
-      <td className="px-3.5 py-2 font-mono text-[11px] text-fg">{h.capacity}</td>
-      <td className="px-3.5 py-2 text-right font-mono text-[12px] font-semibold tabular-nums text-fg-strong">{h.ageYrs}y</td>
-      <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{h.lastSvc}</td>
-      <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{h.nextPm}</td>
-      <td className={`px-3.5 py-2 text-[11.5px] ${warrantyExpired ? 'text-fg-dim' : 'text-fg-muted'}`}>{h.warranty}</td>
+      <td className="px-3.5 py-2 text-right font-mono text-[12px] font-semibold tabular-nums text-fg-strong">
+        {age === null ? <span className="text-fg-dim">—</span> : `${age}y`}
+      </td>
+      <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{formatWoDate(e.lastServicedAt)}</td>
+      {/* Next PM has no backend source yet — unblocks with the agreement /
+          recurring-visit work. */}
+      <td className="px-3.5 py-2 text-[11.5px] text-fg-dim">—</td>
+      <td className={`px-3.5 py-2 text-[11.5px] ${warrantyExpired ? 'text-fg-dim' : 'text-fg-muted'}`}>
+        {!e.warrantyExpiresAt ? '—' : warrantyExpired ? 'Expired' : `Thru ${formatWoDate(e.warrantyExpiresAt)}`}
+      </td>
       <td className="px-3.5 py-2">
-        {h.hasOpenWorkOrder ? (
+        {hasOpenWorkOrder ? (
           <Pill tone="info" dot live>
             Open work order
           </Pill>

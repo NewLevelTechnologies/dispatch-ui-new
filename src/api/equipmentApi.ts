@@ -90,6 +90,17 @@ export interface EquipmentSummary {
   // Presigned URL of the profile image, if any. Short-lived; re-fetch on
   // navigation rather than caching.
   profileImageUrl?: string | null;
+  // ── Health fields (equipment-service) ──
+  // installDate: ISO LocalDate or null → derive Age (years) client-side.
+  // lastServicedAt: ISO Instant or null → "last service" date.
+  // warrantyExpiresAt: ISO LocalDate or null (null = never under warranty) →
+  //   derive expired/ok client-side. attributes: freeform JSON string; capacity
+  //   (if ever captured) lives at attributes.capacity — nothing captures it
+  //   today, so it's effectively empty for now.
+  installDate?: string | null;
+  lastServicedAt?: string | null;
+  warrantyExpiresAt?: string | null;
+  attributes?: string;
   customerName?: string | null;
   // Populated on the descendants endpoint — lets the UI reconstruct the
   // parent/child tree from a flat array. May be omitted on other endpoints.
