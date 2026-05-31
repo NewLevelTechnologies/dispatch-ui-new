@@ -161,6 +161,12 @@ export interface WorkOrderSummary {
   workItemCount: number;
   workItems: WorkItemSummaryProjection[];
 
+  // Count-led equipment summary for dense list rows: `label` is precomputed by
+  // the backend (the unit name when count === 1, else "N units"); `count` is 0
+  // when no equipment is linked. Load-bearing on rows where the AI summary
+  // doesn't name the equipment.
+  equip?: { label: string; count: number } | null;
+
   createdAt: string;
   updatedAt: string;
 }
