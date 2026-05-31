@@ -13,11 +13,15 @@ import {
   UserIcon,
   ReceiptPercentIcon,
   MagnifyingGlassIcon,
+  PencilIcon,
+  TrashIcon,
+  BellIcon,
 } from '@heroicons/react/24/outline';
 import {
   customerApi,
   equipmentApi,
   workOrderTypesApi,
+  contactApi,
   EquipmentStatus,
   type Equipment,
   type EquipmentSummary,
@@ -25,6 +29,7 @@ import {
   type ProgressCategory,
   type WorkOrderPriority,
   type WorkOrderSummary,
+  type AdditionalContact,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -38,7 +43,8 @@ import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import WorkOrdersList from '../components/WorkOrdersList';
 import NotificationLogsList from '../components/NotificationLogsList';
-import AdditionalContactsList from '../components/AdditionalContactsList';
+import AdditionalContactFormDialog from '../components/AdditionalContactFormDialog';
+import NotificationPreferencesDialog from '../components/NotificationPreferencesDialog';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import ConfirmDialog from '../components/ConfirmDialog';
 import IconButton from '../components/IconButton';
@@ -537,7 +543,7 @@ function OverviewTab({
         {/* Right rail — reference / pre-arrival. Ends at Tags. */}
         <div className="flex flex-col gap-3">
           <SiteInstructionsCard location={location} onEdit={canEdit ? onEdit : undefined} />
-          <SiteContactCard location={location} canEdit={canEdit} />
+          <SiteContactCard location={location} canEdit={canEdit} onEdit={canEdit ? onEdit : undefined} />
           <ParentCustomerCard location={location} />
           <TagsCard location={location} />
         </div>
@@ -919,7 +925,9 @@ function WorkOrderRow({ wo, typeName }: { wo: WorkOrderSummary; typeName?: strin
             </span>
           )}
         </div>
-        <div className="mt-0.5 max-w-[420px] truncate text-[12px] text-fg" title={jobLabel}>
+        {/* AI/derived summary as the .bot subline — subordinate to the WO id
+            above it (10.5px), but --fg (not dim) since it's real content. */}
+        <div className="mt-0.5 max-w-[420px] truncate text-[10.5px] text-fg" title={jobLabel}>
           {jobLabel}
         </div>
       </td>
@@ -1016,19 +1024,49 @@ function SiteInstructionsCard({
   );
 }
 
+// Mirrors the mock's Site contact card: a primary contact block, then a
+// compact "Backup" list. The site contact (name/phone/email — the record has
+// no title or after-hours field, so those are omitted) is the primary; the
+// optional additionalContacts are the backups. Backup rows keep full CRUD
+// (add/edit/delete + notification prefs) via the same dialogs the old table
+// used, surfaced as hover actions to stay dense in the 340px rail.
 function SiteContactCard({
   location,
   canEdit,
+  onEdit,
 }: {
   location: ServiceLocationDetailDto;
   canEdit: boolean;
+  onEdit?: () => void;
 }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [contactDialog, setContactDialog] = useState<{ open: boolean; contact: AdditionalContact | null }>({
+    open: false,
+    contact: null,
+  });
+  const [contactToDelete, setContactToDelete] = useState<AdditionalContact | null>(null);
+  const [notifyContact, setNotifyContact] = useState<AdditionalContact | null>(null);
+
   const hasSiteContact = location.siteContactName || location.siteContactPhone || location.siteContactEmail;
-  const showContacts = location.additionalContacts.length > 0 || canEdit;
+  const additional = location.additionalContacts;
+
+  const deleteMutation = useMutation({
+    mutationFn: (contactId: string) => contactApi.deleteServiceLocationContact(location.id, contactId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['service-location', location.id] });
+      setContactToDelete(null);
+    },
+    onError: (err) =>
+      showError(t('common.form.errorDelete', { entity: t('contacts.entity') }), extractApiError(err) ?? undefined),
+  });
 
   return (
-    <Card title={<CardTitle icon={<UserIcon className="size-3.5" />}>{t('serviceLocations.detail.siteContact')}</CardTitle>}>
+    <Card
+      title={<CardTitle icon={<UserIcon className="size-3.5" />}>{t('serviceLocations.detail.siteContact')}</CardTitle>}
+      action={canEdit && onEdit ? <CardLink onClick={onEdit}>{t('common.edit')}</CardLink> : undefined}
+    >
+      {/* Primary site contact */}
       {hasSiteContact ? (
         <div className="space-y-0.5">
           {location.siteContactName && (
@@ -1049,19 +1087,84 @@ function SiteContactCard({
         <div className="text-[12px] text-fg-muted">No site contact on file.</div>
       )}
 
-      {showContacts && (
+      {/* Additional contacts — compact single-line rows (name left, phone
+          flush-right), matching the design. The record has no title field, so
+          the mock's "· {title}" is omitted. CRUD reveals on hover (swapping in
+          for the phone) to stay dense in the rail. */}
+      {(additional.length > 0 || canEdit) && (
         <div className="mt-2.5 border-t border-dashed border-border-soft pt-2.5">
-          <AdditionalContactsList
-            contacts={location.additionalContacts}
-            parentId={location.id}
-            parentType="serviceLocation"
-            customerId={location.customerId}
-            queryKey={['service-location', location.id]}
-            canEdit={canEdit}
-            showAddButton={canEdit}
-          />
+          <div className="mb-1.5 flex items-center justify-between">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Additional</div>
+            {canEdit && (
+              <button
+                onClick={() => setContactDialog({ open: true, contact: null })}
+                className="text-[10px] font-medium text-fg-accent hover:underline"
+              >
+                + Add
+              </button>
+            )}
+          </div>
+          {additional.length === 0 ? (
+            <div className="text-[11.5px] italic text-fg-dim">No additional contacts.</div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {additional.map((c) => {
+                const value = c.phone ? formatPhone(c.phone) : c.email || '';
+                return (
+                  <div key={c.id} className="group flex items-baseline justify-between gap-2 text-[11.5px]">
+                    <span className="min-w-0 truncate font-semibold text-fg-strong">{c.name}</span>
+                    <span className="flex shrink-0 items-center">
+                      {value && (
+                        <span className={`font-mono text-fg-muted ${canEdit ? 'group-hover:hidden' : ''}`}>{value}</span>
+                      )}
+                      {canEdit && (
+                        <span className="hidden items-center gap-1.5 text-fg-dim group-hover:flex">
+                          <button onClick={() => setNotifyContact(c)} aria-label={t('notifications.preferences.manage')} className="hover:text-fg-strong">
+                            <BellIcon className="size-3.5" />
+                          </button>
+                          <button onClick={() => setContactDialog({ open: true, contact: c })} aria-label={t('common.edit')} className="hover:text-fg-strong">
+                            <PencilIcon className="size-3.5" />
+                          </button>
+                          <button onClick={() => setContactToDelete(c)} aria-label={t('common.delete')} className="hover:text-danger-500">
+                            <TrashIcon className="size-3.5" />
+                          </button>
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
+
+      <AdditionalContactFormDialog
+        isOpen={contactDialog.open}
+        onClose={() => setContactDialog({ open: false, contact: null })}
+        parentId={location.id}
+        parentType="serviceLocation"
+        customerId={location.customerId}
+        contact={contactDialog.contact}
+        queryKey={['service-location', location.id]}
+      />
+      <ConfirmDialog
+        isOpen={!!contactToDelete}
+        onClose={() => setContactToDelete(null)}
+        onConfirm={() => contactToDelete && deleteMutation.mutate(contactToDelete.id)}
+        title={t('contacts.delete.title')}
+        message={t('contacts.delete.message', { name: contactToDelete?.name || '' })}
+        confirmLabel={t('common.delete')}
+        isDestructive
+        isPending={deleteMutation.isPending}
+      />
+      <NotificationPreferencesDialog
+        isOpen={!!notifyContact}
+        onClose={() => setNotifyContact(null)}
+        customerId={location.customerId}
+        contact={notifyContact}
+        contactName={notifyContact?.name || ''}
+      />
     </Card>
   );
 }
