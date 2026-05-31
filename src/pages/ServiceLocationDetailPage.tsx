@@ -10,7 +10,6 @@ import {
   PlusIcon,
   WrenchScrewdriverIcon,
   ChartBarIcon,
-  CalendarDaysIcon,
   UserIcon,
   ReceiptPercentIcon,
   MagnifyingGlassIcon,
@@ -18,10 +17,14 @@ import {
 import {
   customerApi,
   equipmentApi,
+  workOrderTypesApi,
   EquipmentStatus,
   type Equipment,
   type EquipmentSummary,
   type ServiceLocationSearchResult,
+  type ProgressCategory,
+  type WorkOrderPriority,
+  type WorkOrderSummary,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -54,7 +57,7 @@ import {
   type MockTone,
 } from './serviceLocationDetailMocks';
 
-type TabId = 'overview' | 'equipment' | 'jobs' | 'visits' | 'contacts' | 'files' | 'activity';
+type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'visits' | 'contacts' | 'files' | 'activity';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Smart back-link. Up-direction is dynamic — users land here from a work
@@ -71,7 +74,10 @@ function useBackContext(location: ServiceLocationDetailDto): { label: string; hr
     return { label: id, href: `/work-orders/${id}` };
   }
   if (from === 'locations') {
-    return { label: 'All locations', href: '/service-locations' };
+    // Spec labels this "All locations · {customer}". There's no per-customer
+    // locations route yet, so the href stays the global list; the customer
+    // name rides the label for context.
+    return { label: `All locations · ${location.customerName}`, href: '/service-locations' };
   }
   if (from === 'search') {
     const q = params.get('q');
@@ -182,6 +188,9 @@ export default function ServiceLocationDetailPage() {
     { id: 'overview', label: t('serviceLocations.tabs.overview') },
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements ?? equipment.length },
     { id: 'jobs', label: getName('work_order', true), count: workOrdersData?.totalElements ?? 0 },
+    // No per-location invoice count source yet (CNT-1 / FIN-1) — renders without
+    // a count badge until the finance slice lands.
+    { id: 'invoices', label: getName('invoice', true) },
     { id: 'visits', label: getName('dispatch', true), count: mockUpcomingVisits.length },
     { id: 'contacts', label: 'Contacts', count: contactCount },
     { id: 'files', label: 'Files' },
@@ -216,6 +225,7 @@ export default function ServiceLocationDetailPage() {
               equipment={equipment}
               onViewEquipment={() => setActiveTab('equipment')}
               onViewJobs={() => setActiveTab('jobs')}
+              onViewActivity={() => setActiveTab('activity')}
               onNewJob={() => setIsNewWorkOrderOpen(true)}
               onEdit={canEditServiceLocations ? () => setIsEditDialogOpen(true) : undefined}
               canEdit={canEditServiceLocations}
@@ -252,6 +262,9 @@ export default function ServiceLocationDetailPage() {
             </Card>
           )}
 
+          {/* Invoices content is blocked on the per-location finance slice
+              (FIN-1). Stubbed in this shell pass; built when that lands. */}
+          {activeTab === 'invoices' && <TabStub label={getName('invoice', true)} />}
           {activeTab === 'visits' && <TabStub label={getName('dispatch', true)} />}
           {activeTab === 'contacts' && <TabStub label="Contacts" />}
           {activeTab === 'files' && <TabStub label="Files" />}
@@ -489,6 +502,7 @@ function OverviewTab({
   equipment,
   onViewEquipment,
   onViewJobs,
+  onViewActivity,
   onNewJob,
   onEdit,
   canEdit,
@@ -497,6 +511,7 @@ function OverviewTab({
   equipment: EquipmentSummary[];
   onViewEquipment: () => void;
   onViewJobs: () => void;
+  onViewActivity: () => void;
   onNewJob: () => void;
   onEdit?: () => void;
   canEdit: boolean;
@@ -508,21 +523,22 @@ function OverviewTab({
       {attentionItems.length > 0 && <AttentionStrip items={attentionItems} />}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
-        {/* Left rail — operational */}
+        {/* Left rail — operational reality + durable knowledge. Notes are
+            promoted here (prose needs the width); Activity is demoted to a
+            one-line teaser (the overview is current-state, not a logfile). */}
         <div className="flex flex-col gap-3">
-          <EquipmentSummaryCard equipment={equipment} onViewAll={onViewEquipment} onNewJob={onNewJob} />
+          <EquipmentSummaryCard equipment={equipment} onViewAll={onViewEquipment} />
           <SiteWorkOrdersCard location={location} onViewAll={onViewJobs} onNewJob={onNewJob} />
-          <UpcomingVisitsCard />
-          <OperationalActivityCard />
+          <NotesCard location={location} />
+          <ActivityTeaser onViewActivity={onViewActivity} />
         </div>
 
-        {/* Right rail — reference / pre-arrival */}
+        {/* Right rail — reference / pre-arrival. Ends at Tags. */}
         <div className="flex flex-col gap-3">
           <SiteInstructionsCard location={location} onEdit={canEdit ? onEdit : undefined} />
           <SiteContactCard location={location} canEdit={canEdit} />
           <ParentCustomerCard location={location} />
           <TagsCard location={location} />
-          <NotesCard location={location} />
         </div>
       </div>
     </div>
@@ -541,9 +557,11 @@ type AttentionItem = {
 // flags (location.techOnSite / location.hasOpenJobs). Their descriptive detail
 // (tech name / WO / since, open-job counts) still comes from mockAttention —
 // that detail lives in dispatch / work-order services that aren't wired here.
-// PM-overdue and equipment-flagged rows remain fully mock (scheduling +
-// equipment-health services not built). Agreement SLA context was dropped (no
-// agreement service exists).
+// The PM-overdue row remains fully mock (scheduling service not built).
+// Agreement SLA context was dropped (no agreement service exists). There is no
+// equipment-flagged rule — the redesign removed equipment flagging entirely; a
+// unit's only live state is whether it has an open work order, which surfaces in
+// the work-order list, not the attention strip.
 function buildAttentionItems(location: ServiceLocationDetailDto): AttentionItem[] {
   const a = mockAttention;
   const items: AttentionItem[] = [];
@@ -577,15 +595,6 @@ function buildAttentionItems(location: ServiceLocationDetailDto): AttentionItem[
       title: `PM overdue · ${a.pmOverdueDays} days`,
       sub: `Next quarterly visit was due ${a.pmOverdueDays}d ago`,
       action: 'Schedule',
-    });
-  }
-  if (a.equipmentFlagged > 0) {
-    items.push({
-      key: 'equip',
-      severity: 'warning',
-      title: `${a.equipmentFlagged} equipment flagged for attention`,
-      sub: a.equipmentFlaggedDetail,
-      action: 'Review',
     });
   }
   const rank = { live: 0, warning: 1 } as const;
@@ -643,11 +652,9 @@ function LivePulse() {
 function EquipmentSummaryCard({
   equipment,
   onViewAll,
-  onNewJob,
 }: {
   equipment: EquipmentSummary[];
   onViewAll: () => void;
-  onNewJob: () => void;
 }) {
   const { getName } = useGlossary();
 
@@ -660,9 +667,11 @@ function EquipmentSummaryCard({
     return acc;
   }, [equipment]);
 
-  // Flagged rows — derived from MOCK health until equipment-service carries it.
-  const flagged = useMemo(
-    () => equipment.map((e, i) => ({ e, h: mockEquipmentHealth(i) })).filter((x) => x.h.flag),
+  // A unit's only surfaced state is "has an open work order" — derived from open
+  // WOs (mocked by stable position until WO-1 carries equipment refs on the WO
+  // list). No flagged/attention list: the redesign removed equipment flagging.
+  const openWorkOrderUnits = useMemo(
+    () => equipment.map((e, i) => ({ e, h: mockEquipmentHealth(i) })).filter((x) => x.h.hasOpenWorkOrder),
     [equipment]
   );
 
@@ -678,70 +687,97 @@ function EquipmentSummaryCard({
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-4 border-b border-border-soft bg-bg-elev-2 px-3.5 py-2.5">
+          <div
+            className={`flex flex-wrap items-center gap-4 bg-bg-elev-2 px-3.5 py-2.5 ${openWorkOrderUnits.length > 0 ? 'border-b border-border-soft' : ''}`}
+          >
             {Object.entries(byType).map(([type, n]) => (
               <div key={type} className="flex items-center gap-1.5">
                 <span className="font-mono text-[12px] font-bold tabular-nums text-fg-strong">{n}</span>
                 <span className="text-[11.5px] text-fg-muted">{type}</span>
               </div>
             ))}
-            <span className="grow" />
-            {flagged.length > 0 && (
-              <Pill tone="warning" dot>
-                {flagged.length} flagged
-              </Pill>
-            )}
           </div>
-          {flagged.length > 0 && (
-            <div>
-              <div className="px-3.5 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
-                Flagged
+          {/* Units with an open work order — the one live signal, surfaced as a
+              line each. Derived from open WOs, not a stored flag. */}
+          {openWorkOrderUnits.map(({ e }, i) => (
+            <div
+              key={e.id}
+              className={`grid grid-cols-[110px_1fr_auto] items-center gap-3 px-3.5 py-2 ${i < openWorkOrderUnits.length - 1 ? 'border-b border-border-soft' : ''}`}
+            >
+              <div>
+                <div className="font-mono text-[12px] font-bold text-fg-strong">{e.name}</div>
+                <div className="text-[11px] text-fg-muted">{e.locationOnSite || '—'}</div>
               </div>
-              {flagged.map(({ e, h }, i) => (
-                <div
-                  key={e.id}
-                  className={`grid grid-cols-[110px_1fr_auto] items-center gap-3 px-3.5 py-2 ${i < flagged.length - 1 ? 'border-b border-border-soft' : ''}`}
-                >
-                  <div>
-                    <div className="font-mono text-[12px] font-bold text-fg-strong">{e.name}</div>
-                    <div className="text-[11px] text-fg-muted">{e.locationOnSite || '—'}</div>
-                  </div>
-                  <div>
-                    <div className="text-[12.5px] font-medium text-fg-strong">
-                      {[e.make, e.model].filter(Boolean).join(' ') || e.equipmentTypeName || '—'}
-                    </div>
-                    {h.flag && (
-                      <div
-                        className="mt-0.5 text-[11.5px] font-medium"
-                        style={{ color: h.flag.tone === 'warning' ? 'var(--warning-fg)' : 'var(--fg-accent)' }}
-                      >
-                        {h.flag.text}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-1.5">
-                    <Button plain size="xxs" href={`/equipment/${e.id}`}>
-                      Details
-                    </Button>
-                    {h.flag?.tone === 'warning' && (
-                      <Button outline size="xxs" onClick={onNewJob}>
-                        New job
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+              <div className="text-[12.5px] font-medium text-fg-strong">
+                {[e.make, e.model].filter(Boolean).join(' ') || e.equipmentTypeName || '—'}
+              </div>
+              <Pill tone="info" dot live>
+                Open work order
+              </Pill>
             </div>
-          )}
+          ))}
         </>
       )}
     </Card>
   );
 }
 
-// The site's work-order list (open + recent). Title pulls the tenant glossary
-// term — a location almost always has 0–1 active job, so this is a record list,
-// not a "jobs in flight" dashboard.
+// Status / priority → display maps for the bespoke work-orders table. Kept
+// local to this dense page; the shared WorkOrdersList carries its own copies.
+const WO_PROGRESS_TONE: Record<ProgressCategory, MockTone> = {
+  NOT_STARTED: 'neutral',
+  AWAITING_SCHEDULE: 'info',
+  IN_PROGRESS: 'info',
+  BLOCKED: 'warning',
+  COMPLETED: 'success',
+  CANCELLED: 'neutral',
+};
+const WO_PROGRESS_KEY: Record<ProgressCategory, string> = {
+  NOT_STARTED: 'notStarted',
+  AWAITING_SCHEDULE: 'awaitingSchedule',
+  IN_PROGRESS: 'inProgress',
+  BLOCKED: 'blocked',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+};
+const WO_PRIORITY_KEY: Record<WorkOrderPriority, string> = {
+  LOW: 'low',
+  NORMAL: 'normal',
+  HIGH: 'high',
+  URGENT: 'urgent',
+};
+
+function formatWoDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+const woIsOpen = (wo: WorkOrderSummary) =>
+  wo.lifecycleState !== 'CANCELLED' &&
+  wo.progressCategory !== 'COMPLETED' &&
+  wo.progressCategory !== 'CANCELLED';
+
+// One-line job blurb leading the Work-order cell. Prefer the backend-derived
+// `summary` (AI blurb for opted-in tenants, else mechanical) — it's already on
+// the wire from work-order-service; the dev `WorkOrderSummary` type just hasn't
+// caught up (the field declaration lands with the feat/wo-summary-in-list PR),
+// so it's read through a narrow cast until then. Falls back to first work item
+// + "N more", then the type name.
+function deriveJobLabel(wo: WorkOrderSummary, typeName?: string): string {
+  const summary = (wo as { summary?: string | null }).summary;
+  if (summary) return summary;
+  const first = wo.workItems[0]?.description;
+  if (!first) return typeName || '—';
+  const more = Math.max(0, wo.workItemCount - 1);
+  return more > 0 ? `${first} +${more} more` : first;
+}
+
+// The site's work-order list — open first, then recent. A bespoke dense table
+// (NOT the shared WorkOrdersList): type + elevated-priority chip + AI summary
+// fold into the Work-order cell, leading with the summary. The count-led
+// Equipment column, relevance-resolved Tech column, and the "Next scheduled"
+// header strip are part of the redesign but blocked on backend (WO-1 / WO-2 /
+// AG-2); their insertion points are marked below.
 function SiteWorkOrdersCard({
   location,
   onViewAll,
@@ -753,13 +789,35 @@ function SiteWorkOrdersCard({
 }) {
   const { getName } = useGlossary();
   const { t } = useTranslation();
+
+  const { data, isLoading } = useQuery(workOrdersListQueryOptions({ serviceLocationId: location.id }));
+  const { data: workOrderTypes } = useQuery({
+    queryKey: ['work-order-types'],
+    queryFn: () => workOrderTypesApi.getAll(),
+  });
+  const safeTypes = Array.isArray(workOrderTypes) ? workOrderTypes : [];
+
+  const items = data?.content ?? [];
+  // Open first, then recent — backend already sorts by scheduledDate desc, so a
+  // stable partition on open-ness is enough.
+  const sorted = [...items].sort((a, b) => Number(woIsOpen(b)) - Number(woIsOpen(a)));
+  const openCount = items.filter(woIsOpen).length;
+  const recentCount = items.length - openCount;
+
   return (
     <Card
       title={<CardTitle icon={<ChartBarIcon className="size-3.5" />}>{getName('work_order', true)}</CardTitle>}
-      subtitle="Open and recent"
       action={
         <div className="flex items-center gap-2">
-          <CardLink onClick={onViewAll}>View all →</CardLink>
+          {items.length > 0 && (
+            <>
+              <span className="text-[11px] text-fg-muted">
+                {openCount} open · {recentCount} recent
+              </span>
+              <span className="text-fg-dim">·</span>
+            </>
+          )}
+          <CardLink onClick={onViewAll}>View all {data?.totalElements ?? items.length} →</CardLink>
           <Button plain size="xxs" onClick={onNewJob}>
             <PlusIcon className="size-3.5" />
             {t('common.actions.new', { entity: getName('work_order') })}
@@ -768,40 +826,96 @@ function SiteWorkOrdersCard({
       }
       padding="none"
     >
-      <div className="p-3.5">
-        <WorkOrdersList serviceLocationId={location.id} showLocation={false} />
-      </div>
+      {/* "Next scheduled" strip folds the former Upcoming-visits card. Blocked
+          on AG-2 (forward proactive/agreement visits); renders here, above the
+          table, when a future visit beyond the open WOs exists. */}
+      {isLoading ? (
+        <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
+          {t('common.actions.loading', { entities: getName('work_order', true) })}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
+          {t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-[12px]">
+            <thead className="bg-bg-elev-2">
+              <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+                <th className="px-3.5 py-2 font-semibold">{getName('work_order')}</th>
+                {/* Equipment column (count-led) inserts here once WO-1 carries
+                    equipment refs on the WO list projection. */}
+                <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
+                {/* Tech column (relevance-resolved) inserts here once WO-2
+                    carries primaryTech on the WO row. */}
+                <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.scheduled')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((wo) => (
+                <WorkOrderRow
+                  key={wo.id}
+                  wo={wo}
+                  typeName={safeTypes.find((tp) => tp.id === wo.workOrderTypeId)?.name}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Card>
   );
 }
 
-function UpcomingVisitsCard() {
-  const { getName } = useGlossary();
+function WorkOrderRow({ wo, typeName }: { wo: WorkOrderSummary; typeName?: string }) {
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  const priority = wo.priority ?? 'NORMAL';
+  const elevated = priority === 'URGENT' || priority === 'HIGH';
+  const cancelled = wo.lifecycleState === 'CANCELLED';
+  const jobLabel = deriveJobLabel(wo, typeName);
   return (
-    <Card
-      title={<CardTitle icon={<CalendarDaysIcon className="size-3.5" />}>Upcoming {getName('dispatch', true)}</CardTitle>}
-      action={<MockBadge />}
-      padding="none"
+    <tr
+      className="cursor-pointer border-b border-border-soft hover:bg-bg-hover"
+      onClick={() => navigate(`/work-orders/${wo.id}`)}
     >
-      {mockUpcomingVisits.map((v, i) => (
-        <div
-          key={i}
-          className={`grid grid-cols-[78px_72px_1fr_auto] items-center gap-3 px-3.5 py-2.5 ${i < mockUpcomingVisits.length - 1 ? 'border-b border-border-soft' : ''}`}
-        >
-          <div>
-            <div className="text-[12px] font-semibold text-fg-strong">{v.date}</div>
-            <div className="font-mono text-[11px] text-fg-muted">{v.time}</div>
-          </div>
-          <Pill tone={v.tone === 'neutral' ? 'neutral' : v.tone} dot live={v.live}>
-            {v.kind}
-          </Pill>
-          <div>
-            <div className="text-[12px] font-medium text-fg-strong">{v.job}</div>
-            <div className="text-[11px] text-fg-muted">Tech {v.tech}</div>
-          </div>
+      <td className="px-3.5 py-2">
+        <div className="flex flex-wrap items-baseline gap-1.5">
+          <span className="font-mono text-[12px] font-bold text-fg-strong">
+            {wo.workOrderNumber || `#${wo.id.slice(0, 8)}`}
+          </span>
+          {typeName && (
+            <span className="rounded-[3px] border border-border-soft bg-bg-active px-1.5 text-[10px] font-semibold text-fg-muted">
+              {typeName}
+            </span>
+          )}
+          {elevated && (
+            <span
+              className="rounded-[3px] px-1.5 text-[9.5px] font-bold tracking-wider"
+              style={{
+                background: 'color-mix(in oklch, var(--danger-500) 14%, transparent)',
+                color: 'var(--danger-500)',
+              }}
+            >
+              {t(`workOrders.priority.${WO_PRIORITY_KEY[priority]}`).toUpperCase()}
+            </span>
+          )}
         </div>
-      ))}
-    </Card>
+        <div className="mt-0.5 max-w-[420px] truncate text-[12px] text-fg" title={jobLabel}>
+          {jobLabel}
+        </div>
+      </td>
+      <td className="px-3.5 py-2">
+        {cancelled ? (
+          <Pill tone="neutral">{t('workOrders.actions.cancelledBadge')}</Pill>
+        ) : (
+          <Pill tone={WO_PROGRESS_TONE[wo.progressCategory]} dot>
+            {t(`workOrders.progress.${WO_PROGRESS_KEY[wo.progressCategory]}`)}
+          </Pill>
+        )}
+      </td>
+      <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{formatWoDate(wo.scheduledDate)}</td>
+    </tr>
   );
 }
 
@@ -813,35 +927,37 @@ const ACTIVITY_GLYPH_STYLE: Record<MockTone, { bg: string; fg: string }> = {
   neutral: { bg: 'var(--bg-active)', fg: 'var(--fg-muted)' },
 };
 
-function OperationalActivityCard() {
+// Activity teaser — the overview answers "what's the state of this site," not
+// "what happened over time." Activity is an audit trail, not knowledge, so it's
+// demoted to the single latest event one-liner; the full feed lives on the
+// Activity tab. (Still mock until a location-scoped operational feed exists.)
+function ActivityTeaser({ onViewActivity }: { onViewActivity: () => void }) {
+  const latest = mockActivityFeed[0];
+  if (!latest) return null;
+  const s = ACTIVITY_GLYPH_STYLE[latest.tone];
   return (
-    <Card
-      title={<CardTitle icon={<ChartBarIcon className="size-3.5" />}>Recent activity at this site</CardTitle>}
-      action={<MockBadge />}
-      padding="none"
-    >
-      {mockActivityFeed.map((e, i) => {
-        const s = ACTIVITY_GLYPH_STYLE[e.tone];
-        return (
-          <div
-            key={i}
-            className={`grid grid-cols-[60px_22px_1fr] items-center gap-2.5 px-3.5 py-2 ${i < mockActivityFeed.length - 1 ? 'border-b border-border-soft' : ''}`}
-          >
-            <span className="text-[11px] text-fg-dim">{e.ts}</span>
-            <div
-              className="flex size-[18px] items-center justify-center rounded text-[11px] font-bold"
-              style={{ background: s.bg, color: s.fg }}
-            >
-              {e.glyph}
-            </div>
-            <div className="flex flex-wrap items-baseline gap-2">
-              <span className="text-[12.5px] font-medium text-fg-strong">{e.text}</span>
-              <span className="text-[11px] text-fg-dim">· {e.sub}</span>
-            </div>
-          </div>
-        );
-      })}
-    </Card>
+    <div className="flex items-center gap-2.5 rounded-[10px] border border-border bg-bg-elev px-3.5 py-2 shadow-sm">
+      <div
+        className="flex size-[18px] shrink-0 items-center justify-center rounded text-[11px] font-bold"
+        style={{ background: s.bg, color: s.fg }}
+      >
+        {latest.glyph}
+      </div>
+      <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-dim">Latest</span>
+        <span className="text-[12.5px] font-medium text-fg-strong">{latest.text}</span>
+        <span className="text-[11px] text-fg-dim">
+          · {latest.sub} · {latest.ts}
+        </span>
+      </div>
+      <MockBadge />
+      <button
+        onClick={onViewActivity}
+        className="shrink-0 text-[11px] font-medium text-fg-accent hover:underline"
+      >
+        View activity →
+      </button>
+    </div>
   );
 }
 
@@ -1002,7 +1118,7 @@ function NotesCard({ location }: { location: ServiceLocationDetailDto }) {
 // Identity columns are REAL; health columns (capacity/age/last svc/next PM/
 // warranty/flag) are MOCK until equipment-service carries them.
 // ─────────────────────────────────────────────────────────────────────────
-type EquipFilter = 'flagged' | 'eol' | 'warranty' | null;
+type EquipFilter = 'open-wo' | 'warranty' | null;
 
 function EquipmentTab({
   equipment,
@@ -1028,10 +1144,12 @@ function EquipmentTab({
     [equipment]
   );
 
+  // Filters: "Open work order" (the one live state, derived from open WOs) and
+  // "Warranty expired" (a pure field filter). No Flagged / EOL — derived-
+  // threshold flagging was cut in the redesign.
   const counts = useMemo(
     () => ({
-      flagged: withHealth.filter((x) => x.h.flag).length,
-      eol: withHealth.filter((x) => x.h.ageYrs >= 10).length,
+      openWo: withHealth.filter((x) => x.h.hasOpenWorkOrder).length,
       warranty: withHealth.filter((x) => /expired/i.test(x.h.warranty)).length,
     }),
     [withHealth]
@@ -1047,8 +1165,7 @@ function EquipmentTab({
           .some((v) => v!.toLowerCase().includes(needle))
       );
     }
-    if (filter === 'flagged') r = r.filter((x) => x.h.flag);
-    if (filter === 'eol') r = r.filter((x) => x.h.ageYrs >= 10);
+    if (filter === 'open-wo') r = r.filter((x) => x.h.hasOpenWorkOrder);
     if (filter === 'warranty') r = r.filter((x) => /expired/i.test(x.h.warranty));
     return r;
   }, [withHealth, q, filter]);
@@ -1063,8 +1180,7 @@ function EquipmentTab({
   }, [rows]);
 
   const chips: { id: Exclude<EquipFilter, null>; label: string; count: number }[] = [
-    { id: 'flagged', label: 'Flagged', count: counts.flagged },
-    { id: 'eol', label: 'EOL approaching', count: counts.eol },
+    { id: 'open-wo', label: 'Open work order', count: counts.openWo },
     { id: 'warranty', label: 'Warranty expired', count: counts.warranty },
   ];
 
@@ -1193,13 +1309,9 @@ function EquipmentRow({
   const navigate = useNavigate();
   const { t } = useTranslation();
   const warrantyExpired = /expired/i.test(h.warranty);
-  const statusTone = h.health === 'Attention' ? 'warning' : h.health === 'In service' ? 'info' : 'success';
-  const tint =
-    h.flag?.tone === 'warning'
-      ? 'bg-[color-mix(in_oklch,var(--warning-500)_6%,var(--bg-elev))]'
-      : h.flag?.tone === 'info'
-        ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]'
-        : '';
+  // The only live state is an open work order; tint that row info. No
+  // flag/attention tint — equipment flagging was removed in the redesign.
+  const tint = h.hasOpenWorkOrder ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]' : '';
 
   return (
     <tr
@@ -1225,16 +1337,13 @@ function EquipmentRow({
       <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{h.nextPm}</td>
       <td className={`px-3.5 py-2 text-[11.5px] ${warrantyExpired ? 'text-fg-dim' : 'text-fg-muted'}`}>{h.warranty}</td>
       <td className="px-3.5 py-2">
-        <div className="flex flex-col gap-0.5">
-          <Pill tone={statusTone} dot live={h.flag?.tone === 'info'}>
-            {h.health}
+        {h.hasOpenWorkOrder ? (
+          <Pill tone="info" dot live>
+            Open work order
           </Pill>
-          {h.flag && (
-            <span className="text-[10.5px]" style={{ color: h.flag.tone === 'warning' ? 'var(--warning-fg)' : 'var(--fg-accent)' }}>
-              {h.flag.text}
-            </span>
-          )}
-        </div>
+        ) : (
+          <span className="text-[11px] text-fg-dim">—</span>
+        )}
       </td>
       <td className="px-3.5 py-2 text-right">
         <Dropdown>
