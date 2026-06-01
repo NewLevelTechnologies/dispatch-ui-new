@@ -9,13 +9,15 @@ import { Button } from './catalyst/button';
 import { Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Select } from './catalyst/select';
-import { Textarea } from './catalyst/textarea';
 import { US_STATES } from '../constants/states';
 
 interface ServiceLocationFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  serviceLocation?: ServiceLocation | null;
+  // `notes` is omitted: it diverged to a NoteDto[] collection on the detail DTO
+  // and is now managed by the Notes card via the /notes endpoints, not this
+  // form. Omitting it lets either DTO (basic or detail) flow in here.
+  serviceLocation?: Omit<ServiceLocation, 'notes'> | null;
   customerId?: string | null;
 }
 
@@ -31,7 +33,6 @@ interface FormData {
   siteContactPhone: string;
   siteContactEmail: string;
   accessInstructions: string;
-  notes: string;
 }
 
 export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLocation, customerId }: ServiceLocationFormDialogProps) {
@@ -53,7 +54,6 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
     siteContactPhone: '',
     siteContactEmail: '',
     accessInstructions: '',
-    notes: '',
   });
 
   // Fetch default dispatch region (for single-region tenants)
@@ -88,7 +88,6 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
             siteContactPhone: serviceLocation.siteContactPhone || '',
             siteContactEmail: serviceLocation.siteContactEmail || '',
             accessInstructions: serviceLocation.accessInstructions || '',
-            notes: serviceLocation.notes || '',
           }
         : {
             dispatchRegionId: defaultRegion?.id || '',
@@ -102,7 +101,6 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
             siteContactPhone: '',
             siteContactEmail: '',
             accessInstructions: '',
-            notes: '',
           }
     );
   }, [isOpen, serviceLocation, defaultRegion]);
@@ -123,7 +121,6 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
         siteContactPhone: data.siteContactPhone || null,
         siteContactEmail: data.siteContactEmail || null,
         accessInstructions: data.accessInstructions || null,
-        notes: data.notes || null,
       };
 
       return customerApi.addServiceLocation(effectiveCustomerId, request);
@@ -157,7 +154,6 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
         siteContactPhone: data.siteContactPhone || null,
         siteContactEmail: data.siteContactEmail || null,
         accessInstructions: data.accessInstructions || null,
-        notes: data.notes || null,
       };
 
       await customerApi.updateServiceLocation(serviceLocation.id, updateRequest);
@@ -364,17 +360,6 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
               value={formData.accessInstructions}
               onChange={(e) => setFormData((prev) => ({ ...prev, accessInstructions: e.target.value }))}
               placeholder="e.g., Use back entrance, gate code 1234"
-            />
-          </Field>
-
-          {/* Notes */}
-          <Field>
-            <Label className="text-xs">{t('common.form.notes')}</Label>
-            <Textarea
-              name="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-              rows={2}
             />
           </Field>
         </form>

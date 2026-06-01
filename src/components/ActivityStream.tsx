@@ -7,7 +7,7 @@ import {
   type ActivityEvent,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
-import { formatRelativeTime } from '../utils/formatRelativeTime';
+import { formatExactTimestamp, formatTimestamp } from '../lib/formatTimestamp';
 import { Text } from './catalyst/text';
 import {
   ChatBubbleLeftEllipsisIcon,
@@ -314,10 +314,10 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
             {context}
           </Text>
         )}
-        <Text className="mt-0.5 text-xs text-zinc-500">
+        <Text className="mt-0.5 text-xs text-zinc-500" title={formatExactTimestamp(event.timestamp)}>
           {t('workOrders.activity.byline', {
             actor: actorName,
-            time: formatRelativeTime(event.timestamp),
+            time: formatTimestamp(event.timestamp),
           })}
         </Text>
       </div>

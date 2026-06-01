@@ -763,6 +763,28 @@
       "totalAmount": "Total"
     }
   },
+  "notes": {
+    "actions": {
+      "pin": "Pin",
+      "unpin": "Unpin"
+    },
+    "add": "Add note",
+    "bodyLabel": "Note",
+    "bodyRequired": "Note can't be empty.",
+    "delete": {
+      "message": "This permanently removes the note. This can't be undone.",
+      "title": "Delete note?"
+    },
+    "edit": "Edit note",
+    "edited": "edited",
+    "empty": "No notes yet.",
+    "entity": "note",
+    "pin": "Pin this note",
+    "pinDescription": "Pinned notes stay at the top of the list.",
+    "pinnedCount": "{{count}} pinned",
+    "pinnedPrefix": "Pinned",
+    "title": "Notes"
+  },
   "notifications": {
     "description": "View notification history and manage preferences",
     "logs": {

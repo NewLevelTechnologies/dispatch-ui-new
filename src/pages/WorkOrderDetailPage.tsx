@@ -37,7 +37,8 @@ import WorkItemsTable from '../components/WorkItemsTable';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import WorkOrderApprovalsCallout from '../features/work-orders/WorkOrderApprovalsCallout';
 import { formatPhone } from '../utils/formatPhone';
-import { formatRelativeTime } from '../utils/formatRelativeTime';
+import { formatExactTimestamp, formatTimestamp } from '../lib/formatTimestamp';
+import { TimeAgo } from '../components/TimeAgo';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
@@ -658,8 +659,8 @@ export default function WorkOrderDetailPage() {
                 </Dropdown>
               );
             })()}
-            <Text className="!text-sm !text-zinc-500">
-              {t('workOrders.detail.lastUpdated', { time: formatRelativeTime(workOrder.updatedAt) })}
+            <Text className="!text-sm !text-zinc-500" title={formatExactTimestamp(workOrder.updatedAt)}>
+              {t('workOrders.detail.lastUpdated', { time: formatTimestamp(workOrder.updatedAt) })}
             </Text>
             <div className="ml-auto flex items-center gap-2">
               <ActivityButton
@@ -1158,7 +1159,7 @@ export default function WorkOrderDetailPage() {
             <Card title={t('workOrders.detail.info', { entity: getName('work_order') })}>
               <DescriptionList>
                 <DescriptionTerm>{t('workOrders.detail.created')}</DescriptionTerm>
-                <DescriptionDetails>{formatDate(workOrder.createdAt)}</DescriptionDetails>
+                <DescriptionDetails><TimeAgo iso={workOrder.createdAt} /></DescriptionDetails>
 
                 <DescriptionTerm>{t('workOrders.form.customerOrderNumber')}</DescriptionTerm>
                 <DescriptionDetails>
@@ -1219,7 +1220,7 @@ export default function WorkOrderDetailPage() {
                 {workOrder.completedDate && (
                   <>
                     <DescriptionTerm>{t('workOrders.detail.completed')}</DescriptionTerm>
-                    <DescriptionDetails>{formatDate(workOrder.completedDate)}</DescriptionDetails>
+                    <DescriptionDetails><TimeAgo iso={workOrder.completedDate} /></DescriptionDetails>
                   </>
                 )}
               </DescriptionList>

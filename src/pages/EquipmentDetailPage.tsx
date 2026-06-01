@@ -65,7 +65,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { formatFilterSize } from '../utils/formatFilterSize';
-import { formatRelativeTime } from '../utils/formatRelativeTime';
+import { TimeAgo } from '../components/TimeAgo';
 
 type TabId = 'overview' | 'notes' | 'photos' | 'filters' | 'service-history' | 'components';
 
@@ -1358,7 +1358,7 @@ function RecentNotesCard({ notes, onViewAll }: RecentNotesCardProps) {
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
               {note.authorName ?? t('equipment.notes.systemAuthor')}
               {' · '}
-              {formatRelativeTime(note.createdAt)}
+              <TimeAgo iso={note.createdAt} />
             </p>
           </li>
         ))}
