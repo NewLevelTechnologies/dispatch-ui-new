@@ -75,6 +75,10 @@ describe('ServiceLocationDetailPage', () => {
         contacts.push(...(location?.additionalContacts ?? []).map((c) => ({ ...c, isPrimary: false })));
         return Promise.resolve({ data: contacts });
       }
+      if (url.includes('/notification-preferences')) {
+        // Contacts tab fetches per-contact prefs for the Notifications column.
+        return Promise.resolve({ data: [] });
+      }
       if (url.includes('/service-locations/')) {
         return location ? Promise.resolve({ data: location }) : Promise.reject(new Error('Not found'));
       }
@@ -311,6 +315,26 @@ describe('ServiceLocationDetailPage', () => {
     const activityTab = screen.getByRole('tab', { name: /activity/i });
     await user.click(activityTab);
     await waitFor(() => expect(activityTab).toHaveAttribute('aria-selected', 'true'));
+  });
+
+  it('renders the contacts directory table on the Contacts tab', async () => {
+    mockApiResponses();
+    const user = userEvent.setup();
+    renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+    const contactsTab = screen.getByRole('tab', { name: /contacts/i });
+    await user.click(contactsTab);
+    await waitFor(() => expect(contactsTab).toHaveAttribute('aria-selected', 'true'));
+
+    // The primary site contact shows in the directory, badged + with its phone.
+    await waitFor(() => {
+      const table = screen.getByRole('table');
+      expect(within(table).getByText('John Doe')).toBeInTheDocument();
+      expect(within(table).getByText('Primary')).toBeInTheDocument();
+      expect(within(table).getByText('(555) 123-4567')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /add contact/i })).toBeInTheDocument();
   });
 
   it('shows the coming-soon stub for the Visits (Dispatches) tab', async () => {

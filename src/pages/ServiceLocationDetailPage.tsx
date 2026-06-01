@@ -2,7 +2,7 @@
 import type React from 'react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   MapPinIcon,
@@ -16,12 +16,18 @@ import {
   PencilIcon,
   PhoneIcon,
   BellIcon,
+  TrashIcon,
+  StarIcon,
 } from '@heroicons/react/24/outline';
+import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
 import {
   customerApi,
   equipmentApi,
   workOrderTypesApi,
   contactApi,
+  notificationApi,
+  NotificationChannel,
+  type NotificationPreferenceDto,
   EquipmentStatus,
   type Equipment,
   type EquipmentSummary,
@@ -236,6 +242,7 @@ export default function ServiceLocationDetailPage() {
               onViewEquipment={() => setActiveTab('equipment')}
               onViewJobs={() => setActiveTab('jobs')}
               onViewActivity={() => setActiveTab('activity')}
+              onViewContacts={() => setActiveTab('contacts')}
               onNewJob={() => setIsNewWorkOrderOpen(true)}
               onEdit={canEditServiceLocations ? () => setIsEditDialogOpen(true) : undefined}
               canEdit={canEditServiceLocations}
@@ -275,7 +282,7 @@ export default function ServiceLocationDetailPage() {
               (FIN-1). Stubbed in this shell pass; built when that lands. */}
           {activeTab === 'invoices' && <TabStub label={getName('invoice', true)} />}
           {activeTab === 'visits' && <TabStub label={getName('dispatch', true)} />}
-          {activeTab === 'contacts' && <TabStub label="Contacts" />}
+          {activeTab === 'contacts' && <ContactsTab location={location} canEdit={canEditServiceLocations} />}
           {activeTab === 'files' && <TabStub label="Files" />}
 
           {activeTab === 'activity' && (
@@ -512,6 +519,7 @@ function OverviewTab({
   onViewEquipment,
   onViewJobs,
   onViewActivity,
+  onViewContacts,
   onNewJob,
   onEdit,
   canEdit,
@@ -521,6 +529,7 @@ function OverviewTab({
   onViewEquipment: () => void;
   onViewJobs: () => void;
   onViewActivity: () => void;
+  onViewContacts: () => void;
   onNewJob: () => void;
   onEdit?: () => void;
   canEdit: boolean;
@@ -545,7 +554,7 @@ function OverviewTab({
         {/* Right rail — reference / pre-arrival. Ends at Tags. */}
         <div className="flex flex-col gap-3">
           <SiteInstructionsCard location={location} onEdit={canEdit ? onEdit : undefined} />
-          <SiteContactCard location={location} canEdit={canEdit} />
+          <SiteContactCard location={location} canEdit={canEdit} onViewAll={onViewContacts} />
           <ParentCustomerCard location={location} />
           <TagsCard location={location} />
         </div>
@@ -1074,37 +1083,24 @@ function ContactBlock({
   );
 }
 
-// Site contact card. Reads the full contact collection (primary-first, each
-// isPrimary-flagged) and splits client-side — that hands us a real contact id
-// for every row, including the primary, which the projected siteContact* fields
-// don't carry (needed to PUT the primary on Edit / promote on make-primary).
-// Header Edit = edit the primary; per additional row = Make primary + Edit +
-// notification bell; Delete lives in the dialog (never for the primary). Make
-// primary is one atomic server call — no client-side swap.
-function SiteContactCard({
-  location,
-  canEdit,
-}: {
-  location: ServiceLocationDetailDto;
-  canEdit: boolean;
-}) {
+// Shared contact data + mutations for the location. Both the Overview Site
+// contact card and the Contacts tab read the same collection (primary-first,
+// each isPrimary-flagged) and split client-side — that hands us a real contact
+// id for every row, including the primary, which the projected siteContact*
+// fields don't carry (needed to PUT the primary on Edit / promote). Make primary
+// and delete are one atomic server call each.
+function useServiceLocationContacts(location: ServiceLocationDetailDto) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const contactsQueryKey = ['service-location-contacts', location.id];
-  const [contactDialog, setContactDialog] = useState<{ open: boolean; contact: AdditionalContact | null }>({
-    open: false,
-    contact: null,
-  });
-  const [contactToDelete, setContactToDelete] = useState<AdditionalContact | null>(null);
-  const [notifyContact, setNotifyContact] = useState<AdditionalContact | null>(null);
 
-  const { data: contacts = [] } = useQuery({
+  const { data } = useQuery({
     queryKey: contactsQueryKey,
     queryFn: () => contactApi.getServiceLocationContacts(location.id),
     enabled: !!location.id,
   });
 
-  const list = Array.isArray(contacts) ? contacts : [];
+  const list = Array.isArray(data) ? data : [];
   const primary = list.find((c) => c.isPrimary) ?? null;
   const additional = list.filter((c) => !c.isPrimary);
 
@@ -1115,33 +1111,56 @@ function SiteContactCard({
     queryClient.invalidateQueries({ queryKey: ['service-location', location.id] });
   };
 
-  const deleteMutation = useMutation({
-    mutationFn: (contactId: string) => contactApi.deleteServiceLocationContact(location.id, contactId),
-    onSuccess: () => {
-      invalidate();
-      setContactToDelete(null);
-    },
-    onError: (err) =>
-      showError(t('common.form.errorDelete', { entity: t('contacts.entity') }), extractApiError(err) ?? undefined),
-  });
-
   const makePrimaryMutation = useMutation({
     mutationFn: (contactId: string) => contactApi.makeServiceLocationContactPrimary(location.id, contactId),
     onSuccess: invalidate,
-    onError: (err) =>
+    onError: (err: unknown) =>
       showError(t('common.form.errorUpdate', { entity: t('contacts.entity') }), extractApiError(err) ?? undefined),
   });
 
-  // Notification bell — preserves the existing per-contact notification-prefs
-  // feature (out of the designer's scope, but a real capability we keep).
+  const deleteMutation = useMutation({
+    mutationFn: (contactId: string) => contactApi.deleteServiceLocationContact(location.id, contactId),
+    onSuccess: invalidate,
+    onError: (err: unknown) =>
+      showError(t('common.form.errorDelete', { entity: t('contacts.entity') }), extractApiError(err) ?? undefined),
+  });
+
+  return { contactsQueryKey, list, primary, additional, makePrimaryMutation, deleteMutation };
+}
+
+// Overview Site contact card — preview + common case. Shows the primary plus up
+// to CARD_ADDITIONAL_CAP backups; beyond that it caps and links to the Contacts
+// tab ("View all N →"), the full directory. Header Edit = edit the primary; per
+// additional row = Make primary + Edit + notification bell; Delete lives in the
+// dialog (never for the primary).
+const CARD_ADDITIONAL_CAP = 2;
+
+function SiteContactCard({
+  location,
+  canEdit,
+  onViewAll,
+}: {
+  location: ServiceLocationDetailDto;
+  canEdit: boolean;
+  onViewAll: () => void;
+}) {
+  const { t } = useTranslation();
+  const { contactsQueryKey, list, primary, additional, makePrimaryMutation, deleteMutation } =
+    useServiceLocationContacts(location);
+  const [contactDialog, setContactDialog] = useState<{ open: boolean; contact: AdditionalContact | null }>({
+    open: false,
+    contact: null,
+  });
+  const [contactToDelete, setContactToDelete] = useState<AdditionalContact | null>(null);
+  const [notifyContact, setNotifyContact] = useState<AdditionalContact | null>(null);
+
+  const shown = additional.slice(0, CARD_ADDITIONAL_CAP);
+  const hiddenCount = additional.length - shown.length;
+
+  // Notification bell — filled when the contact has any alert enabled. Self-
+  // fetches its state (cache-shared with the dialog + tab).
   const notifyButton = (c: AdditionalContact) => (
-    <button
-      onClick={() => setNotifyContact(c)}
-      aria-label={t('notifications.preferences.manage')}
-      className="text-fg-dim hover:text-fg-strong"
-    >
-      <BellIcon className="size-3.5" />
-    </button>
+    <NotifBell customerId={location.customerId} contactId={c.id} onClick={() => setNotifyContact(c)} />
   );
 
   return (
@@ -1173,7 +1192,7 @@ function SiteContactCard({
         )}
       </div>
 
-      {/* Additional — same block shape as the primary, divided rows */}
+      {/* Additional — same block shape as the primary, divided rows, capped */}
       {(additional.length > 0 || (canEdit && primary)) && (
         <div className="border-t border-border-soft px-3.5 py-2.5">
           <div className="mb-2 flex items-center justify-between">
@@ -1191,7 +1210,7 @@ function SiteContactCard({
             <div className="text-[11.5px] italic text-fg-dim">No additional contacts.</div>
           ) : (
             <div className="flex flex-col">
-              {additional.map((c) => (
+              {shown.map((c) => (
                 <div key={c.id} className="border-t border-border-soft py-2.5 first:border-t-0 first:pt-0 last:pb-0">
                   <ContactBlock
                     contact={c}
@@ -1201,13 +1220,16 @@ function SiteContactCard({
                           <button
                             onClick={() => makePrimaryMutation.mutate(c.id)}
                             disabled={makePrimaryMutation.isPending}
-                            className="text-[10.5px] font-medium text-fg-accent hover:underline disabled:opacity-50"
+                            title={t('contacts.makePrimary')}
+                            aria-label={t('contacts.makePrimary')}
+                            className="text-fg-dim hover:text-fg-strong disabled:opacity-50"
                           >
-                            {t('contacts.makePrimary')}
+                            <StarIcon className="size-3.5" />
                           </button>
                           <button
                             onClick={() => setContactDialog({ open: true, contact: c })}
                             aria-label={t('common.edit')}
+                            title={t('common.edit')}
                             className="text-fg-dim hover:text-fg-strong"
                           >
                             <PencilIcon className="size-3.5" />
@@ -1220,6 +1242,15 @@ function SiteContactCard({
                 </div>
               ))}
             </div>
+          )}
+          {/* Beyond the cap, send the rest to the full directory on the tab. */}
+          {hiddenCount > 0 && (
+            <button
+              onClick={onViewAll}
+              className="mt-2.5 block w-full border-t border-border-soft pt-2 text-left text-[11px] font-medium text-fg-accent hover:underline"
+            >
+              {t('contacts.viewAll', { count: list.length })} →
+            </button>
           )}
         </div>
       )}
@@ -1243,7 +1274,10 @@ function SiteContactCard({
       <ConfirmDialog
         isOpen={!!contactToDelete}
         onClose={() => setContactToDelete(null)}
-        onConfirm={() => contactToDelete && deleteMutation.mutate(contactToDelete.id)}
+        onConfirm={() =>
+          contactToDelete &&
+          deleteMutation.mutate(contactToDelete.id, { onSuccess: () => setContactToDelete(null) })
+        }
         title={t('contacts.delete.title')}
         message={t('contacts.delete.message', { name: contactToDelete?.name || '' })}
         confirmLabel={t('common.delete')}
@@ -1258,6 +1292,286 @@ function SiteContactCard({
         contactName={notifyContact?.name || ''}
       />
     </Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Contacts tab — the full directory: one row per contact with every reachable
+// number side by side + a notification-routing summary the 340px card can't
+// show. Primary pinned + badged. Row actions mirror the card (Edit / Make
+// primary / Delete / notification bell); add via the same dialog.
+// ─────────────────────────────────────────────────────────────────────────
+
+const NOTIFICATION_CHANNEL_LABEL: Record<string, string> = {
+  [NotificationChannel.EMAIL]: 'Email',
+  [NotificationChannel.SMS]: 'SMS',
+  [NotificationChannel.PUSH]: 'Push',
+};
+
+// Distinct channels the contact has opted into, in a stable display order.
+function enabledChannelSummary(prefs: NotificationPreferenceDto[] | undefined): string | null {
+  if (!prefs?.length) return null;
+  const order = [NotificationChannel.EMAIL, NotificationChannel.SMS, NotificationChannel.PUSH];
+  const on = new Set(prefs.filter((p) => p.optIn).map((p) => p.channel));
+  const labels = order.filter((c) => on.has(c)).map((c) => NOTIFICATION_CHANNEL_LABEL[c]);
+  return labels.length ? labels.join(' · ') : null;
+}
+
+function ContactsTab({ location, canEdit }: { location: ServiceLocationDetailDto; canEdit: boolean }) {
+  const { t } = useTranslation();
+  const { contactsQueryKey, primary, additional, makePrimaryMutation, deleteMutation } =
+    useServiceLocationContacts(location);
+  const [contactDialog, setContactDialog] = useState<{ open: boolean; contact: AdditionalContact | null }>({
+    open: false,
+    contact: null,
+  });
+  const [contactToDelete, setContactToDelete] = useState<AdditionalContact | null>(null);
+  const [notifyContact, setNotifyContact] = useState<AdditionalContact | null>(null);
+
+  // Primary first, then additional in their existing (displayOrder) order.
+  const rows = primary ? [primary, ...additional] : additional;
+
+  // Per-contact notification prefs power the Notifications column. One query per
+  // contact (keyed to match the dialog so the cache is shared); only runs while
+  // this tab is mounted.
+  const prefQueries = useQueries({
+    queries: rows.map((c) => ({
+      queryKey: ['notification-preferences', 'contact', location.customerId, c.id],
+      queryFn: () => notificationApi.getContactPreferences(location.customerId, c.id),
+      enabled: !!location.customerId,
+    })),
+  });
+  const summaryByContactId = new Map<string, string | null>(
+    rows.map((c, i) => [c.id, enabledChannelSummary(prefQueries[i]?.data)])
+  );
+  const anyOnByContactId = new Map<string, boolean>(
+    rows.map((c, i) => [c.id, (prefQueries[i]?.data ?? []).some((p) => p.optIn)])
+  );
+
+  return (
+    <Card
+      title={<CardTitle icon={<UserIcon className="size-3.5" />}>Contacts</CardTitle>}
+      action={
+        canEdit ? (
+          <Button plain size="xxs" onClick={() => setContactDialog({ open: true, contact: null })}>
+            <PlusIcon className="size-3.5" />
+            {t('contacts.addContact')}
+          </Button>
+        ) : undefined
+      }
+      padding="none"
+    >
+      {rows.length === 0 ? (
+        <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">{t('contacts.noContacts')}</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-[12px]">
+            <thead className="bg-bg-elev-2">
+              <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+                <th className="px-3.5 py-2 font-semibold">{t('common.form.name')}</th>
+                <th className="px-3.5 py-2 font-semibold">{t('common.form.role')}</th>
+                <th className="px-3.5 py-2 font-semibold">{t('common.form.mobilePhone')}</th>
+                <th className="px-3.5 py-2 font-semibold">Office</th>
+                <th className="px-3.5 py-2 font-semibold">After hours</th>
+                <th className="px-3.5 py-2 font-semibold">{t('common.form.email')}</th>
+                <th className="px-3.5 py-2 font-semibold">Notifications</th>
+                <th className="px-3.5 py-2 font-semibold">{t('common.form.notes')}</th>
+                {canEdit && <th className="px-3.5 py-2 text-right font-semibold">{t('common.actions.title')}</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((c) => {
+                const summary = summaryByContactId.get(c.id) ?? null;
+                return (
+                  <tr key={c.id} className="border-b border-border-soft hover:bg-bg-hover">
+                    <td className="px-3.5 py-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-fg-strong">{c.name}</span>
+                        {c.isPrimary && <Pill tone="info">Primary</Pill>}
+                      </div>
+                    </td>
+                    <td className="px-3.5 py-2 text-fg-muted">{c.role || <Dash />}</td>
+                    <td className="px-3.5 py-2">
+                      <PhoneCell value={c.mobilePhone} />
+                    </td>
+                    <td className="px-3.5 py-2">
+                      <PhoneCell value={c.phone} />
+                    </td>
+                    <td className="px-3.5 py-2">
+                      <PhoneCell value={c.afterHoursPhone} />
+                    </td>
+                    <td className="px-3.5 py-2">
+                      {c.email ? (
+                        <a
+                          href={`mailto:${c.email}`}
+                          className="font-mono text-[11.5px] text-fg-muted hover:text-fg-strong hover:underline"
+                        >
+                          {c.email}
+                        </a>
+                      ) : (
+                        <Dash />
+                      )}
+                    </td>
+                    <td className="px-3.5 py-2">
+                      {summary ? (
+                        <button
+                          onClick={() => setNotifyContact(c)}
+                          className="text-fg-muted hover:text-fg-strong hover:underline"
+                          title={t('notifications.preferences.tooltip')}
+                        >
+                          {summary}
+                        </button>
+                      ) : (
+                        <Dash />
+                      )}
+                    </td>
+                    <td className="max-w-[200px] px-3.5 py-2">
+                      {c.notes ? (
+                        <span className="block truncate text-fg-muted" title={c.notes}>
+                          {c.notes}
+                        </span>
+                      ) : (
+                        <Dash />
+                      )}
+                    </td>
+                    {canEdit && (
+                      <td className="px-3.5 py-2">
+                        {/* Standard row actions: Edit + Notifications on every row;
+                            Make primary + Delete suppressed on the primary (a
+                            location must always keep a primary). */}
+                        <div className="flex items-center justify-end gap-2 text-fg-dim">
+                          <button
+                            onClick={() => setContactDialog({ open: true, contact: c })}
+                            title={t('common.edit')}
+                            className="hover:text-fg-strong"
+                          >
+                            <PencilIcon className="size-3.5" />
+                          </button>
+                          <NotifBell
+                            customerId={location.customerId}
+                            contactId={c.id}
+                            active={anyOnByContactId.get(c.id)}
+                            onClick={() => setNotifyContact(c)}
+                          />
+                          {!c.isPrimary && (
+                            <button
+                              onClick={() => makePrimaryMutation.mutate(c.id)}
+                              disabled={makePrimaryMutation.isPending}
+                              title={t('contacts.makePrimary')}
+                              className="hover:text-fg-strong disabled:opacity-50"
+                            >
+                              <StarIcon className="size-3.5" />
+                            </button>
+                          )}
+                          {!c.isPrimary && (
+                            <button
+                              onClick={() => setContactToDelete(c)}
+                              title={t('common.delete')}
+                              className="hover:text-danger-500"
+                            >
+                              <TrashIcon className="size-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <ServiceLocationContactDialog
+        isOpen={contactDialog.open}
+        onClose={() => setContactDialog({ open: false, contact: null })}
+        locationId={location.id}
+        contact={contactDialog.contact}
+        queryKey={contactsQueryKey}
+        onRequestDelete={
+          contactDialog.contact && !contactDialog.contact.isPrimary
+            ? () => {
+                const target = contactDialog.contact;
+                setContactDialog({ open: false, contact: null });
+                setContactToDelete(target);
+              }
+            : undefined
+        }
+      />
+      <ConfirmDialog
+        isOpen={!!contactToDelete}
+        onClose={() => setContactToDelete(null)}
+        onConfirm={() =>
+          contactToDelete &&
+          deleteMutation.mutate(contactToDelete.id, { onSuccess: () => setContactToDelete(null) })
+        }
+        title={t('contacts.delete.title')}
+        message={t('contacts.delete.message', { name: contactToDelete?.name || '' })}
+        confirmLabel={t('common.delete')}
+        isDestructive
+        isPending={deleteMutation.isPending}
+      />
+      <NotificationPreferencesDialog
+        isOpen={!!notifyContact}
+        onClose={() => setNotifyContact(null)}
+        customerId={location.customerId}
+        contact={notifyContact}
+        contactName={notifyContact?.name || ''}
+      />
+    </Card>
+  );
+}
+
+// Muted em-dash for empty table cells.
+function Dash() {
+  return <span className="text-fg-dim">—</span>;
+}
+
+// A phone value as a tel: link (mono), or a dash when absent.
+function PhoneCell({ value }: { value?: string | null }) {
+  if (!value) return <Dash />;
+  return (
+    <a
+      href={`tel:${value.replace(/\D/g, '')}`}
+      className="font-mono text-[11.5px] text-fg-muted hover:text-fg-strong hover:underline"
+    >
+      {formatPhone(value)}
+    </a>
+  );
+}
+
+// Per-contact notification bell. Filled/accent when the contact has any alert
+// enabled, outline/muted when none — so you can see at a glance who's wired up.
+// `active` lets a caller that already has the prefs (the Contacts tab) pass the
+// state in; otherwise the bell fetches its own (cache-shared with the dialog).
+function NotifBell({
+  customerId,
+  contactId,
+  onClick,
+  active,
+}: {
+  customerId: string;
+  contactId: string;
+  onClick: () => void;
+  active?: boolean;
+}) {
+  const { t } = useTranslation();
+  const { data } = useQuery({
+    queryKey: ['notification-preferences', 'contact', customerId, contactId],
+    queryFn: () => notificationApi.getContactPreferences(customerId, contactId),
+    enabled: active === undefined && !!customerId && !!contactId,
+  });
+  const on = active ?? (data ?? []).some((p) => p.optIn);
+  return (
+    <button
+      onClick={onClick}
+      title={t('notifications.preferences.tooltip')}
+      aria-label={t('notifications.preferences.tooltip')}
+      className={on ? 'text-fg-accent hover:text-fg-accent' : 'text-fg-dim hover:text-fg-strong'}
+    >
+      {on ? <BellSolidIcon className="size-3.5" /> : <BellIcon className="size-3.5" />}
+    </button>
   );
 }
 

@@ -172,7 +172,6 @@ export default function ServiceLocationContactDialog({
                     name="name"
                     value={form.name}
                     onChange={(e) => setField('name', e.target.value)}
-                    required
                     invalid={!!errors.name}
                   />
                   {errors.name && <div className="mt-1 text-[11px] text-danger-500">{errors.name}</div>}

@@ -242,6 +242,7 @@
     "actions": {
       "add": "Add Additional Contact"
     },
+    "addContact": "Add contact",
     "delete": {
       "message": "Are you sure you want to delete {{name}}?",
       "title": "Delete Contact"
@@ -269,7 +270,8 @@
     "table": {
       "contact": "Contact"
     },
-    "title": "Additional Contacts"
+    "title": "Additional Contacts",
+    "viewAll": "View all {{count}}"
   },
   "customers": {
     "agedBadge": "91+ aged",
@@ -799,13 +801,20 @@
       "channelPush": "Push",
       "channelSms": "SMS",
       "description": "Manage notification preferences for {{name}}",
+      "emailUnavailable": "Email unavailable — no email address on file.",
       "errorLoad": "Failed to load notification preferences",
       "errorUpdate": "Failed to update notification preference",
       "formDescription": "Choose which notifications this contact should receive",
       "manage": "Manage Notifications",
+      "noAddresses": "No email or mobile on file — only push alerts can be delivered.",
       "noPreferences": "No notification preferences available",
       "notificationType": "Notification Type",
-      "title": "Notification Preferences"
+      "scopeIntro": "{{name}} will receive these at:",
+      "smsUnavailable": "SMS unavailable — no mobile number on file.",
+      "title": "Notification Preferences",
+      "toggleAll": "Toggle all {{channel}}",
+      "tooltip": "Notification preferences",
+      "unavailable": "Not available"
     }
   },
   "payments": {

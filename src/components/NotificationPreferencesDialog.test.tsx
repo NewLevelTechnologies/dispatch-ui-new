@@ -146,8 +146,10 @@ describe('NotificationPreferencesDialog', () => {
       expect(screen.getByText('Work Order Scheduled')).toBeInTheDocument();
     });
 
-    const checkboxes = screen.getAllByRole('checkbox');
-    const emailCheckbox = checkboxes[0]; // First checkbox (EMAIL for Work Order Scheduled)
+    // Body-cell checkboxes have no accessible name; the column "toggle all"
+    // header checkboxes carry an aria-label, so filter those out.
+    const bodyCheckboxes = screen.getAllByRole('checkbox').filter((cb) => !cb.getAttribute('aria-label'));
+    const emailCheckbox = bodyCheckboxes[0]; // EMAIL cell for Work Order Scheduled (pref-1)
 
     await user.click(emailCheckbox);
 
@@ -213,7 +215,9 @@ describe('NotificationPreferencesDialog', () => {
       expect(screen.getByText('Work Order Scheduled')).toBeInTheDocument();
     });
 
-    const checkbox = screen.getByRole('checkbox');
+    // Body cell (no aria-label) — the PUSH column also renders a "toggle all"
+    // header checkbox, so target the body one.
+    const checkbox = screen.getAllByRole('checkbox').filter((cb) => !cb.getAttribute('aria-label'))[0];
     await user.click(checkbox);
 
     await waitFor(() => {
