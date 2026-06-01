@@ -19,10 +19,21 @@ export interface Address {
 export interface AdditionalContact {
   id: string;
   name: string;
+  // Relationship to the site (e.g. "Property manager"), not a corporate title.
+  // Net-new field — there was never a `title` to migrate from. Free text; FE
+  // offers a typeahead of common values.
+  role?: string | null;
+  // Three optional numbers, digits-only on the wire. The card surfaces the
+  // best-reach one (mobile, else office); all are editable in the contact form.
   phone?: string | null;
+  mobilePhone?: string | null;
+  afterHoursPhone?: string | null;
   email?: string | null;
   notes?: string | null;
   displayOrder: number;
+  // Exactly one contact per location is primary; it's projected onto the
+  // location's siteContact* fields. Absent/false for customer-level contacts.
+  isPrimary?: boolean;
   createdAt: string;
   updatedAt: string;
 }
