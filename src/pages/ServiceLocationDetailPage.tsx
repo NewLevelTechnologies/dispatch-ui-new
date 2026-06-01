@@ -1755,12 +1755,7 @@ function SiteContactCard({
           <div className="mb-2 flex items-center justify-between">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Additional</div>
             {canEdit && (
-              <button
-                onClick={() => setContactDialog({ open: true, contact: null })}
-                className="text-[10px] font-medium text-fg-accent hover:underline"
-              >
-                + Add
-              </button>
+              <CardLink onClick={() => setContactDialog({ open: true, contact: null })}>+ Add</CardLink>
             )}
           </div>
           {additional.length === 0 ? (
