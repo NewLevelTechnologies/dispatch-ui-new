@@ -24,7 +24,6 @@ import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
 import { TagPill } from '../components/ui/TagPill';
-import { tagSwatchColor } from '../utils/tagColor';
 import { PremiseMark } from '../components/ui/PremiseMark';
 import { StatusIndicator } from '../components/ui/StatusIndicator';
 import { StatusPickerChip } from '../components/ui/StatusPickerChip';
@@ -378,6 +377,38 @@ export default function ServiceLocationsPage() {
             allLabel={t('serviceLocations.filter.all')}
             allShortcutLabel={t('serviceLocations.filter.allStatuses')}
           />
+          {(tags?.length ?? 0) > 0 && (
+            <FilterChipListbox
+              multiple
+              label={t('serviceLocations.filter.tags')}
+              ariaLabel={t('serviceLocations.filter.tags')}
+              value={tagIds}
+              displayValue={formatTagDisplayValue(tagIds, tags ?? [], t)}
+              onChange={(ids) => updateFilters({ tag: ids })}
+              onClear={() => updateFilters({ tag: [] })}
+            >
+              {(tags ?? []).map((tag) => (
+                <ChipListboxOption key={tag.id} value={tag.id}>
+                  <TagPill color={tag.color} name={tag.name} className="w-full" />
+                </ChipListboxOption>
+              ))}
+            </FilterChipListbox>
+          )}
+          {activeRegions.length > 0 && (
+            <FilterChipListbox
+              label={t('serviceLocations.filter.region')}
+              ariaLabel={t('serviceLocations.filter.region')}
+              value={regionId || null}
+              displayValue={regionId ? activeRegions.find((r) => r.id === regionId)?.name ?? null : null}
+              resetLabel={t('serviceLocations.filter.allRegions')}
+              onChange={(id) => updateFilters({ region: id ?? '' })}
+              onClear={() => updateFilters({ region: '' })}
+            >
+              {activeRegions.map((r) => (
+                <ChipListboxOption key={r.id} value={r.id}>{r.name}</ChipListboxOption>
+              ))}
+            </FilterChipListbox>
+          )}
           <FilterChipRow>
             <FilterChip
               label={t('serviceLocations.filter.live')}
@@ -416,46 +447,7 @@ export default function ServiceLocationsPage() {
                 updateFilters({ premise: premiseFilter === 'residence' ? '' : 'residence' })
               }
             />
-            {(tags?.length ?? 0) > 0 && (
-              <FilterChipListbox
-                multiple
-                label={t('serviceLocations.filter.tags')}
-                ariaLabel={t('serviceLocations.filter.tags')}
-                value={tagIds}
-                displayValue={formatTagDisplayValue(tagIds, tags ?? [], t)}
-                onChange={(ids) => updateFilters({ tag: ids })}
-                onClear={() => updateFilters({ tag: [] })}
-              >
-                {(tags ?? []).map((tag) => (
-                  <ChipListboxOption key={tag.id} value={tag.id}>
-                    <span className="inline-flex items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className="size-2 rounded-full"
-                        style={{ backgroundColor: tagSwatchColor(tag.color) }}
-                      />
-                      {tag.name}
-                    </span>
-                  </ChipListboxOption>
-                ))}
-              </FilterChipListbox>
-            )}
           </FilterChipRow>
-          {activeRegions.length > 0 && (
-            <FilterChipListbox
-              label={t('serviceLocations.filter.region')}
-              ariaLabel={t('serviceLocations.filter.region')}
-              value={regionId || null}
-              displayValue={regionId ? activeRegions.find((r) => r.id === regionId)?.name ?? null : null}
-              resetLabel={t('serviceLocations.filter.allRegions')}
-              onChange={(id) => updateFilters({ region: id ?? '' })}
-              onClear={() => updateFilters({ region: '' })}
-            >
-              {activeRegions.map((r) => (
-                <ChipListboxOption key={r.id} value={r.id}>{r.name}</ChipListboxOption>
-              ))}
-            </FilterChipListbox>
-          )}
         </ListToolbar>
 
         <Card>
