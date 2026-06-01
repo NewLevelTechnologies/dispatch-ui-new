@@ -63,6 +63,11 @@ export default function WorkItemStatusPill({
       workOrderApi.updateWorkItemStatus(workOrderId, workItem.id, { statusId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      // A work-item status change can roll up to a new work-order status, so the
+      // embedded list surfaces (location/customer/equipment detail WO cards +
+      // Jobs tab) must refetch too — they read the separate 'work-orders-list'
+      // key, which the bare 'work-orders' invalidation above doesn't cover.
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
       // The status change emits a WORK_ITEM_STATUS_CHANGED event on the backend,
       // which the activity listener writes into work_order_activity. Refetch the
       // activity rail so the new event surfaces without a manual reload.
