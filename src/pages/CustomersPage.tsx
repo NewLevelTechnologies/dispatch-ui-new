@@ -17,7 +17,6 @@ import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
 import { TagPill } from '../components/ui/TagPill';
-import { tagSwatchColor } from '../utils/tagColor';
 import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { StatusPickerChip } from '../components/ui/StatusPickerChip';
@@ -322,6 +321,23 @@ export default function CustomersPage() {
             allLabel={t('customers.filter.all')}
             allShortcutLabel={t('customers.filter.allStatuses')}
           />
+          {(tags?.length ?? 0) > 0 && (
+            <FilterChipListbox
+              multiple
+              label={t('customers.filter.tags')}
+              ariaLabel={t('customers.filter.tags')}
+              value={tagIds}
+              displayValue={formatTagDisplayValue(tagIds, tags ?? [], t)}
+              onChange={(ids) => updateFilters({ tag: ids })}
+              onClear={() => updateFilters({ tag: [] })}
+            >
+              {(tags ?? []).map((tag) => (
+                <ChipListboxOption key={tag.id} value={tag.id}>
+                  <TagPill color={tag.color} name={tag.name} className="w-full" />
+                </ChipListboxOption>
+              ))}
+            </FilterChipListbox>
+          )}
           <FilterChipRow>
             <FilterChip
               label={t('customers.filter.openBalance')}
@@ -343,30 +359,6 @@ export default function CustomersPage() {
               active={agedFilter}
               onToggle={() => updateFilters({ aged: !agedFilter })}
             />
-            {(tags?.length ?? 0) > 0 && (
-              <FilterChipListbox
-                multiple
-                label={t('customers.filter.tags')}
-                ariaLabel={t('customers.filter.tags')}
-                value={tagIds}
-                displayValue={formatTagDisplayValue(tagIds, tags ?? [], t)}
-                onChange={(ids) => updateFilters({ tag: ids })}
-                onClear={() => updateFilters({ tag: [] })}
-              >
-                {(tags ?? []).map((tag) => (
-                  <ChipListboxOption key={tag.id} value={tag.id}>
-                    <span className="inline-flex items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className="size-2 rounded-full"
-                        style={{ backgroundColor: tagSwatchColor(tag.color) }}
-                      />
-                      {tag.name}
-                    </span>
-                  </ChipListboxOption>
-                ))}
-              </FilterChipListbox>
-            )}
           </FilterChipRow>
         </ListToolbar>
 
