@@ -1770,6 +1770,17 @@ vi.mock('react-i18next', () => {
     'settings.workflows.panel.savedUpdate': 'Transition updated',
     'settings.workflows.panel.savedDelete': 'Transition removed',
 
+    'tags.allApplied': 'All tags applied.',
+    'tags.createOption': 'Create "{{name}}"',
+    'tags.empty': 'No tags.',
+    'tags.errorApply': 'Failed to apply tag',
+    'tags.errorCreate': 'Failed to create tag',
+    'tags.errorRemove': 'Failed to remove tag',
+    'tags.noMatches': 'No matching tags.',
+    'tags.remove': 'Remove tag {{name}}',
+    'tags.searchPlaceholder': 'Add a tag…',
+    'tags.title': 'Tags',
+
     // Approvals inbox / WO callout
     'approvals.title': 'Approvals',
     'approvals.subtitle':

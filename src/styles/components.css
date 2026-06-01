@@ -112,6 +112,8 @@
 .pill.accent   { background: color-mix(in oklch, var(--accent-500) 14%, var(--bg-elev)); color: var(--accent-700); }
 .theme-dark .pill.accent { color: var(--accent-300); }
 .pill.violet   { background: color-mix(in oklch, var(--violet-500) 12%, var(--bg-elev)); color: var(--violet-500); }
+.pill.teal     { background: color-mix(in oklch, var(--teal-500) 12%, var(--bg-elev)); color: var(--teal-500); }
+.pill.pink     { background: color-mix(in oklch, var(--pink-500) 12%, var(--bg-elev)); color: var(--pink-500); }
 .pill.neutral  { background: var(--bg-active); color: var(--fg-muted); }
 
 /* Dark-mode pill contrast lift — heavier tint + brighter fg + visible border.
@@ -140,6 +142,16 @@
   background: color-mix(in oklch, var(--violet-500) 20%, var(--bg-elev));
   color: oklch(82% 0.12 295);
   border: 1px solid color-mix(in oklch, var(--violet-500) 28%, var(--bg-elev));
+}
+.theme-dark .pill.teal {
+  background: color-mix(in oklch, var(--teal-500) 20%, var(--bg-elev));
+  color: oklch(84% 0.10 195);
+  border: 1px solid color-mix(in oklch, var(--teal-500) 28%, var(--bg-elev));
+}
+.theme-dark .pill.pink {
+  background: color-mix(in oklch, var(--pink-500) 20%, var(--bg-elev));
+  color: oklch(84% 0.13 350);
+  border: 1px solid color-mix(in oklch, var(--pink-500) 28%, var(--bg-elev));
 }
 .theme-dark .pill.accent {
   background: color-mix(in oklch, var(--accent-500) 22%, var(--bg-elev));

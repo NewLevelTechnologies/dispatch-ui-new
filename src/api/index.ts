@@ -291,8 +291,9 @@ export {
   type UpdateDispatchRegionRequest,
 } from './dispatchRegionApi';
 
-// Tag API (tenant tag list, used by customer + service-location filters)
-export { tagApi, type Tag } from './tagApi';
+// Tag API (tenant tag library + customer / service-location assignment)
+export { tagApi, type Tag, type CreateTagRequest } from './tagApi';
+export { type TagColor } from '../utils/tagColor';
 
 // Approvals API (workflow engine approval requests)
 export {

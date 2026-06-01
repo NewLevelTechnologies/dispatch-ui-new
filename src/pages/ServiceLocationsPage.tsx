@@ -23,6 +23,8 @@ import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
+import { TagPill } from '../components/ui/TagPill';
+import { tagSwatchColor } from '../utils/tagColor';
 import { PremiseMark } from '../components/ui/PremiseMark';
 import { StatusIndicator } from '../components/ui/StatusIndicator';
 import { StatusPickerChip } from '../components/ui/StatusPickerChip';
@@ -430,7 +432,7 @@ export default function ServiceLocationsPage() {
                       <span
                         aria-hidden="true"
                         className="size-2 rounded-full"
-                        style={{ backgroundColor: tag.color }}
+                        style={{ backgroundColor: tagSwatchColor(tag.color) }}
                       />
                       {tag.name}
                     </span>
@@ -675,12 +677,7 @@ function TagList({ tags }: { tags?: TagSummary[] }) {
   return (
     <div className="flex flex-wrap gap-1">
       {visible.map((tag) => (
-        <span
-          key={tag.id}
-          className="inline-flex max-w-[140px] items-center truncate rounded-full border border-border-soft bg-bg-active px-2 py-[1px] text-[10.5px] font-medium text-fg-muted"
-        >
-          {tag.name}
-        </span>
+        <TagPill key={tag.id} color={tag.color} name={tag.name} className="max-w-[140px]" />
       ))}
       {overflow.length > 0 && (
         <span title={overflow.map((tag) => tag.name).join(', ')}>

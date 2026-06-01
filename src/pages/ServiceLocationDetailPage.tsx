@@ -27,6 +27,8 @@ import {
   contactApi,
   notificationApi,
   noteApi,
+  tagApi,
+  type Tag,
   NotificationChannel,
   type NotificationPreferenceDto,
   type NoteDto,
@@ -58,6 +60,9 @@ import NotificationPreferencesDialog from '../components/NotificationPreferences
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import ConfirmDialog from '../components/ConfirmDialog';
 import NoteDialog from '../components/NoteDialog';
+import TagPicker from '../components/TagPicker';
+import { TagPill } from '../components/ui/TagPill';
+import { nextTagColor } from '../utils/tagColor';
 import IconButton from '../components/IconButton';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
@@ -560,7 +565,7 @@ function OverviewTab({
           <SiteInstructionsCard location={location} onEdit={canEdit ? onEdit : undefined} />
           <SiteContactCard location={location} canEdit={canEdit} onViewAll={onViewContacts} />
           <ParentCustomerCard location={location} />
-          <TagsCard location={location} />
+          <TagsCard location={location} canEdit={canEdit} />
         </div>
       </div>
     </div>
@@ -1604,23 +1609,95 @@ function ParentCustomerCard({ location }: { location: ServiceLocationDetailDto }
   );
 }
 
-function TagsCard({ location }: { location: ServiceLocationDetailDto }) {
+function TagsCard({ location, canEdit }: { location: ServiceLocationDetailDto; canEdit: boolean }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [picking, setPicking] = useState(false);
+
   const tags = location.tags ?? [];
+  const tagIds = tags.map((tag) => tag.id);
+
+  const invalidate = () => {
+    // Tags ride along on both the detail payload and the list rows.
+    queryClient.invalidateQueries({ queryKey: ['service-location', location.id] });
+    queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+  };
+
+  // Apply is a full idempotent sync — send the complete desired id set.
+  const applyMutation = useMutation({
+    mutationFn: (nextIds: string[]) => tagApi.setForServiceLocation(location.id, nextIds),
+    onSuccess: invalidate,
+    onError: (err: unknown) =>
+      showError(t('tags.errorApply'), extractApiError(err) ?? undefined),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (tagId: string) => tagApi.removeFromServiceLocation(location.id, tagId),
+    onSuccess: invalidate,
+    onError: (err: unknown) =>
+      showError(t('tags.errorRemove'), extractApiError(err) ?? undefined),
+  });
+
+  // Create-and-apply: POST the new tag, then sync it onto this location and
+  // refresh the tenant library so it shows in future pickers.
+  const createMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const created = await tagApi.create({ name, color: nextTagColor(tags.length) });
+      await tagApi.setForServiceLocation(location.id, [...tagIds, created.id]);
+      return created;
+    },
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+    },
+    onError: (err: unknown) =>
+      showError(t('tags.errorCreate'), extractApiError(err) ?? undefined),
+  });
+
+  const busy = applyMutation.isPending || createMutation.isPending;
+
+  const handleApply = (tag: Tag) => {
+    applyMutation.mutate([...tagIds, tag.id]);
+    setPicking(false);
+  };
+  const handleCreate = (name: string) => {
+    createMutation.mutate(name);
+    setPicking(false);
+  };
+
   return (
-    <Card title="Tags">
-      {tags.length === 0 ? (
-        <div className="text-[12px] text-fg-muted">No tags.</div>
+    <Card
+      title={<CardTitle>{t('tags.title')}</CardTitle>}
+      action={
+        canEdit && !picking ? <CardLink onClick={() => setPicking(true)}>+ Add</CardLink> : undefined
+      }
+    >
+      {tags.length === 0 && !picking ? (
+        <div className="text-[12px] text-fg-muted">{t('tags.empty')}</div>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {tags.map((tag) => (
-            <span
+            <TagPill
               key={tag.id}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border-soft bg-bg-active px-2 py-0.5 text-[11px] font-medium text-fg"
-            >
-              <span aria-hidden className="size-2 rounded-full" style={{ backgroundColor: tag.color }} />
-              {tag.name}
-            </span>
+              color={tag.color}
+              name={tag.name}
+              onRemove={canEdit ? () => removeMutation.mutate(tag.id) : undefined}
+              removeLabel={t('tags.remove', { name: tag.name })}
+            />
           ))}
+        </div>
+      )}
+
+      {picking && (
+        <div className="mt-2">
+          <TagPicker
+            appliedTagIds={tagIds}
+            onApply={handleApply}
+            onCreate={handleCreate}
+            onClose={() => setPicking(false)}
+            canCreate={canEdit}
+            busy={busy}
+          />
         </div>
       )}
     </Card>
