@@ -8,6 +8,12 @@ import type { Customer, CustomerListResponse } from '../api';
 // Mock the API client
 vi.mock('../api/client');
 
+const navigateSpy = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => navigateSpy };
+});
+
 const mockCustomersListResponse: CustomerListResponse = {
   content: [
     {
@@ -495,5 +501,125 @@ describe('CustomersPage', () => {
 
     const phoneLink = screen.getByText(/\(555\) 123-4567/);
     expect(phoneLink).toHaveAttribute('href', 'tel:5551234567');
+  });
+
+  describe('interactions', () => {
+    beforeEach(() => {
+      navigateSpy.mockReset();
+    });
+
+    it('navigates to the detail page when a row is clicked', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomersListResponse });
+      const user = userEvent.setup();
+      renderWithProviders(<CustomersPage />);
+
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      await user.click(screen.getByText('John Doe'));
+      expect(navigateSpy).toHaveBeenCalledWith('/customers/1');
+    });
+
+    it('does not navigate when the phone or email link is clicked', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomersListResponse });
+      const user = userEvent.setup();
+      renderWithProviders(<CustomersPage />);
+
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      await user.click(screen.getByText(/\(555\) 123-4567/));
+      await user.click(screen.getByText('john@example.com'));
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
+
+    it('navigates from the row View action', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomersListResponse });
+      const user = userEvent.setup();
+      renderWithProviders(<CustomersPage />);
+
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      await user.click(screen.getAllByRole('button', { name: /more options/i })[0]);
+      await user.click(await screen.findByRole('menuitem', { name: /^view$/i }));
+      expect(navigateSpy).toHaveBeenCalledWith('/customers/1');
+    });
+
+    it('toggles the open-balance, open-jobs, and aged filter chips', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomersListResponse });
+      const user = userEvent.setup();
+      renderWithProviders(<CustomersPage />);
+
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      await user.click(screen.getByRole('button', { name: /openBalance/i }));
+      await user.click(screen.getByRole('button', { name: /openJobs/i }));
+      await user.click(screen.getByRole('button', { name: /\.aged/i }));
+
+      // Each toggle pushes an axios query param the next fetch must carry.
+      await waitFor(() => {
+        const params = vi
+          .mocked(apiClient.get)
+          .mock.calls.map((c) => (c[1] as { params?: Record<string, unknown> })?.params ?? {});
+        expect(params.some((p) => p.openBalance === true)).toBe(true);
+        expect(params.some((p) => p.openJobs === true)).toBe(true);
+        expect(params.some((p) => p.agedBalance === true)).toBe(true);
+      });
+    });
+
+    it('retries the fetch from the error state', async () => {
+      vi.mocked(apiClient.get).mockRejectedValue(new Error('Network error'));
+      const user = userEvent.setup();
+      renderWithProviders(<CustomersPage />);
+
+      await waitFor(() =>
+        expect(screen.getByText(/couldn't load customers/i)).toBeInTheDocument()
+      );
+
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomersListResponse });
+      await user.click(screen.getByRole('button', { name: /try again/i }));
+
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    });
+
+    it('closes the create dialog after opening it', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({
+        data: { ...mockCustomersListResponse, content: [], totalElements: 0, empty: true },
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<CustomersPage />);
+
+      await waitFor(() =>
+        expect(screen.getByText(/no customers yet/i)).toBeInTheDocument()
+      );
+
+      await user.click(screen.getAllByRole('button', { name: /add customer/i })[0]);
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+      await user.keyboard('{Escape}');
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      );
+    });
+
+    it('surfaces a toast when a delete fails', async () => {
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (String(url).includes('/customers/1')) {
+          return Promise.resolve({ data: mockFullCustomers[0] });
+        }
+        return Promise.resolve({ data: mockCustomersListResponse });
+      });
+      vi.mocked(apiClient.delete).mockRejectedValue(new Error('boom'));
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const user = userEvent.setup();
+
+      renderWithProviders(<CustomersPage />);
+
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      await user.click(screen.getAllByRole('button', { name: /more options/i })[0]);
+      await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+
+      await waitFor(() => expect(apiClient.delete).toHaveBeenCalledWith('/customers/1'));
+      confirmSpy.mockRestore();
+    });
   });
 });

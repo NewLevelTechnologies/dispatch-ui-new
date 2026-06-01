@@ -3,6 +3,7 @@ import { screen, waitFor, within, fireEvent } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../test/utils';
 import DispatchRegionsPanel from './DispatchRegionsPanel';
 import apiClient from '../../api/client';
+import { showError } from '../../lib/toast';
 
 vi.mock('../../api/client');
 
@@ -225,5 +226,134 @@ describe('DispatchRegionsPanel', () => {
     await waitFor(() => {
       expect(screen.getByText('Region service down')).toBeInTheDocument();
     });
+  });
+
+  it('refetches when the error-state retry is clicked', async () => {
+    const error = Object.assign(new Error('fail'), {
+      response: { data: { message: 'Region service down' } },
+    });
+    vi.mocked(apiClient.get).mockRejectedValueOnce(error);
+
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchRegionsPanel />);
+
+    await waitFor(() =>
+      expect(screen.getByText('Region service down')).toBeInTheDocument()
+    );
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRegions });
+    await user.click(screen.getByRole('button', { name: /try again/i }));
+
+    await waitFor(() => expect(screen.getByText('Georgia')).toBeInTheDocument());
+  });
+
+  it('opens the add dialog from the empty state', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchRegionsPanel />);
+
+    // Empty-state copy renders once the (empty) list resolves.
+    const addButtons = await screen.findAllByRole('button', {
+      name: /add.*region/i,
+    });
+    // The empty-state action is the trailing add affordance (header add leads).
+    await user.click(addButtons[addButtons.length - 1]);
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('clears the search from the no-match empty state', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchRegionsPanel />);
+
+    await waitFor(() => expect(screen.getByText('Georgia')).toBeInTheDocument());
+
+    await user.type(screen.getByPlaceholderText(/search/i), 'zzzzz');
+
+    await waitFor(() =>
+      expect(screen.queryByText('Georgia')).not.toBeInTheDocument()
+    );
+
+    await user.click(screen.getByRole('button', { name: /clear search/i }));
+
+    await waitFor(() => expect(screen.getByText('Georgia')).toBeInTheDocument());
+  });
+
+  it('closes the form dialog on Escape', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchRegionsPanel />);
+
+    await waitFor(() => expect(screen.getByText('Georgia')).toBeInTheDocument());
+
+    const row = screen.getByText('Georgia').closest('tr')!;
+    await user.click(within(row).getByRole('button', { name: /more options/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /^edit$/i }));
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    );
+  });
+
+  it('surfaces a toast when disabling a region fails', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.delete).mockRejectedValue(new Error('boom'));
+
+    renderWithProviders(<DispatchRegionsPanel />);
+
+    await waitFor(() => expect(screen.getByText('Georgia')).toBeInTheDocument());
+
+    const row = screen.getByText('Georgia').closest('tr')!;
+    await user.click(within(row).getByRole('button', { name: /more options/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /^disable$/i }));
+
+    const confirmButtons = screen.getAllByRole('button', { name: /^disable$/i });
+    await user.click(confirmButtons[confirmButtons.length - 1]);
+
+    await waitFor(() => expect(vi.mocked(showError)).toHaveBeenCalled());
+  });
+
+  it('surfaces a toast when enabling a region fails', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.post).mockRejectedValue(new Error('boom'));
+
+    renderWithProviders(<DispatchRegionsPanel />);
+
+    await waitFor(() => expect(screen.getByText('Old Florida')).toBeInTheDocument());
+
+    const row = screen.getByText('Old Florida').closest('tr')!;
+    await user.click(within(row).getByRole('button', { name: /more options/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /^enable$/i }));
+
+    await waitFor(() => expect(vi.mocked(showError)).toHaveBeenCalled());
+  });
+
+  it('surfaces a toast when reordering fails', async () => {
+    vi.mocked(apiClient.post).mockRejectedValue(new Error('boom'));
+
+    renderWithProviders(<DispatchRegionsPanel />);
+
+    await waitFor(() => expect(screen.getByText('South Carolina')).toBeInTheDocument());
+
+    const gaRow = screen.getByText('Georgia').closest('tr')!;
+    const scRow = screen.getByText('South Carolina').closest('tr')!;
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: vi.fn(),
+      getData: vi.fn(),
+      types: [],
+      files: [],
+      items: [],
+    };
+
+    fireEvent.dragStart(scRow, { dataTransfer });
+    fireEvent.dragOver(gaRow, { dataTransfer });
+    fireEvent.drop(gaRow, { dataTransfer });
+
+    await waitFor(() => expect(vi.mocked(showError)).toHaveBeenCalled());
   });
 });

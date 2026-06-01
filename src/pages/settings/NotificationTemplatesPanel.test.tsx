@@ -137,4 +137,114 @@ describe('NotificationTemplatesPanel', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('filters by channel and clears via the chip × button', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NotificationTemplatesPanel />);
+
+    await waitFor(() =>
+      expect(screen.getByText('Invoice Sent')).toBeInTheDocument()
+    );
+
+    // Select EMAIL → only the EMAIL template remains (SMS row drops out).
+    await user.click(screen.getByRole('button', { name: /^Channel$/i }));
+    await user.click(screen.getByRole('option', { name: /^Email$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Invoice Sent')).toBeInTheDocument();
+      expect(screen.queryByText('Work Order Completed')).not.toBeInTheDocument();
+    });
+
+    // Clearing the chip restores the full list.
+    await user.click(screen.getByRole('button', { name: /channel.*clear/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Work Order Completed')).toBeInTheDocument()
+    );
+  });
+
+  it('filters by audience and clears via the chip × button', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NotificationTemplatesPanel />);
+
+    await waitFor(() =>
+      expect(screen.getByText('Invoice Sent')).toBeInTheDocument()
+    );
+
+    await user.click(screen.getByRole('button', { name: /^Audience$/i }));
+    await user.click(screen.getByRole('option', { name: /^Customer$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Invoice Sent')).toBeInTheDocument();
+      expect(screen.queryByText('Work Order Completed')).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /audience.*clear/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Work Order Completed')).toBeInTheDocument()
+    );
+  });
+
+  it('filters by status (customized) and clears via the chip × button', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NotificationTemplatesPanel />);
+
+    await waitFor(() =>
+      expect(screen.getByText('Invoice Sent')).toBeInTheDocument()
+    );
+
+    // "Customized" keeps the non-system template, drops the system default.
+    await user.click(screen.getByRole('button', { name: /^Status$/i }));
+    await user.click(screen.getByRole('option', { name: /^Customized$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Work Order Completed')).toBeInTheDocument();
+      expect(screen.queryByText('Invoice Sent')).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /status.*clear/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Invoice Sent')).toBeInTheDocument()
+    );
+  });
+
+  it('filters the list by search text', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NotificationTemplatesPanel />);
+
+    await waitFor(() =>
+      expect(screen.getByText('Invoice Sent')).toBeInTheDocument()
+    );
+
+    await user.type(screen.getByRole('textbox'), 'invoice');
+
+    await waitFor(() => {
+      expect(screen.getByText('Invoice Sent')).toBeInTheDocument();
+      expect(screen.queryByText('Work Order Completed')).not.toBeInTheDocument();
+    });
+  });
+
+  it('refetches when the error-state retry is clicked', async () => {
+    const error = Object.assign(new Error('fail'), {
+      response: { data: { message: 'Templates service down' } },
+    });
+    vi.mocked(apiClient.get).mockRejectedValue(error);
+
+    const user = userEvent.setup();
+    renderWithProviders(<NotificationTemplatesPanel />);
+
+    await waitFor(() =>
+      expect(screen.getByText('Templates service down')).toBeInTheDocument()
+    );
+
+    // Recover on retry, then assert the list renders.
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { templates: mockTemplates } });
+    await user.click(screen.getByRole('button', { name: /try again/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Invoice Sent')).toBeInTheDocument()
+    );
+  });
 });
