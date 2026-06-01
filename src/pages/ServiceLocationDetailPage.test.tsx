@@ -55,6 +55,26 @@ describe('ServiceLocationDetailPage', () => {
     equipment: unknown[] = []
   ) => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
+      // Site contact card reads the full contact collection (primary-first).
+      // Project the location's primary site-contact fields into a primary
+      // contact, then append any additional contacts.
+      if (url.includes('/service-locations/') && url.includes('/contacts')) {
+        const contacts = [];
+        if (location?.siteContactName || location?.siteContactPhone || location?.siteContactEmail) {
+          contacts.push({
+            id: 'primary-contact',
+            name: location.siteContactName ?? '',
+            phone: location.siteContactPhone ?? null,
+            email: location.siteContactEmail ?? null,
+            displayOrder: 0,
+            isPrimary: true,
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+          });
+        }
+        contacts.push(...(location?.additionalContacts ?? []).map((c) => ({ ...c, isPrimary: false })));
+        return Promise.resolve({ data: contacts });
+      }
       if (url.includes('/service-locations/')) {
         return location ? Promise.resolve({ data: location }) : Promise.reject(new Error('Not found'));
       }

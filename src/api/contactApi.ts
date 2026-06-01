@@ -4,7 +4,10 @@ import type { AdditionalContact } from './customerApi';
 
 export interface CreateAdditionalContactRequest {
   name: string;
+  role?: string | null;
   phone?: string | null;
+  mobilePhone?: string | null;
+  afterHoursPhone?: string | null;
   email?: string | null;
   notes?: string | null;
   displayOrder?: number;
@@ -12,7 +15,10 @@ export interface CreateAdditionalContactRequest {
 
 export interface UpdateAdditionalContactRequest {
   name: string;
+  role?: string | null;
   phone?: string | null;
+  mobilePhone?: string | null;
+  afterHoursPhone?: string | null;
   email?: string | null;
   notes?: string | null;
   displayOrder?: number;
@@ -89,6 +95,18 @@ export const contactApi = {
 
   deleteServiceLocationContact: async (locationId: string, contactId: string): Promise<void> => {
     await apiClient.delete(`/service-locations/${locationId}/contacts/${contactId}`);
+  },
+
+  // Atomically promote a contact to primary; the server demotes the current
+  // primary into the additional list. One call — no client-side swap.
+  makeServiceLocationContactPrimary: async (
+    locationId: string,
+    contactId: string
+  ): Promise<AdditionalContact> => {
+    const response = await apiClient.post<AdditionalContact>(
+      `/service-locations/${locationId}/contacts/${contactId}/make-primary`
+    );
+    return response.data;
   },
 
   // Direct contact access (for cache misses)

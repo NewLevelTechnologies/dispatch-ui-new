@@ -78,6 +78,7 @@
       "accessInstructions": "Access Instructions",
       "address": "Address",
       "addressLine2": "Address Line 2",
+      "afterHoursPhone": "After-Hours Phone",
       "billingAddress": "Billing Address",
       "billingAddressSameAsService": "Send invoice to same address",
       "city": "City",
@@ -95,8 +96,10 @@
       "firstName": "First Name",
       "lastName": "Last Name",
       "locationName": "Location Name",
+      "mobilePhone": "Mobile",
       "name": "Name",
       "notes": "Notes",
+      "officePhone": "Office Phone",
       "optional": "optional",
       "optionalCount": "{{count}} optional",
       "paymentTermsDays": "Payment Terms (Days)",
@@ -245,12 +248,24 @@
     },
     "entity": "contact",
     "form": {
+      "delete": "Delete contact",
       "descriptionCreate": "Add an additional contact for this record.",
       "descriptionEdit": "Update contact information.",
       "titleCreate": "Add Contact",
       "titleEdit": "Edit Contact"
     },
+    "makePrimary": "Make primary",
     "noContacts": "No additional contacts yet",
+    "noContactInfo": "No contact info on file",
+    "roleSuggestions": [
+      "Property manager",
+      "Building engineer",
+      "Tenant",
+      "Owner",
+      "On-site manager",
+      "Security / front desk",
+      "Maintenance"
+    ],
     "table": {
       "contact": "Contact"
     },

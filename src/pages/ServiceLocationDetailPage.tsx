@@ -14,7 +14,7 @@ import {
   ReceiptPercentIcon,
   MagnifyingGlassIcon,
   PencilIcon,
-  TrashIcon,
+  PhoneIcon,
   BellIcon,
 } from '@heroicons/react/24/outline';
 import {
@@ -44,7 +44,7 @@ import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import WorkOrdersList from '../components/WorkOrdersList';
 import NotificationLogsList from '../components/NotificationLogsList';
-import AdditionalContactFormDialog from '../components/AdditionalContactFormDialog';
+import ServiceLocationContactDialog from '../components/ServiceLocationContactDialog';
 import NotificationPreferencesDialog from '../components/NotificationPreferencesDialog';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -545,7 +545,7 @@ function OverviewTab({
         {/* Right rail — reference / pre-arrival. Ends at Tags. */}
         <div className="flex flex-col gap-3">
           <SiteInstructionsCard location={location} onEdit={canEdit ? onEdit : undefined} />
-          <SiteContactCard location={location} canEdit={canEdit} onEdit={canEdit ? onEdit : undefined} />
+          <SiteContactCard location={location} canEdit={canEdit} />
           <ParentCustomerCard location={location} />
           <TagsCard location={location} />
         </div>
@@ -1007,23 +1007,90 @@ function SiteInstructionsCard({
   );
 }
 
-// Mirrors the mock's Site contact card: a primary contact block, then a
-// compact "Backup" list. The site contact (name/phone/email — the record has
-// no title or after-hours field, so those are omitted) is the primary; the
-// optional additionalContacts are the backups. Backup rows keep full CRUD
-// (add/edit/delete + notification prefs) via the same dialogs the old table
-// used, surfaced as hover actions to stay dense in the 340px rail.
+// One contact — the same block for the primary and every additional contact
+// (no more ragged "name … email" rows). Name · role on one line; the best-reach
+// phone (mobile, else office) is the call action (accent, mono, tel:); email is
+// a quieter mailto; after-hours + per-contact notes render only when present. A
+// contact with neither phone nor email is flagged rather than shown blank.
+// Hover actions are supplied by the card.
+function ContactBlock({
+  contact,
+  primary,
+  actions,
+}: {
+  contact: AdditionalContact;
+  primary?: boolean;
+  actions?: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  const phone = contact.mobilePhone || contact.phone || null;
+  return (
+    <div className="group/contact">
+      <div className="flex items-baseline gap-2">
+        <div className="flex grow flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+          <span className={`font-semibold text-fg-strong ${primary ? 'text-[13px]' : 'text-[12.5px]'}`}>
+            {contact.name}
+          </span>
+          {contact.role && <span className="text-[11px] text-fg-muted">· {contact.role}</span>}
+        </div>
+        {actions && (
+          <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover/contact:opacity-100 focus-within:opacity-100">
+            {actions}
+          </div>
+        )}
+      </div>
+
+      {phone ? (
+        <a
+          href={`tel:${phone.replace(/\D/g, '')}`}
+          className="mt-0.5 inline-flex items-center gap-1 font-mono text-[12.5px] font-semibold text-fg-accent hover:underline"
+        >
+          <PhoneIcon className="size-3" />
+          {formatPhone(phone)}
+        </a>
+      ) : !contact.email ? (
+        <div className="mt-0.5 text-[11.5px]" style={{ color: 'var(--warning-fg)' }}>
+          {t('contacts.noContactInfo')}
+        </div>
+      ) : null}
+
+      {contact.email && (
+        <a
+          href={`mailto:${contact.email}`}
+          className="mt-0.5 block truncate font-mono text-[11px] text-fg-muted hover:text-fg-strong hover:underline"
+        >
+          {contact.email}
+        </a>
+      )}
+
+      {contact.afterHoursPhone && (
+        <div className="mt-0.5 font-mono text-[11px] text-fg-muted">
+          {formatPhone(contact.afterHoursPhone)} <span className="text-fg-dim">· after hours</span>
+        </div>
+      )}
+
+      {contact.notes && <div className="mt-1 text-[11px] leading-snug text-fg-muted">{contact.notes}</div>}
+    </div>
+  );
+}
+
+// Site contact card. Reads the full contact collection (primary-first, each
+// isPrimary-flagged) and splits client-side — that hands us a real contact id
+// for every row, including the primary, which the projected siteContact* fields
+// don't carry (needed to PUT the primary on Edit / promote on make-primary).
+// Header Edit = edit the primary; per additional row = Make primary + Edit +
+// notification bell; Delete lives in the dialog (never for the primary). Make
+// primary is one atomic server call — no client-side swap.
 function SiteContactCard({
   location,
   canEdit,
-  onEdit,
 }: {
   location: ServiceLocationDetailDto;
   canEdit: boolean;
-  onEdit?: () => void;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const contactsQueryKey = ['service-location-contacts', location.id];
   const [contactDialog, setContactDialog] = useState<{ open: boolean; contact: AdditionalContact | null }>({
     open: false,
     contact: null,
@@ -1031,52 +1098,85 @@ function SiteContactCard({
   const [contactToDelete, setContactToDelete] = useState<AdditionalContact | null>(null);
   const [notifyContact, setNotifyContact] = useState<AdditionalContact | null>(null);
 
-  const hasSiteContact = location.siteContactName || location.siteContactPhone || location.siteContactEmail;
-  const additional = location.additionalContacts;
+  const { data: contacts = [] } = useQuery({
+    queryKey: contactsQueryKey,
+    queryFn: () => contactApi.getServiceLocationContacts(location.id),
+    enabled: !!location.id,
+  });
+
+  const list = Array.isArray(contacts) ? contacts : [];
+  const primary = list.find((c) => c.isPrimary) ?? null;
+  const additional = list.filter((c) => !c.isPrimary);
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: contactsQueryKey });
+    // The detail payload projects the primary onto siteContact* + lists the
+    // rest; refetch so a promote/edit/delete reflects everywhere.
+    queryClient.invalidateQueries({ queryKey: ['service-location', location.id] });
+  };
 
   const deleteMutation = useMutation({
     mutationFn: (contactId: string) => contactApi.deleteServiceLocationContact(location.id, contactId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['service-location', location.id] });
+      invalidate();
       setContactToDelete(null);
     },
     onError: (err) =>
       showError(t('common.form.errorDelete', { entity: t('contacts.entity') }), extractApiError(err) ?? undefined),
   });
 
+  const makePrimaryMutation = useMutation({
+    mutationFn: (contactId: string) => contactApi.makeServiceLocationContactPrimary(location.id, contactId),
+    onSuccess: invalidate,
+    onError: (err) =>
+      showError(t('common.form.errorUpdate', { entity: t('contacts.entity') }), extractApiError(err) ?? undefined),
+  });
+
+  // Notification bell — preserves the existing per-contact notification-prefs
+  // feature (out of the designer's scope, but a real capability we keep).
+  const notifyButton = (c: AdditionalContact) => (
+    <button
+      onClick={() => setNotifyContact(c)}
+      aria-label={t('notifications.preferences.manage')}
+      className="text-fg-dim hover:text-fg-strong"
+    >
+      <BellIcon className="size-3.5" />
+    </button>
+  );
+
   return (
     <Card
       title={<CardTitle icon={<UserIcon className="size-3.5" />}>{t('serviceLocations.detail.siteContact')}</CardTitle>}
-      action={canEdit && onEdit ? <CardLink onClick={onEdit}>{t('common.edit')}</CardLink> : undefined}
+      action={
+        canEdit && primary ? (
+          <CardLink onClick={() => setContactDialog({ open: true, contact: primary })}>{t('common.edit')}</CardLink>
+        ) : undefined
+      }
+      padding="none"
     >
-      {/* Primary site contact */}
-      {hasSiteContact ? (
-        <div className="space-y-0.5">
-          {location.siteContactName && (
-            <div className="text-[13px] font-semibold text-fg-strong">{location.siteContactName}</div>
-          )}
-          {location.siteContactPhone && (
-            <a href={`tel:${location.siteContactPhone}`} className="block font-mono text-[11.5px] text-fg-muted hover:text-fg-strong hover:underline">
-              {formatPhone(location.siteContactPhone)}
-            </a>
-          )}
-          {location.siteContactEmail && (
-            <a href={`mailto:${location.siteContactEmail}`} className="block font-mono text-[11.5px] text-fg-muted hover:text-fg-strong hover:underline">
-              {location.siteContactEmail}
-            </a>
-          )}
-        </div>
-      ) : (
-        <div className="text-[12px] text-fg-muted">No site contact on file.</div>
-      )}
+      {/* Primary */}
+      <div className="px-3.5 py-3">
+        {primary ? (
+          <ContactBlock contact={primary} primary actions={canEdit ? notifyButton(primary) : undefined} />
+        ) : (
+          <div className="flex items-center gap-2 text-[12px] text-fg-muted">
+            No site contact on file.
+            {canEdit && (
+              <button
+                onClick={() => setContactDialog({ open: true, contact: null })}
+                className="font-medium text-fg-accent hover:underline"
+              >
+                + Add
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
-      {/* Additional contacts — compact single-line rows (name left, phone
-          flush-right), matching the design. The record has no title field, so
-          the mock's "· {title}" is omitted. CRUD reveals on hover (swapping in
-          for the phone) to stay dense in the rail. */}
-      {(additional.length > 0 || canEdit) && (
-        <div className="mt-2.5 border-t border-dashed border-border-soft pt-2.5">
-          <div className="mb-1.5 flex items-center justify-between">
+      {/* Additional — same block shape as the primary, divided rows */}
+      {(additional.length > 0 || (canEdit && primary)) && (
+        <div className="border-t border-border-soft px-3.5 py-2.5">
+          <div className="mb-2 flex items-center justify-between">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Additional</div>
             {canEdit && (
               <button
@@ -1090,46 +1190,55 @@ function SiteContactCard({
           {additional.length === 0 ? (
             <div className="text-[11.5px] italic text-fg-dim">No additional contacts.</div>
           ) : (
-            <div className="flex flex-col gap-1">
-              {additional.map((c) => {
-                const value = c.phone ? formatPhone(c.phone) : c.email || '';
-                return (
-                  <div key={c.id} className="group flex items-baseline justify-between gap-2 text-[11.5px]">
-                    <span className="min-w-0 truncate font-semibold text-fg-strong">{c.name}</span>
-                    <span className="flex shrink-0 items-center">
-                      {value && (
-                        <span className={`font-mono text-fg-muted ${canEdit ? 'group-hover:hidden' : ''}`}>{value}</span>
-                      )}
-                      {canEdit && (
-                        <span className="hidden items-center gap-1.5 text-fg-dim group-hover:flex">
-                          <button onClick={() => setNotifyContact(c)} aria-label={t('notifications.preferences.manage')} className="hover:text-fg-strong">
-                            <BellIcon className="size-3.5" />
+            <div className="flex flex-col">
+              {additional.map((c) => (
+                <div key={c.id} className="border-t border-border-soft py-2.5 first:border-t-0 first:pt-0 last:pb-0">
+                  <ContactBlock
+                    contact={c}
+                    actions={
+                      canEdit ? (
+                        <>
+                          <button
+                            onClick={() => makePrimaryMutation.mutate(c.id)}
+                            disabled={makePrimaryMutation.isPending}
+                            className="text-[10.5px] font-medium text-fg-accent hover:underline disabled:opacity-50"
+                          >
+                            {t('contacts.makePrimary')}
                           </button>
-                          <button onClick={() => setContactDialog({ open: true, contact: c })} aria-label={t('common.edit')} className="hover:text-fg-strong">
+                          <button
+                            onClick={() => setContactDialog({ open: true, contact: c })}
+                            aria-label={t('common.edit')}
+                            className="text-fg-dim hover:text-fg-strong"
+                          >
                             <PencilIcon className="size-3.5" />
                           </button>
-                          <button onClick={() => setContactToDelete(c)} aria-label={t('common.delete')} className="hover:text-danger-500">
-                            <TrashIcon className="size-3.5" />
-                          </button>
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                );
-              })}
+                          {notifyButton(c)}
+                        </>
+                      ) : undefined
+                    }
+                  />
+                </div>
+              ))}
             </div>
           )}
         </div>
       )}
 
-      <AdditionalContactFormDialog
+      <ServiceLocationContactDialog
         isOpen={contactDialog.open}
         onClose={() => setContactDialog({ open: false, contact: null })}
-        parentId={location.id}
-        parentType="serviceLocation"
-        customerId={location.customerId}
+        locationId={location.id}
         contact={contactDialog.contact}
-        queryKey={['service-location', location.id]}
+        queryKey={contactsQueryKey}
+        onRequestDelete={
+          contactDialog.contact && !contactDialog.contact.isPrimary
+            ? () => {
+                const target = contactDialog.contact;
+                setContactDialog({ open: false, contact: null });
+                setContactToDelete(target);
+              }
+            : undefined
+        }
       />
       <ConfirmDialog
         isOpen={!!contactToDelete}
