@@ -1,6 +1,7 @@
 // Customer API Client
 import apiClient from './client';
 import type { NoteDto } from './noteApi';
+import type { ArrivalFactDto } from './arrivalFactApi';
 
 export interface Address {
   streetAddress: string;
@@ -264,6 +265,14 @@ export interface ServiceLocationDetailDto {
   // Usable for first paint; the card refetches GET /service-locations/{id}/notes
   // as the live source for add/edit/pin/delete.
   notes?: NoteDto[] | null;
+  // Structured arrival facts (gate code, lockbox, parking, …) — the label/value
+  // list beside `accessInstructions`. Server-ordered by displayOrder. Seeds the
+  // Site instructions card's first paint; the card refetches
+  // GET /service-locations/{id}/arrival-facts as the live source.
+  arrivalFacts?: ArrivalFactDto[] | null;
+  // Tenant-learned label typeahead seed (distinct labels already in use). Empty
+  // on a fresh tenant; the card falls back to a default seed.
+  suggestedFactLabels?: string[] | null;
   status: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
   createdAt: string;
   updatedAt: string;

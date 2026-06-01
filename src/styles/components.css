@@ -42,6 +42,22 @@
   gap: 7px;
 }
 .card-sub { font-size: 11.5px; color: var(--fg-muted); }
+/* Quiet card-header action link — a ~11.5px accent affordance that sits UNDER
+   the card title, not as a peer of it ("View all →", "+ Add", "Edit",
+   "Open customer →", …). Unlayered like the other .card-* classes so it wins
+   over the global body/Preflight font-size that otherwise bumps bare <button>
+   links to 13px (the layered Tailwind text-size utility can't override it).
+   Icons scale with the text. */
+.card-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--fg-accent);
+}
+.card-action:hover { text-decoration: underline; }
+.card-action svg { width: 14px; height: 14px; }
 .card-body { padding: 14px; }
 .card-body.flush { padding: 0; }
 
