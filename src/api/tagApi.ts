@@ -1,13 +1,18 @@
 import apiClient from './client';
+import type { TagSummary } from './customerApi';
+import type { TagColor } from '../utils/tagColor';
 
-// Tenant tag list. Endpoint lives under /customers because the customer service
-// owns the resource today, but the same tags apply to both customers and
-// service locations via the ?tags= filter on each list endpoint.
+// Tenant tag list + assignment. The library endpoint lives under /customers
+// because the customer service owns the resource today, but the same tags
+// apply to both customers and service locations.
 //
-// Default response: active tags only, sorted by name. Tenant counts are
+// Default list response: active tags only, sorted by name. Tenant counts are
 // typically <50 (hard cap 200), so client-side filtering in pickers is fine —
 // the `q` param is available for server-side typeahead if a future picker
 // needs it.
+//
+// `color` is a fixed 8-value enum (see TagColor), not a hex string — map it to
+// a pill tone with `tagPillTone()` from utils/tagColor.
 export interface Tag {
   id: string;
   name: string;
@@ -15,6 +20,11 @@ export interface Tag {
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateTagRequest {
+  name: string;
+  color: TagColor;
 }
 
 export const tagApi = {
@@ -32,6 +42,26 @@ export const tagApi = {
     }
     const response = await apiClient.get<Tag[]>('/customers/tags', { params: apiParams });
     return response.data;
+  },
+
+  // Create a tenant-level tag. Returns the new tag so callers can immediately
+  // assign it (inline create-and-apply).
+  create: async (request: CreateTagRequest): Promise<Tag> => {
+    const response = await apiClient.post<Tag>('/customers/tags', request);
+    return response.data;
+  },
+
+  // Full idempotent sync of a service location's tags — send the complete set
+  // of tagIds you want; the server adds/removes to match. Returns the result.
+  setForServiceLocation: async (locationId: string, tagIds: string[]): Promise<TagSummary[]> => {
+    const response = await apiClient.put<TagSummary[]>(`/service-locations/${locationId}/tags`, { tagIds });
+    return response.data;
+  },
+
+  // Remove a single tag assignment from a service location (does not delete
+  // the tag from the tenant library).
+  removeFromServiceLocation: async (locationId: string, tagId: string): Promise<void> => {
+    await apiClient.delete(`/service-locations/${locationId}/tags/${tagId}`);
   },
 };
 

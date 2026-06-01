@@ -65,6 +65,10 @@
   --color-danger-100: var(--danger-100);
   --color-violet-500: var(--violet-500);
   --color-violet-100: var(--violet-100);
+  --color-teal-500: var(--teal-500);
+  --color-teal-100: var(--teal-100);
+  --color-pink-500: var(--pink-500);
+  --color-pink-100: var(--pink-100);
 
   /* Radii */
   --radius-xs: var(--r-xs);

@@ -1712,6 +1712,18 @@
       "transitionSummary_zero": "No transitions defined"
     }
   },
+  "tags": {
+    "allApplied": "All tags applied.",
+    "createOption": "Create \"{{name}}\"",
+    "empty": "No tags.",
+    "errorApply": "Failed to apply tag",
+    "errorCreate": "Failed to create tag",
+    "errorRemove": "Failed to remove tag",
+    "noMatches": "No matching tags.",
+    "remove": "Remove tag {{name}}",
+    "searchPlaceholder": "Add a tag…",
+    "title": "Tags"
+  },
   "tenantSettings": {
     "description": "Manage company branding, contact information, and business settings",
     "sections": {

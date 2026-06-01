@@ -50,6 +50,14 @@
   --danger-100:  oklch(94% 0.06 27);
   --violet-500:  oklch(58% 0.18 295);
   --violet-100:  oklch(94% 0.05 295);
+  /* Tag accent hues — fixed, independent of the tenant --accent ramp so tags
+     never inherit brand tint. Hues chosen distinct from the four semantic
+     tones (235/152/78/27) so a tag never reads as a status signal. Dark-mode
+     contrast is handled by the .pill dark lifts, matching violet. */
+  --teal-500:    oklch(64% 0.12 195);
+  --teal-100:    oklch(94% 0.04 195);
+  --pink-500:    oklch(64% 0.19 350);
+  --pink-100:    oklch(94% 0.05 350);
 }
 
 /* Cool accent — steel teal. Apply by adding `accent-cool` class to <html> */
