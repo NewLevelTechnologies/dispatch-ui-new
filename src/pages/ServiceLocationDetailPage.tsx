@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string -- dense visual detail page; entity names + major strings go through getName()/t(), but inline glyphs, separators, and short operational labels are kept as literals to keep the dense markup readable (same convention as UserDetailPage). */
 import type React from 'react';
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +18,8 @@ import {
   BellIcon,
   TrashIcon,
   StarIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from '@heroicons/react/24/outline';
 import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
 import {
@@ -27,11 +29,13 @@ import {
   contactApi,
   notificationApi,
   noteApi,
+  arrivalFactApi,
   tagApi,
   type Tag,
   NotificationChannel,
   type NotificationPreferenceDto,
   type NoteDto,
+  type ArrivalFactDto,
   EquipmentStatus,
   type Equipment,
   type EquipmentSummary,
@@ -46,6 +50,7 @@ import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { formatPhone } from '../utils/formatPhone';
+import { formatTimestamp, formatExactTimestamp } from '../lib/formatTimestamp';
 import { TimeAgo } from '../components/TimeAgo';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { extractApiError, showError, showInfo, showSuccess } from '../lib/toast';
@@ -66,6 +71,8 @@ import { nextTagColor } from '../utils/tagColor';
 import IconButton from '../components/IconButton';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
+import { Input } from '../components/catalyst/input';
+import { Textarea } from '../components/catalyst/textarea';
 import { Heading } from '../components/catalyst/heading';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Pill } from '../components/ui/Pill';
@@ -252,8 +259,6 @@ export default function ServiceLocationDetailPage() {
               onViewJobs={() => setActiveTab('jobs')}
               onViewActivity={() => setActiveTab('activity')}
               onViewContacts={() => setActiveTab('contacts')}
-              onNewJob={() => setIsNewWorkOrderOpen(true)}
-              onEdit={canEditServiceLocations ? () => setIsEditDialogOpen(true) : undefined}
               canEdit={canEditServiceLocations}
             />
           )}
@@ -274,10 +279,10 @@ export default function ServiceLocationDetailPage() {
             <Card
               title={<CardTitle icon={<ChartBarIcon className="size-3.5" />}>{getName('work_order', true)}</CardTitle>}
               action={
-                <Button plain onClick={() => setIsNewWorkOrderOpen(true)}>
-                  <PlusIcon className="size-4" />
+                <CardLink onClick={() => setIsNewWorkOrderOpen(true)}>
+                  <PlusIcon />
                   {t('common.actions.new', { entity: getName('work_order') })}
-                </Button>
+                </CardLink>
               }
               padding="none"
             >
@@ -497,9 +502,33 @@ function CardTitle({ icon, children }: { icon?: React.ReactNode; children: React
   );
 }
 
-function CardLink({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+// Canonical card-header action link — a quiet ~11.5px accent affordance that
+// sits under the 13px card title, not as a peer of it. Styled by the unlayered
+// `.card-action` component class (components.css); a layered Tailwind text-size
+// utility can't override the global body/Preflight font-size on a bare <button>,
+// which is why the size lives in CSS, not a `text-[…]` class here. Pass `to` for
+// a navigation link, otherwise `onClick` for an action button.
+function CardLink({
+  children,
+  onClick,
+  to,
+  className,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  to?: string;
+  className?: string;
+}) {
+  const cls = className ? `card-action ${className}` : 'card-action';
+  if (to) {
+    return (
+      <Link to={to} className={cls}>
+        {children}
+      </Link>
+    );
+  }
   return (
-    <button onClick={onClick} className="text-[11px] font-medium text-fg-accent hover:underline">
+    <button type="button" onClick={onClick} className={cls}>
       {children}
     </button>
   );
@@ -529,8 +558,6 @@ function OverviewTab({
   onViewJobs,
   onViewActivity,
   onViewContacts,
-  onNewJob,
-  onEdit,
   canEdit,
 }: {
   location: ServiceLocationDetailDto;
@@ -539,8 +566,6 @@ function OverviewTab({
   onViewJobs: () => void;
   onViewActivity: () => void;
   onViewContacts: () => void;
-  onNewJob: () => void;
-  onEdit?: () => void;
   canEdit: boolean;
 }) {
   const attentionItems = buildAttentionItems(location);
@@ -555,14 +580,14 @@ function OverviewTab({
             one-line teaser (the overview is current-state, not a logfile). */}
         <div className="flex flex-col gap-3">
           <EquipmentSummaryCard equipment={equipment} onViewAll={onViewEquipment} />
-          <SiteWorkOrdersCard location={location} onViewAll={onViewJobs} onNewJob={onNewJob} />
+          <SiteWorkOrdersCard location={location} onViewAll={onViewJobs} />
           <NotesCard location={location} canEdit={canEdit} />
           <ActivityTeaser onViewActivity={onViewActivity} />
         </div>
 
         {/* Right rail — reference / pre-arrival. Ends at Tags. */}
         <div className="flex flex-col gap-3">
-          <SiteInstructionsCard location={location} onEdit={canEdit ? onEdit : undefined} />
+          <SiteInstructionsCard location={location} canEdit={canEdit} />
           <SiteContactCard location={location} canEdit={canEdit} onViewAll={onViewContacts} />
           <ParentCustomerCard location={location} />
           <TagsCard location={location} canEdit={canEdit} />
@@ -798,11 +823,9 @@ function deriveJobLabel(wo: WorkOrderSummary, typeName?: string): string {
 function SiteWorkOrdersCard({
   location,
   onViewAll,
-  onNewJob,
 }: {
   location: ServiceLocationDetailDto;
   onViewAll: () => void;
-  onNewJob: () => void;
 }) {
   const { getName } = useGlossary();
   const { t } = useTranslation();
@@ -835,10 +858,6 @@ function SiteWorkOrdersCard({
             </>
           )}
           <CardLink onClick={onViewAll}>View all {data?.totalElements ?? items.length} →</CardLink>
-          <Button plain size="xxs" onClick={onNewJob}>
-            <PlusIcon className="size-3.5" />
-            {t('common.actions.new', { entity: getName('work_order') })}
-          </Button>
         </div>
       }
       padding="none"
@@ -978,12 +997,9 @@ function ActivityTeaser({ onViewActivity }: { onViewActivity: () => void }) {
         </span>
       </div>
       <MockBadge />
-      <button
-        onClick={onViewActivity}
-        className="shrink-0 text-[11px] font-medium text-fg-accent hover:underline"
-      >
+      <CardLink onClick={onViewActivity} className="shrink-0">
         View activity →
-      </button>
+      </CardLink>
     </div>
   );
 }
@@ -1001,27 +1017,559 @@ function MockBadge() {
   );
 }
 
-function SiteInstructionsCard({
-  location,
-  onEdit,
-}: {
-  location: ServiceLocationDetailDto;
-  onEdit?: () => void;
-}) {
-  // Free-form arrival prose — REAL (accessInstructions). The structured
-  // label/value facts (gate code, lockbox, etc.) are deferred to the Add/Edit
-  // Location pass (no writer yet), so only the prose renders for now.
+// ─────────────────────────────────────────────────────────────────────────
+// Site instructions — the pre-arrival reference card. Two INDEPENDENT editable
+// parts: the free-form arrival prose (`accessInstructions`, edited via the
+// location update endpoint) and the structured label/value facts (gate code,
+// lockbox, parking, …) managed via arrivalFactApi. Editing one never touches
+// the other. Only populated rows render; sensitive codes mask by default with a
+// reveal toggle since the page may be over-shoulder-visible at a CSR counter.
+// ─────────────────────────────────────────────────────────────────────────
+
+// Default label seed for a fresh tenant (suggestedFactLabels empty). The
+// backend's tenant-learned list is merged in front of this and wins on dupes.
+// Ordered most-common-first — this is the order the typeahead shows on focus
+// (before the user types), so the everyday operational facts surface at the top.
+const DEFAULT_FACT_LABELS = [
+  'Gate code',
+  'Lockbox code',
+  'Alarm code',
+  'Alarm disarm',
+  'Parking',
+  'Hours',
+  'Quiet hours',
+  'Key location',
+  'Cross street',
+  'Floor / suite',
+  'Pet on site',
+  'Manager on duty',
+  'Hazards',
+  'Badge',
+  'Refrigerant log',
+];
+
+// Codes/combos/PINs are security-sensitive — masked by default. The deployed
+// fact contract carries no `sensitive` flag, so we derive it from the label.
+// Heuristic (not a fixed list) so it also catches "Garage code", "Door pin", …;
+// plain labels (Parking, Manager, Cross street) stay unmasked.
+const SENSITIVE_LABEL_RE = /\b(code|combo|combination|pin|passcode|password|disarm)\b/i;
+function isSensitiveLabel(label: string): boolean {
+  return SENSITIVE_LABEL_RE.test(label);
+}
+
+function SiteInstructionsCard({ location, canEdit }: { location: ServiceLocationDetailDto; canEdit: boolean }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const factsQueryKey = ['service-location-arrival-facts', location.id];
+
+  // Facts — first paint from the detail payload, then the dedicated endpoint is
+  // the live source for add/edit/delete.
+  const { data: factsData } = useQuery({
+    queryKey: factsQueryKey,
+    queryFn: () => arrivalFactApi.listForServiceLocation(location.id),
+    enabled: !!location.id,
+    initialData: location.arrivalFacts ?? undefined,
+  });
+  const facts = Array.isArray(factsData) ? factsData : [];
+
+  // Label typeahead seed — tenant-learned (endpoint) ∪ payload seed ∪ defaults,
+  // de-duped case-insensitively, learned labels first.
+  const { data: learnedLabels } = useQuery({
+    queryKey: ['arrival-fact-suggested-labels'],
+    queryFn: () => arrivalFactApi.suggestedLabels(),
+    staleTime: 5 * 60_000,
+  });
+  const suggestedLabels = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of [...(learnedLabels ?? []), ...(location.suggestedFactLabels ?? []), ...DEFAULT_FACT_LABELS]) {
+      const label = raw.trim();
+      const key = label.toLowerCase();
+      if (!label || seen.has(key)) continue;
+      seen.add(key);
+      out.push(label);
+    }
+    return out;
+  }, [learnedLabels, location.suggestedFactLabels]);
+
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [addingFact, setAddingFact] = useState(false);
+  const [factToDelete, setFactToDelete] = useState<ArrivalFactDto | null>(null);
+
+  const invalidateFacts = () => {
+    queryClient.invalidateQueries({ queryKey: factsQueryKey });
+    // The detail payload also carries arrivalFacts (first-paint copy) — refresh.
+    queryClient.invalidateQueries({ queryKey: ['service-location', location.id] });
+  };
+
+  // Arrival prose lives on the location. The update endpoint is a partial merge
+  // (omitted fields preserved — see UpdateServiceLocationRequest), so sending
+  // only accessInstructions is safe. Empty clears it (null → block hides).
+  const notesMutation = useMutation({
+    mutationFn: (value: string) =>
+      customerApi.updateServiceLocation(location.id, { accessInstructions: value.trim() || null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['service-location', location.id] });
+      setEditingNotes(false);
+    },
+    onError: (err: unknown) => showError('Couldn’t save arrival notes', extractApiError(err) ?? undefined),
+  });
+
+  const createFactMutation = useMutation({
+    mutationFn: (vars: { label: string; value: string }) =>
+      arrivalFactApi.createForServiceLocation(location.id, {
+        label: vars.label,
+        value: vars.value,
+        mono: isSensitiveLabel(vars.label),
+        displayOrder: facts.length,
+      }),
+    onSuccess: () => {
+      invalidateFacts();
+      setAddingFact(false);
+    },
+    onError: (err: unknown) => showError('Couldn’t add field', extractApiError(err) ?? undefined),
+  });
+
+  const updateFactMutation = useMutation({
+    mutationFn: (vars: { id: string; label: string; value: string }) =>
+      arrivalFactApi.update(vars.id, {
+        label: vars.label,
+        value: vars.value,
+        mono: isSensitiveLabel(vars.label),
+      }),
+    onSuccess: invalidateFacts,
+    onError: (err: unknown) => showError('Couldn’t save field', extractApiError(err) ?? undefined),
+  });
+
+  const deleteFactMutation = useMutation({
+    mutationFn: (factId: string) => arrivalFactApi.delete(factId),
+    onSuccess: () => {
+      invalidateFacts();
+      setFactToDelete(null);
+    },
+    onError: (err: unknown) => showError('Couldn’t delete field', extractApiError(err) ?? undefined),
+  });
+
+  const notes = location.accessInstructions?.trim() ?? '';
+  const hasNotes = notes.length > 0;
+  const showNotesAdd = canEdit && !hasNotes && !editingNotes;
+  const nothingAtAll = !hasNotes && !editingNotes && facts.length === 0 && !addingFact;
+
   return (
     <Card
       title={<CardTitle icon={<MapPinIcon className="size-3.5" />}>Site instructions</CardTitle>}
-      action={onEdit ? <CardLink onClick={onEdit}>Edit</CardLink> : undefined}
+      padding="none"
     >
-      {location.accessInstructions ? (
-        <div className="text-[12px] leading-relaxed text-fg">{location.accessInstructions}</div>
-      ) : (
-        <div className="text-[12px] text-fg-muted">No site instructions yet.</div>
+      {/* ── Arrival prose ("Before you arrive") — independent of facts ── */}
+      {hasNotes || editingNotes ? (
+        <div className="group/notes border-b border-border-soft px-3.5 py-2.5">
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Before you arrive</span>
+            {canEdit && hasNotes && !editingNotes && (
+              <button
+                onClick={() => setEditingNotes(true)}
+                className="text-[11px] font-medium text-fg-accent opacity-0 transition-opacity hover:underline group-hover/notes:opacity-100 focus-visible:opacity-100"
+              >
+                Edit
+              </button>
+            )}
+          </div>
+          {editingNotes ? (
+            <NotesEditor
+              initial={notes}
+              saving={notesMutation.isPending}
+              onCancel={() => setEditingNotes(false)}
+              onSave={(value) => notesMutation.mutate(value)}
+            />
+          ) : (
+            <div className="whitespace-pre-wrap text-[12px] leading-relaxed text-fg">{notes}</div>
+          )}
+        </div>
+      ) : showNotesAdd ? (
+        <div className="border-b border-border-soft px-3.5 py-2.5">
+          <button
+            onClick={() => setEditingNotes(true)}
+            className="text-[12px] font-medium text-fg-accent hover:underline"
+          >
+            + Add notes
+          </button>
+        </div>
+      ) : null}
+
+      {/* ── Facts (label/value) — independent of the prose ── */}
+      {facts.map((fact) => (
+        <FactRow
+          key={fact.id}
+          fact={fact}
+          canEdit={canEdit}
+          suggestedLabels={suggestedLabels}
+          onSave={(vars) => updateFactMutation.mutateAsync(vars)}
+          onRequestDelete={(f) =>
+            isSensitiveLabel(f.label) ? setFactToDelete(f) : deleteFactMutation.mutate(f.id)
+          }
+        />
+      ))}
+
+      {addingFact && (
+        <FactEditor
+          addMode
+          initialLabel=""
+          initialValue=""
+          suggestedLabels={suggestedLabels}
+          onCancel={() => setAddingFact(false)}
+          onSave={(label, value) => createFactMutation.mutateAsync({ label, value })}
+        />
       )}
+
+      {/* Footer affordance — present whenever the user can edit. Uses the same
+          CardLink treatment as "Edit" / "+ Add" elsewhere so the add affordance
+          stays subordinate to the content above it. */}
+      {canEdit && !addingFact && (
+        <div className="px-3.5 py-2">
+          <CardLink onClick={() => setAddingFact(true)}>+ Add field</CardLink>
+        </div>
+      )}
+
+      {/* Read-only + completely empty — graceful nothing-but-header. */}
+      {nothingAtAll && !canEdit && (
+        <div className="px-3.5 py-3 text-[12px] text-fg-muted">No site instructions on file.</div>
+      )}
+
+      <ConfirmDialog
+        isOpen={!!factToDelete}
+        onClose={() => setFactToDelete(null)}
+        onConfirm={() => factToDelete && deleteFactMutation.mutate(factToDelete.id)}
+        title="Delete this field?"
+        message={
+          factToDelete
+            ? `“${factToDelete.label}” holds a sensitive value. Remove it from this location’s arrival info?`
+            : ''
+        }
+        confirmLabel={t('common.delete')}
+        isDestructive
+        isPending={deleteFactMutation.isPending}
+      />
     </Card>
+  );
+}
+
+// Inline editor for the arrival prose — controlled textarea + Save/Cancel. Empty
+// is allowed (clears the block). The parent owns the mutation.
+function NotesEditor({
+  initial,
+  saving,
+  onSave,
+  onCancel,
+}: {
+  initial: string;
+  saving: boolean;
+  onSave: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const [text, setText] = useState(initial);
+  return (
+    <div>
+      <Textarea
+        autoFocus
+        rows={4}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Parking, where to check in, who to ask for, anything a tech should know before arriving…"
+      />
+      <div className="mt-2 flex items-center justify-end gap-1.5">
+        <Button plain size="xs" onClick={onCancel} disabled={saving}>
+          Cancel
+        </Button>
+        <Button color="accent" size="xs" onClick={() => onSave(text)} disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// One fact in read mode; flips to an inline FactEditor on Edit. Sensitive values
+// mask by default with a reveal toggle. Attribution (who/when) + actions surface
+// on hover to keep the resting row dense.
+function FactRow({
+  fact,
+  canEdit,
+  suggestedLabels,
+  onSave,
+  onRequestDelete,
+}: {
+  fact: ArrivalFactDto;
+  canEdit: boolean;
+  suggestedLabels: string[];
+  onSave: (vars: { id: string; label: string; value: string }) => Promise<unknown>;
+  onRequestDelete: (fact: ArrivalFactDto) => void;
+}) {
+  const { t } = useTranslation();
+  const [editing, setEditing] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+
+  if (editing) {
+    return (
+      <FactEditor
+        initialLabel={fact.label}
+        initialValue={fact.value}
+        suggestedLabels={suggestedLabels}
+        onCancel={() => setEditing(false)}
+        onSave={async (label, value) => {
+          await onSave({ id: fact.id, label, value });
+          setEditing(false);
+        }}
+      />
+    );
+  }
+
+  const sensitive = isSensitiveLabel(fact.label);
+  const masked = sensitive && !revealed;
+  const attribution =
+    (fact.authorName ? `${fact.authorName} · ` : '') + (formatExactTimestamp(fact.updatedAt) || '');
+
+  return (
+    <div className="group/fact flex items-baseline gap-2.5 border-b border-border-soft px-3.5 py-2">
+      <span className="w-[84px] shrink-0 text-[10px] font-semibold uppercase leading-tight tracking-wider text-fg-muted sm:w-[96px]">
+        {fact.label}
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <span
+          className={[
+            'text-[12.5px] text-fg-strong',
+            fact.mono ? 'font-mono' : '',
+            fact.multiline ? 'block whitespace-pre-wrap' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {/* Fixed-width mask — never leaks the real value length. */}
+          {masked ? '••••••' : fact.value}
+        </span>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1.5">
+        {sensitive && (
+          <button
+            onClick={() => setRevealed((r) => !r)}
+            title={masked ? 'Reveal' : 'Hide'}
+            aria-label={masked ? 'Reveal' : 'Hide'}
+            className="text-fg-dim hover:text-fg-strong"
+          >
+            {masked ? <EyeIcon className="size-3.5" /> : <EyeSlashIcon className="size-3.5" />}
+          </button>
+        )}
+        <div className="flex items-center gap-1.5 opacity-0 transition-opacity group-hover/fact:opacity-100 focus-within:opacity-100">
+          {attribution.trim() && (
+            <span className="hidden text-[10.5px] text-fg-muted sm:inline" title={attribution}>
+              {formatTimestamp(fact.updatedAt)}
+            </span>
+          )}
+          {canEdit && (
+            <>
+              <button
+                onClick={() => setEditing(true)}
+                title={t('common.edit')}
+                aria-label={t('common.edit')}
+                className="text-fg-dim hover:text-fg-strong"
+              >
+                <PencilIcon className="size-3.5" />
+              </button>
+              <button
+                onClick={() => onRequestDelete(fact)}
+                title={t('common.delete')}
+                aria-label={t('common.delete')}
+                className="text-fg-dim hover:text-danger-500"
+              >
+                <TrashIcon className="size-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Inline add/edit for a single fact — label combobox + value input. Used both
+// for a new draft row (addMode) and editing an existing fact.
+function FactEditor({
+  initialLabel,
+  initialValue,
+  suggestedLabels,
+  addMode,
+  onSave,
+  onCancel,
+}: {
+  initialLabel: string;
+  initialValue: string;
+  suggestedLabels: string[];
+  addMode?: boolean;
+  onSave: (label: string, value: string) => Promise<unknown>;
+  onCancel: () => void;
+}) {
+  const [label, setLabel] = useState(initialLabel);
+  const [value, setValue] = useState(initialValue);
+  const [saving, setSaving] = useState(false);
+  const valid = !!label.trim() && !!value.trim();
+
+  const submit = async () => {
+    if (!valid || saving) return;
+    setSaving(true);
+    try {
+      await onSave(label.trim(), value.trim());
+    } catch {
+      // Failure already surfaced via the mutation's onError toast; keep the
+      // editor open so the entry isn't lost.
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="border-b border-border-soft bg-bg-elev-2 px-3.5 py-2.5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+        <div className="shrink-0 sm:w-[132px]">
+          <LabelCombobox
+            value={label}
+            onChange={setLabel}
+            suggestions={suggestedLabels}
+            autoFocus={addMode}
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <Input
+            value={value}
+            autoFocus={!addMode}
+            placeholder="Value"
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                submit();
+              }
+            }}
+          />
+        </div>
+      </div>
+      <div className="mt-2 flex items-center justify-end gap-1.5">
+        <Button plain size="xs" onClick={onCancel} disabled={saving}>
+          Cancel
+        </Button>
+        <Button color="accent" size="xs" onClick={submit} disabled={!valid || saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// Free-text label field with a suggestion dropdown. Any typed text is a valid
+// label — the dropdown speeds up reuse of known labels (click/Enter to fill),
+// and when the query matches no existing label it offers an explicit
+// "Create '{query}'" row so the suggestion set reads as a nudge, not a cage.
+function LabelCombobox({
+  value,
+  onChange,
+  suggestions,
+  autoFocus,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  suggestions: string[];
+  autoFocus?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const q = value.trim().toLowerCase();
+  // Filter by the query; the typed text itself is always a valid label, so
+  // there's no "create" row — picking a suggestion is just a shortcut. On focus
+  // (empty query) show a tidy shortlist of the most-common labels; once the user
+  // types, show every match (the query already narrows it, and free-text labels
+  // accrete over time so an uncapped on-focus list would get unwieldy).
+  const FOCUS_LIMIT = 10;
+  const matches = useMemo(() => {
+    const filtered = suggestions.filter((s) => {
+      const sl = s.toLowerCase();
+      return sl !== q && (q === '' || sl.includes(q));
+    });
+    return q === '' ? filtered.slice(0, FOCUS_LIMIT) : filtered;
+  }, [suggestions, q]);
+
+  // Close on outside click.
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const pick = (label: string) => {
+    onChange(label);
+    setOpen(false);
+    setHighlight(-1);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setOpen(true);
+      setHighlight((h) => Math.min(h + 1, matches.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlight((h) => Math.max(h - 1, 0));
+    } else if (e.key === 'Enter' && open && highlight >= 0 && matches[highlight]) {
+      e.preventDefault();
+      pick(matches[highlight]);
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <Input
+        value={value}
+        autoFocus={autoFocus}
+        placeholder="Label"
+        aria-label="Label"
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+          setHighlight(-1);
+        }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={onKeyDown}
+      />
+      {open && matches.length > 0 && (
+        <ul
+          role="listbox"
+          className="absolute left-0 top-full z-50 mt-1 w-full overflow-y-auto rounded-md border border-border bg-bg-elev py-1 shadow-lg"
+          style={{ maxHeight: 200 }}
+        >
+          {matches.map((s, i) => (
+            <li
+              key={s}
+              role="option"
+              aria-selected={highlight === i}
+              onMouseEnter={() => setHighlight(i)}
+              onMouseDown={(e) => {
+                // Commit before the input's blur closes the list.
+                e.preventDefault();
+                pick(s);
+              }}
+              className={`cursor-pointer px-2.5 py-1.5 text-[12px] text-fg ${highlight === i ? 'bg-bg-hover' : ''}`}
+            >
+              {s}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -1362,10 +1910,10 @@ function ContactsTab({ location, canEdit }: { location: ServiceLocationDetailDto
       title={<CardTitle icon={<UserIcon className="size-3.5" />}>Contacts</CardTitle>}
       action={
         canEdit ? (
-          <Button plain size="xxs" onClick={() => setContactDialog({ open: true, contact: null })}>
-            <PlusIcon className="size-3.5" />
+          <CardLink onClick={() => setContactDialog({ open: true, contact: null })}>
+            <PlusIcon />
             {t('contacts.addContact')}
-          </Button>
+          </CardLink>
         ) : undefined
       }
       padding="none"
@@ -1591,7 +2139,7 @@ function ParentCustomerCard({ location }: { location: ServiceLocationDetailDto }
   return (
     <Card
       title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>Billed to</CardTitle>}
-      action={<Link to={`/customers/${location.customerId}`} className="text-[11px] font-medium text-fg-accent hover:underline">Open customer →</Link>}
+      action={<CardLink to={`/customers/${location.customerId}`}>Open customer →</CardLink>}
     >
       <div className="text-[13px] font-semibold text-fg-strong">{location.customerName}</div>
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

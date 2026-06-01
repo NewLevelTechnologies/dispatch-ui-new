@@ -26,6 +26,14 @@ export {
 // Notes API (customer + service-location notes — see noteApi.ts header)
 export { noteApi, type NoteDto } from './noteApi';
 
+// Arrival facts API (service-location structured arrival facts — see arrivalFactApi.ts header)
+export {
+  arrivalFactApi,
+  type ArrivalFactDto,
+  type CreateArrivalFactRequest,
+  type UpdateArrivalFactRequest,
+} from './arrivalFactApi';
+
 // Customer API
 export {
   customerApi,
