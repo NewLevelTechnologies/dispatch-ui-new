@@ -15,6 +15,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
+import { TimeAgo } from '../components/TimeAgo';
 import { formatPhone } from '../utils/formatPhone';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { extractApiError, showError } from '../lib/toast';
@@ -77,22 +78,6 @@ function formatTagDisplayValue(
   return t('common.selectedCount', { count: ids.length });
 }
 
-// Compact "last service" — Today / Yest / 3d / 2w / 6mo / 2y. Different scale
-// than utils/formatRelativeTime (which targets minute/hour resolution); this
-// one is for a column where day-week-month granularity is what a CSR scans.
-function formatLastService(iso?: string | null): string {
-  if (!iso) return '';
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '';
-  const days = Math.max(0, Math.floor((Date.now() - then) / 86_400_000));
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Yest';
-  if (days < 7) return `${days}d`;
-  if (days < 30) return `${Math.round(days / 7)}w`;
-  if (days < 365) return `${Math.round(days / 30)}mo`;
-  return `${Math.round(days / 365)}y`;
-}
-
 export default function ServiceLocationsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -100,7 +85,9 @@ export default function ServiceLocationsPage() {
   const { getName } = useGlossary();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState<ServiceLocation | null>(null);
+  // Holds the detail DTO fetched for editing; `notes` is omitted because it
+  // diverged to a NoteDto[] collection on the detail DTO (the form ignores it).
+  const [selectedLocation, setSelectedLocation] = useState<Omit<ServiceLocation, 'notes'> | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
   // URL-driven filter state
@@ -549,7 +536,6 @@ export default function ServiceLocationsPage() {
                       const dimmed = location.status === 'INACTIVE' || location.status === 'CLOSED'
                         ? 'opacity-55'
                         : '';
-                      const lastSvc = formatLastService(location.lastServiceAt);
                       const statusKey = location.status.toLowerCase() as LocationStatusKey;
 
                       return (
@@ -586,8 +572,8 @@ export default function ServiceLocationsPage() {
                             <StatusIndicator status={statusKey} />
                           </td>
                           <td>
-                            {lastSvc ? (
-                              <span className="text-[11.5px] text-fg-muted">{lastSvc}</span>
+                            {location.lastServiceAt ? (
+                              <TimeAgo iso={location.lastServiceAt} className="text-[11.5px] text-fg-muted" />
                             ) : (
                               <span className="text-[11px] text-fg-dim">
                                 {t('serviceLocations.table.newCustomer')}

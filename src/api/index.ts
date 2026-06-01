@@ -23,6 +23,9 @@ export {
   type CreateNoteRequest,
 } from './notesApi';
 
+// Notes API (customer + service-location notes — see noteApi.ts header)
+export { noteApi, type NoteDto } from './noteApi';
+
 // Customer API
 export {
   customerApi,

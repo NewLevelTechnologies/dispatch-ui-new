@@ -30,7 +30,16 @@ const mockLocation: ServiceLocationDetailDto = {
   siteContactEmail: 'john@example.com',
   additionalContacts: [],
   accessInstructions: 'Use side entrance',
-  notes: 'Important client',
+  notes: [
+    {
+      id: 'note-1',
+      body: 'Important client',
+      pinned: false,
+      authorName: 'Jane CSR',
+      createdAt: '2024-01-02T10:30:00Z',
+      updatedAt: '2024-01-02T10:30:00Z',
+    },
+  ],
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-02T10:30:00Z',
   version: 1,
@@ -74,6 +83,12 @@ describe('ServiceLocationDetailPage', () => {
         }
         contacts.push(...(location?.additionalContacts ?? []).map((c) => ({ ...c, isPrimary: false })));
         return Promise.resolve({ data: contacts });
+      }
+      // Notes card reads the note collection live (same data the detail payload
+      // seeds first paint with). Must precede the generic /service-locations/
+      // branch below, which would otherwise swallow this URL.
+      if (url.includes('/service-locations/') && url.includes('/notes')) {
+        return Promise.resolve({ data: location?.notes ?? [] });
       }
       if (url.includes('/notification-preferences')) {
         // Contacts tab fetches per-contact prefs for the Notifications column.
@@ -257,7 +272,7 @@ describe('ServiceLocationDetailPage', () => {
       siteContactPhone: '',
       siteContactEmail: '',
       accessInstructions: '',
-      notes: '',
+      notes: [],
     });
     renderDetailPage();
     await waitFor(() => {
@@ -522,6 +537,119 @@ describe('ServiceLocationDetailPage', () => {
         expect(deleteSpy).toHaveBeenCalledWith('/equipment/eq-1');
       });
       confirmSpy.mockRestore();
+    });
+  });
+
+  // ── Notes card ───────────────────────────────────────────────────────────
+  describe('notes card', () => {
+    // Walk up from a note body to the enclosing Card root. getByText only
+    // matches an element's own direct text, so the body div is the hit.
+    const notesCardFor = (bodyText: RegExp): HTMLElement => {
+      let el: HTMLElement | null = screen.getByText(bodyText);
+      while (el && !(typeof el.className === 'string' && /rounded-\[10px\]/.test(el.className))) {
+        el = el.parentElement;
+      }
+      if (!el) throw new Error('Notes card not found');
+      return el;
+    };
+
+    const pinnedFirstLocation: ServiceLocationDetailDto = {
+      ...mockLocation,
+      notes: [
+        {
+          id: 'n-pin',
+          body: 'Roof access via rear ladder',
+          pinned: true,
+          authorName: 'Dispatch',
+          createdAt: '2024-05-01T00:00:00Z',
+          updatedAt: '2024-05-01T00:00:00Z',
+        },
+        {
+          id: 'note-1',
+          body: 'Important client',
+          pinned: false,
+          authorName: 'Jane CSR',
+          createdAt: '2024-01-02T10:30:00Z',
+          updatedAt: '2024-01-02T10:30:00Z',
+        },
+      ],
+    };
+
+    it('renders the pinned count, the pinned treatment, and the author', async () => {
+      mockApiResponses(pinnedFirstLocation);
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('Roof access via rear ladder')).toBeInTheDocument());
+
+      expect(screen.getByText(/1 pinned/)).toBeInTheDocument();
+      expect(screen.getByText('Pinned ·')).toBeInTheDocument();
+      expect(screen.getByText(/Jane CSR/)).toBeInTheDocument();
+    });
+
+    it('opens the add-note dialog from + Add and POSTs the new note', async () => {
+      mockApiResponses();
+      const postSpy = vi.mocked(apiClient.post).mockResolvedValue({
+        data: { id: 'new', body: 'New note', pinned: false, authorName: null, createdAt: '', updatedAt: '' },
+      });
+      const user = userEvent.setup();
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('Important client')).toBeInTheDocument());
+
+      await user.click(within(notesCardFor(/Important client/)).getByRole('button', { name: '+ Add' }));
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText(/add note/i)).toBeInTheDocument();
+
+      await user.type(within(dialog).getByRole('textbox'), 'New note');
+      await user.click(within(dialog).getByRole('button', { name: /save/i }));
+
+      await waitFor(() =>
+        expect(postSpy).toHaveBeenCalledWith('/service-locations/location-1/notes', {
+          body: 'New note',
+          pinned: false,
+        })
+      );
+    });
+
+    it('toggles pin via the row action (partial PATCH)', async () => {
+      mockApiResponses();
+      const patchSpy = vi.mocked(apiClient.patch).mockResolvedValue({
+        data: { id: 'note-1', pinned: true },
+      });
+      const user = userEvent.setup();
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('Important client')).toBeInTheDocument());
+
+      await user.click(within(notesCardFor(/Important client/)).getByRole('button', { name: /^pin$/i }));
+
+      await waitFor(() => expect(patchSpy).toHaveBeenCalledWith('/notes/note-1', { pinned: true }));
+    });
+
+    it('confirms before deleting a note, then DELETEs', async () => {
+      mockApiResponses();
+      const deleteSpy = vi.mocked(apiClient.delete).mockResolvedValue({ data: undefined });
+      const user = userEvent.setup();
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('Important client')).toBeInTheDocument());
+
+      await user.click(within(notesCardFor(/Important client/)).getByRole('button', { name: /^delete$/i }));
+      expect(await screen.findByText(/delete note\?/i)).toBeInTheDocument();
+
+      // The confirm button is the last "Delete"-labelled button (the row's is first).
+      const deleteButtons = screen.getAllByRole('button', { name: /^delete$/i });
+      await user.click(deleteButtons[deleteButtons.length - 1]);
+
+      await waitFor(() => expect(deleteSpy).toHaveBeenCalledWith('/notes/note-1'));
+    });
+
+    it('opens the edit dialog prefilled with the note body', async () => {
+      mockApiResponses();
+      const user = userEvent.setup();
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('Important client')).toBeInTheDocument());
+
+      await user.click(within(notesCardFor(/Important client/)).getByRole('button', { name: /^edit$/i }));
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText(/edit note/i)).toBeInTheDocument();
+      expect(within(dialog).getByRole('textbox')).toHaveValue('Important client');
     });
   });
 });

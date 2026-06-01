@@ -1,5 +1,6 @@
 // Customer API Client
 import apiClient from './client';
+import type { NoteDto } from './noteApi';
 
 export interface Address {
   streetAddress: string;
@@ -257,7 +258,12 @@ export interface ServiceLocationDetailDto {
   siteContactEmail?: string | null;
   additionalContacts: AdditionalContact[];
   accessInstructions?: string | null;
-  notes?: string | null;
+  // Pinned-first note collection (server-ordered). Replaced the legacy single
+  // free-form string; the string still rides the basic ServiceLocation DTO +
+  // create/update payloads (backfilled into this collection) until it's dropped.
+  // Usable for first paint; the card refetches GET /service-locations/{id}/notes
+  // as the live source for add/edit/pin/delete.
+  notes?: NoteDto[] | null;
   status: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
   createdAt: string;
   updatedAt: string;
