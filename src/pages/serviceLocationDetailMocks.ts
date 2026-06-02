@@ -82,15 +82,21 @@ export const mockUpcomingVisits: MockVisit[] = [
 // opened, equipment flagged…). Distinct from the real NotificationLogsList on
 // the Activity tab (notifications, not operations).
 export interface MockActivityEvent {
-  ts: string;
+  at: string; // ISO timestamp — rendered via the shared formatTimestamp helper
   glyph: string;
   text: string;
   sub: string;
   tone: MockTone;
 }
+// Offsets from load so the teaser exercises the hybrid timestamp rule (relative
+// under 7 days). The real feed will carry server ISO timestamps in this shape.
+const MIN = 60_000;
+const HOUR = 60 * MIN;
+const DAY = 24 * HOUR;
+const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 export const mockActivityFeed: MockActivityEvent[] = [
-  { ts: '12 min', glyph: '→', text: 'Tech D. Park arrived', sub: 'WO-4203 · RTU-3 no cooling', tone: 'info' },
-  { ts: '2 h', glyph: '+', text: 'Critical job opened · WO-4203', sub: 'RTU-3 no cooling', tone: 'warning' },
-  { ts: '3 d', glyph: '✓', text: 'Visit completed · WO-4144', sub: 'AHU-2 compressor diagnostic · 1.5h', tone: 'success' },
-  { ts: '6 d', glyph: '★', text: 'Equipment baseline updated', sub: 'AHU-2 draw +8% vs Jun baseline · alert set', tone: 'accent' },
+  { at: ago(12 * MIN), glyph: '→', text: 'Tech D. Park arrived', sub: 'WO-4203 · RTU-3 no cooling', tone: 'info' },
+  { at: ago(2 * HOUR), glyph: '+', text: 'Critical job opened · WO-4203', sub: 'RTU-3 no cooling', tone: 'warning' },
+  { at: ago(3 * DAY), glyph: '✓', text: 'Visit completed · WO-4144', sub: 'AHU-2 compressor diagnostic · 1.5h', tone: 'success' },
+  { at: ago(6 * DAY), glyph: '★', text: 'Equipment baseline updated', sub: 'AHU-2 draw +8% vs Jun baseline · alert set', tone: 'accent' },
 ];

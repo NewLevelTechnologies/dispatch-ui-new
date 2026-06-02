@@ -569,8 +569,9 @@ function locationTechQueryOptions(serviceLocationId: string) {
   };
 }
 
-// Elapsed time since arrival, compact ("2h 14m" / "45m"). This is app runtime,
-// so the wall clock is fine here.
+// Elapsed time since arrival, compact and rolled up to the two largest units so
+// the reader never has to divide ("45m", "2h 14m", "3d 4h"). This is app
+// runtime, so the wall clock is fine here.
 function formatOnSiteDuration(sinceIso: string): string {
   const start = new Date(sinceIso).getTime();
   if (Number.isNaN(start)) return 'now';
@@ -578,8 +579,13 @@ function formatOnSiteDuration(sinceIso: string): string {
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m`;
   const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m ? `${h}h ${m}m` : `${h}h`;
+  if (h < 24) {
+    const m = mins % 60;
+    return m ? `${h}h ${m}m` : `${h}h`;
+  }
+  const d = Math.floor(h / 24);
+  const rh = h % 24;
+  return rh ? `${d}d ${rh}h` : `${d}d`;
 }
 
 function OverviewTab({
@@ -1098,29 +1104,42 @@ const ACTIVITY_GLYPH_STYLE: Record<MockTone, { bg: string; fg: string }> = {
 // "what happened over time." Activity is an audit trail, not knowledge, so it's
 // demoted to the single latest event one-liner; the full feed lives on the
 // Activity tab. (Still mock until a location-scoped operational feed exists.)
+// Bounded peek at the operational feed — the 3 most recent events, not the full
+// audit log. Activity is mostly disposable, so it doesn't earn a tall scrolling
+// card here; the chronological feed lives on the Activity tab. Don't grow this
+// past 3. Notes (knowledge) stays the prominent block above it.
 function ActivityTeaser({ onViewActivity }: { onViewActivity: () => void }) {
-  const latest = mockActivityFeed[0];
-  if (!latest) return null;
-  const s = ACTIVITY_GLYPH_STYLE[latest.tone];
+  const recent = mockActivityFeed.slice(0, 3);
+  if (recent.length === 0) return null;
   return (
-    <div className="flex items-center gap-2.5 rounded-[10px] border border-border bg-bg-elev px-3.5 py-2 shadow-sm">
-      <div
-        className="flex size-[18px] shrink-0 items-center justify-center rounded text-[11px] font-bold"
-        style={{ background: s.bg, color: s.fg }}
-      >
-        {latest.glyph}
+    <div className="overflow-hidden rounded-[10px] border border-border bg-bg-elev shadow-sm">
+      <div className="flex items-center gap-2 border-b border-border-soft px-3.5 py-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-dim">Recent activity</span>
+        <MockBadge />
+        <span className="grow" />
+        <CardLink onClick={onViewActivity}>View activity →</CardLink>
       </div>
-      <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-dim">Latest</span>
-        <span className="text-[12.5px] font-medium text-fg-strong">{latest.text}</span>
-        <span className="text-[11px] text-fg-dim">
-          · {latest.sub} · {latest.ts}
-        </span>
-      </div>
-      <MockBadge />
-      <CardLink onClick={onViewActivity} className="shrink-0">
-        View activity →
-      </CardLink>
+      {recent.map((e, i) => {
+        const s = ACTIVITY_GLYPH_STYLE[e.tone];
+        return (
+          <div
+            key={e.at}
+            className={`flex items-center gap-2.5 px-3.5 py-1.5 ${i < recent.length - 1 ? 'border-b border-border-soft' : ''}`}
+          >
+            <div
+              className="flex size-[18px] shrink-0 items-center justify-center rounded text-[11px] font-bold"
+              style={{ background: s.bg, color: s.fg }}
+            >
+              {e.glyph}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
+              <span className="text-[12.5px] font-medium text-fg-strong">{e.text}</span>
+              <span className="text-[11px] text-fg-dim">· {e.sub}</span>
+            </div>
+            <span className="shrink-0 text-[11px] text-fg-dim">{formatTimestamp(e.at)}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
