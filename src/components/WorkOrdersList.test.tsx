@@ -121,7 +121,11 @@ describe('WorkOrdersList', () => {
     renderWithProviders(<WorkOrdersList customerId="cust-1" />);
     await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
     const link = screen.getByRole('link', { name: /Main Office/ });
-    expect(link).toHaveAttribute('href', '/service-locations/loc-1');
+    // Links to the location detail, carrying back-context so its smart back
+    // link can return to this work order.
+    const href = link.getAttribute('href');
+    expect(href).toMatch(/^\/service-locations\/loc-1(\?|$)/);
+    expect(href).toContain('from=work-order');
   });
 
   it('falls back to the full address when the location has no locationName', async () => {

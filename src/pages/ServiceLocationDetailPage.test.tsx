@@ -4,7 +4,7 @@ import { renderWithProviders, userEvent } from '../test/utils';
 import ServiceLocationDetailPage from './ServiceLocationDetailPage';
 import apiClient from '../api/client';
 import type { RouteObject } from 'react-router-dom';
-import type { ServiceLocationDetailDto } from '../api';
+import type { ServiceLocationDetailDto, WorkOrderSummary } from '../api';
 
 vi.mock('../api/client');
 
@@ -61,7 +61,9 @@ describe('ServiceLocationDetailPage', () => {
   const mockApiResponses = (
     location: ServiceLocationDetailDto | null = mockLocation,
     regions: unknown[] = [],
-    equipment: unknown[] = []
+    equipment: unknown[] = [],
+    workOrders: unknown[] = [],
+    locationTech: unknown = { onSiteTech: null, techByWorkOrder: {} }
   ) => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
       // Site contact card reads the full contact collection (primary-first).
@@ -103,9 +105,18 @@ describe('ServiceLocationDetailPage', () => {
       if (url.startsWith('/work-orders/config/')) {
         return Promise.resolve({ data: [] });
       }
+      if (url.includes('/scheduling/dispatches/location-tech')) {
+        return Promise.resolve({ data: locationTech });
+      }
       if (url.includes('/work-orders')) {
         return Promise.resolve({
-          data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 },
+          data: {
+            content: workOrders,
+            totalElements: workOrders.length,
+            totalPages: workOrders.length ? 1 : 0,
+            number: 0,
+            size: 25,
+          },
         });
       }
       if (url === '/equipment' || url.startsWith('/equipment?')) {
@@ -146,6 +157,73 @@ describe('ServiceLocationDetailPage', () => {
       initialPath: `/service-locations/${locationId}`,
     });
   };
+
+  // ── Resolved tech view (scheduling-service location-tech) ───────────────
+  describe('resolved tech view', () => {
+    const makeWO = (over: Partial<WorkOrderSummary>): WorkOrderSummary => ({
+      id: 'wo-x',
+      customerId: 'customer-1',
+      serviceLocationId: 'location-1',
+      lifecycleState: 'ACTIVE',
+      progressCategory: 'IN_PROGRESS',
+      priority: 'NORMAL',
+      workItemCount: 0,
+      workItems: [],
+      createdAt: '2026-06-01T00:00:00Z',
+      updatedAt: '2026-06-01T00:00:00Z',
+      ...over,
+    });
+
+    const techLocation = { ...mockLocation, hasOpenJobs: true };
+    const workOrders = [
+      makeWO({ id: 'wo-1', workOrderNumber: 'WO-5000', priority: 'URGENT', equip: { label: 'RTU-3', count: 1 } }),
+      makeWO({ id: 'wo-2', workOrderNumber: 'WO-5001' }),
+      makeWO({ id: 'wo-3', workOrderNumber: 'WO-5002', progressCategory: 'COMPLETED' }),
+      makeWO({ id: 'wo-4', workOrderNumber: 'WO-5003', progressCategory: 'NOT_STARTED' }),
+    ];
+    const locationTech = {
+      onSiteTech: {
+        name: 'Dana Park',
+        workOrderId: 'wo-1',
+        workOrderNumber: 'WO-5000',
+        // ~50h ago → exercises the day-tier of the duration formatter, clock-independent.
+        since: new Date(Date.now() - 50 * 60 * 60 * 1000).toISOString(),
+        eta: new Date(Date.now() - 51 * 60 * 60 * 1000).toISOString(),
+      },
+      techByWorkOrder: {
+        'wo-1': { name: 'Dana Park', state: 'ON_SITE', extra: 1, live: true },
+        'wo-2': { name: null, state: 'SCHEDULED', extra: 0, live: false },
+        'wo-3': { name: 'Sam Lee', state: 'DONE', extra: 0, live: false },
+        // wo-4 intentionally absent → renders a dash, not an error.
+      },
+    };
+
+    it('surfaces the live on-site tech row in the attention strip', async () => {
+      mockApiResponses(techLocation, [], [], workOrders, locationTech);
+      renderDetailPage();
+      await waitFor(() =>
+        expect(screen.getByText(/Dana Park on site · WO-5000/)).toBeInTheDocument()
+      );
+      expect(screen.getByText('LIVE')).toBeInTheDocument();
+    });
+
+    it('derives the urgent open-jobs row from the loaded work orders', async () => {
+      mockApiResponses(techLocation, [], [], workOrders, locationTech);
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText(/1 urgent job/)).toBeInTheDocument());
+    });
+
+    it('renders the resolved tech per work-order row (name, +N, null fallback)', async () => {
+      mockApiResponses(techLocation, [], [], workOrders, locationTech);
+      renderDetailPage();
+      // on-site lead with +N overflow
+      await waitFor(() => expect(screen.getByText('Dana Park +1')).toBeInTheDocument());
+      // null name falls back rather than blanking the cell
+      expect(screen.getByText('Tech assigned')).toBeInTheDocument();
+      // historical (DONE) lead still shown
+      expect(screen.getByText('Sam Lee')).toBeInTheDocument();
+    });
+  });
 
   // ── States ────────────────────────────────────────────────────────────
   it('displays loading state', () => {
