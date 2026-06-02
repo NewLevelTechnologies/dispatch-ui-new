@@ -925,6 +925,8 @@ vi.mock('react-i18next', () => {
       'The link you followed has expired, been replaced, or is no longer valid.',
     'public.common.contactPhone': ' at {{phone}}',
     'public.common.logoAlt': '{{name}} logo',
+    'public.common.retry': 'Try again',
+    'public.common.slowLoad': 'Still loading — this is taking longer than usual.',
     'public.common.theSender': 'the sender',
     'public.invoice.amountDue': 'Amount due',
     'public.invoice.amountPaid': 'Amount paid',
