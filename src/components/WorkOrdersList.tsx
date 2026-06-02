@@ -175,7 +175,7 @@ export default function WorkOrdersList({
                 <TableCell>
                   {wo.serviceLocation ? (
                     <RouterLink
-                      to={`/service-locations/${wo.serviceLocation.id}`}
+                      to={`/service-locations/${wo.serviceLocation.id}?from=work-order&woId=${wo.id}&woNo=${encodeURIComponent(wo.workOrderNumber || '')}`}
                       className="flex flex-col text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
                     >
                       {wo.serviceLocation.locationName ? (

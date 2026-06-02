@@ -49,6 +49,34 @@ export interface UpdateDispatchRequest {
   notes?: string;
 }
 
+// ---- Resolved technician view (location detail) ----
+// Read-only summary that resolves "which tech matters" per work order at a
+// location, plus who's physically on site right now. The backend picks one
+// primary tech per WO: on-site wins → next upcoming SCHEDULED → most recent
+// historical lead (DONE). `extra` is a COUNT of additional distinct techs on
+// that WO, not a list — surfacing their names is a future backend follow-up.
+export type TechState = 'ON_SITE' | 'SCHEDULED' | 'DONE';
+
+export interface OnSiteTech {
+  name: string | null; // null while the user-cache name resolves — render a fallback
+  workOrderId: string;
+  workOrderNumber: string;
+  since: string; // arrived-at (ISO) — show as "on site since …"
+  eta: string; // scheduled arrival window start (ISO)
+}
+
+export interface WorkOrderTech {
+  name: string | null; // null → fallback (e.g. "Tech assigned"); never blank the row
+  state: TechState;
+  extra: number; // count of OTHER distinct techs on this WO (0 = just this one)
+  live: boolean; // true only when state === 'ON_SITE'
+}
+
+export interface LocationTechSummaryResponse {
+  onSiteTech: OnSiteTech | null; // null when nobody is on site right now
+  techByWorkOrder: Record<string, WorkOrderTech>; // keyed by workOrderId; {} is valid
+}
+
 export const dispatchesApi = {
   getAll: async (params?: {
     userId?: string;
@@ -58,6 +86,18 @@ export const dispatchesApi = {
     endDate?: string;
   }): Promise<Dispatch[]> => {
     const response = await apiClient.get<Dispatch[]>('/scheduling/dispatches', { params });
+    return response.data;
+  },
+
+  // Resolved technician view for a location detail page (read-only, safe to
+  // fire on page load alongside the other location reads). An empty
+  // techByWorkOrder ({}) means no dispatches are linked to this location's work
+  // orders — not an error.
+  getLocationTech: async (serviceLocationId: string): Promise<LocationTechSummaryResponse> => {
+    const response = await apiClient.get<LocationTechSummaryResponse>(
+      '/scheduling/dispatches/location-tech',
+      { params: { serviceLocationId } },
+    );
     return response.data;
   },
 

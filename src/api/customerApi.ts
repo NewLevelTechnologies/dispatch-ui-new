@@ -284,6 +284,12 @@ export interface ServiceLocationDetailDto {
   customerStatus?: CustomerStatus | null;
   customerType?: CustomerType | null;
   customerPaymentTermsDays?: number | null;
+  // Billed-to financial state (financial-service AR rollup — FIN-2). Both ride
+  // the detail payload, no separate FE fetch. Amounts are decimal dollars.
+  // null = unknown/unavailable (figure omitted); 0 = known-zero (rendered muted).
+  customerOutstandingBalance?: number | null; // customer total AR across all locations
+  openInvoiceAmount?: number | null; // this location's open-invoice total
+  openInvoiceCount?: number | null; // this location's open-invoice count
   // Tenant tags (id/name/color), same shape as the list DTO.
   tags?: TagSummary[];
   // Denormalized operational flags for the attention strip. Booleans only —

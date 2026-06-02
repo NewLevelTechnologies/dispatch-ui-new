@@ -539,7 +539,7 @@ export default function ServiceLocationsPage() {
                           onClick={(e: React.MouseEvent) => {
                             const target = e.target as HTMLElement;
                             if (target.closest('[role="menu"]') || target.closest('button[aria-label]') || target.closest('a')) return;
-                            navigate(`/service-locations/${location.id}`);
+                            navigate(`/service-locations/${location.id}?from=locations`);
                           }}
                         >
                           <td>
@@ -605,7 +605,7 @@ export default function ServiceLocationsPage() {
                                     <EllipsisVerticalIcon className="size-4" />
                                   </DropdownButton>
                                   <DropdownMenu anchor="bottom end">
-                                    <DropdownItem onClick={() => navigate(`/service-locations/${location.id}`)}>
+                                    <DropdownItem onClick={() => navigate(`/service-locations/${location.id}?from=locations`)}>
                                       <DropdownLabel>{t('common.view')}</DropdownLabel>
                                     </DropdownItem>
                                     {canEditServiceLocations && (
