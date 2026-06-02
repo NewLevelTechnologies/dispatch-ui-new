@@ -31,6 +31,9 @@ import {
   noteApi,
   arrivalFactApi,
   tagApi,
+  dispatchesApi,
+  type OnSiteTech,
+  type WorkOrderTech,
   type Tag,
   NotificationChannel,
   type NotificationPreferenceDto,
@@ -47,6 +50,7 @@ import {
   type ListEquipmentParams,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
+import { roleColor } from '../utils/roleColor';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { formatPhone } from '../utils/formatPhone';
@@ -98,9 +102,12 @@ function useBackContext(location: ServiceLocationDetailDto): { label: string; hr
   const [params] = useSearchParams();
   const from = (params.get('from') || '').toLowerCase();
 
-  if (from.startsWith('wo-')) {
-    const id = from.toUpperCase();
-    return { label: id, href: `/work-orders/${id}` };
+  if (from === 'work-order') {
+    // Work-order detail resolves by UUID (getById), so the href carries woId;
+    // the human-readable WO number rides woNo for the label.
+    const woId = params.get('woId');
+    const woNo = params.get('woNo');
+    if (woId) return { label: woNo || 'Work order', href: `/work-orders/${woId}` };
   }
   if (from === 'locations') {
     // Spec labels this "All locations · {customer}". There's no per-customer
@@ -551,6 +558,30 @@ function TabStub({ label }: { label: string }) {
 // ─────────────────────────────────────────────────────────────────────────
 // Overview tab
 // ─────────────────────────────────────────────────────────────────────────
+// Resolved-tech read shared by the attention strip (on-site tech) and the
+// work-orders card (per-WO tech). Same query key in both consumers → one
+// request, two readers (like workOrdersListQueryOptions).
+function locationTechQueryOptions(serviceLocationId: string) {
+  return {
+    queryKey: ['location-tech', serviceLocationId] as const,
+    queryFn: () => dispatchesApi.getLocationTech(serviceLocationId),
+    enabled: Boolean(serviceLocationId),
+  };
+}
+
+// Elapsed time since arrival, compact ("2h 14m" / "45m"). This is app runtime,
+// so the wall clock is fine here.
+function formatOnSiteDuration(sinceIso: string): string {
+  const start = new Date(sinceIso).getTime();
+  if (Number.isNaN(start)) return 'now';
+  const mins = Math.max(0, Math.round((Date.now() - start) / 60000));
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
 function OverviewTab({
   location,
   equipment,
@@ -568,7 +599,16 @@ function OverviewTab({
   onViewContacts: () => void;
   canEdit: boolean;
 }) {
-  const attentionItems = buildAttentionItems(location);
+  const { data: locationTech } = useQuery(locationTechQueryOptions(location.id));
+  // Shares the work-orders cache with SiteWorkOrdersCard (same query key → one
+  // request). Used to derive the real open / urgent counts for the strip.
+  const { data: workOrdersData } = useQuery(workOrdersListQueryOptions({ serviceLocationId: location.id }));
+  const woItems = workOrdersData?.content ?? [];
+  const openJobs = {
+    open: woItems.filter(woIsOpen).length,
+    urgent: woItems.filter((wo) => woIsOpen(wo) && wo.priority === 'URGENT').length,
+  };
+  const attentionItems = buildAttentionItems(location, locationTech?.onSiteTech ?? null, openJobs, onViewJobs);
 
   return (
     <div className="flex flex-col gap-3">
@@ -603,41 +643,55 @@ type AttentionItem = {
   title: string;
   sub: string;
   action: string;
+  to?: string; // route the action navigates to; falls back to a toast when absent
+  onAction?: () => void; // in-page action (e.g. switch tab); takes precedence over `to`
 };
 
-// Visibility of the live-tech and open-jobs rows is gated on the REAL detail
-// flags (location.techOnSite / location.hasOpenJobs). Their descriptive detail
-// (tech name / WO / since, open-job counts) still comes from mockAttention —
-// that detail lives in dispatch / work-order services that aren't wired here.
-// The PM-overdue row remains fully mock (scheduling service not built).
-// Agreement SLA context was dropped (no agreement service exists). There is no
-// equipment-flagged rule — the redesign removed equipment flagging entirely; a
-// unit's only live state is whether it has an open work order, which surfaces in
-// the work-order list, not the attention strip.
-function buildAttentionItems(location: ServiceLocationDetailDto): AttentionItem[] {
+// The live-tech row is now REAL — driven by scheduling-service's resolved
+// on-site tech (passed in). The open-jobs row's visibility is gated on the real
+// location.hasOpenJobs flag, but its count detail is still mockAttention (the
+// open-job count lives in work-order-service, not wired here). The PM-overdue
+// row remains fully mock (scheduling service not built). Agreement SLA context
+// was dropped (no agreement service exists). There is no equipment-flagged rule
+// — the redesign removed equipment flagging; a unit's only live state is whether
+// it has an open work order, which surfaces in the work-order list.
+function buildAttentionItems(
+  location: ServiceLocationDetailDto,
+  onSiteTech: OnSiteTech | null,
+  openJobs: { open: number; urgent: number },
+  onViewJobs: () => void,
+): AttentionItem[] {
   const a = mockAttention;
   const items: AttentionItem[] = [];
 
-  if (location.techOnSite && a.techOnSite) {
+  // The cheap location.techOnSite list flag stays as a quick-check indicator;
+  // the rich live row comes from onSiteTech here. Name can lag the user-cache,
+  // so fall back rather than blank the row.
+  if (onSiteTech) {
+    const who = onSiteTech.name ?? 'A technician';
     items.push({
       key: 'live',
       severity: 'live',
-      title: `${a.techOnSite.name} on site · ${a.techOnSite.job.id}`,
-      sub: `${a.techOnSite.job.title} · on-site ${a.techOnSite.since} · ${a.techOnSite.eta}`,
+      title: `${who} on site · ${onSiteTech.workOrderNumber}`,
+      sub: `on site ${formatOnSiteDuration(onSiteTech.since)}`,
       action: 'Open job',
+      to: `/work-orders/${onSiteTech.workOrderId}`,
     });
   }
+  // Open-jobs row — gated on the authoritative location.hasOpenJobs flag; the
+  // open / urgent counts are derived from the work orders already loaded for
+  // this location (no extra fetch). URGENT is the strip's escalation bar —
+  // HIGH is elevated but not "drop everything," so including it would make the
+  // strip noisy. (The row-level priority chip still flags HIGH + URGENT.)
   if (location.hasOpenJobs) {
-    const remainingCritical = a.openCritical - (location.techOnSite ? 1 : 0);
+    const { open, urgent } = openJobs;
     items.push({
-      key: 'critical',
+      key: 'open-jobs',
       severity: 'warning',
-      title:
-        remainingCritical > 0
-          ? `${remainingCritical} open critical ${remainingCritical === 1 ? 'job' : 'jobs'}`
-          : 'Open jobs at this site',
-      sub: 'Critical priority',
+      title: urgent > 0 ? `${urgent} urgent ${urgent === 1 ? 'job' : 'jobs'}` : 'Open jobs at this site',
+      sub: open > 0 ? `${open} open at this site` : 'Open work orders',
       action: 'Open jobs',
+      onAction: onViewJobs,
     });
   }
   if (a.pmOverdueDays > 0) {
@@ -654,6 +708,7 @@ function buildAttentionItems(location: ServiceLocationDetailDto): AttentionItem[
 }
 
 function AttentionStrip({ items }: { items: AttentionItem[] }) {
+  const navigate = useNavigate();
   return (
     <Card padding="none">
       <div className="flex items-center gap-2 border-b border-border-soft px-3.5 py-1.5">
@@ -682,7 +737,14 @@ function AttentionStrip({ items }: { items: AttentionItem[] }) {
               </span>
               <span className="text-[11.5px] text-fg-muted">· {it.sub}</span>
             </div>
-            <Button outline size="xxs" className="shrink-0" onClick={() => showInfo('Not available yet')}>
+            <Button
+              outline
+              size="xxs"
+              className="shrink-0"
+              onClick={() =>
+                it.onAction ? it.onAction() : it.to ? navigate(it.to) : showInfo('Not available yet')
+              }
+            >
               {it.action}
             </Button>
           </div>
@@ -837,6 +899,11 @@ function SiteWorkOrdersCard({
   });
   const safeTypes = Array.isArray(workOrderTypes) ? workOrderTypes : [];
 
+  // Resolved per-WO tech, merged into rows by workOrderId. {} (or a row not in
+  // the map) just means that WO has no dispatches — render a dash, not an error.
+  const { data: locationTech } = useQuery(locationTechQueryOptions(location.id));
+  const techByWorkOrder = locationTech?.techByWorkOrder ?? {};
+
   const items = data?.content ?? [];
   // Open first, then recent — backend already sorts by scheduledDate desc, so a
   // stable partition on open-ness is enough.
@@ -881,8 +948,9 @@ function SiteWorkOrdersCard({
                 <th className="px-3.5 py-2 font-semibold">{getName('work_order')}</th>
                 <th className="px-3.5 py-2 font-semibold">{getName('equipment')}</th>
                 <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
-                {/* Tech column (relevance-resolved) inserts here once WO-2
-                    carries primaryTech on the WO row. */}
+                {/* Relevance-resolved tech (on-site > next scheduled > last lead),
+                    merged from scheduling-service's location-tech read. */}
+                <th className="px-3.5 py-2 font-semibold">Tech</th>
                 <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.scheduled')}</th>
               </tr>
             </thead>
@@ -892,6 +960,7 @@ function SiteWorkOrdersCard({
                   key={wo.id}
                   wo={wo}
                   typeName={safeTypes.find((tp) => tp.id === wo.workOrderTypeId)?.name}
+                  tech={techByWorkOrder[wo.id]}
                 />
               ))}
             </tbody>
@@ -902,7 +971,15 @@ function SiteWorkOrdersCard({
   );
 }
 
-function WorkOrderRow({ wo, typeName }: { wo: WorkOrderSummary; typeName?: string }) {
+function WorkOrderRow({
+  wo,
+  typeName,
+  tech,
+}: {
+  wo: WorkOrderSummary;
+  typeName?: string;
+  tech?: WorkOrderTech;
+}) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const priority = wo.priority ?? 'NORMAL';
@@ -960,8 +1037,52 @@ function WorkOrderRow({ wo, typeName }: { wo: WorkOrderSummary; typeName?: strin
           </Pill>
         )}
       </td>
+      <td className="px-3.5 py-2">
+        <WorkOrderTechCell tech={tech} />
+      </td>
       <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{formatWoDate(wo.scheduledDate)}</td>
     </tr>
+  );
+}
+
+function techInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
+}
+
+// Round initials avatar (round = person) + relevance-resolved name. On-site
+// shows a live dot; a finished (DONE) tech is muted; +N for multi-dispatch (a
+// count, not stacked avatars — too dense for the row). Avatar bg uses the same
+// name-hash (roleColor) as user avatars elsewhere, so a person reads the same
+// color everywhere. Name can be null while the user-cache catches up — fall
+// back to "Tech assigned" rather than blanking.
+function WorkOrderTechCell({ tech }: { tech?: WorkOrderTech }) {
+  if (!tech) return <span className="text-[11px] text-fg-dim">—</span>;
+
+  const named = Boolean(tech.name);
+  const name = tech.name ?? 'Tech assigned';
+  const done = tech.state === 'DONE';
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="relative shrink-0">
+        <span
+          className="flex size-[18px] items-center justify-center rounded-full text-[8.5px] font-bold text-white"
+          style={{ background: named ? roleColor(name) : 'var(--fg-dim)', opacity: done ? 0.6 : 1 }}
+        >
+          {named ? techInitials(name) : '—'}
+        </span>
+        {tech.live && (
+          <span
+            className="absolute -bottom-px -right-px size-[7px] rounded-full bg-info-500"
+            style={{ border: '1.5px solid var(--bg-elev)' }}
+          />
+        )}
+      </span>
+      <span className={`text-[12px] ${done ? 'text-fg-muted' : 'text-fg'}`}>
+        {name}
+        {tech.extra > 0 ? ` +${tech.extra}` : ''}
+      </span>
+    </span>
   );
 }
 
@@ -1187,12 +1308,7 @@ function SiteInstructionsCard({ location, canEdit }: { location: ServiceLocation
         </div>
       ) : showNotesAdd ? (
         <div className="border-b border-border-soft px-3.5 py-2.5">
-          <button
-            onClick={() => setEditingNotes(true)}
-            className="text-[12px] font-medium text-fg-accent hover:underline"
-          >
-            + Add notes
-          </button>
+          <CardLink onClick={() => setEditingNotes(true)}>+ Add notes</CardLink>
         </div>
       ) : null}
 
@@ -2127,10 +2243,34 @@ function NotifBell({
   );
 }
 
+// Whole-dollar formatter for the Billed-to glance figures — these are summary
+// balances, not invoice lines, so cents only add noise. Amounts arrive as
+// decimal dollars (matching financial-service elsewhere).
+const balanceFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+});
+
 function ParentCustomerCard({ location }: { location: ServiceLocationDetailDto }) {
-  // REAL — customer billing context now rides the detail payload. Agreement
-  // coverage was dropped (no agreement service exists in the platform).
+  // REAL — customer billing context rides the detail payload. The two-up
+  // balance block consumes the FIN-2 financial-service reads
+  // (customerOutstandingBalance + this site's open-invoice total/count); it
+  // renders only once finance ships those fields and stays hidden until then.
+  // Agreement coverage below is MOCKED — there's no agreement service yet, but
+  // one is planned, so the line is kept and stubbed rather than cut.
+  const { getName } = useGlossary();
   const termsDays = location.customerPaymentTermsDays;
+
+  const customerBalance = location.customerOutstandingBalance;
+  const siteOpenAmount = location.openInvoiceAmount;
+  const siteOpenCount = location.openInvoiceCount ?? 0;
+  const hasFinance =
+    typeof customerBalance === 'number' || typeof siteOpenAmount === 'number';
+
+  // MOCK — drop this stub once the agreements feature ships and rides the payload.
+  const agreement = { id: 'SA-018', name: 'Critical equipment monitoring', sla: '2h response · 4h on-site' };
+
   return (
     <Card
       title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>Billed to</CardTitle>}
@@ -2145,8 +2285,37 @@ function ParentCustomerCard({ location }: { location: ServiceLocationDetailDto }
         )}
         {typeof termsDays === 'number' && <Pill tone="neutral">Net {termsDays}</Pill>}
       </div>
-      <div className="mt-2 text-[11.5px] text-fg-muted">
-        Customer AR rolls up across all of this customer’s locations. Job-level bill-to overrides apply per job when set.
+
+      {hasFinance && (
+        <div className="mt-2.5 grid grid-cols-2 gap-3 border-t border-border-soft pt-2.5">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Customer balance</div>
+            <div className="mt-0.5 font-mono text-[13px] font-bold tabular-nums text-fg-strong">
+              {typeof customerBalance === 'number' ? balanceFormatter.format(customerBalance) : '—'}
+            </div>
+            <div className="text-[10.5px] text-fg-muted">across all locations</div>
+          </div>
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">This site</div>
+            <div
+              className={`mt-0.5 font-mono text-[13px] font-bold tabular-nums ${
+                siteOpenAmount ? 'text-info-500' : 'text-fg-muted'
+              }`}
+            >
+              {siteOpenAmount ? balanceFormatter.format(siteOpenAmount) : '—'}
+            </div>
+            <div className="text-[10.5px] text-fg-muted">
+              {siteOpenCount} open {getName('invoice', siteOpenCount !== 1).toLowerCase()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MOCK agreement coverage — kept pending the agreements feature. */}
+      <div className="mt-2 border-t border-dashed border-border-soft pt-2 text-[11.5px] text-fg-muted">
+        Agreement <span className="font-mono text-fg-strong">{agreement.id}</span> covers this site
+        <br />
+        <span className="text-fg">{agreement.name}</span> · {agreement.sla}
       </div>
     </Card>
   );

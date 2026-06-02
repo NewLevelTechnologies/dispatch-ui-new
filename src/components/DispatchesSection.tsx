@@ -356,6 +356,13 @@ function DispatchRow({
       queryClient.invalidateQueries({
         queryKey: ['work-order-activity', dispatch.workOrderId],
       });
+      // Dispatch changes shift the resolved on-site/scheduled tech and can move
+      // the work order's scheduled/progress state — refresh the location
+      // detail's resolved-tech read plus the work-order list/card and detail
+      // caches. Prefix keys match every cached variant.
+      queryClient.invalidateQueries({ queryKey: ['location-tech'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
     },
     onError: (err: unknown) => {
       const msg =
@@ -374,6 +381,13 @@ function DispatchRow({
       queryClient.invalidateQueries({
         queryKey: ['work-order-activity', dispatch.workOrderId],
       });
+      // Dispatch changes shift the resolved on-site/scheduled tech and can move
+      // the work order's scheduled/progress state — refresh the location
+      // detail's resolved-tech read plus the work-order list/card and detail
+      // caches. Prefix keys match every cached variant.
+      queryClient.invalidateQueries({ queryKey: ['location-tech'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
     },
     onError: (err: unknown) => {
       const msg =
@@ -573,6 +587,13 @@ function PastDispatchRow({
       queryClient.invalidateQueries({
         queryKey: ['work-order-activity', dispatch.workOrderId],
       });
+      // Dispatch changes shift the resolved on-site/scheduled tech and can move
+      // the work order's scheduled/progress state — refresh the location
+      // detail's resolved-tech read plus the work-order list/card and detail
+      // caches. Prefix keys match every cached variant.
+      queryClient.invalidateQueries({ queryKey: ['location-tech'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
     },
     onError: (err: unknown) => {
       const msg =

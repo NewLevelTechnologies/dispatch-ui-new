@@ -176,6 +176,14 @@ export default function AssignTechnicianDialog({
     queryClient.invalidateQueries({
       queryKey: ['work-order-activity', workOrderId],
     });
+    // A dispatch change resolves "which tech matters" and can shift the work
+    // order's scheduled/progress state — refresh the location detail's
+    // resolved-tech read and the work-order list/card + detail caches so the
+    // Tech column, attention strip, and scheduled dates stay in sync. Prefix
+    // keys → matches every cached location / list variant.
+    queryClient.invalidateQueries({ queryKey: ['location-tech'] });
+    queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+    queryClient.invalidateQueries({ queryKey: ['work-orders'] });
     onClose();
   };
 
