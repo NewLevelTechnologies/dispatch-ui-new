@@ -877,6 +877,8 @@
     "common": {
       "logoAlt": "{{name}} logo",
       "contactPhone": " at {{phone}}",
+      "retry": "Try again",
+      "slowLoad": "Still loading — this is taking longer than usual.",
       "theSender": "the sender"
     },
     "cliff": {

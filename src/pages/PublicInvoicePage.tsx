@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -95,19 +96,61 @@ const PaymentMethodLabel = ({ method }: PaymentMethodProps) => {
   return <>{t(`public.invoice.paymentMethod.${method}`)}</>;
 };
 
+/**
+ * Loading screen for the public invoice. After ~5s with no result it
+ * surfaces a "taking longer than usual" note plus a manual retry, so a
+ * viewer who hits a hard network stall on mobile has an escape hatch
+ * instead of an indefinitely dead "Loading invoice…" screen.
+ */
+const InvoiceLoadingState = ({ onRetry }: { onRetry: () => void }) => {
+  const { t } = useTranslation();
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    const id = setTimeout(() => setSlow(true), 5000);
+    return () => clearTimeout(id);
+  }, []);
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-zinc-50 px-4 text-center">
+      <div className="text-zinc-500">{t('public.invoice.loading')}</div>
+      {slow && (
+        <>
+          <div className="text-sm text-zinc-400">{t('public.common.slowLoad')}</div>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="text-sm font-medium text-zinc-700 underline underline-offset-2 hover:text-zinc-900"
+          >
+            {t('public.common.retry')}
+          </button>
+        </>
+      )}
+    </div>
+  );
+};
+
 export default function PublicInvoicePage() {
   const { t } = useTranslation();
   const { token = '' } = useParams<{ token: string }>();
   useScopedReferrerPolicy();
 
-  const { data, isLoading, isError, error } = useQuery<
+  const { data, isLoading, isError, error, refetch } = useQuery<
     PublicInvoiceResponse,
     unknown
   >({
     queryKey: ['publicInvoice', token],
     queryFn: () => publicFinancialApi.getInvoiceByToken(token),
     enabled: !!token,
-    retry: false,
+    // Retry transient failures (flaky mobile networks / in-app email
+    // webviews stall the single request far more than desktop wifi). A
+    // real 404 means the token is revoked/expired — that's the cliff, so
+    // bail immediately rather than spinning through retries.
+    retry: (failureCount, err) => {
+      if (axios.isAxiosError(err) && err.response?.status === 404) return false;
+      return failureCount < 3;
+    },
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 
   if (!token) {
@@ -115,11 +158,7 @@ export default function PublicInvoicePage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
-        <div className="text-zinc-500">{t('public.invoice.loading')}</div>
-      </div>
-    );
+    return <InvoiceLoadingState onRetry={() => refetch()} />;
   }
 
   // 404 from the public endpoint (token not found / revoked / expired) is
